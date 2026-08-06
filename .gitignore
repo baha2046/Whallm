@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Build and package output
+dist/
+
+# Local configuration and model data
+.env
+.env.*
+!.env.example
+Makefile.env
+*.dsv4/
+*.dsv4.partial/
+plan.json
+scratch/

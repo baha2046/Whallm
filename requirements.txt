@@ -1,0 +1,6 @@
+mlx==0.32.0
+mlx-lm @ git+https://github.com/Blaizzy/mlx-lm@5c10538136b9038b9626c134612b08afc18d697a
+numpy==2.3.5
+sentencepiece==0.2.2
+tiktoken==0.13.0
+transformers==5.12.1
