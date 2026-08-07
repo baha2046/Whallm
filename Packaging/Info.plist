@@ -26,5 +26,17 @@
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>SUFeedURL</key>
+  <string>https://github.com/yanun0323/deepseek_ssd/releases/latest/download/appcast.xml</string>
+  <key>SUEnableAutomaticChecks</key>
+  <true/>
+  <key>SUAutomaticallyUpdate</key>
+  <true/>
+  <key>SUPublicEDKey</key>
+  <string>lIPzU9kiU95/mwDaKtaSjXUtoa6EMdSGm7STb93/k28=</string>
+  <key>SURequireSignedFeed</key>
+  <true/>
+  <key>SUVerifyUpdateBeforeExtraction</key>
+  <true/>
 </dict>
 </plist>

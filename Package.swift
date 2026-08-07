@@ -10,10 +10,18 @@ let package = Package(
     .executable(name: "dsv4-repack", targets: ["dsv4-repack"]),
     .executable(name: "dsv4-app", targets: ["DeepSeekV4SSDApp"]),
   ],
+  dependencies: [
+    .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2")
+  ],
   targets: [
     .target(name: "DeepSeekRepack"),
     .executableTarget(name: "dsv4-repack", dependencies: ["DeepSeekRepack"]),
-    .executableTarget(name: "DeepSeekV4SSDApp", dependencies: ["DeepSeekRepack"]),
+    .executableTarget(
+      name: "DeepSeekV4SSDApp",
+      dependencies: [
+        "DeepSeekRepack",
+        .product(name: "Sparkle", package: "Sparkle"),
+      ]),
     .testTarget(name: "DeepSeekRepackTests", dependencies: ["DeepSeekRepack"]),
     .testTarget(name: "DeepSeekV4SSDAppTests", dependencies: ["DeepSeekV4SSDApp"]),
   ]

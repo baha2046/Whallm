@@ -6,6 +6,7 @@ export
 MODEL ?= scratch/deepseek-v4-flash-0731.dsv4
 HOST ?= 127.0.0.1
 PORT ?= 8000
+SPARKLE_FRAMEWORK_PATH := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
 
 ARGS := $(word 2,$(MAKECMDGOALS))
 
@@ -27,11 +28,17 @@ build:
 
 ## test: run all Swift tests
 test:
+	mkdir -p .build/debug/PackageFrameworks
+	ln -sfn "$(SPARKLE_FRAMEWORK_PATH)/Sparkle.framework" .build/debug/PackageFrameworks/Sparkle.framework
 	swift test $(ARGS)
 
 ## package: build a distributable macOS app with Python and runtime
 package:
 	./Scripts/package-app.sh
+
+## release: sign, notarize, and publish a Sparkle update to GitHub Releases
+release:
+	./Scripts/release.sh
 
 ## server: start the OpenAI-compatible API server directly
 server:

@@ -6,6 +6,13 @@ python_executable=${PYTHON_EXECUTABLE:-$project_root/.venv/bin/python}
 output_root=$project_root/dist
 app_path=$output_root/DeepSeekV4SSD.app
 zip_path=$output_root/DeepSeekV4SSD-macOS-arm64.zip
+app_version=${APP_VERSION:-1.0.0}
+build_version=${BUILD_VERSION:-$app_version}
+
+if [[ $app_version != <->(|.<->)(|.<->) || $build_version != <->(|.<->)(|.<->) ]]; then
+  print -u2 "APP_VERSION and BUILD_VERSION must contain one to three numeric parts."
+  exit 1
+fi
 
 if [[ ! -x $python_executable ]]; then
   print -u2 "Python environment not found: $python_executable"
@@ -27,16 +34,26 @@ fi
 
 swift build --package-path "$project_root" -c release --product dsv4-app
 binary_path=$(swift build --package-path "$project_root" -c release --show-bin-path)/dsv4-app
+sparkle_framework=$project_root/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
+
+if [[ ! -d $sparkle_framework ]]; then
+  print -u2 "Sparkle framework not found: $sparkle_framework"
+  exit 1
+fi
 
 rm -rf "$app_path" "$zip_path"
 mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources/python" "$app_path/Contents/Frameworks"
 ditto "$binary_path" "$app_path/Contents/MacOS/dsv4-app"
 ditto "$project_root/Packaging/Info.plist" "$app_path/Contents/Info.plist"
+ditto "$sparkle_framework" "$app_path/Contents/Frameworks/Sparkle.framework"
 ditto "$project_root/runtime" "$app_path/Contents/Resources/runtime"
 ditto "$site_packages" "$app_path/Contents/Resources/python/site-packages"
 ditto "$python_framework" "$app_path/Contents/Frameworks/Python.framework"
 ditto "$python_binary" "$app_path/Contents/MacOS/python3"
 rm -f "$app_path/Contents/Frameworks/Python.framework/Versions/$python_version/lib/python$python_version/site-packages"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $app_version" "$app_path/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_version" "$app_path/Contents/Info.plist"
+install_name_tool -add_rpath "@executable_path/../Frameworks" "$app_path/Contents/MacOS/dsv4-app"
 
 rewrite_python_library() {
   local target=$1
@@ -107,11 +124,13 @@ if [[ $code_sign_identity != - ]]; then
   code_sign_arguments+=(--options runtime --timestamp)
   while IFS= read -r -d '' target; do
     if /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
-      codesign "${code_sign_arguments[@]}" "$target"
+      codesign "${code_sign_arguments[@]}" \
+        --preserve-metadata=identifier,entitlements,flags "$target"
     fi
   done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
   while IFS= read -r -d '' target; do
-    codesign "${code_sign_arguments[@]}" "$target"
+    codesign "${code_sign_arguments[@]}" \
+      --preserve-metadata=identifier,entitlements,flags "$target"
   done < <(
     /usr/bin/find "$app_path/Contents" -depth -type d \
       \( -name '*.app' -o -name '*.framework' -o -name '*.bundle' -o -name '*.xpc' \) \
@@ -128,7 +147,7 @@ PYTHONPATH="$app_path/Contents/Resources/runtime:$app_path/Contents/Resources/py
 PYTHONDONTWRITEBYTECODE=1 \
   "$app_path/Contents/MacOS/python3" -c 'import mlx, deepseek_v4_ssd.server'
 
-ditto -c -k --keepParent "$app_path" "$zip_path"
+ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 
 if [[ -n ${NOTARY_PROFILE:-} ]]; then
   if [[ $code_sign_identity == - ]]; then
@@ -138,7 +157,7 @@ if [[ -n ${NOTARY_PROFILE:-} ]]; then
   xcrun notarytool submit "$zip_path" --keychain-profile "$NOTARY_PROFILE" --wait
   xcrun stapler staple "$app_path"
   rm -f "$zip_path"
-  ditto -c -k --keepParent "$app_path" "$zip_path"
+  ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 fi
 
 print "App: $app_path"

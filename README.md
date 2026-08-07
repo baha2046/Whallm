@@ -144,6 +144,19 @@ Without this value, the command uses an ad hoc signature for local testing.
 Set `NOTARY_PROFILE` to a `notarytool` keychain profile to submit the signed App
 to Apple and staple the accepted ticket.
 
+The app uses Sparkle to check GitHub Releases for updates. Publish a signed and
+notarized update with a version that is higher than the previous release:
+
+```sh
+CODE_SIGN_IDENTITY="Developer ID Application: Yanun Yang (Y366CJ66L6)" \
+NOTARY_PROFILE=DeepSeekV4SSD \
+make release VERSION=1.0.0
+```
+
+This command uploads the app ZIP and signed `appcast.xml` to the matching GitHub
+Release. The Sparkle private key stays in the local macOS Keychain under the
+`deepseek_ssd` account.
+
 Use `make server` to start the server without the app. Set
 `DEEPSEEK_API_KEY=local-key` when a Bearer API key is needed.
 
@@ -155,7 +168,7 @@ parameters, security rules, and current limits.
 Run tests:
 
 ```sh
-swift test
+make test
 PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 ```
 
