@@ -38,18 +38,87 @@ ditto "$python_framework" "$app_path/Contents/Frameworks/Python.framework"
 ditto "$python_binary" "$app_path/Contents/MacOS/python3"
 rm -f "$app_path/Contents/Frameworks/Python.framework/Versions/$python_version/lib/python$python_version/site-packages"
 
-old_python_library=$(otool -L "$app_path/Contents/MacOS/python3" | sed -n '2{s/^[[:space:]]*//;s/ (.*$//;p;}')
-install_name_tool -change "$old_python_library" \
-  "@executable_path/../Frameworks/Python.framework/Versions/$python_version/Python" \
-  "$app_path/Contents/MacOS/python3"
+rewrite_python_library() {
+  local target=$1
+  local replacement=$2
+  local dependency
+  dependency=$(otool -L "$target" | tail -n +2 | sed -n \
+    '/Python\.framework\/Versions\//{s/^[[:space:]]*//;s/ (.*$//;p;q;}')
+  if [[ -z $dependency ]]; then
+    print -u2 "Python framework dependency not found: $target"
+    exit 1
+  fi
+  install_name_tool -change "$dependency" "$replacement" "$target"
+}
+
+framework_version_path="$app_path/Contents/Frameworks/Python.framework/Versions/$python_version"
+rewrite_python_library \
+  "$app_path/Contents/MacOS/python3" \
+  "@executable_path/../Frameworks/Python.framework/Versions/$python_version/Python"
+rewrite_python_library \
+  "$framework_version_path/bin/python$python_version" \
+  "@executable_path/../Python"
+rewrite_python_library \
+  "$framework_version_path/Resources/Python.app/Contents/MacOS/Python" \
+  "@executable_path/../../../../Python"
+install_name_tool -id \
+  "@rpath/Python.framework/Versions/$python_version/Python" \
+  "$framework_version_path/Python"
+
+library_path="$app_path/Contents/Frameworks/Libraries"
+mkdir -p "$library_path"
+while true; do
+  copied_library=false
+  while IFS= read -r -d '' target; do
+    if ! /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
+      continue
+    fi
+    while IFS= read -r dependency; do
+      [[ $dependency == /opt/homebrew/* ]] || continue
+      library_name=${dependency:t}
+      bundled_library="$library_path/$library_name"
+      if [[ ! -f $bundled_library ]]; then
+        dependency_source=$($python_executable -c \
+          'import os, sys; print(os.path.realpath(sys.argv[1]))' "$dependency")
+        ditto "$dependency_source" "$bundled_library"
+        copied_library=true
+      fi
+      loader_relative_path=$($python_executable -c \
+        'import os, sys; print(os.path.relpath(sys.argv[1], os.path.dirname(sys.argv[2])))' \
+        "$bundled_library" "$target")
+      install_name_tool -change "$dependency" \
+        "@loader_path/$loader_relative_path" "$target"
+    done < <(otool -L "$target" | tail -n +2 | sed \
+      's/^[[:space:]]*//;s/ (.*$//')
+  done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
+  [[ $copied_library == true ]] || break
+done
+for bundled_library in "$library_path"/*.dylib(N); do
+  install_name_tool -id "@rpath/${bundled_library:t}" "$bundled_library"
+done
 
 /usr/bin/find "$app_path" -type d -name __pycache__ -prune -exec rm -rf {} +
 /usr/bin/find "$app_path" -type f -name '*.pyc' -delete
+rm -rf "$app_path/Contents/Frameworks/Python.framework/Versions/$python_version/lib/python$python_version/test"
 
 code_sign_identity=${CODE_SIGN_IDENTITY:--}
-code_sign_arguments=(--force --deep --sign "$code_sign_identity")
+code_sign_arguments=(--force --sign "$code_sign_identity")
 if [[ $code_sign_identity != - ]]; then
   code_sign_arguments+=(--options runtime --timestamp)
+  while IFS= read -r -d '' target; do
+    if /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
+      codesign "${code_sign_arguments[@]}" "$target"
+    fi
+  done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
+  while IFS= read -r -d '' target; do
+    codesign "${code_sign_arguments[@]}" "$target"
+  done < <(
+    /usr/bin/find "$app_path/Contents" -depth -type d \
+      \( -name '*.app' -o -name '*.framework' -o -name '*.bundle' -o -name '*.xpc' \) \
+      -print0
+  )
+else
+  code_sign_arguments+=(--deep)
 fi
 codesign "${code_sign_arguments[@]}" "$app_path"
 codesign --verify --deep --strict "$app_path"
