@@ -12,10 +12,10 @@ struct DeepSeekV4SSDApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView(server: server)
-        .frame(minWidth: 820, minHeight: 620)
+        .frame(minWidth: 980, minHeight: 680)
         .onAppear { NSApplication.shared.activate() }
         .onDisappear { server.stop() }
     }
-    .defaultSize(width: 1_020, height: 760)
+    .defaultSize(width: 1_280, height: 800)
   }
 }

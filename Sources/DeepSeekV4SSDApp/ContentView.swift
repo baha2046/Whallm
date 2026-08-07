@@ -7,15 +7,12 @@ struct ContentView: View {
   @State private var configuration = ServerConfiguration.localDefault
 
   var body: some View {
-    TabView {
+    HSplitView {
+      ChatView(configuration: configuration, server: server)
+        .frame(minWidth: 560, idealWidth: 760, maxWidth: .infinity)
       ServerView(configuration: $configuration, server: server, modelLibrary: modelLibrary)
-        .tabItem { Label("Server", systemImage: "server.rack") }
-      if !modelLibrary.usableModels.isEmpty {
-        ChatView(configuration: configuration, server: server)
-          .tabItem { Label("測試對話", systemImage: "bubble.left.and.bubble.right") }
-      }
+        .frame(minWidth: 340, idealWidth: 390, maxWidth: 480)
     }
-    .padding(16)
     .task {
       await modelLibrary.scan()
       selectDetectedModel()
@@ -41,7 +38,6 @@ private struct ServerView: View {
   @Binding var configuration: ServerConfiguration
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
-  @State private var showsAdvancedSettings = false
   @State private var showsLog = false
   @State private var confirmsDownload = false
   @State private var confirmsRepair = false
@@ -50,8 +46,8 @@ private struct ServerView: View {
   @State private var reinstallTarget: URL?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      if selectedModel != nil { serverHeader }
+    VStack(alignment: .leading, spacing: 14) {
+      serverHeader
 
       if case .failed(let message) = server.state {
         Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -85,16 +81,9 @@ private struct ServerView: View {
             damagedModelsPanel
           }
 
-          if server.isActive || server.performance.hasStatus {
-            PerformancePanel(performance: server.performance)
-          }
-
           if selectedModel != nil {
-            DisclosureGroup("進階設定", isExpanded: $showsAdvancedSettings) {
-              advancedSettings
-                .padding(.top, 12)
-            }
-            .disabled(server.isActive)
+            advancedSettings
+              .disabled(server.isActive)
 
             DisclosureGroup("Server 日誌", isExpanded: $showsLog) {
               ScrollView {
@@ -112,9 +101,11 @@ private struct ServerView: View {
             }
           }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
       }
     }
+    .padding(18)
+    .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
     .confirmationDialog(
       "下載並安裝模型？",
       isPresented: $confirmsDownload,
@@ -359,47 +350,62 @@ private struct ServerView: View {
   }
 
   private var advancedSettings: some View {
-    Form {
-      Section("API server") {
-        LabeledContent("Host") {
-          TextField("127.0.0.1", text: $configuration.host)
-            .textFieldStyle(.roundedBorder)
+    VStack(alignment: .leading, spacing: 18) {
+      Text("Server")
+        .font(.headline)
+      GroupBox {
+        VStack(spacing: 12) {
+          LabeledContent("Host") {
+            TextField("127.0.0.1", text: $configuration.host)
+              .textFieldStyle(.roundedBorder)
+          }
+          LabeledContent("Port") {
+            TextField("8000", value: $configuration.port, format: .number.grouping(.never))
+              .textFieldStyle(.roundedBorder)
+              .frame(width: 100)
+          }
+          LabeledContent("API key") {
+            SecureField("本機使用時可留空", text: $configuration.apiKey)
+              .textFieldStyle(.roundedBorder)
+          }
+          LabeledContent("Model ID") {
+            TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
+              .textFieldStyle(.roundedBorder)
+          }
         }
-        LabeledContent("Port") {
-          TextField("8000", value: $configuration.port, format: .number.grouping(.never))
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 100)
-        }
-        LabeledContent("API key") {
-          SecureField("本機使用時可留空", text: $configuration.apiKey)
-            .textFieldStyle(.roundedBorder)
-        }
-        LabeledContent("Model ID") {
-          TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
-            .textFieldStyle(.roundedBorder)
-        }
+        .padding(6)
       }
 
-      Section("Runtime") {
-        integerField(
-          "Slots", hint: "Active Parameters Cache 的 routed expert 數量。推薦值是 1024。",
-          value: $configuration.slots)
-        integerField(
-          "Read workers", hint: "同時讀取 expert blob 的工作數量。推薦值是 4。", value: $configuration.readWorkers)
-        integerField(
-          "Prefill step size", hint: "每次處理的 prompt token 數量。推薦值是 32。",
-          value: $configuration.prefillStepSize)
-        Toggle("使用 BF16 KV cache", isOn: $configuration.bf16KVCache)
+      Text("Runtime")
+        .font(.headline)
+      GroupBox {
+        VStack(spacing: 12) {
+          integerField(
+            "Slots", hint: "Active Parameters Cache 的 routed expert 數量。推薦值是 1024。",
+            value: $configuration.slots)
+          integerField(
+            "Read workers", hint: "同時讀取 expert blob 的工作數量。推薦值是 4。",
+            value: $configuration.readWorkers)
+          integerField(
+            "Prefill step size", hint: "每次處理的 prompt token 數量。推薦值是 128。",
+            value: $configuration.prefillStepSize)
+          Toggle("使用 BF16 KV cache", isOn: $configuration.bf16KVCache)
+        }
+        .padding(6)
       }
 
-      Section("生成") {
-        integerField(
-          "Max tokens", hint: "每次 request 的預設 token 上限。", value: $configuration.defaultMaxTokens)
-        doubleField("Temperature", hint: "0 會產生穩定結果。", value: $configuration.defaultTemperature)
-        doubleField("Top P", hint: "推薦值是 1。", value: $configuration.defaultTopP)
+      Text("生成")
+        .font(.headline)
+      GroupBox {
+        VStack(spacing: 12) {
+          integerField(
+            "Max tokens", hint: "每次 request 的預設 token 上限。", value: $configuration.defaultMaxTokens)
+          doubleField("Temperature", hint: "0 會產生穩定結果。", value: $configuration.defaultTemperature)
+          doubleField("Top P", hint: "推薦值是 1。", value: $configuration.defaultTopP)
+        }
+        .padding(6)
       }
     }
-    .formStyle(.grouped)
   }
 
   private var selectedModel: InstalledModelInfo? {
@@ -482,45 +488,67 @@ private struct ServerView: View {
 }
 
 private struct PerformancePanel: View {
+  let model: String
+  let state: ServerController.State
   let performance: LivePerformance
 
   var body: some View {
-    HStack(spacing: 12) {
-      MetricCard(
-        title: "Token 生成速度",
+    HStack(spacing: 18) {
+      HStack(spacing: 9) {
+        Circle()
+          .fill(statusColor)
+          .frame(width: 9, height: 9)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(model)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+          Text(state.label)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+      .accessibilityElement(children: .combine)
+
+      Spacer(minLength: 8)
+
+      MetricValue(
+        title: "TOK/S",
         value: performance.hasStatus
-          ? "\(performance.tokensPerSecond.formatted(.number.precision(.fractionLength(2)))) token/sec"
-          : "—",
-        detail: performance.hasStatus
-          ? (performance.generating ? "正在生成" : "最近一次生成") : "尚無資料",
-        systemImage: "gauge.with.dots.needle.67percent"
+          ? performance.tokensPerSecond.formatted(.number.precision(.fractionLength(1))) : "—"
       )
-      MetricCard(
-        title: "記憶體使用量",
-        value: performance.memoryBytes > 0 ? formattedBytes(performance.memoryBytes) : "—",
-        detail: "Python server 目前常駐的記憶體",
-        systemImage: "memorychip"
+      MetricValue(
+        title: "TOKENS",
+        value: performance.hasStatus ? performance.generationTokens.formatted() : "—"
       )
-      MetricCard(
-        title: "SSD 讀取速度",
-        value: performance.hasStatus
-          ? "\(formattedBytes(UInt64(max(0, performance.ssdBytesPerSecond))))/s"
-          : "—",
-        detail: "最近一秒的 expert blob 讀取量",
-        systemImage: "externaldrive"
+      MetricValue(
+        title: "MEMORY",
+        value: performance.memoryBytes > 0 ? formattedBytes(performance.memoryBytes) : "—"
       )
-      MetricCard(
-        title: "Active Parameters Cache",
+      MetricValue(
+        title: "CACHE",
         value: performance.hasStatus
           ? performance.cacheHitRate.formatted(.percent.precision(.fractionLength(1)))
-          : "—",
-        detail: performance.hasStatus
-          ? "\(performance.cacheResidentSlots) / \(performance.cacheCapacitySlots) slots"
-          : "尚無資料",
-        systemImage: "shippingbox"
+          : "—"
       )
     }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+    .overlay(
+      RoundedRectangle(cornerRadius: 16)
+        .stroke(Color.primary.opacity(0.06))
+    )
     .accessibilityElement(children: .contain)
+  }
+
+  private var statusColor: Color {
+    switch state {
+    case .running: .green
+    case .failed: .red
+    case .starting, .stopping: .orange
+    case .stopped: .secondary
+    }
   }
 
   private func formattedBytes(_ bytes: UInt64) -> String {
@@ -528,35 +556,24 @@ private struct PerformancePanel: View {
   }
 }
 
-private struct MetricCard: View {
+private struct MetricValue: View {
   let title: String
   let value: String
-  let detail: String
-  let systemImage: String
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Label(title, systemImage: systemImage)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .minimumScaleFactor(0.8)
+    VStack(alignment: .trailing, spacing: 2) {
       Text(value)
-        .font(.title3.bold())
+        .font(.subheadline.weight(.semibold))
         .monospacedDigit()
         .lineLimit(1)
-        .minimumScaleFactor(0.75)
-      Text(detail)
-        .font(.caption2)
+      Text(title)
+        .font(.caption2.weight(.medium))
         .foregroundStyle(.secondary)
         .lineLimit(1)
-        .minimumScaleFactor(0.8)
     }
-    .padding(12)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+    .frame(minWidth: 54, alignment: .trailing)
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("\(title)：\(value)。\(detail)")
+    .accessibilityLabel("\(title)：\(value)")
   }
 }
 
@@ -589,40 +606,35 @@ private struct ChatView: View {
   @State private var messages: [ChatMessage] = []
   @State private var input = ""
   @State private var thinkingMode = "chat"
+  @State private var enableTestTool = false
   @State private var isSending = false
   @State private var errorMessage: String?
   @State private var lastMetrics: ChatMetrics?
   @State private var showingClearConfirmation = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack {
-        VStack(alignment: .leading, spacing: 2) {
-          Text("測試對話").font(.title2.bold())
-          Text("這個畫面只用來確認本機 server 可以回應。")
-            .foregroundStyle(.secondary)
-        }
+    VStack(alignment: .leading, spacing: 14) {
+      PerformancePanel(
+        model: configuration.publicModel,
+        state: server.state,
+        performance: server.performance
+      )
+
+      HStack(spacing: 12) {
+        Text("對話")
+          .font(.title2.bold())
         Spacer()
-        Button {
-          showingClearConfirmation = true
-        } label: {
-          Label("清空對話", systemImage: "trash")
-        }
-        .disabled(messages.isEmpty || isSending)
         Picker("Thinking mode", selection: $thinkingMode) {
           Text("Chat").tag("chat")
           Text("Thinking").tag("thinking")
         }
         .pickerStyle(.segmented)
         .frame(width: 220)
-        if let lastMetrics {
-          Label(
-            "\(lastMetrics.tokensPerSecond.formatted(.number.precision(.fractionLength(2)))) token/sec",
-            systemImage: "gauge.with.dots.needle.67percent"
-          )
-          .monospacedDigit()
-          .help("\(lastMetrics.completionTokens) completion tokens")
-        }
+        Toggle("啟用 Tool call 測試", isOn: $enableTestTool)
+          .toggleStyle(.switch)
+          .disabled(isSending)
+          .help("模型可以呼叫 get_current_time。App 只顯示呼叫內容，不會執行 Tool。")
+          .accessibilityHint("App 只顯示 get_current_time 呼叫內容，不會執行 Tool。")
       }
 
       GroupBox {
@@ -655,7 +667,28 @@ private struct ChatView: View {
                     if !message.content.isEmpty {
                       Text(message.content)
                         .textSelection(.enabled)
-                    } else if message.role == "assistant" && message.reasoningContent.isEmpty {
+                    }
+                    ForEach(message.toolCalls) { toolCall in
+                      GroupBox("Tool call") {
+                        VStack(alignment: .leading, spacing: 8) {
+                          LabeledContent("Function", value: toolCall.function.name)
+                          VStack(alignment: .leading, spacing: 3) {
+                            Text("Arguments")
+                              .foregroundStyle(.secondary)
+                            Text(toolCall.function.arguments)
+                              .font(.system(.body, design: .monospaced))
+                              .textSelection(.enabled)
+                          }
+                          Text("App 不會執行這個 Tool。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                      }
+                    }
+                    if message.role == "assistant" && message.content.isEmpty
+                      && message.reasoningContent.isEmpty && message.toolCalls.isEmpty
+                    {
                       ProgressView("正在生成")
                         .controlSize(.small)
                     }
@@ -687,37 +720,66 @@ private struct ChatView: View {
           .accessibilityLabel("錯誤：\(errorMessage)")
       }
 
-      HStack(alignment: .bottom, spacing: 12) {
-        TextEditor(text: $input)
-          .font(.body)
-          .frame(minHeight: 72, maxHeight: 140)
-          .overlay(
-            RoundedRectangle(cornerRadius: 8)
-              .stroke(Color.secondary.opacity(0.35))
-          )
-          .accessibilityLabel("測試訊息")
-        Button {
-          send()
-        } label: {
-          if isSending {
-            ProgressView().controlSize(.small)
-          } else {
-            Label("送出訊息", systemImage: "paperplane.fill")
+      VStack(alignment: .leading, spacing: 10) {
+        ZStack(alignment: .topLeading) {
+          if input.isEmpty {
+            Text("輸入訊息…")
+              .foregroundStyle(.tertiary)
+              .padding(.horizontal, 5)
+              .padding(.vertical, 8)
+              .allowsHitTesting(false)
           }
+          TextEditor(text: $input)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 74, maxHeight: 140)
+            .accessibilityLabel("測試訊息")
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(isSending || server.state != .running)
-        .keyboardShortcut(.return, modifiers: .command)
-      }
 
-      if server.state != .running {
-        Text("請先在 Server 畫面啟動 server。")
-          .font(.caption)
-          .foregroundStyle(.secondary)
+        HStack(spacing: 10) {
+          if server.state != .running {
+            Label("請先啟動 server", systemImage: "server.rack")
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          } else if let lastMetrics {
+            Text(
+              "\(lastMetrics.completionTokens) tokens · \(lastMetrics.tokensPerSecond.formatted(.number.precision(.fractionLength(1)))) tok/s"
+            )
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+          }
+          Spacer()
+          Button {
+            showingClearConfirmation = true
+          } label: {
+            Label("清空對話", systemImage: "trash")
+          }
+          .disabled(messages.isEmpty || isSending)
+          Button {
+            send()
+          } label: {
+            if isSending {
+              ProgressView()
+                .controlSize(.small)
+                .frame(minWidth: 72)
+            } else {
+              Label("生成", systemImage: "arrow.up")
+            }
+          }
+          .buttonStyle(.borderedProminent)
+          .controlSize(.large)
+          .disabled(isSending || server.state != .running)
+          .keyboardShortcut(.return, modifiers: .command)
+        }
       }
+      .padding(12)
+      .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+      .overlay(
+        RoundedRectangle(cornerRadius: 16)
+          .stroke(Color.primary.opacity(0.06))
+      )
     }
-    .padding(4)
+    .padding(18)
     .confirmationDialog(
       "要清空測試對話嗎？",
       isPresented: $showingClearConfirmation,
@@ -738,6 +800,9 @@ private struct ChatView: View {
   private var streamedCharacterCount: Int {
     guard let message = messages.last else { return 0 }
     return message.content.count + message.reasoningContent.count
+      + message.toolCalls.reduce(0) {
+        $0 + $1.function.name.count + $1.function.arguments.count
+      }
   }
 
   private func send() {
@@ -759,7 +824,8 @@ private struct ChatView: View {
           baseURL: baseURL,
           apiKey: configuration.apiKey,
           model: configuration.publicModel,
-          thinkingMode: thinkingMode
+          thinkingMode: thinkingMode,
+          enableTestTool: enableTestTool
         ) { delta in
           guard let index = messages.firstIndex(where: { $0.id == assistantID }) else { return }
           messages[index].append(delta)
@@ -767,7 +833,8 @@ private struct ChatView: View {
       } catch {
         if let index = messages.firstIndex(where: { $0.id == assistantID }),
           messages[index].content.isEmpty,
-          messages[index].reasoningContent.isEmpty
+          messages[index].reasoningContent.isEmpty,
+          messages[index].toolCalls.isEmpty
         {
           messages.remove(at: index)
         }

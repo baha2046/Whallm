@@ -14,6 +14,29 @@ final class ChatStreamDecoderTests: XCTestCase {
         line: #"data: {"choices":[{"delta":{"content":"Hello"}}]}"#),
       .delta(ChatDelta(content: "Hello", reasoningContent: ""))
     )
+    let toolCall = ChatToolCall(
+      id: "call_1",
+      type: "function",
+      function: .init(
+        name: "get_current_time",
+        arguments: #"{"time_zone":"Asia/Taipei"}"#
+      )
+    )
+    let toolDelta = ChatToolCallDelta(
+      index: 0,
+      id: "call_1",
+      type: "function",
+      function: .init(
+        name: "get_current_time",
+        arguments: #"{"time_zone":"Asia/Taipei"}"#
+      )
+    )
+    XCTAssertEqual(
+      try ChatStreamDecoder.decode(
+        line: #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_current_time","arguments":"{\"time_zone\":\"Asia/Taipei\"}"}}]}}]}"#
+      ),
+      .delta(ChatDelta(content: "", reasoningContent: "", toolCalls: [toolDelta]))
+    )
     XCTAssertEqual(
       try ChatStreamDecoder.decode(
         line: #"data: {"choices":[],"usage":{"completion_tokens":12}}"#),
@@ -31,6 +54,7 @@ final class ChatStreamDecoderTests: XCTestCase {
       #"data: {"choices":[{"delta":{"reasoning_content":"p"}}]}"#,
       #"data: {"choices":[{"delta":{"reasoning_content":"lan"}}]}"#,
       #"data: {"choices":[{"delta":{"content":"Hello"}}]}"#,
+      #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_current_time","arguments":"{\"time_zone\":\"Asia/Taipei\"}"}}]}}]}"#,
     ] {
       if case .delta(let delta) = try ChatStreamDecoder.decode(line: line) {
         message.append(delta)
@@ -38,5 +62,24 @@ final class ChatStreamDecoderTests: XCTestCase {
     }
     XCTAssertEqual(message.reasoningContent, "plan")
     XCTAssertEqual(message.content, "Hello")
+    XCTAssertEqual(message.toolCalls, [toolCall])
+
+    XCTAssertThrowsError(
+      try ChatStreamDecoder.decode(
+        line: #"data: {"error":{"message":"Tool call 格式無效。"}}"#
+      )
+    ) { error in
+      XCTAssertEqual(error.localizedDescription, "Tool call 格式無效。")
+    }
+
+    if case .delta(let delta) = try ChatStreamDecoder.decode(
+      line: #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Tai"}}]}}]}"#
+    ) {
+      message.append(delta)
+    }
+    XCTAssertEqual(
+      message.toolCalls[0].function.arguments,
+      #"{"time_zone":"Asia/Taipei"}Tai"#
+    )
   }
 }

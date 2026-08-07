@@ -106,7 +106,7 @@ struct ServerConfiguration {
       publicModel: "deepseek-v4-flash-0731",
       slots: 1_024,
       readWorkers: 4,
-      prefillStepSize: 32,
+      prefillStepSize: 128,
       bf16KVCache: false,
       defaultMaxTokens: 32,
       defaultTemperature: 0,

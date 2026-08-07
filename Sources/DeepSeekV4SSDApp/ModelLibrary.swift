@@ -55,6 +55,14 @@ enum InstalledModelDiscovery {
   static func inspect(_ root: URL) -> InstalledModelInfo? {
     let root = root.standardizedFileURL.resolvingSymlinksInPath()
     guard let manifest = try? InstalledModel.loadManifest(at: root) else { return nil }
+    let paths = Set(manifest.files.map(\.path))
+    let requiredPaths = [
+      "common.bin",
+      "config.json",
+      "encoding/encoding_dsv4.py",
+      "tokenizer/tokenizer.json",
+    ]
+    guard requiredPaths.allSatisfy(paths.contains) else { return nil }
     let expectedLayerSize = UInt64(manifest.expertCount) * manifest.expertBlobSize
     var totalSize: UInt64 = 0
     var issues: [InstalledFileIssue] = []
