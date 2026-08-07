@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct DeepSeekV4SSDApp: App {
   @StateObject private var server = ServerController()
+  @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
   private let updaterController: SPUStandardUpdaterController
 
   init() {
@@ -18,18 +19,26 @@ struct DeepSeekV4SSDApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView(server: server)
-        .frame(minWidth: 980, minHeight: 680)
+        .font(.body)
+        .dynamicTypeSize(.xLarge ... .accessibility5)
+        .controlSize(.large)
+        .frame(minWidth: 1_180, minHeight: 760)
+        .environment(\.locale, selectedLanguage.locale)
         .onAppear { NSApplication.shared.activate() }
         .onDisappear { server.stop() }
     }
-    .defaultSize(width: 1_280, height: 800)
+    .defaultSize(width: 1_440, height: 900)
     .commands {
       CommandGroup(after: .appInfo) {
-        Button("檢查更新…") {
+        Button(L10n.string("Check for Updates…")) {
           updaterController.checkForUpdates(nil)
         }
         .disabled(!updaterController.updater.canCheckForUpdates)
       }
     }
+  }
+
+  private var selectedLanguage: AppLanguage {
+    AppLanguage(rawValue: languageCode) ?? .appDefault
   }
 }

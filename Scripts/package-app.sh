@@ -34,8 +34,13 @@ fi
 
 swift build --package-path "$project_root" -c release --product dsv4-app
 binary_path=$(swift build --package-path "$project_root" -c release --show-bin-path)/dsv4-app
+resource_bundle=${binary_path:h}/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle
 sparkle_framework=$project_root/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
 
+if [[ ! -d $resource_bundle ]]; then
+  print -u2 "App resource bundle not found: $resource_bundle"
+  exit 1
+fi
 if [[ ! -d $sparkle_framework ]]; then
   print -u2 "Sparkle framework not found: $sparkle_framework"
   exit 1
@@ -46,7 +51,11 @@ mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources/python" "$app_
 ditto "$binary_path" "$app_path/Contents/MacOS/dsv4-app"
 ditto "$project_root/Packaging/Info.plist" "$app_path/Contents/Info.plist"
 ditto "$sparkle_framework" "$app_path/Contents/Frameworks/Sparkle.framework"
+ditto "$resource_bundle" "$app_path/Contents/Resources/${resource_bundle:t}"
 ditto "$project_root/runtime" "$app_path/Contents/Resources/runtime"
+for localization in "$project_root/Sources/DeepSeekV4SSDApp/Resources"/*.lproj; do
+  ditto "$localization" "$app_path/Contents/Resources/${localization:t}"
+done
 ditto "$site_packages" "$app_path/Contents/Resources/python/site-packages"
 ditto "$python_framework" "$app_path/Contents/Frameworks/Python.framework"
 ditto "$python_binary" "$app_path/Contents/MacOS/python3"
@@ -122,23 +131,21 @@ code_sign_identity=${CODE_SIGN_IDENTITY:--}
 code_sign_arguments=(--force --sign "$code_sign_identity")
 if [[ $code_sign_identity != - ]]; then
   code_sign_arguments+=(--options runtime --timestamp)
-  while IFS= read -r -d '' target; do
-    if /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
-      codesign "${code_sign_arguments[@]}" \
-        --preserve-metadata=identifier,entitlements,flags "$target"
-    fi
-  done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
-  while IFS= read -r -d '' target; do
+fi
+while IFS= read -r -d '' target; do
+  if /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
     codesign "${code_sign_arguments[@]}" \
       --preserve-metadata=identifier,entitlements,flags "$target"
-  done < <(
-    /usr/bin/find "$app_path/Contents" -depth -type d \
-      \( -name '*.app' -o -name '*.framework' -o -name '*.bundle' -o -name '*.xpc' \) \
-      -print0
-  )
-else
-  code_sign_arguments+=(--deep)
-fi
+  fi
+done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
+while IFS= read -r -d '' target; do
+  codesign "${code_sign_arguments[@]}" \
+    --preserve-metadata=identifier,entitlements,flags "$target"
+done < <(
+  /usr/bin/find "$app_path/Contents" -depth -type d \
+    \( -name '*.app' -o -name '*.framework' -o -name '*.bundle' -o -name '*.xpc' \) \
+    -print0
+)
 codesign "${code_sign_arguments[@]}" "$app_path"
 codesign --verify --deep --strict "$app_path"
 

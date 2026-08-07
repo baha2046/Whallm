@@ -12,8 +12,12 @@ The first low-risk changes from this report are now active:
 - The runtime evaluates the generation cache after each output token. This
   limits the Metal resource growth reported by MLX-LM issue 1332.
 - The CLI and `GET /api/status` return the new measurements.
-- The runtime reuses one in-memory prompt prefix when the next request fully
-  continues the previous token sequence.
+- The runtime keeps up to two in-memory prompt cache timelines. It moves a
+  matching timeline forward when the next request continues that token prefix.
+- Long prompts use layer-major prefill. This keeps one layer's routed experts
+  resident while the runtime processes its token chunks.
+- Automatic prefill selects 128, 256, or 512 tokens from the uncached prompt
+  length.
 - Single-token decode runs each selected routed expert directly. Multi-token
   prefill groups token routes by expert. Neither path builds stacked weights.
 - MXFP8 sparse attention selects packed top-k rows before dequantization. It
@@ -129,7 +133,9 @@ The checked MLX-LM revision is `254d153fdeb6f150edd4fc5a54f9828638481fa8`, dated
 - The official encoder supports `reasoning_effort` values `low`, `high`, and `max`, tool definitions, tool calls, tool results, and structured `response_format` instructions ([official encoding guide](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/README.md), [official encoding code](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/encoding_dsv4.py)). The runtime now loads this pinned official encoder from the installed model. The API supports text messages, Tool definitions, Tool calls, Tool results, and `chat` or `thinking` mode. It does not yet expose `reasoning_effort` or `response_format` ([local Tool codec](../runtime/deepseek_v4_ssd/tool_codec.py)).
 - The 8K MXFP8 run took 264.1 seconds. Routed expert reads used about 34 seconds and read 1,340.2 GB. The recorded hit rate was 57.2 percent ([validation record](VALIDATION.md#end-to-end-measurements), [DSpark decision](VALIDATION.md#dspark-decision)).
 - Multi-token prefill slices and stacks expert regions, then uses compact stack indices for three routed MXFP4 matrix multiplications. Single-token decode now runs the six experts directly without stacked weight buffers ([expert pool](../runtime/deepseek_v4_ssd/expert_cache.py), [routed execution](../runtime/deepseek_v4_ssd/model.py)).
-- The runtime keeps one in-memory generation cache. It reuses the cache only when the next prompt fully continues the cached token sequence. A mismatch creates a new cache ([generation path](../runtime/deepseek_v4_ssd/generation.py)).
+- The runtime keeps up to two in-memory prompt cache timelines within an 8 GiB
+  default limit. It reuses the longest complete token prefix. A mismatch creates
+  a new cache timeline ([generation path](../runtime/deepseek_v4_ssd/generation.py)).
 - The custom MXFP8 pooling cache becomes non-trimmable after it stores compressed entries ([local cache](../runtime/deepseek_v4_ssd/fp8_cache.py#L217-L218)). Generic MLX-LM speculative decoding needs cache rollback after rejected draft tokens, so it cannot be connected to this cache without a new trim or checkpoint-and-restore operation.
 - An MLX-LM issue reports unbounded Metal-resource growth during long DeepSeek-V4 decode on the same experimental model branch. The reported workaround evaluates cache state every decode step ([MLX-LM issue 1332](https://github.com/ml-explore/mlx-lm/issues/1332)). This runtime now applies that workaround. It has not validated a 12K-token decode.
 
@@ -162,8 +168,9 @@ The order below uses expected value and implementation risk. Expected gains are 
 | P0 | Add phase timers | Required before more optimization. |
 | P0 | Run a 12K-token decode stability test | Confirm or fix cache-state growth before claiming long output support. |
 | Done | Remove expert stack creation | Complete for decode and prefill. |
-| Done | Group prefill work by expert and tune chunk size | Grouping and the 128-token default are active. |
-| Done | Add prefix-cache reuse | One continued-chat prefix is reused in memory. It does not improve steady decode. |
+| Done | Group prefill work by expert and tune chunk size | Grouping and automatic 128, 256, or 512-token chunks are active. |
+| Done | Add layer-major prefill | Prompts with at least 4K uncached tokens keep one layer's experts resident. |
+| Done | Add prefix-cache reuse | Two continued-chat timelines are retained within a memory limit. |
 | Done | Remove repeated layer scans during expert eviction | One global LFU heap keeps the per-layer reserve. |
 | Partial | Fuse sparse attention and quantized cache reads | Packed top-k selection and packed index scoring are complete. Full kernel fusion remains. |
 | P3 | Test an FP4 indexer cache | Keep only after top-k and output validation pass. |
@@ -183,7 +190,10 @@ Single-token decode keeps its smaller direct path. It does not pay the grouping 
 
 ### 3. Tune prefill chunk size with phase metrics
 
-Test at least 16, 32, 64, and 128 tokens. Larger chunks reduce the number of complete 43-layer model calls and routing synchronizations. Larger chunks can also increase the number of unique experts, temporary memory, and cache churn. MLX-LM processes one model call per prefill step ([MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L298-L436)). The local comparison selected 128 tokens as the new default ([runtime configuration](../runtime/deepseek_v4_ssd/model.py#L19-L25)).
+The local comparison now covers 128, 256, and 512 tokens. The runtime uses 128
+below 1K uncached tokens, 256 below 4K, and 512 from 4K onward. Layer-major
+prefill reduced the 8K test from 47.04 to 38.20 seconds at a 512-token step
+([validation record](VALIDATION.md#layer-major-prefill-measurements)).
 
 Select the chunk size from total prompt time, peak memory, expert bytes read, stack time, routing synchronization, and cache hit rate.
 
@@ -197,7 +207,9 @@ This matches the official model's cache-and-kernel co-design. DeepSeek states th
 
 ### 5. Add prefix-cache reuse
 
-The runtime now reuses one in-memory prompt cache for a continued chat. A token-prefix check prevents reuse after a branch or unrelated request ([local generation path](../runtime/deepseek_v4_ssd/generation.py)). MLX-LM supports an explicit prompt cache ([MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L298-L436)). DeepSeek's official design stores compressed entries and recomputes incomplete tails when it reuses a disk prefix ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S3.SS5.SSS2)).
+The runtime now keeps two in-memory prompt cache timelines. A token-prefix check
+selects the longest matching timeline. An optional warmup prompt prepares one
+fixed prefix before the server accepts requests ([local generation path](../runtime/deepseek_v4_ssd/generation.py)). MLX-LM supports an explicit prompt cache ([MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L298-L436)). DeepSeek's official design stores compressed entries and recomputes incomplete tails when it reuses a disk prefix ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S3.SS5.SSS2)).
 
 This change improves time to first token for repeated prefixes. It does not improve steady one-token decode.
 

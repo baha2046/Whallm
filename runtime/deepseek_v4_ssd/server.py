@@ -19,7 +19,7 @@ from .model import RuntimeConfig
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
 MAX_REQUEST_BYTES = 1_048_576
-MAX_GENERATION_TOKENS = 32_768
+MAX_GENERATION_TOKENS = 272_000
 PUBLIC_MODEL = "deepseek-v4-flash-0731"
 
 
@@ -52,9 +52,9 @@ class APIError(Exception):
 
 @dataclass(frozen=True)
 class ServerDefaults:
-    max_tokens: int = 32
-    temperature: float = 0.0
-    top_p: float = 1.0
+    max_tokens: int = 272_000
+    temperature: float = 0.2
+    top_p: float = 0.98
 
 
 class GenerationMetrics:
@@ -70,14 +70,17 @@ class GenerationMetrics:
             self._generating = True
             self._tokens = 0
             self._tokens_per_second = 0.0
-            self._first_token_at = time.perf_counter()
+            self._first_token_at = 0.0
 
     def record(self, tokens: int) -> None:
         now = time.perf_counter()
         with self._lock:
             self._tokens = tokens
+            if tokens == 1 or self._first_token_at == 0:
+                self._first_token_at = now
+                return
             elapsed = now - self._first_token_at
-            if tokens > 1 and elapsed > 0:
+            if elapsed > 0:
                 self._tokens_per_second = (tokens - 1) / elapsed
 
     def finish(self) -> None:
@@ -115,17 +118,13 @@ class OpenAIServer(ThreadingHTTPServer):
         super().__init__(address, OpenAIHandler)
 
     def track(self, pieces: Iterator[GeneratedPiece]) -> Iterator[GeneratedPiece]:
-        started = False
+        self.metrics.start()
         try:
             for piece in pieces:
-                if not started:
-                    self.metrics.start()
-                    started = True
                 self.metrics.record(piece.generation_tokens)
                 yield piece
         finally:
-            if started:
-                self.metrics.finish()
+            self.metrics.finish()
 
 
 class ReasoningParser:
@@ -372,7 +371,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             request["max_tokens"] = request["max_output_tokens"]
         options, stream = self._common(request)
         messages = _response_messages(payload)
-        tools, tool_choice = _response_tool_request(payload)
+        tools, tool_choice, response_tools = _response_tool_request(payload)
         thinking_mode = _response_thinking_mode(payload)
         _validate_response_request(payload)
         prompt = self.app.runtime.encode_chat(
@@ -392,6 +391,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 options,
                 thinking_mode,
                 tool_calling,
+                response_tools,
             )
             return
 
@@ -411,7 +411,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 turn.reasoning_content,
                 include_empty=False,
             )
-            output.extend(_response_function_calls(turn.tool_calls))
+            output.extend(_response_function_calls(turn.tool_calls, response_tools))
         else:
             text, reasoning, prompt_tokens, generated, _ = _collect(
                 pieces,
@@ -436,6 +436,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         options: GenerationOptions,
         thinking_mode: str,
         tool_calling: bool,
+        response_tools: dict[str, dict[str, str]],
     ) -> None:
         self._start_sse()
         output: list[dict[str, Any]] = []
@@ -581,14 +582,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             if delta.tool_name is not None and delta.tool_index not in calls:
                 finish_reasoning()
                 finish_message()
-                item = {
-                    "id": "fc_" + uuid.uuid4().hex,
-                    "call_id": "call_" + uuid.uuid4().hex,
-                    "type": "function_call",
-                    "name": delta.tool_name,
-                    "arguments": "",
-                    "status": "in_progress",
-                }
+                item = _response_tool_call(
+                    delta.tool_name,
+                    "",
+                    response_tools,
+                    status="in_progress",
+                )
                 output_index = len(output)
                 output.append(item)
                 calls[delta.tool_index] = (output_index, item)
@@ -997,7 +996,25 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "runtime": {
                 "slots": config.slots,
                 "read_workers": config.read_workers,
+                "prefetch_read_workers": getattr(
+                    config, "prefetch_read_workers", 1
+                ),
                 "prefill_step_size": config.prefill_step_size,
+                "moe_prefill_step_size": getattr(
+                    config, "moe_prefill_step_size", 0
+                ),
+                "layer_major_prefill": getattr(config, "layer_major_prefill", False),
+                "batched_expert_prefill": getattr(
+                    config, "batched_expert_prefill", False
+                ),
+                "prompt_cache_entries": getattr(config, "prompt_cache_entries", 1),
+                "prompt_cache_memory_gib": getattr(
+                    config, "prompt_cache_memory_gib", 0
+                ),
+                "persistent_prompt_cache": getattr(
+                    config, "persistent_prompt_cache", False
+                ),
+                "fp4_index_cache": getattr(config, "fp4_index_cache", False),
                 "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
             },
             "performance": {
@@ -1160,10 +1177,14 @@ def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if item_type == "function_call":
             call_id = raw.get("call_id")
             name = raw.get("name")
+            namespace = raw.get("namespace")
             arguments = raw.get("arguments")
             if not isinstance(call_id, str) or not call_id:
                 raise APIError("call_id must be a non-empty string.", param=f"{param}.call_id")
             _validate_function_name(name, f"{param}.name")
+            if namespace is not None:
+                _validate_function_name(namespace, f"{param}.namespace")
+            name = _response_internal_tool_name(name, namespace)
             if not isinstance(arguments, str):
                 raise APIError("arguments must be a JSON string.", param=f"{param}.arguments")
             pending_calls.append(
@@ -1173,6 +1194,8 @@ def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     "function": {"name": name, "arguments": arguments},
                 }
             )
+            continue
+        if item_type == "reasoning":
             continue
         flush_calls()
         if item_type == "function_call_output":
@@ -1195,27 +1218,81 @@ def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _response_tool_request(
     payload: dict[str, Any],
-) -> tuple[list[dict[str, Any]], ToolChoice]:
+) -> tuple[list[dict[str, Any]], ToolChoice, dict[str, dict[str, str]]]:
     raw_tools = payload.get("tools")
+    response_tools: dict[str, dict[str, str]] = {}
     if raw_tools is None:
         tools = None
     elif not isinstance(raw_tools, list):
         raise APIError("tools must be an array.", param="tools")
     else:
         tools = []
-        for index, raw in enumerate(raw_tools):
-            if not isinstance(raw, dict) or raw.get("type") != "function":
-                raise APIError(
-                    "Only function tools are supported.",
-                    param=f"tools.{index}",
-                )
-            function = {name: raw[name] for name in ("name", "description", "parameters", "strict") if name in raw}
+
+        def add_tool(raw: dict[str, Any], param: str, namespace: str | None = None) -> None:
+            kind = raw.get("type")
+            if kind != "function":
+                raise APIError("Namespace tools must be functions.", param=param)
+            name = raw.get("name")
+            _validate_function_name(name, f"{param}.name")
+            internal_name = _response_internal_tool_name(name, namespace)
+            description = raw.get("description", "")
+            if not isinstance(description, str):
+                raise APIError("Tool description must be a string.", param=f"{param}.description")
+            function = {
+                field: raw[field]
+                for field in ("description", "parameters", "strict")
+                if field in raw
+            }
+            function["name"] = internal_name
             tools.append({"type": "function", "function": function})
+            response_tools[internal_name] = {
+                "type": kind,
+                "name": name,
+                **({"namespace": namespace} if namespace else {}),
+            }
+
+        for index, raw in enumerate(raw_tools):
+            param = f"tools.{index}"
+            if not isinstance(raw, dict):
+                raise APIError("Each tool must be an object.", param=param)
+            kind = raw.get("type")
+            if kind == "function":
+                add_tool(raw, param)
+                continue
+            if kind == "namespace":
+                namespace = raw.get("name")
+                _validate_function_name(namespace, f"{param}.name")
+                namespace_tools = raw.get("tools")
+                if not isinstance(namespace_tools, list):
+                    raise APIError("Namespace tools must be an array.", param=f"{param}.tools")
+                for child_index, child in enumerate(namespace_tools):
+                    child_param = f"{param}.tools.{child_index}"
+                    if not isinstance(child, dict):
+                        raise APIError("Each namespace tool must be an object.", param=child_param)
+                    add_tool(child, child_param, namespace)
+                continue
+            if kind == "web_search":
+                continue
+            raise APIError(
+                "This tool type is not supported.",
+                param=param,
+            )
     choice = payload.get("tool_choice", "auto")
     if isinstance(choice, dict) and choice.get("type") == "function":
-        choice = {"type": "function", "function": {"name": choice.get("name")}}
+        selected = next(
+            (
+                internal_name
+                for internal_name, tool in response_tools.items()
+                if tool["type"] == choice.get("type")
+                and tool["name"] == choice.get("name")
+                and tool.get("namespace") == choice.get("namespace")
+            ),
+            None,
+        )
+        choice = {"type": "function", "function": {"name": selected}}
     request = {"tools": tools, "tool_choice": choice}
-    return _tool_request(request)
+    parsed_tools, parsed_choice = _tool_request(request)
+    return parsed_tools, parsed_choice, response_tools
 
 
 def _response_text(text: str) -> dict[str, Any]:
@@ -1253,16 +1330,41 @@ def _response_output(
     return output
 
 
-def _response_function_calls(calls) -> list[dict[str, Any]]:
+def _response_internal_tool_name(name: str, namespace: str | None) -> str:
+    return f"{namespace}__{name}" if namespace else name
+
+
+def _response_tool_call(
+    internal_name: str,
+    arguments: str,
+    response_tools: dict[str, dict[str, str]],
+    *,
+    status: str,
+) -> dict[str, Any]:
+    tool = response_tools.get(
+        internal_name,
+        {"type": "function", "name": internal_name},
+    )
+    item: dict[str, Any] = {
+        "id": "fc_" + uuid.uuid4().hex,
+        "call_id": "call_" + uuid.uuid4().hex,
+        "type": "function_call",
+        "name": tool["name"],
+        "arguments": arguments,
+        "status": status,
+    }
+    if "namespace" in tool:
+        item["namespace"] = tool["namespace"]
+    return item
+
+
+def _response_function_calls(
+    calls,
+    response_tools: dict[str, dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    tools = response_tools or {}
     return [
-        {
-            "id": "fc_" + uuid.uuid4().hex,
-            "call_id": "call_" + uuid.uuid4().hex,
-            "type": "function_call",
-            "name": call.name,
-            "arguments": call.arguments,
-            "status": "completed",
-        }
+        _response_tool_call(call.name, call.arguments, tools, status="completed")
         for call in calls
     ]
 
@@ -1641,16 +1743,31 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Serve the installed model with an OpenAI-compatible API")
     parser.add_argument("--model", required=True)
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
     parser.add_argument("--public-model", default=PUBLIC_MODEL)
     parser.add_argument("--slots", type=int, default=1024)
     parser.add_argument("--read-workers", type=int, default=4)
-    parser.add_argument("--prefill-step-size", type=int, default=128)
+    parser.add_argument("--prefetch-read-workers", type=int, default=2)
+    parser.add_argument(
+        "--prefill-step-size",
+        type=int,
+        default=0,
+        help="prompt chunk size; 0 selects 128, 256, or 512 automatically",
+    )
+    parser.add_argument("--moe-prefill-step-size", type=int, default=0)
+    parser.add_argument("--no-layer-major-prefill", action="store_true")
+    parser.add_argument("--no-batched-expert-prefill", action="store_true")
+    parser.add_argument("--prompt-cache-entries", type=int, default=2)
+    parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
+    parser.add_argument("--no-persistent-prompt-cache", action="store_true")
+    parser.add_argument("--prompt-cache-directory")
+    parser.add_argument("--warmup-prompt-file")
     parser.add_argument("--bf16-kv-cache", action="store_true")
-    parser.add_argument("--default-max-tokens", type=int, default=32)
-    parser.add_argument("--default-temperature", type=float, default=0.0)
-    parser.add_argument("--default-top-p", type=float, default=1.0)
+    parser.add_argument("--no-fp4-index-cache", action="store_true")
+    parser.add_argument("--default-max-tokens", type=int, default=272_000)
+    parser.add_argument("--default-temperature", type=float, default=0.2)
+    parser.add_argument("--default-top-p", type=float, default=0.98)
     return parser
 
 
@@ -1665,8 +1782,16 @@ def main() -> None:
         parser.error("--slots must be at least 6")
     if arguments.read_workers < 1:
         parser.error("--read-workers must be greater than zero")
-    if arguments.prefill_step_size < 1:
-        parser.error("--prefill-step-size must be greater than zero")
+    if arguments.prefetch_read_workers < 1:
+        parser.error("--prefetch-read-workers must be greater than zero")
+    if arguments.prefill_step_size < 0:
+        parser.error("--prefill-step-size must be zero or greater")
+    if arguments.moe_prefill_step_size < 0:
+        parser.error("--moe-prefill-step-size must be zero or greater")
+    if arguments.prompt_cache_entries < 1:
+        parser.error("--prompt-cache-entries must be greater than zero")
+    if arguments.prompt_cache_memory_gib < 1:
+        parser.error("--prompt-cache-memory-gib must be greater than zero")
     if not arguments.public_model:
         parser.error("--public-model must not be empty")
     try:
@@ -1688,13 +1813,31 @@ def main() -> None:
     config = RuntimeConfig(
         slots=arguments.slots,
         read_workers=arguments.read_workers,
+        prefetch_read_workers=arguments.prefetch_read_workers,
         prefill_step_size=arguments.prefill_step_size,
+        moe_prefill_step_size=arguments.moe_prefill_step_size,
         fp8_kv_cache=not arguments.bf16_kv_cache,
+        layer_major_prefill=not arguments.no_layer_major_prefill,
+        batched_expert_prefill=not arguments.no_batched_expert_prefill,
+        prompt_cache_entries=arguments.prompt_cache_entries,
+        prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
+        persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
+        prompt_cache_directory=arguments.prompt_cache_directory,
+        fp4_index_cache=not arguments.no_fp4_index_cache,
     )
     print(f"Loading {arguments.model}...", flush=True)
     runtime = ModelRuntime.open(arguments.model, config)
     server = None
     try:
+        if arguments.warmup_prompt_file:
+            try:
+                with open(arguments.warmup_prompt_file, encoding="utf-8") as file:
+                    warmup_prompt = file.read()
+            except OSError as error:
+                parser.error(f"cannot read --warmup-prompt-file: {error}")
+            print("Warming prompt cache...", flush=True)
+            warmed = runtime.warm_prompt(warmup_prompt)
+            print(f"Warmed {warmed} prompt tokens.", flush=True)
         server = OpenAIServer(
             (arguments.host, arguments.port),
             runtime,

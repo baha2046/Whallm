@@ -15,11 +15,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run DeepSeek-V4 from an installed model")
     parser.add_argument("--model", required=True)
     parser.add_argument("--prompt", required=True)
-    parser.add_argument("--max-tokens", type=int, default=32)
+    parser.add_argument("--max-tokens", type=int, default=272_000)
     parser.add_argument("--slots", type=int, default=1024)
     parser.add_argument("--read-workers", type=int, default=4)
-    parser.add_argument("--prefill-step-size", type=int, default=128)
+    parser.add_argument("--prefetch-read-workers", type=int, default=2)
+    parser.add_argument("--prefill-step-size", type=int, default=0)
+    parser.add_argument("--moe-prefill-step-size", type=int, default=0)
+    parser.add_argument("--no-layer-major-prefill", action="store_true")
+    parser.add_argument("--no-batched-expert-prefill", action="store_true")
+    parser.add_argument("--prompt-cache-entries", type=int, default=2)
+    parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
+    parser.add_argument("--no-persistent-prompt-cache", action="store_true")
+    parser.add_argument("--prompt-cache-directory")
     parser.add_argument("--bf16-kv-cache", action="store_true")
+    parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--metrics-json")
     arguments = parser.parse_args()
     if arguments.max_tokens < 1:
@@ -28,14 +37,31 @@ def main() -> None:
         parser.error("--slots must be at least 6")
     if arguments.read_workers < 1:
         parser.error("--read-workers must be greater than zero")
-    if arguments.prefill_step_size < 1:
-        parser.error("--prefill-step-size must be greater than zero")
+    if arguments.prefetch_read_workers < 1:
+        parser.error("--prefetch-read-workers must be greater than zero")
+    if arguments.prefill_step_size < 0:
+        parser.error("--prefill-step-size must be zero or greater")
+    if arguments.moe_prefill_step_size < 0:
+        parser.error("--moe-prefill-step-size must be zero or greater")
+    if arguments.prompt_cache_entries < 1:
+        parser.error("--prompt-cache-entries must be greater than zero")
+    if arguments.prompt_cache_memory_gib < 1:
+        parser.error("--prompt-cache-memory-gib must be greater than zero")
 
     config = RuntimeConfig(
         slots=arguments.slots,
         read_workers=arguments.read_workers,
+        prefetch_read_workers=arguments.prefetch_read_workers,
         prefill_step_size=arguments.prefill_step_size,
+        moe_prefill_step_size=arguments.moe_prefill_step_size,
         fp8_kv_cache=not arguments.bf16_kv_cache,
+        layer_major_prefill=not arguments.no_layer_major_prefill,
+        batched_expert_prefill=not arguments.no_batched_expert_prefill,
+        prompt_cache_entries=arguments.prompt_cache_entries,
+        prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
+        persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
+        prompt_cache_directory=arguments.prompt_cache_directory,
+        fp4_index_cache=not arguments.no_fp4_index_cache,
     )
     runtime = ModelRuntime.open(arguments.model, config)
 
@@ -77,6 +103,9 @@ def main() -> None:
             "peak_memory_bytes": mx.get_peak_memory(),
             "fp8_kv_cache": config.fp8_kv_cache,
             "prefill_step_size": config.prefill_step_size,
+            "moe_prefill_step_size": config.moe_prefill_step_size,
+            "batched_expert_prefill": config.batched_expert_prefill,
+            "fp4_index_cache": config.fp4_index_cache,
             **runtime.metrics.snapshot(),
         }
         sys.stderr.write("\n" + json.dumps(result, indent=2) + "\n")

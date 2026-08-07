@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import copy
+import hashlib
+import json
+import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterator
 
 import mlx.core as mx
@@ -11,8 +17,14 @@ from mlx_lm.models.cache import make_prompt_cache
 from mlx_lm.sample_utils import make_sampler
 from transformers import AutoTokenizer
 
+from .expert_cache import CacheMetrics
 from .manifest import InstalledModel
-from .model import RuntimeConfig, load_model
+from .model import (
+    RuntimeConfig,
+    _select_prefill_step_size,
+    layer_major_prefill,
+    load_model,
+)
 from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
 
 THINK_START = "<think>"
@@ -21,9 +33,9 @@ THINK_END = "</think>"
 
 @dataclass(frozen=True)
 class GenerationOptions:
-    max_tokens: int = 32
-    temperature: float = 0.0
-    top_p: float = 1.0
+    max_tokens: int = 272_000
+    temperature: float = 0.2
+    top_p: float = 0.98
 
 
 @dataclass(frozen=True)
@@ -33,6 +45,45 @@ class GeneratedPiece:
     prompt_tokens: int
     generation_tokens: int
     finish_reason: str | None
+
+
+@dataclass
+class _PromptCacheEntry:
+    cache: Any
+    tokens: list[int]
+
+
+@dataclass(frozen=True)
+class _PersistentPromptCacheEntry:
+    tokens: list[int]
+    path: Path
+
+
+_PROMPT_CACHE_FORMAT = 1
+
+
+def _encode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
+    if isinstance(value, mx.array):
+        name = f"state_{len(arrays)}"
+        arrays[name] = value
+        return {"array": name}
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return {
+            "items": [_encode_cache_state(item, arrays) for item in value],
+            "tuple": isinstance(value, tuple),
+        }
+    raise TypeError(f"unsupported prompt cache state value: {type(value).__name__}")
+
+
+def _decode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
+    if isinstance(value, dict) and "array" in value:
+        return arrays[value["array"]]
+    if isinstance(value, dict) and "items" in value:
+        items = [_decode_cache_state(item, arrays) for item in value["items"]]
+        return tuple(items) if value.get("tuple") else items
+    return value
 
 
 class RuntimeMetrics:
@@ -45,8 +96,23 @@ class RuntimeMetrics:
         self._prompt_tokens = 0
         self._generation_tokens = 0
         self._prompt_cache_reused_tokens = 0
+        self._prefill_step_size = 0
+        self._layer_major_prefill = False
+        self._request_started = 0.0
+        self._request_seconds = 0.0
+        self._request_active = False
+        self._completed_request_count = 0
+        self._expert_before = CacheMetrics()
+        self._expert_request = CacheMetrics()
 
-    def start(self, prompt_tokens: int, reused_tokens: int) -> None:
+    def start(
+        self,
+        prompt_tokens: int,
+        reused_tokens: int,
+        prefill_step_size: int,
+        layer_major_prefill_enabled: bool,
+        expert_before: CacheMetrics,
+    ) -> None:
         with self._lock:
             self._time_to_first_token_seconds = 0.0
             self._decode_seconds = 0.0
@@ -55,6 +121,13 @@ class RuntimeMetrics:
             self._prompt_tokens = prompt_tokens
             self._generation_tokens = 0
             self._prompt_cache_reused_tokens = reused_tokens
+            self._prefill_step_size = prefill_step_size
+            self._layer_major_prefill = layer_major_prefill_enabled
+            self._request_started = time.perf_counter()
+            self._request_seconds = 0.0
+            self._request_active = True
+            self._expert_before = expert_before
+            self._expert_request = CacheMetrics()
 
     def record(
         self,
@@ -64,27 +137,72 @@ class RuntimeMetrics:
     ) -> None:
         with self._lock:
             if response.generation_tokens == 1:
-                self._time_to_first_token_seconds = step_seconds
+                self._time_to_first_token_seconds = (
+                    time.perf_counter() - self._request_started
+                )
             else:
                 self._decode_seconds += step_seconds
             self._cache_state_eval_seconds += cache_state_eval_seconds
             self._cache_state_eval_count += 1
             self._generation_tokens = response.generation_tokens
 
+    def finish(self, expert_after: CacheMetrics) -> None:
+        with self._lock:
+            self._request_seconds = time.perf_counter() - self._request_started
+            self._request_active = False
+            self._expert_request = expert_after.delta(self._expert_before)
+            if self._generation_tokens > 0:
+                self._completed_request_count += 1
+
     def snapshot(self) -> dict[str, int | float]:
         with self._lock:
             decode_tokens = max(0, self._generation_tokens - 1)
+            request_seconds = self._request_seconds
+            if self._request_active:
+                request_seconds = time.perf_counter() - self._request_started
+            prefill_tokens = max(
+                0, self._prompt_tokens - self._prompt_cache_reused_tokens
+            )
             return {
                 "runtime_prompt_tokens": self._prompt_tokens,
                 "runtime_generation_tokens": self._generation_tokens,
                 "prompt_cache_reused_tokens": self._prompt_cache_reused_tokens,
+                "completed_request_count": self._completed_request_count,
+                "request_seconds": request_seconds,
                 "time_to_first_token_seconds": self._time_to_first_token_seconds,
+                "prefill_tokens_per_second": (
+                    prefill_tokens / self._time_to_first_token_seconds
+                    if self._time_to_first_token_seconds
+                    else 0.0
+                ),
                 "decode_seconds": self._decode_seconds,
                 "decode_tokens_per_second": (
                     decode_tokens / self._decode_seconds if self._decode_seconds else 0.0
                 ),
                 "cache_state_eval_seconds": self._cache_state_eval_seconds,
                 "cache_state_eval_count": self._cache_state_eval_count,
+                "request_prefill_step_size": self._prefill_step_size,
+                "layer_major_prefill": self._layer_major_prefill,
+                "request_expert_cache_hit_rate": self._expert_request.hit_rate,
+                "request_expert_cache_hits": self._expert_request.hits,
+                "request_expert_cache_misses": self._expert_request.misses,
+                "request_expert_evictions": self._expert_request.evictions,
+                "request_expert_bytes_read": self._expert_request.bytes_read,
+                "request_expert_read_seconds": self._expert_request.read_seconds,
+                "request_ssd_read_bytes_per_second": (
+                    self._expert_request.bytes_read
+                    / self._expert_request.read_seconds
+                    if self._expert_request.read_seconds
+                    else 0.0
+                ),
+                "request_routing_sync_seconds": (
+                    self._expert_request.routing_sync_seconds
+                ),
+                "request_batched_expert_layers": self._expert_request.batched_layers,
+                "request_gather_qmm_calls": self._expert_request.gather_qmm_calls,
+                "request_prefetched_layer_hits": (
+                    self._expert_request.prefetched_layer_hits
+                ),
             }
 
 
@@ -96,8 +214,10 @@ class ModelRuntime:
         self.config = config
         self.metrics = RuntimeMetrics()
         self._codec: ToolCodec | None = None
-        self._prompt_cache = None
-        self._prompt_cache_tokens: list[int] = []
+        self._prompt_caches: list[_PromptCacheEntry] = []
+        self._persistent_prompt_caches: list[_PersistentPromptCacheEntry] = []
+        self._prompt_cache_writer: ThreadPoolExecutor | None = None
+        self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
         with mx.stream(self._generation_stream):
@@ -110,6 +230,10 @@ class ModelRuntime:
             except Exception:
                 self.expert_cache.close()
                 raise
+        self._prompt_cache_directory = self._open_prompt_cache_directory()
+        if self._prompt_cache_directory is not None:
+            self._prompt_cache_writer = ThreadPoolExecutor(max_workers=1)
+            self._persistent_prompt_caches = self._scan_persistent_prompt_caches()
         # ponytail: the lock serializes graph evaluation as required by the
         # cross-thread MLX stream and remains correct for batch size 1.
 
@@ -153,32 +277,58 @@ class ModelRuntime:
         with self._generation_lock:
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
-                reused_tokens = 0
-                if (
-                    self._prompt_cache is not None
-                    and len(self._prompt_cache_tokens) < len(prompt_tokens)
-                    and prompt_tokens[: len(self._prompt_cache_tokens)]
-                    == self._prompt_cache_tokens
-                ):
-                    reused_tokens = len(self._prompt_cache_tokens)
-                else:
-                    self._prompt_cache = make_prompt_cache(self.model)
-                    self._prompt_cache_tokens = []
+                entry = self._acquire_prompt_cache(prompt_tokens)
+                prompt_cache = entry.cache
+                cache_tokens = entry.tokens
+                reused_tokens = len(cache_tokens)
                 generation_prompt = prompt_tokens[reused_tokens:]
-                self._prompt_cache_tokens.extend(generation_prompt)
-                responses = iter(
-                    stream_generate(
-                        self.model,
-                        self.tokenizer,
-                        generation_prompt,
-                        max_tokens=options.max_tokens,
-                        sampler=sampler,
-                        prompt_cache=self._prompt_cache,
-                        prefill_step_size=self.config.prefill_step_size,
-                    )
+                cache_tokens.extend(generation_prompt)
+                step_size = _select_prefill_step_size(
+                    getattr(self.config, "prefill_step_size", 128),
+                    len(generation_prompt),
                 )
-                self.metrics.start(len(prompt_tokens), reused_tokens)
+                use_layer_major = bool(
+                    getattr(self.config, "layer_major_prefill", True)
+                    and len(generation_prompt) >= 4_096
+                )
+                self.metrics.start(
+                    len(prompt_tokens),
+                    reused_tokens,
+                    step_size,
+                    use_layer_major,
+                    self._expert_metrics(),
+                )
+                completed = False
                 try:
+                    if use_layer_major:
+                        layer_major_prefill(
+                            self.model,
+                            generation_prompt[:-1],
+                            prompt_cache,
+                            step_size,
+                            self.expert_cache,
+                            getattr(self.config, "moe_prefill_step_size", 0),
+                            getattr(self.config, "batched_expert_prefill", True),
+                        )
+                        self._store_prompt_cache(
+                            _PromptCacheEntry(
+                                copy.deepcopy(prompt_cache),
+                                list(prompt_tokens[:-1]),
+                            ),
+                            persist=True,
+                        )
+                        generation_prompt = generation_prompt[-1:]
+                    responses = iter(
+                        stream_generate(
+                            self.model,
+                            self.tokenizer,
+                            generation_prompt,
+                            max_tokens=options.max_tokens,
+                            sampler=sampler,
+                            prompt_cache=prompt_cache,
+                            prefill_step_size=step_size,
+                        )
+                    )
                     while True:
                         started = time.perf_counter()
                         try:
@@ -187,11 +337,13 @@ class ModelRuntime:
                             break
                         step_seconds = time.perf_counter() - started
                         cache_started = time.perf_counter()
-                        mx.eval([cache.state for cache in self._prompt_cache])
+                        mx.eval([cache.state for cache in prompt_cache])
                         cache_seconds = time.perf_counter() - cache_started
                         self.metrics.record(response, step_seconds, cache_seconds)
                         if response.finish_reason != "stop":
-                            self._prompt_cache_tokens.append(int(response.token))
+                            cache_tokens.append(int(response.token))
+                        if response.finish_reason is not None:
+                            completed = True
                         yield GeneratedPiece(
                             text=response.text,
                             token=response.token,
@@ -199,10 +351,91 @@ class ModelRuntime:
                             generation_tokens=response.generation_tokens,
                             finish_reason=response.finish_reason,
                         )
-                except Exception:
-                    self._prompt_cache = None
-                    self._prompt_cache_tokens = []
-                    raise
+                finally:
+                    self.metrics.finish(self._expert_metrics())
+                    if completed:
+                        self._store_prompt_cache(entry, persist=True)
+
+    def warm_prompt(self, prompt: str) -> int:
+        tokens = self._encode_prompt(prompt)
+        if len(tokens) < 2:
+            return 0
+        with self._generation_lock:
+            with mx.stream(self._generation_stream):
+                cache = make_prompt_cache(self.model)
+                step_size = _select_prefill_step_size(
+                    getattr(self.config, "prefill_step_size", 128),
+                    len(tokens) - 1,
+                )
+                layer_major_prefill(
+                    self.model,
+                    tokens[:-1],
+                    cache,
+                    step_size,
+                    self.expert_cache,
+                    getattr(self.config, "moe_prefill_step_size", 0),
+                    getattr(self.config, "batched_expert_prefill", True),
+                )
+                self._store_prompt_cache(
+                    _PromptCacheEntry(cache, tokens[:-1]),
+                    persist=True,
+                )
+        return len(tokens) - 1
+
+    def _acquire_prompt_cache(self, prompt_tokens: list[int]) -> _PromptCacheEntry:
+        matches = [
+            entry
+            for entry in self._prompt_caches
+            if len(entry.tokens) < len(prompt_tokens)
+            and prompt_tokens[: len(entry.tokens)] == entry.tokens
+        ]
+        if matches:
+            entry = max(matches, key=lambda item: len(item.tokens))
+            return _PromptCacheEntry(copy.deepcopy(entry.cache), list(entry.tokens))
+        persistent = [
+            entry
+            for entry in self._persistent_prompt_caches
+            if len(entry.tokens) < len(prompt_tokens)
+            and prompt_tokens[: len(entry.tokens)] == entry.tokens
+        ]
+        if persistent:
+            entry = max(persistent, key=lambda item: len(item.tokens))
+            loaded = self._load_persistent_prompt_cache(entry)
+            if loaded is not None:
+                return loaded
+        return _PromptCacheEntry(make_prompt_cache(self.model), [])
+
+    def _store_prompt_cache(
+        self,
+        entry: _PromptCacheEntry,
+        *,
+        persist: bool = False,
+    ) -> None:
+        self._prompt_caches = [
+            cached for cached in self._prompt_caches if cached.tokens != entry.tokens
+        ]
+        self._prompt_caches.insert(0, entry)
+        maximum = max(1, int(getattr(self.config, "prompt_cache_entries", 2)))
+        memory_limit = max(
+            1,
+            int(getattr(self.config, "prompt_cache_memory_gib", 8)),
+        ) * 1024**3
+        while len(self._prompt_caches) > maximum:
+            self._prompt_caches.pop()
+        while len(self._prompt_caches) > 1 and self._prompt_cache_bytes() > memory_limit:
+            self._prompt_caches.pop()
+        if persist:
+            self._persist_prompt_cache(entry)
+
+    def _prompt_cache_bytes(self) -> int:
+        return sum(
+            sum(int(getattr(cache, "nbytes", 0)) for cache in entry.cache)
+            for entry in self._prompt_caches
+        )
+
+    def _expert_metrics(self) -> CacheMetrics:
+        snapshot = getattr(self.expert_cache, "metrics_snapshot", None)
+        return snapshot() if snapshot is not None else CacheMetrics()
 
     def _encode_prompt(self, prompt: str) -> list[int]:
         add_special_tokens = self.tokenizer.bos_token is None or not prompt.startswith(
@@ -212,7 +445,154 @@ class ModelRuntime:
             self.tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
         )
 
+    def _open_prompt_cache_directory(self) -> Path | None:
+        if not getattr(self.config, "persistent_prompt_cache", True):
+            return None
+        revision = getattr(self.installed, "revision", None)
+        if not revision:
+            return None
+        configured = getattr(self.config, "prompt_cache_directory", None)
+        root = (
+            Path(configured).expanduser()
+            if configured
+            else Path.home() / ".dsmodel" / "prompt-cache"
+        )
+        directory = root / revision
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            return None
+        return directory
+
+    def _scan_persistent_prompt_caches(self) -> list[_PersistentPromptCacheEntry]:
+        directory = self._prompt_cache_directory
+        if directory is None:
+            return []
+        entries = []
+        for metadata_path in sorted(
+            directory.glob("*.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        ):
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                data_path = directory / metadata["data"]
+                if (
+                    metadata.get("format") == _PROMPT_CACHE_FORMAT
+                    and metadata.get("revision") == self.installed.revision
+                    and data_path.is_file()
+                ):
+                    entries.append(
+                        _PersistentPromptCacheEntry(
+                            [int(token) for token in metadata["tokens"]],
+                            data_path,
+                        )
+                    )
+            except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+        maximum = max(
+            1,
+            int(getattr(self.config, "persistent_prompt_cache_entries", 8)),
+        )
+        return entries[:maximum]
+
+    def _load_persistent_prompt_cache(
+        self,
+        entry: _PersistentPromptCacheEntry,
+    ) -> _PromptCacheEntry | None:
+        try:
+            arrays, metadata = mx.load(entry.path, return_metadata=True)
+            schema = json.loads(metadata["state"])
+            state = _decode_cache_state(schema, arrays)
+            cache = make_prompt_cache(self.model)
+            if len(cache) != len(state):
+                return None
+            for target, saved in zip(cache, state):
+                target.state = saved
+            mx.eval([item.state for item in cache])
+            return _PromptCacheEntry(cache, list(entry.tokens))
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
+    def _persist_prompt_cache(self, entry: _PromptCacheEntry) -> None:
+        directory = self._prompt_cache_directory
+        writer = self._prompt_cache_writer
+        if directory is None or writer is None or not entry.tokens:
+            return
+        digest = hashlib.sha256(
+            json.dumps(entry.tokens, separators=(",", ":")).encode()
+        ).hexdigest()
+        data_path = directory / f"{digest}.safetensors"
+        metadata_path = directory / f"{digest}.json"
+        if data_path.exists() and metadata_path.exists():
+            return
+        arrays: dict[str, mx.array] = {}
+        schema = _encode_cache_state([item.state for item in entry.cache], arrays)
+        mx.eval(list(arrays.values()))
+        metadata = {
+            "format": _PROMPT_CACHE_FORMAT,
+            "revision": self.installed.revision,
+            "tokens": entry.tokens,
+            "data": data_path.name,
+        }
+
+        def save() -> None:
+            temporary_data = data_path.with_name(data_path.stem + ".tmp.safetensors")
+            temporary_metadata = metadata_path.with_name(
+                metadata_path.stem + ".tmp.json"
+            )
+            try:
+                mx.save_safetensors(
+                    temporary_data,
+                    arrays,
+                    metadata={"state": json.dumps(schema, separators=(",", ":"))},
+                )
+                temporary_metadata.write_text(
+                    json.dumps(metadata, separators=(",", ":")),
+                    encoding="utf-8",
+                )
+                os.replace(temporary_data, data_path)
+                os.replace(temporary_metadata, metadata_path)
+                maximum = max(
+                    1,
+                    int(
+                        getattr(
+                            self.config,
+                            "persistent_prompt_cache_entries",
+                            8,
+                        )
+                    ),
+                )
+                saved = sorted(
+                    directory.glob("*.json"),
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
+                for stale_metadata in saved[maximum:]:
+                    try:
+                        stale = json.loads(
+                            stale_metadata.read_text(encoding="utf-8")
+                        )
+                        stale_data = directory / stale["data"]
+                        if stale_data.parent == directory:
+                            stale_data.unlink(missing_ok=True)
+                        stale_metadata.unlink(missing_ok=True)
+                    except (KeyError, OSError, json.JSONDecodeError):
+                        continue
+            except Exception:
+                for path in (temporary_data, temporary_metadata):
+                    try:
+                        path.unlink()
+                    except OSError:
+                        pass
+
+        writer.submit(save)
+
     def close(self) -> None:
+        self._prompt_caches.clear()
+        if self._prompt_cache_writer is not None:
+            self._prompt_cache_writer.shutdown(wait=True)
+            self._prompt_cache_writer = None
         self.expert_cache.close()
 
     def __enter__(self) -> ModelRuntime:

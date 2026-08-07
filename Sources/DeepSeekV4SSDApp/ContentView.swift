@@ -5,14 +5,20 @@ struct ContentView: View {
   @ObservedObject var server: ServerController
   @StateObject private var modelLibrary = ModelLibrary()
   @State private var configuration = ServerConfiguration.localDefault
+  @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
 
   var body: some View {
     HSplitView {
-      ChatView(configuration: configuration, server: server)
-        .frame(minWidth: 560, idealWidth: 760, maxWidth: .infinity)
-      ServerView(configuration: $configuration, server: server, modelLibrary: modelLibrary)
-        .frame(minWidth: 340, idealWidth: 390, maxWidth: 480)
+      ChatView(configuration: configuration, server: server, language: selectedLanguage)
+        .frame(minWidth: 680, idealWidth: 880, maxWidth: .infinity)
+      ServerView(
+        configuration: $configuration,
+        languageCode: $languageCode,
+        server: server,
+        modelLibrary: modelLibrary)
+        .frame(minWidth: 480, idealWidth: 540, maxWidth: 680)
     }
+    .environment(\.locale, selectedLanguage.locale)
     .task {
       await modelLibrary.scan()
       selectDetectedModel()
@@ -22,6 +28,10 @@ struct ContentView: View {
     .onChange(of: configuration.modelPath) {
       UserDefaults.standard.set(configuration.modelPath, forKey: "selectedModelPath")
     }
+  }
+
+  private var selectedLanguage: AppLanguage {
+    AppLanguage(rawValue: languageCode) ?? .appDefault
   }
 
   private func selectDetectedModel() {
@@ -36,6 +46,7 @@ struct ContentView: View {
 
 private struct ServerView: View {
   @Binding var configuration: ServerConfiguration
+  @Binding var languageCode: String
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
   @State private var showsLog = false
@@ -46,17 +57,18 @@ private struct ServerView: View {
   @State private var reinstallTarget: URL?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 16) {
       serverHeader
+      languagePicker
 
       if case .failed(let message) = server.state {
         Label(message, systemImage: "exclamationmark.triangle.fill")
           .foregroundStyle(.red)
-          .accessibilityLabel("錯誤：\(message)")
+          .accessibilityLabel(L10n.string("Error: %@", message))
       }
 
       ScrollView {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 28) {
           if modelLibrary.usableModels.isEmpty {
             onboardingPanel
           } else {
@@ -74,7 +86,7 @@ private struct ServerView: View {
             )
             .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
             .textSelection(.enabled)
-            .accessibilityLabel("模型狀態：\(message)")
+            .accessibilityLabel(L10n.string("Model status: %@", message))
           }
 
           if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
@@ -85,10 +97,12 @@ private struct ServerView: View {
             advancedSettings
               .disabled(server.isActive)
 
-            DisclosureGroup("Server 日誌", isExpanded: $showsLog) {
+            DisclosureGroup(L10n.string("Server log"), isExpanded: $showsLog) {
               ScrollView {
-                Text(server.log.isEmpty ? "啟動 server 後，日誌會顯示在這裡。" : server.log)
-                  .font(.system(.caption, design: .monospaced))
+                Text(
+                  server.log.isEmpty
+                    ? L10n.string("The log will appear here after the server starts.") : server.log)
+                  .font(.system(.callout, design: .monospaced))
                   .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
                   .textSelection(.enabled)
                   .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -96,7 +110,7 @@ private struct ServerView: View {
               }
               .frame(minHeight: 140, maxHeight: 260)
               .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-              .accessibilityLabel("Server 日誌")
+              .accessibilityLabel(L10n.string("Server log"))
               .padding(.top, 12)
             }
           }
@@ -104,41 +118,60 @@ private struct ServerView: View {
         .padding(.vertical, 2)
       }
     }
-    .padding(18)
+    .padding(22)
     .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
     .confirmationDialog(
-      "下載並安裝模型？",
+      L10n.string("Download and install the model?"),
       isPresented: $confirmsDownload,
       titleVisibility: .visible
     ) {
-      Button("下載模型") { modelLibrary.startDownload() }
-      Button("取消", role: .cancel) {}
+      Button(L10n.string("Download Model")) { modelLibrary.startDownload() }
+      Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
-      Text("App 會將模型安裝到 \(modelLibrary.rootURL.path)。下載中斷後可以繼續。")
+      Text(
+        L10n.string(
+          "The app will install the model in %@. You can resume an interrupted download.", modelLibrary.rootURL.path))
     }
     .confirmationDialog(
-      "驗證並修復模型？",
+      L10n.string("Verify and repair the model?"),
       isPresented: $confirmsRepair,
       titleVisibility: .visible
     ) {
-      Button("驗證並修復模型") {
+      Button(L10n.string("Verify and Repair")) {
         if let repairTarget { modelLibrary.startRepair(repairTarget) }
       }
-      Button("取消", role: .cancel) {}
+      Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
-      Text("App 會先完整驗證模型，然後只重新下載缺少或損壞的資料。")
+      Text(L10n.string("The app will verify the complete model. It will download only missing or damaged data."))
     }
     .confirmationDialog(
-      "重新下載模型？",
+      L10n.string("Download the model again?"),
       isPresented: $confirmsReinstall,
       titleVisibility: .visible
     ) {
-      Button("重新下載模型", role: .destructive) {
+      Button(L10n.string("Download Again"), role: .destructive) {
         if let reinstallTarget { modelLibrary.reinstall(reinstallTarget) }
       }
-      Button("取消", role: .cancel) {}
+      Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
-      Text("App 會將目前的損壞模型移到垃圾桶，然後重新下載完整模型。")
+      Text(L10n.string("The app will move the damaged model to Trash. It will then download the complete model."))
+    }
+    .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
+  }
+
+  private var languagePicker: some View {
+    HStack(spacing: 12) {
+      Text(L10n.string("Language"))
+        .foregroundStyle(.secondary)
+      Spacer()
+      Picker(L10n.string("Language"), selection: $languageCode) {
+        ForEach(AppLanguage.allCases) { language in
+          Text(language.displayName).tag(language.rawValue)
+        }
+      }
+      .labelsHidden()
+      .pickerStyle(.menu)
+      .frame(minWidth: 160, alignment: .trailing)
     }
   }
 
@@ -149,18 +182,18 @@ private struct ServerView: View {
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(server.state.label).font(.headline)
-        Text(configuration.baseURL?.absoluteString ?? "Base URL 無效")
-          .font(.caption.monospaced())
+        Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
+          .font(.callout.monospaced())
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
       }
       .accessibilityElement(children: .combine)
       Spacer()
       if server.isActive {
-        Button("停止 server", action: server.stop)
+        Button(L10n.string("Stop Server"), action: server.stop)
           .keyboardShortcut(".", modifiers: .command)
       } else {
-        Button("啟動 server") { server.start(configuration) }
+        Button(L10n.string("Start Server")) { server.start(configuration) }
           .buttonStyle(.borderedProminent)
           .disabled(!modelLibrary.canUseModel(at: configuration.modelPath))
           .keyboardShortcut(.return, modifiers: .command)
@@ -171,18 +204,18 @@ private struct ServerView: View {
   private var onboardingPanel: some View {
     VStack(alignment: .leading, spacing: 24) {
       VStack(alignment: .leading, spacing: 6) {
-        Text(modelLibrary.hasPartialDownload ? "繼續安裝模型" : "安裝模型")
+        Text(L10n.string(modelLibrary.hasPartialDownload ? "Continue Model Installation" : "Install Model"))
           .font(.title2.bold())
-        Text("下載模型或選擇現有的模型資料夾。完成後即可啟動本機 server。")
+        Text(L10n.string("Download a model or select an existing model folder. You can then start the local server."))
           .foregroundStyle(.secondary)
       }
 
       preflightPanel
 
       HStack(spacing: 12) {
-        Button("選擇模型資料夾") { chooseModelDirectory() }
+        Button(L10n.string("Select Model Folder")) { chooseModelDirectory() }
           .disabled(modelLibrary.isBusy)
-        Button(modelLibrary.hasPartialDownload ? "繼續下載" : "下載模型") {
+        Button(L10n.string(modelLibrary.hasPartialDownload ? "Resume Download" : "Download Model")) {
           if modelLibrary.hasPartialDownload {
             modelLibrary.startDownload()
           } else {
@@ -200,7 +233,7 @@ private struct ServerView: View {
 
   private var preflightPanel: some View {
     VStack(alignment: .leading, spacing: 10) {
-      Text("下載前檢查")
+      Text(L10n.string("Checks Before Download"))
         .font(.headline)
       ForEach(modelLibrary.preflightChecks) { check in
         HStack(alignment: .top, spacing: 10) {
@@ -210,7 +243,7 @@ private struct ServerView: View {
           VStack(alignment: .leading, spacing: 2) {
             Text(check.title).fontWeight(.medium)
             Text(check.detail)
-              .font(.caption)
+              .font(.callout)
               .foregroundStyle(.secondary)
               .textSelection(.enabled)
           }
@@ -221,7 +254,7 @@ private struct ServerView: View {
   }
 
   private var modelPanel: some View {
-    GroupBox("模型") {
+    GroupBox(L10n.string("Model")) {
       VStack(alignment: .leading, spacing: 12) {
         HStack(spacing: 12) {
           if modelLibrary.isScanning {
@@ -232,27 +265,36 @@ private struct ServerView: View {
               .accessibilityHidden(true)
           }
 
-          Picker("Installed model", selection: $configuration.modelPath) {
+          Picker(L10n.string("Installed model"), selection: $configuration.modelPath) {
             ForEach(modelLibrary.usableModels) { model in
-              Text("\(model.name) · \(formattedBytes(model.size))").tag(model.url.path)
+              Text(L10n.string("%@ · %@", model.name, formattedBytes(model.size)))
+                .tag(model.url.path)
             }
           }
           .labelsHidden()
-          .frame(maxWidth: 420)
-          Spacer()
-          Button("在 Finder 中顯示") {
-            if let selectedModel { modelLibrary.reveal(selectedModel.url) }
-          }
-          Button("完整驗證模型") {
-            if let selectedModel { modelLibrary.startVerification(selectedModel) }
-          }
-          .disabled(server.isActive || modelLibrary.isBusy)
-          Button("選擇其他資料夾") { chooseModelDirectory() }
+          .frame(maxWidth: .infinity)
+        }
+
+        VStack(alignment: .trailing, spacing: 10) {
+          HStack(spacing: 12) {
+            Spacer()
+            Button(L10n.string("Show in Finder")) {
+              if let selectedModel { modelLibrary.reveal(selectedModel.url) }
+            }
+            Button(L10n.string("Verify Complete Model")) {
+              if let selectedModel { modelLibrary.startVerification(selectedModel) }
+            }
             .disabled(server.isActive || modelLibrary.isBusy)
+          }
+          HStack {
+            Spacer()
+            Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
+              .disabled(server.isActive || modelLibrary.isBusy)
+          }
         }
 
         Text(modelLibrary.rootURL.path)
-          .font(.caption.monospaced())
+          .font(.callout.monospaced())
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.middle)
@@ -262,12 +304,14 @@ private struct ServerView: View {
           let issues = modelLibrary.verificationIssues
         {
           if issues.isEmpty {
-            Label("已通過完整驗證", systemImage: "checkmark.seal.fill")
+            Label(L10n.string("Complete verification passed"), systemImage: "checkmark.seal.fill")
               .foregroundStyle(.green)
           } else {
-            Label("有 \(issues.count) 個檔案需要修復", systemImage: "exclamationmark.triangle.fill")
+            Label(
+              L10n.string("%lld files need repair", Int64(issues.count)),
+              systemImage: "exclamationmark.triangle.fill")
               .foregroundStyle(.red)
-            Button("驗證並修復模型") {
+            Button(L10n.string("Verify and Repair")) {
               repairTarget = selectedModel
               confirmsRepair = true
             }
@@ -288,21 +332,23 @@ private struct ServerView: View {
             .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
           HStack(spacing: 16) {
             Text(
-              "\(formattedBytes(progress.completedBytes)) / \(formattedBytes(progress.totalBytes))")
+              L10n.string(
+                "%@ / %@", formattedBytes(progress.completedBytes),
+                formattedBytes(progress.totalBytes)))
             if let speed = progress.bytesPerSecond, speed > 0 {
-              Text("\(formattedBytes(UInt64(speed)))/s")
+              Text(L10n.string("%@/s", formattedBytes(UInt64(speed))))
             }
             if let seconds = progress.estimatedSecondsRemaining, seconds.isFinite {
-              Text("約剩 \(formattedDuration(seconds))")
+              Text(L10n.string("About %@ remaining", formattedDuration(seconds)))
             }
           }
-          .font(.caption.monospacedDigit())
+          .font(.callout.monospacedDigit())
           .foregroundStyle(.secondary)
         } else {
           ProgressView()
             .accessibilityLabel(modelLibrary.operationPhase.label)
         }
-        Button("停止目前操作") { modelLibrary.cancelOperation() }
+        Button(L10n.string("Stop Current Operation")) { modelLibrary.cancelOperation() }
           .disabled(modelLibrary.operationPhase == .cancelling)
       }
       .padding(8)
@@ -310,18 +356,20 @@ private struct ServerView: View {
   }
 
   private var damagedModelsPanel: some View {
-    GroupBox("需要處理的模型") {
+    GroupBox(L10n.string("Models That Need Attention")) {
       VStack(alignment: .leading, spacing: 16) {
         ForEach(modelLibrary.damagedModels) { model in
           HStack(alignment: .top, spacing: 12) {
             Label(
-              "\(model.name)：缺少或大小錯誤的檔案有 \(model.quickIssues.count) 個",
+              L10n.string(
+                "%@: %lld files are missing or have the wrong size", model.name,
+                Int64(model.quickIssues.count)),
               systemImage: "exclamationmark.triangle.fill"
             )
             .foregroundStyle(.red)
             Spacer()
-            Button("在 Finder 中顯示") { modelLibrary.reveal(model.url) }
-            Button("驗證並修復模型") {
+            Button(L10n.string("Show in Finder")) { modelLibrary.reveal(model.url) }
+            Button(L10n.string("Verify and Repair")) {
               repairTarget = model
               confirmsRepair = true
             }
@@ -331,13 +379,13 @@ private struct ServerView: View {
         ForEach(modelLibrary.invalidModelURLs, id: \.path) { url in
           HStack(alignment: .top, spacing: 12) {
             Label(
-              "\(url.lastPathComponent)：manifest 無法讀取",
+              L10n.string("%@: The manifest cannot be read", url.lastPathComponent),
               systemImage: "xmark.octagon.fill"
             )
             .foregroundStyle(.red)
             Spacer()
-            Button("在 Finder 中顯示") { modelLibrary.reveal(url) }
-            Button("重新下載模型") {
+            Button(L10n.string("Show in Finder")) { modelLibrary.reveal(url) }
+            Button(L10n.string("Download Again")) {
               reinstallTarget = url
               confirmsReinstall = true
             }
@@ -351,24 +399,24 @@ private struct ServerView: View {
 
   private var advancedSettings: some View {
     VStack(alignment: .leading, spacing: 18) {
-      Text("Server")
+      Text(L10n.string("Server"))
         .font(.headline)
       GroupBox {
         VStack(spacing: 12) {
-          LabeledContent("Host") {
+          LabeledContent(L10n.string("Host")) {
             TextField("127.0.0.1", text: $configuration.host)
               .textFieldStyle(.roundedBorder)
           }
-          LabeledContent("Port") {
-            TextField("8000", value: $configuration.port, format: .number.grouping(.never))
+          LabeledContent(L10n.string("Port")) {
+            TextField("11434", value: $configuration.port, format: .number.grouping(.never))
               .textFieldStyle(.roundedBorder)
               .frame(width: 100)
           }
-          LabeledContent("API key") {
-            SecureField("本機使用時可留空", text: $configuration.apiKey)
+          LabeledContent(L10n.string("API key")) {
+            SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
               .textFieldStyle(.roundedBorder)
           }
-          LabeledContent("Model ID") {
+          LabeledContent(L10n.string("Model ID")) {
             TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
               .textFieldStyle(.roundedBorder)
           }
@@ -376,32 +424,51 @@ private struct ServerView: View {
         .padding(6)
       }
 
-      Text("Runtime")
+      Text(L10n.string("Runtime"))
         .font(.headline)
       GroupBox {
         VStack(spacing: 12) {
           integerField(
-            "Slots", hint: "Active Parameters Cache 的 routed expert 數量。推薦值是 1024。",
+            "Slots", hint: "Number of routed experts in the Active Parameters Cache. The recommended value is 1024.",
             value: $configuration.slots)
           integerField(
-            "Read workers", hint: "同時讀取 expert blob 的工作數量。推薦值是 4。",
+            "Read workers", hint: "Number of workers that read expert blobs at the same time. The recommended value is 4.",
             value: $configuration.readWorkers)
           integerField(
-            "Prefill step size", hint: "每次處理的 prompt token 數量。推薦值是 128。",
+            "Prefill step size", hint: "0 selects 128, 256, or 1024 based on the prompt length.",
             value: $configuration.prefillStepSize)
-          Toggle("使用 BF16 KV cache", isOn: $configuration.bf16KVCache)
+          Toggle(
+            L10n.string("Use layer-major prefill"),
+            isOn: $configuration.layerMajorPrefill)
+          integerField(
+            "Prompt cache entries", hint: "Number of linear conversations to keep. The recommended value is 2.",
+            value: $configuration.promptCacheEntries)
+          integerField(
+            "Prompt cache GiB", hint: "Memory limit for all prompt caches. The recommended value is 8.",
+            value: $configuration.promptCacheMemoryGiB)
+          LabeledContent(L10n.string("Warmup prompt")) {
+            TextField(
+              L10n.string("Optional UTF-8 prompt file path"),
+              text: $configuration.warmupPromptPath)
+              .textFieldStyle(.roundedBorder)
+          }
+          Toggle(L10n.string("Use BF16 KV cache"), isOn: $configuration.bf16KVCache)
         }
         .padding(6)
       }
 
-      Text("生成")
+      Text(L10n.string("Generate"))
         .font(.headline)
       GroupBox {
         VStack(spacing: 12) {
           integerField(
-            "Max tokens", hint: "每次 request 的預設 token 上限。", value: $configuration.defaultMaxTokens)
-          doubleField("Temperature", hint: "0 會產生穩定結果。", value: $configuration.defaultTemperature)
-          doubleField("Top P", hint: "推薦值是 1。", value: $configuration.defaultTopP)
+            "Max tokens", hint: "Default token limit for each request.", value: $configuration.defaultMaxTokens)
+          doubleField(
+            "Temperature", hint: "A higher value increases output variation.",
+            value: $configuration.defaultTemperature)
+          doubleField(
+            "Top P", hint: "A lower value reduces the candidate token range.",
+            value: $configuration.defaultTopP)
         }
         .padding(6)
       }
@@ -424,31 +491,40 @@ private struct ServerView: View {
   @ViewBuilder
   private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
     LabeledContent {
-      TextField(label, value: value, format: .number.grouping(.never))
+      TextField(
+        L10n.string(label, language: selectedLanguage),
+        value: value,
+        format: .number.grouping(.never))
         .labelsHidden()
         .textFieldStyle(.roundedBorder)
-        .frame(width: 100)
+        .frame(width: 120)
     } label: {
-      SettingLabel(label, hint: hint)
+      SettingLabel(label, hint: hint, language: selectedLanguage)
     }
   }
 
   @ViewBuilder
   private func doubleField(_ label: String, hint: String, value: Binding<Double>) -> some View {
     LabeledContent {
-      TextField(label, value: value, format: .number.precision(.fractionLength(0...6)))
+      TextField(
+        L10n.string(label, language: selectedLanguage), value: value,
+        format: .number.precision(.fractionLength(0...6)))
         .labelsHidden()
         .textFieldStyle(.roundedBorder)
-        .frame(width: 100)
+        .frame(width: 120)
     } label: {
-      SettingLabel(label, hint: hint)
+      SettingLabel(label, hint: hint, language: selectedLanguage)
     }
+  }
+
+  private var selectedLanguage: AppLanguage {
+    AppLanguage(rawValue: languageCode) ?? .appDefault
   }
 
   private func chooseModelDirectory() {
     let panel = NSOpenPanel()
-    panel.title = "選擇模型資料夾"
-    panel.prompt = "選擇資料夾"
+    panel.title = L10n.string("Select Model Folder")
+    panel.prompt = L10n.string("Select Folder")
     panel.canChooseDirectories = true
     panel.canChooseFiles = false
     panel.allowsMultipleSelection = false
@@ -466,8 +542,9 @@ private struct ServerView: View {
 
   private func formattedDuration(_ seconds: Double) -> String {
     let totalMinutes = max(1, Int(seconds / 60))
-    if totalMinutes < 60 { return "\(totalMinutes) 分鐘" }
-    return "\(totalMinutes / 60) 小時 \(totalMinutes % 60) 分鐘"
+    if totalMinutes < 60 { return L10n.string("%lld min", Int64(totalMinutes)) }
+    return L10n.string(
+      "%lld hr %lld min", Int64(totalMinutes / 60), Int64(totalMinutes % 60))
   }
 
   private func preflightSymbol(_ status: PreflightStatus) -> String {
@@ -491,55 +568,166 @@ private struct PerformancePanel: View {
   let model: String
   let state: ServerController.State
   let performance: LivePerformance
+  let history: PerformanceHistory
+  let language: AppLanguage
+  let clearHistory: () -> Void
 
   var body: some View {
-    HStack(spacing: 18) {
-      HStack(spacing: 9) {
-        Circle()
-          .fill(statusColor)
-          .frame(width: 9, height: 9)
-          .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(model)
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-          Text(state.label)
-            .font(.caption)
-            .foregroundStyle(.secondary)
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(spacing: 12) {
+        HStack(spacing: 9) {
+          Circle()
+            .fill(statusColor)
+            .frame(width: 9, height: 9)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(model)
+              .font(.headline)
+              .lineLimit(1)
+            Text(localizedStateLabel)
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
         }
+        .accessibilityElement(children: .combine)
+
+        Spacer(minLength: 8)
+
+        Button(action: clearHistory) {
+          Label(localized("Clear metric history"), systemImage: "trash")
+        }
+        .controlSize(.small)
+        .disabled(history.isEmpty)
       }
-      .accessibilityElement(children: .combine)
 
-      Spacer(minLength: 8)
+      ScrollView(.horizontal) {
+        Grid(alignment: .trailing, horizontalSpacing: 24, verticalSpacing: 9) {
+          GridRow {
+            Text(localized("Metric"))
+              .gridColumnAlignment(.leading)
+            Text(localized("Live"))
+            Text(localized("Minimum"))
+            Text(localized("Average"))
+            Text(localized("Maximum"))
+          }
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(.secondary)
 
-      MetricValue(
-        title: "TOK/S",
-        value: performance.hasStatus
-          ? performance.tokensPerSecond.formatted(.number.precision(.fractionLength(1))) : "—"
-      )
-      MetricValue(
-        title: "TOKENS",
-        value: performance.hasStatus ? performance.generationTokens.formatted() : "—"
-      )
-      MetricValue(
-        title: "MEMORY",
-        value: performance.memoryBytes > 0 ? formattedBytes(performance.memoryBytes) : "—"
-      )
-      MetricValue(
-        title: "CACHE",
-        value: performance.hasStatus
-          ? performance.cacheHitRate.formatted(.percent.precision(.fractionLength(1)))
-          : "—"
-      )
+          ForEach(PerformanceMetric.allCases) { metric in
+            metricRow(metric)
+          }
+        }
+        .padding(.horizontal, 1)
+      }
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 12)
+    .padding(.horizontal, 18)
+    .padding(.vertical, 14)
     .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
     .overlay(
       RoundedRectangle(cornerRadius: 16)
         .stroke(Color.primary.opacity(0.06))
     )
     .accessibilityElement(children: .contain)
+    .environment(\.locale, language.locale)
+  }
+
+  private func metricRow(_ metric: PerformanceMetric) -> some View {
+    let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
+    let statistics = history[metric]
+    let minimum = statistics.map { formattedValue($0.minimum, for: metric) } ?? "—"
+    let average = statistics.map { formattedValue($0.average, for: metric) } ?? "—"
+    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "—"
+    return GridRow {
+      Text(localized(metricTitle(metric)))
+        .font(.callout.weight(.medium))
+        .foregroundStyle(.secondary)
+        .gridColumnAlignment(.leading)
+      metricValue(live)
+      metricValue(minimum)
+      metricValue(average)
+      metricValue(maximum)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(
+      "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
+        + "\(localized("Minimum"))：\(minimum)。\(localized("Average"))：\(average)。"
+        + "\(localized("Maximum"))：\(maximum)"
+    )
+  }
+
+  private func metricValue(_ value: String) -> some View {
+    Text(value)
+      .font(.callout.monospacedDigit())
+      .lineLimit(1)
+      .frame(minWidth: 88, alignment: .trailing)
+  }
+
+  private func localized(_ key: String) -> String {
+    L10n.string(key, language: language)
+  }
+
+  private var localizedStateLabel: String {
+    switch state {
+    case .stopped: localized("Stopped")
+    case .starting: localized("Starting")
+    case .running: localized("Running")
+    case .stopping: localized("Stopping")
+    case .failed: localized("Start failed")
+    }
+  }
+
+  private func metricTitle(_ metric: PerformanceMetric) -> String {
+    switch metric {
+    case .prefillTokensPerSecond: "Prefill Tok/s"
+    case .decodeTokensPerSecond: "Decode Tok/s"
+    case .inputTokens: "Input Tokens"
+    case .outputTokens: "Output Tokens"
+    case .memoryUsage: "Memory usage"
+    case .ssdReadSpeed: "SSD read speed"
+    case .cacheHitRate: "Cache Hit rate"
+    case .firstTokenWaitTime: "First Token wait time"
+    case .completionTime: "Completion time"
+    }
+  }
+
+  private func formattedValue(
+    _ value: Double,
+    for metric: PerformanceMetric,
+    live: Bool = false
+  ) -> String {
+    if value == 0 { return "-" }
+    if live && !hasLiveValue(metric, value: value) { return "—" }
+    switch metric {
+    case .prefillTokensPerSecond, .decodeTokensPerSecond:
+      return value.formatted(.number.precision(.fractionLength(1)))
+    case .inputTokens, .outputTokens:
+      return Int64(value.rounded()).formatted()
+    case .memoryUsage:
+      return ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .memory)
+    case .ssdReadSpeed:
+      return "\(ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file))/s"
+    case .cacheHitRate:
+      return value.formatted(.percent.precision(.fractionLength(1)))
+    case .firstTokenWaitTime, .completionTime:
+      if value < 1 {
+        return "\((value * 1_000).formatted(.number.precision(.fractionLength(0)))) ms"
+      }
+      return "\(value.formatted(.number.precision(.fractionLength(2)))) s"
+    }
+  }
+
+  private func hasLiveValue(_ metric: PerformanceMetric, value: Double) -> Bool {
+    guard performance.hasStatus else { return false }
+    switch metric {
+    case .memoryUsage:
+      return value > 0
+    case .prefillTokensPerSecond, .firstTokenWaitTime:
+      return value > 0
+    case .inputTokens, .outputTokens, .decodeTokensPerSecond, .completionTime:
+      return performance.snapshot.inputTokens > 0
+    case .ssdReadSpeed, .cacheHitRate:
+      return true
+    }
   }
 
   private var statusColor: Color {
@@ -551,90 +739,65 @@ private struct PerformancePanel: View {
     }
   }
 
-  private func formattedBytes(_ bytes: UInt64) -> String {
-    ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .memory)
-  }
-}
-
-private struct MetricValue: View {
-  let title: String
-  let value: String
-
-  var body: some View {
-    VStack(alignment: .trailing, spacing: 2) {
-      Text(value)
-        .font(.subheadline.weight(.semibold))
-        .monospacedDigit()
-        .lineLimit(1)
-      Text(title)
-        .font(.caption2.weight(.medium))
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-    }
-    .frame(minWidth: 54, alignment: .trailing)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("\(title)：\(value)")
-  }
 }
 
 private struct SettingLabel: View {
   let title: String
   let hint: String
+  let language: AppLanguage
 
-  init(_ title: String, hint: String) {
+  init(_ title: String, hint: String, language: AppLanguage) {
     self.title = title
     self.hint = hint
+    self.language = language
   }
 
   var body: some View {
     HStack(spacing: 4) {
-      Text(title)
+      Text(L10n.string(title, language: language))
       Image(systemName: "info.circle")
         .foregroundStyle(.secondary)
         .accessibilityHidden(true)
     }
-    .help(hint)
+    .help(L10n.string(hint, language: language))
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(title)
-    .accessibilityHint(hint)
+    .accessibilityLabel(L10n.string(title, language: language))
+    .accessibilityHint(L10n.string(hint, language: language))
   }
 }
 
 private struct ChatView: View {
   let configuration: ServerConfiguration
   @ObservedObject var server: ServerController
+  let language: AppLanguage
   @State private var messages: [ChatMessage] = []
   @State private var input = ""
   @State private var thinkingMode = "chat"
-  @State private var enableTestTool = false
   @State private var isSending = false
   @State private var errorMessage: String?
-  @State private var lastMetrics: ChatMetrics?
   @State private var showingClearConfirmation = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
+    VStack(alignment: .leading, spacing: 16) {
       PerformancePanel(
         model: configuration.publicModel,
         state: server.state,
-        performance: server.performance
+        performance: server.performance,
+        history: server.performanceHistory,
+        language: language,
+        clearHistory: server.clearPerformanceHistory
       )
 
       HStack(spacing: 12) {
-        Text("對話")
+        Text(localized("Chat"))
           .font(.title2.bold())
         Spacer()
-        Picker("Thinking mode", selection: $thinkingMode) {
-          Text("Chat").tag("chat")
-          Text("Thinking").tag("thinking")
+        Picker(localized("Thinking mode"), selection: $thinkingMode) {
+          Text(localized("Chat")).tag("chat")
+          Text(localized("Thinking")).tag("thinking")
         }
         .pickerStyle(.segmented)
         .frame(width: 220)
-        Toggle("啟用 Tool call 測試", isOn: $enableTestTool)
-          .toggleStyle(.switch)
-          .disabled(isSending)
-          .help("模型可以呼叫 get_current_time。App 只顯示呼叫內容，不會執行 Tool。")
-          .accessibilityHint("App 只顯示 get_current_time 呼叫內容，不會執行 Tool。")
       }
 
       GroupBox {
@@ -643,21 +806,21 @@ private struct ChatView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
               if messages.isEmpty {
                 ContentUnavailableView(
-                  "尚無測試訊息",
+                  localized("No Test Messages"),
                   systemImage: "bubble.left",
-                  description: Text("啟動 server，然後送出一則訊息。")
+                  description: Text(localized("Start the server. Then send a message."))
                 )
                 .frame(maxWidth: .infinity, minHeight: 280)
               } else {
                 ForEach(messages) { message in
                   VStack(alignment: .leading, spacing: 6) {
-                    Text(message.role == "user" ? "你" : "DeepSeek")
-                      .font(.caption.bold())
+                    Text(message.role == "user" ? localized("You") : "DeepSeek")
+                      .font(.callout.bold())
                       .foregroundStyle(.secondary)
                     if !message.reasoningContent.isEmpty {
                       VStack(alignment: .leading, spacing: 4) {
-                        Text("思考過程")
-                          .font(.caption.bold())
+                        Text(localized("Reasoning"))
+                          .font(.callout.bold())
                           .foregroundStyle(.secondary)
                         Text(message.reasoningContent)
                           .foregroundStyle(.secondary)
@@ -669,18 +832,19 @@ private struct ChatView: View {
                         .textSelection(.enabled)
                     }
                     ForEach(message.toolCalls) { toolCall in
-                      GroupBox("Tool call") {
+                      GroupBox(localized("Tool call")) {
                         VStack(alignment: .leading, spacing: 8) {
-                          LabeledContent("Function", value: toolCall.function.name)
+                          LabeledContent(
+                            localized("Function"), value: toolCall.function.name)
                           VStack(alignment: .leading, spacing: 3) {
-                            Text("Arguments")
+                            Text(localized("Arguments"))
                               .foregroundStyle(.secondary)
                             Text(toolCall.function.arguments)
                               .font(.system(.body, design: .monospaced))
                               .textSelection(.enabled)
                           }
-                          Text("App 不會執行這個 Tool。")
-                            .font(.caption)
+                          Text(localized("The app does not run this tool."))
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -689,11 +853,11 @@ private struct ChatView: View {
                     if message.role == "assistant" && message.content.isEmpty
                       && message.reasoningContent.isEmpty && message.toolCalls.isEmpty
                     {
-                      ProgressView("正在生成")
+                      ProgressView(localized("Generating"))
                         .controlSize(.small)
                     }
                   }
-                  .padding(12)
+                  .padding(14)
                   .frame(maxWidth: .infinity, alignment: .leading)
                   .background(
                     message.role == "user"
@@ -717,13 +881,13 @@ private struct ChatView: View {
       if let errorMessage {
         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
           .foregroundStyle(.red)
-          .accessibilityLabel("錯誤：\(errorMessage)")
+          .accessibilityLabel(L10n.string("Error: %@", language: language, errorMessage))
       }
 
       VStack(alignment: .leading, spacing: 10) {
         ZStack(alignment: .topLeading) {
           if input.isEmpty {
-            Text("輸入訊息…")
+            Text(localized("Enter a message…"))
               .foregroundStyle(.tertiary)
               .padding(.horizontal, 5)
               .padding(.vertical, 8)
@@ -732,27 +896,21 @@ private struct ChatView: View {
           TextEditor(text: $input)
             .font(.body)
             .scrollContentBackground(.hidden)
-            .frame(minHeight: 74, maxHeight: 140)
-            .accessibilityLabel("測試訊息")
+            .frame(minHeight: 90, maxHeight: 180)
+            .accessibilityLabel(localized("Test message"))
         }
 
         HStack(spacing: 10) {
           if server.state != .running {
-            Label("請先啟動 server", systemImage: "server.rack")
-              .font(.caption)
+            Label(localized("Start the server first"), systemImage: "server.rack")
+              .font(.callout)
               .foregroundStyle(.secondary)
-          } else if let lastMetrics {
-            Text(
-              "\(lastMetrics.completionTokens) tokens · \(lastMetrics.tokensPerSecond.formatted(.number.precision(.fractionLength(1)))) tok/s"
-            )
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.secondary)
           }
           Spacer()
           Button {
             showingClearConfirmation = true
           } label: {
-            Label("清空對話", systemImage: "trash")
+            Label(localized("Clear Chat"), systemImage: "trash")
           }
           .disabled(messages.isEmpty || isSending)
           Button {
@@ -763,7 +921,7 @@ private struct ChatView: View {
                 .controlSize(.small)
                 .frame(minWidth: 72)
             } else {
-              Label("生成", systemImage: "arrow.up")
+              Label(localized("Generate"), systemImage: "arrow.up")
             }
           }
           .buttonStyle(.borderedProminent)
@@ -772,28 +930,28 @@ private struct ChatView: View {
           .keyboardShortcut(.return, modifiers: .command)
         }
       }
-      .padding(12)
+      .padding(14)
       .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
       .overlay(
         RoundedRectangle(cornerRadius: 16)
           .stroke(Color.primary.opacity(0.06))
       )
     }
-    .padding(18)
+    .padding(22)
+    .environment(\.locale, language.locale)
     .confirmationDialog(
-      "要清空測試對話嗎？",
+      localized("Clear the test chat?"),
       isPresented: $showingClearConfirmation,
       titleVisibility: .visible
     ) {
-      Button("清空對話", role: .destructive) {
+      Button(localized("Clear Chat"), role: .destructive) {
         messages.removeAll()
         input = ""
         errorMessage = nil
-        lastMetrics = nil
       }
-      Button("取消", role: .cancel) {}
+      Button(localized("Cancel"), role: .cancel) {}
     } message: {
-      Text("App 只會清除本機測試對話。Server 和其他 API client 不受影響。")
+      Text(localized("The app will clear only the local test chat. The server and other API clients are not affected."))
     }
   }
 
@@ -805,6 +963,10 @@ private struct ChatView: View {
       }
   }
 
+  private func localized(_ key: String) -> String {
+    L10n.string(key, language: language)
+  }
+
   private func send() {
     let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty, let baseURL = configuration.baseURL else { return }
@@ -812,20 +974,19 @@ private struct ChatView: View {
     messages.append(userMessage)
     input = ""
     errorMessage = nil
-    lastMetrics = nil
     isSending = true
     let requestMessages = messages
     let assistantID = UUID()
     messages.append(ChatMessage(id: assistantID, role: "assistant", content: ""))
     Task {
       do {
-        lastMetrics = try await ChatClient.stream(
+        _ = try await ChatClient.stream(
           messages: requestMessages,
           baseURL: baseURL,
           apiKey: configuration.apiKey,
           model: configuration.publicModel,
           thinkingMode: thinkingMode,
-          enableTestTool: enableTestTool
+          enableTestTool: false
         ) { delta in
           guard let index = messages.firstIndex(where: { $0.id == assistantID }) else { return }
           messages[index].append(delta)
@@ -838,7 +999,8 @@ private struct ChatView: View {
         {
           messages.remove(at: index)
         }
-        errorMessage = "無法取得回應。\(error.localizedDescription)"
+        errorMessage = L10n.string(
+          "Could not get a response. %@", language: language, error.localizedDescription)
       }
       isSending = false
     }

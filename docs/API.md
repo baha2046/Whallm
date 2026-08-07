@@ -11,7 +11,7 @@ make run
 ```
 
 Use the SwiftUI app to select the installed model, configure the runtime, and
-start the server. The default address is `http://127.0.0.1:8000`.
+start the server. The default address is `http://127.0.0.1:11434`.
 
 Start the server without the app when needed:
 
@@ -21,6 +21,23 @@ DEEPSEEK_API_KEY=local-key make server
 
 The server allows a local address without an API key. The server requires
 `--api-key` or `DEEPSEEK_API_KEY` when `--host` is not local.
+
+Use `--prefill-step-size 0` to select 128, 256, or 1,024 tokens automatically.
+Layer-major prefill is enabled for requests with at least 4,096 uncached
+tokens. The default layer-local MoE tile is 4,096 tokens. The runtime uses a
+strided routed expert layer and batched `gather_qmm` during this path. Use
+`--no-batched-expert-prefill` or `--no-layer-major-prefill` only for comparison.
+
+The server keeps two prompt cache timelines within an 8 GiB limit. It keeps up
+to eight persistent cache entries under `~/.dsmodel/prompt-cache/`. Use
+`--no-persistent-prompt-cache` to disable disk cache. Use
+`--warmup-prompt-file PATH` to populate a fixed UTF-8 prompt prefix during
+startup.
+
+The runtime uses four workers for individual routed expert reads. It uses two
+workers for full-layer prefetch. Use `--prefetch-read-workers` to change the
+second value. The indexer uses an FP4 cache by default. Use
+`--no-fp4-index-cache` for the MXFP8 comparison path.
 
 ## OpenAI Python client
 
@@ -34,7 +51,7 @@ python -m pip install openai
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://127.0.0.1:8000/v1",
+    base_url="http://127.0.0.1:11434/v1",
     api_key="local-key",
 )
 
@@ -63,7 +80,7 @@ print(response.output_text)
 ## curl
 
 ```sh
-curl http://127.0.0.1:8000/v1/chat/completions \
+curl http://127.0.0.1:11434/v1/chat/completions \
   -H 'Authorization: Bearer local-key' \
   -H 'Content-Type: application/json' \
   --data-binary '{
@@ -108,7 +125,8 @@ defaults in memory. A server restart restores the command-line defaults.
 
 `/v1/responses` accepts a text `input` or an array of text message items. It
 also accepts `instructions`, `max_output_tokens`, `reasoning.effort`, function
-`tools`, and `function_call_output` items. Set `stream: true` to receive typed
+`tools`, Codex namespace tools, and `function_call_output` items. Set
+`stream: true` to receive typed
 Responses API events, including `response.output_text.delta`,
 `response.function_call_arguments.delta`, and `response.completed`.
 
@@ -134,12 +152,18 @@ fails, the stream sends an error event and then `[DONE]`.
 - `/v1/responses` is stateless. It does not support `previous_response_id`,
   `conversation`, `store`, or `background`. Send earlier output items again in
   `input` when you continue a Tool call.
-- `/v1/responses` supports function tools. It does not support OpenAI built-in
-  tools, such as web search, file search, computer use, or MCP.
+- `/v1/responses` supports function tools and Codex namespace tools. The server
+  ignores hosted `web_search` declarations because the local runtime cannot
+  execute them. It rejects other unsupported built-in tools.
 - The server returns an OpenAI error object when a request uses an unsupported
   field.
 - The request body limit is 1 MiB.
 - The maximum requested output is 32,768 tokens.
+
+`GET /api/status` reports both cumulative expert cache values and values for
+the latest request. Request fields include the selected prefill step, whether
+layer-major prefill ran, expert cache hits and misses, expert evictions, expert
+bytes read, SSD read time, and routing synchronization time.
 
 DeepSeek-V4 uses the official encoder stored in the installed model. The model
 installer pins this file to the same revision as the model weights. The Runtime

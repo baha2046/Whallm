@@ -114,7 +114,7 @@ struct ChatDelta: Decodable, Equatable, Sendable {
 
 enum ChatStreamEvent: Equatable {
   case delta(ChatDelta)
-  case usage(completionTokens: Int)
+  case usage(promptTokens: Int, completionTokens: Int)
   case done
 }
 
@@ -125,9 +125,11 @@ enum ChatStreamDecoder {
     }
 
     struct Usage: Decodable {
+      let promptTokens: Int
       let completionTokens: Int
 
       enum CodingKeys: String, CodingKey {
+        case promptTokens = "prompt_tokens"
         case completionTokens = "completion_tokens"
       }
     }
@@ -148,7 +150,10 @@ enum ChatStreamDecoder {
     let chunk = try JSONDecoder().decode(Chunk.self, from: Data(payload.utf8))
     if let error = chunk.error { throw ChatError(error.message) }
     if let usage = chunk.usage {
-      return .usage(completionTokens: usage.completionTokens)
+      return .usage(
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens
+      )
     }
     guard let delta = chunk.choices?.first?.delta else { return nil }
     return .delta(delta)
@@ -156,11 +161,14 @@ enum ChatStreamDecoder {
 }
 
 struct ChatMetrics: Equatable, Sendable {
+  let promptTokens: Int
   let completionTokens: Int
   let elapsedSeconds: Double
+  let firstTokenSeconds: Double
 
   var tokensPerSecond: Double {
-    elapsedSeconds > 0 ? Double(completionTokens) / elapsedSeconds : 0
+    let generationSeconds = elapsedSeconds - firstTokenSeconds
+    return generationSeconds > 0 ? Double(completionTokens) / generationSeconds : 0
   }
 }
 
@@ -252,15 +260,17 @@ enum ChatClient {
     let start = clock.now
     let (bytes, response) = try await URLSession.shared.bytes(for: request)
     guard let http = response as? HTTPURLResponse else {
-      throw ChatError("Server 未傳回 HTTP response。")
+      throw ChatError(L10n.string("The server did not return an HTTP response."))
     }
     guard (200..<300).contains(http.statusCode) else {
       var data = Data()
       for try await byte in bytes { data.append(byte) }
       let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data)
-      throw ChatError(detail?.error.message ?? "Server 傳回 HTTP \(http.statusCode)。")
+      throw ChatError(
+        detail?.error.message ?? L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
     }
 
+    var promptTokens = 0
     var completionTokens = 0
     var firstDelta: ContinuousClock.Instant?
     for try await line in bytes.lines {
@@ -271,16 +281,20 @@ enum ChatClient {
           firstDelta = firstDelta ?? clock.now
           await receive(delta)
         }
-      case .usage(let tokens):
-        completionTokens = tokens
+      case .usage(let prompt, let completion):
+        promptTokens = prompt
+        completionTokens = completion
       case .done:
+        let end = clock.now
         return ChatMetrics(
+          promptTokens: promptTokens,
           completionTokens: completionTokens,
-          elapsedSeconds: seconds(from: (firstDelta ?? start).duration(to: clock.now))
+          elapsedSeconds: seconds(from: start.duration(to: end)),
+          firstTokenSeconds: seconds(from: start.duration(to: firstDelta ?? end))
         )
       }
     }
-    throw ChatError("Streaming response 在 [DONE] 前中斷。")
+    throw ChatError(L10n.string("The streaming response ended before [DONE]."))
   }
 
   private static func seconds(from duration: Duration) -> Double {

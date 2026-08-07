@@ -60,11 +60,14 @@ class MXFP8PoolingCache(CorrectPoolingCache):
     """Store completed compressed-attention cache chunks as MXFP8."""
 
     chunk_size = 64
+    fp4_index = True
 
     def __init__(self, ratio: int):
         super().__init__(ratio)
         self._chunks: list[tuple[mx.array, mx.array]] = []
+        self._index_chunks: list[tuple[mx.array, mx.array]] = []
         self._packed_cache: tuple[mx.array, mx.array] | None = None
+        self._packed_index_cache: tuple[mx.array, mx.array] | None = None
         self._pending: mx.array | None = None
         self._length = 0
         self._last_shape: tuple[int, int] | None = None
@@ -100,17 +103,18 @@ class MXFP8PoolingCache(CorrectPoolingCache):
             ready = self._pending.shape[1] // self.chunk_size * self.chunk_size
             if ready:
                 self._packed_cache = None
+                self._packed_index_cache = None
                 completed = self._pending[:, :ready]
                 self._pending = self._pending[:, ready:] if ready < self._pending.shape[1] else None
                 for start in range(0, ready, self.chunk_size):
+                    chunk = completed[:, start : start + self.chunk_size]
                     self._chunks.append(
-                        mx.quantize(
-                            completed[:, start : start + self.chunk_size],
-                            group_size=32,
-                            bits=8,
-                            mode="mxfp8",
-                        )
+                        mx.quantize(chunk, group_size=32, bits=8, mode="mxfp8")
                     )
+                    if self.fp4_index:
+                        self._index_chunks.append(
+                            mx.quantize(chunk, group_size=32, bits=4, mode="mxfp4")
+                        )
 
     def quantized_matmul(self, query: mx.array) -> mx.array:
         scores = []
@@ -124,6 +128,28 @@ class MXFP8PoolingCache(CorrectPoolingCache):
                     group_size=32,
                     bits=8,
                     mode="mxfp8",
+                )
+            )
+        if self._pending is not None:
+            scores.append(query @ self._pending[:, None].swapaxes(-1, -2).astype(query.dtype))
+        if not scores:
+            return mx.zeros((*query.shape[:-1], 0), dtype=query.dtype)
+        return scores[0] if len(scores) == 1 else mx.concatenate(scores, axis=-1)
+
+    def index_matmul(self, query: mx.array) -> mx.array:
+        if not self.fp4_index:
+            return self.quantized_matmul(query)
+        scores = []
+        packed = self._packed_index()
+        if packed is not None:
+            scores.append(
+                mx.quantized_matmul(
+                    query,
+                    *packed,
+                    transpose=True,
+                    group_size=32,
+                    bits=4,
+                    mode="mxfp4",
                 )
             )
         if self._pending is not None:
@@ -187,6 +213,18 @@ class MXFP8PoolingCache(CorrectPoolingCache):
             )
         return self._packed_cache
 
+    def _packed_index(self) -> tuple[mx.array, mx.array] | None:
+        if not self._index_chunks:
+            return None
+        if self._packed_index_cache is None:
+            weights = [weight for weight, _ in self._index_chunks]
+            scales = [scale for _, scale in self._index_chunks]
+            self._packed_index_cache = (
+                weights[0] if len(weights) == 1 else mx.concatenate(weights, axis=1),
+                scales[0] if len(scales) == 1 else mx.concatenate(scales, axis=1),
+            )
+        return self._packed_index_cache
+
     def fetch(self, batch: int, width: int, dtype):
         return self._fetch(batch, width, dtype)
 
@@ -237,7 +275,9 @@ class MXFP8PoolingCache(CorrectPoolingCache):
         self.remainder = 0
         self.buf_kv = self.buf_gate = None
         self._chunks = []
+        self._index_chunks = []
         self._packed_cache = None
+        self._packed_index_cache = None
         self._pending = None
         self._length = 0
         self._last_shape = None
@@ -261,6 +301,9 @@ class MXFP8PoolingCache(CorrectPoolingCache):
     @property
     def nbytes(self):
         total = sum(weight.nbytes + scale.nbytes for weight, scale in self._chunks)
+        total += sum(
+            weight.nbytes + scale.nbytes for weight, scale in self._index_chunks
+        )
         if self._pending is not None:
             total += self._pending.nbytes
         if self.buf_kv is not None:

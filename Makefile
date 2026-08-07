@@ -5,7 +5,7 @@ export
 
 MODEL ?= scratch/deepseek-v4-flash-0731.dsv4
 HOST ?= 127.0.0.1
-PORT ?= 8000
+PORT ?= 11434
 SPARKLE_FRAMEWORK_PATH := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
 
 ARGS := $(word 2,$(MAKECMDGOALS))

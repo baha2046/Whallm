@@ -85,25 +85,33 @@ PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli \
   --max-tokens 32
 ```
 
-The M5 Pro defaults use 1,024 expert slots, four SSD read workers, 128-token
-prefill chunks, and an MXFP8 compressed-attention cache. Use
+The M5 Pro defaults use 1,024 expert slots, four SSD read workers, automatic
+128-, 256-, or 512-token prefill chunks, and an MXFP8 compressed-attention
+cache. Prompts with at least 4,096 uncached tokens use layer-major prefill. Use
 `--bf16-kv-cache` for the correctness baseline.
 
 Each expert slot stores one packed expert blob. A cache miss creates one Metal
 array instead of six arrays. The cache uses layer-aware LFU heaps with frequency
-aging. MXFP8 index scoring and sparse pooled attention operate on cache chunks
-without rebuilding the complete index cache. The API status and CLI metrics
+aging. FP4 index scoring and MXFP8 sparse pooled attention operate on cache
+chunks without rebuilding the complete cache. The API status and CLI metrics
 include time to first token, decode speed, cache-state evaluation, packing,
 eviction, and routing synchronization times. The runtime evaluates cache state
 after each output token. This limits Metal resource growth during long output.
-The runtime also reuses one in-memory prompt prefix for a continued chat.
+The runtime keeps up to two in-memory prompt cache timelines for continued
+chats. Their combined default memory limit is 8 GiB. The runtime also stores
+up to eight restart-safe prompt caches under `~/.dsmodel/prompt-cache/`. Use
+`--warmup-prompt-file` to populate a fixed prompt prefix before the server
+starts accepting requests.
 Single-token decode runs the six routed experts directly. Multi-token prefill
-groups token routes by expert. Neither path builds stacked weight buffers.
+uses layer-local MoE tiles. It reads one routed expert layer into a strided
+tensor and runs three batched `gather_qmm` operations per MoE tile.
 
 Measured direct SSD throughput reached 14.30 GiB/s with four read workers.
-After prefill grouping, a 4,096-token BF16 prefill and one output token took
-30.74 seconds. An 8,192-token MXFP8 prefill and one output token took 65.47
-seconds. See the validation record for the full measurements and their limits.
+The layer prefetch path uses two read workers to limit unified-memory bandwidth
+contention. A varied 4,097-token Tool-like prompt decreased from 44.03 to 28.02
+seconds. A varied 14,363-token Tool-like prompt decreased from 105.81 to 76.54
+seconds. Both measurements generated one greedy token.
+See the validation record for the full measurements and their limits.
 
 ## Run the macOS app
 

@@ -12,8 +12,15 @@ struct ServerStatus: Decodable {
     }
 
     let generating: Bool
-    let generationTokens: Int
-    let tokensPerSecond: Double
+    let runtimePromptTokens: Int
+    let runtimeGenerationTokens: Int
+    let completedRequestCount: Int
+    let requestSeconds: Double
+    let timeToFirstTokenSeconds: Double
+    let prefillTokensPerSecond: Double
+    let decodeTokensPerSecond: Double
+    let requestSsdReadBytesPerSecond: Double
+    let requestExpertCacheHitRate: Double
     let ssdBytesRead: UInt64
     let activeParametersCache: ActiveParametersCache
   }
@@ -27,16 +34,91 @@ struct ServerStatus: Decodable {
   }
 }
 
+enum PerformanceMetric: String, CaseIterable, Identifiable {
+  case prefillTokensPerSecond
+  case decodeTokensPerSecond
+  case inputTokens
+  case outputTokens
+  case memoryUsage
+  case ssdReadSpeed
+  case cacheHitRate
+  case firstTokenWaitTime
+  case completionTime
+
+  var id: String { rawValue }
+}
+
+struct PerformanceSnapshot: Equatable {
+  var prefillTokensPerSecond = 0.0
+  var decodeTokensPerSecond = 0.0
+  var inputTokens = 0.0
+  var outputTokens = 0.0
+  var memoryUsage = 0.0
+  var ssdReadSpeed = 0.0
+  var cacheHitRate = 0.0
+  var firstTokenWaitTime = 0.0
+  var completionTime = 0.0
+
+  subscript(metric: PerformanceMetric) -> Double {
+    switch metric {
+    case .prefillTokensPerSecond: prefillTokensPerSecond
+    case .decodeTokensPerSecond: decodeTokensPerSecond
+    case .inputTokens: inputTokens
+    case .outputTokens: outputTokens
+    case .memoryUsage: memoryUsage
+    case .ssdReadSpeed: ssdReadSpeed
+    case .cacheHitRate: cacheHitRate
+    case .firstTokenWaitTime: firstTokenWaitTime
+    case .completionTime: completionTime
+    }
+  }
+}
+
+struct MetricStatistics: Equatable {
+  private(set) var count = 0
+  private(set) var minimum = 0.0
+  private(set) var total = 0.0
+  private(set) var maximum = 0.0
+
+  var average: Double { count == 0 ? 0 : total / Double(count) }
+
+  mutating func record(_ value: Double) {
+    guard value.isFinite else { return }
+    if count == 0 {
+      minimum = value
+      maximum = value
+    } else {
+      minimum = Swift.min(minimum, value)
+      maximum = Swift.max(maximum, value)
+    }
+    count += 1
+    total += value
+  }
+}
+
+struct PerformanceHistory: Equatable {
+  private(set) var values: [PerformanceMetric: MetricStatistics] = [:]
+
+  var isEmpty: Bool { values.isEmpty }
+
+  subscript(metric: PerformanceMetric) -> MetricStatistics? { values[metric] }
+
+  mutating func record(_ snapshot: PerformanceSnapshot) {
+    for metric in PerformanceMetric.allCases {
+      values[metric, default: MetricStatistics()].record(snapshot[metric])
+    }
+  }
+
+  mutating func clear() {
+    values.removeAll()
+  }
+}
+
 struct LivePerformance: Equatable {
   var hasStatus = false
   var generating = false
-  var generationTokens = 0
-  var tokensPerSecond = 0.0
-  var memoryBytes: UInt64 = 0
-  var ssdBytesPerSecond = 0.0
-  var cacheHitRate = 0.0
-  var cacheResidentSlots = 0
-  var cacheCapacitySlots = 0
+  var completedRequestCount = 0
+  var snapshot = PerformanceSnapshot()
 }
 
 private struct RuntimeEnvironment {
@@ -87,6 +169,10 @@ struct ServerConfiguration {
   var slots: Int
   var readWorkers: Int
   var prefillStepSize: Int
+  var layerMajorPrefill: Bool
+  var promptCacheEntries: Int
+  var promptCacheMemoryGiB: Int
+  var warmupPromptPath: String
   var bf16KVCache: Bool
   var defaultMaxTokens: Int
   var defaultTemperature: Double
@@ -101,16 +187,20 @@ struct ServerConfiguration {
       sitePackages: runtime.sitePackages?.path,
       modelPath: UserDefaults.standard.string(forKey: "selectedModelPath") ?? "",
       host: "127.0.0.1",
-      port: 8000,
+      port: 11_434,
       apiKey: "",
       publicModel: "deepseek-v4-flash-0731",
       slots: 1_024,
       readWorkers: 4,
-      prefillStepSize: 128,
+      prefillStepSize: 0,
+      layerMajorPrefill: true,
+      promptCacheEntries: 2,
+      promptCacheMemoryGiB: 8,
+      warmupPromptPath: "",
       bf16KVCache: false,
-      defaultMaxTokens: 32,
-      defaultTemperature: 0,
-      defaultTopP: 1
+      defaultMaxTokens: 272_000,
+      defaultTemperature: 0.2,
+      defaultTopP: 0.98
     )
   }
 
@@ -130,10 +220,16 @@ struct ServerConfiguration {
       "--slots", String(slots),
       "--read-workers", String(readWorkers),
       "--prefill-step-size", String(prefillStepSize),
+      "--prompt-cache-entries", String(promptCacheEntries),
+      "--prompt-cache-memory-gib", String(promptCacheMemoryGiB),
       "--default-max-tokens", String(defaultMaxTokens),
       "--default-temperature", String(defaultTemperature),
       "--default-top-p", String(defaultTopP),
     ]
+    if !layerMajorPrefill { values.append("--no-layer-major-prefill") }
+    if !warmupPromptPath.isEmpty {
+      values += ["--warmup-prompt-file", warmupPromptPath]
+    }
     if bf16KVCache { values.append("--bf16-kv-cache") }
     return values
   }
@@ -143,10 +239,10 @@ struct ServerConfiguration {
     guard FileManager.default.fileExists(atPath: runtimeDirectory, isDirectory: &isDirectory),
       isDirectory.boolValue
     else {
-      throw ConfigurationError("App 缺少 runtime。請重新安裝 App。")
+      throw ConfigurationError(L10n.string("The app runtime is missing. Install the app again."))
     }
     guard FileManager.default.isExecutableFile(atPath: pythonExecutable) else {
-      throw ConfigurationError("App 缺少 Python。請重新安裝 App。")
+      throw ConfigurationError(L10n.string("Python is missing from the app. Install the app again."))
     }
     guard
       FileManager.default.fileExists(
@@ -154,34 +250,43 @@ struct ServerConfiguration {
           .appending(path: "deepseek_v4_ssd/server.py").path
       )
     else {
-      throw ConfigurationError("App 的 runtime 不完整。請重新安裝 App。")
+      throw ConfigurationError(L10n.string("The app runtime is incomplete. Install the app again."))
     }
     guard InstalledModelDiscovery.inspect(URL(fileURLWithPath: modelPath))?.isUsable == true else {
-      throw ConfigurationError("請選擇可使用的 installed model。")
+      throw ConfigurationError(L10n.string("Select a usable installed model."))
     }
     guard !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      throw ConfigurationError("Host 不可空白。")
+      throw ConfigurationError(L10n.string("Host cannot be empty."))
     }
     guard (1...65_535).contains(port) else {
-      throw ConfigurationError("Port 必須介於 1 和 65535。")
+      throw ConfigurationError(L10n.string("Port must be from 1 through 65535."))
     }
     guard ["127.0.0.1", "::1", "localhost"].contains(host) || !apiKey.isEmpty else {
-      throw ConfigurationError("非本機 Host 必須設定 API key。")
+      throw ConfigurationError(L10n.string("An API key is required for a non-local host."))
     }
     guard !publicModel.isEmpty else {
-      throw ConfigurationError("Model ID 不可空白。")
+      throw ConfigurationError(L10n.string("Model ID cannot be empty."))
     }
     guard slots >= 6 else {
-      throw ConfigurationError("Slot 數量至少需要 6。")
+      throw ConfigurationError(L10n.string("Slots must be at least 6."))
     }
-    guard readWorkers >= 1, prefillStepSize >= 1 else {
-      throw ConfigurationError("Read workers 和 prefill step size 必須大於 0。")
+    guard readWorkers >= 1, prefillStepSize >= 0 else {
+      throw ConfigurationError(
+        L10n.string("Read workers must be greater than 0. Prefill step size must be 0 or greater."))
     }
-    guard (1...32_768).contains(defaultMaxTokens),
+    guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
+      throw ConfigurationError(L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
+    }
+    if !warmupPromptPath.isEmpty {
+      guard FileManager.default.isReadableFile(atPath: warmupPromptPath) else {
+        throw ConfigurationError(L10n.string("The warmup prompt file cannot be read."))
+      }
+    }
+    guard (1...272_000).contains(defaultMaxTokens),
       (0...2).contains(defaultTemperature),
       (0.000_001...1).contains(defaultTopP)
     else {
-      throw ConfigurationError("請修正預設生成參數。")
+      throw ConfigurationError(L10n.string("Correct the default generation parameters."))
     }
   }
 }
@@ -207,11 +312,11 @@ final class ServerController: ObservableObject {
 
     var label: String {
       switch self {
-      case .stopped: "已停止"
-      case .starting: "正在啟動"
-      case .running: "執行中"
-      case .stopping: "正在停止"
-      case .failed: "啟動失敗"
+      case .stopped: L10n.string("Stopped")
+      case .starting: L10n.string("Starting")
+      case .running: L10n.string("Running")
+      case .stopping: L10n.string("Stopping")
+      case .failed: L10n.string("Start failed")
       }
     }
 
@@ -228,6 +333,7 @@ final class ServerController: ObservableObject {
   @Published private(set) var state: State = .stopped
   @Published private(set) var log = ""
   @Published private(set) var performance = LivePerformance()
+  @Published private(set) var performanceHistory = PerformanceHistory()
 
   private var process: Process?
   private var outputTask: Task<Void, Never>?
@@ -235,6 +341,7 @@ final class ServerController: ObservableObject {
   private var monitorConfiguration: ServerConfiguration?
   private var previousSSDBytes: UInt64?
   private var previousSSDTime: ContinuousClock.Instant?
+  private var lastRecordedCompletedRequestCount = 0
 
   var isActive: Bool {
     switch state {
@@ -283,7 +390,7 @@ final class ServerController: ObservableObject {
       startMonitoring()
     } catch {
       state = .failed(error.localizedDescription)
-      appendLog("錯誤：\(error.localizedDescription)\n")
+      appendLog(L10n.string("Error: %@", error.localizedDescription) + "\n")
     }
   }
 
@@ -294,6 +401,11 @@ final class ServerController: ObservableObject {
     }
     state = .stopping
     process.interrupt()
+  }
+
+  func clearPerformanceHistory() {
+    performanceHistory.clear()
+    lastRecordedCompletedRequestCount = performance.completedRequestCount
   }
 
   private func readOutput(_ handle: FileHandle) {
@@ -333,7 +445,7 @@ final class ServerController: ObservableObject {
   private func refreshPerformance() async {
     guard let process, process.isRunning else { return }
     let memoryBytes = residentMemoryBytes(process.processIdentifier)
-    performance.memoryBytes = memoryBytes
+    performance.snapshot.memoryUsage = Double(memoryBytes)
     guard case .running = state,
       let configuration = monitorConfiguration,
       let baseURL = configuration.baseURL
@@ -362,19 +474,43 @@ final class ServerController: ObservableObject {
       previousSSDBytes = status.performance.ssdBytesRead
       previousSSDTime = now
       let cache = status.performance.activeParametersCache
-      performance = LivePerformance(
+      let requestCompleted = status.performance.completedRequestCount > 0
+      let cacheHitRate = status.performance.generating || !requestCompleted
+        ? cache.hitRate : status.performance.requestExpertCacheHitRate
+      let live = LivePerformance(
         hasStatus: true,
         generating: status.performance.generating,
-        generationTokens: status.performance.generationTokens,
-        tokensPerSecond: status.performance.tokensPerSecond,
-        memoryBytes: memoryBytes,
-        ssdBytesPerSecond: bytesPerSecond,
-        cacheHitRate: cache.hitRate,
-        cacheResidentSlots: cache.residentSlots,
-        cacheCapacitySlots: cache.capacitySlots
+        completedRequestCount: status.performance.completedRequestCount,
+        snapshot: PerformanceSnapshot(
+          prefillTokensPerSecond: status.performance.prefillTokensPerSecond,
+          decodeTokensPerSecond: status.performance.decodeTokensPerSecond,
+          inputTokens: Double(status.performance.runtimePromptTokens),
+          outputTokens: Double(status.performance.runtimeGenerationTokens),
+          memoryUsage: Double(memoryBytes),
+          ssdReadSpeed: bytesPerSecond,
+          cacheHitRate: cacheHitRate,
+          firstTokenWaitTime: status.performance.timeToFirstTokenSeconds,
+          completionTime: status.performance.requestSeconds
+        )
       )
+      performance = live
+      recordPerformanceSample(live)
     } catch {
       return
+    }
+  }
+
+  func recordPerformanceSample(_ live: LivePerformance) {
+    if live.completedRequestCount < lastRecordedCompletedRequestCount {
+      lastRecordedCompletedRequestCount = live.completedRequestCount
+    }
+
+    let requestCompleted = live.completedRequestCount > lastRecordedCompletedRequestCount
+    if live.generating || requestCompleted {
+      performanceHistory.record(live.snapshot)
+    }
+    if requestCompleted {
+      lastRecordedCompletedRequestCount = live.completedRequestCount
     }
   }
 
@@ -412,7 +548,7 @@ final class ServerController: ObservableObject {
     } else if status == 0 {
       state = .stopped
     } else {
-      let message = "Server 已停止，結束碼為 \(status)。"
+      let message = L10n.string("The server stopped with exit code %d.", status)
       state = .failed(message)
       appendLog("\n\(message)\n")
     }

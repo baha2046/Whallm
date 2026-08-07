@@ -108,6 +108,64 @@ main-model baseline spends most time in model and expert work. SSD reads use
 about 14.0 seconds of the 65.5-second 8K run. There is no measured evidence that
 DSpark gives a net speed increase in this runtime.
 
+## Layer-major prefill measurements
+
+These measurements use the same installed model and a deterministic repeated
+token prompt. Each row generates one greedy token. The 4K and 8K outputs were
+` test` in both prefill modes.
+
+| Context | Mode | Step | Time | Expert bytes read |
+| ---: | --- | ---: | ---: | ---: |
+| 321 | Chunk-major | 128 | 7.23 s | 52.4 GB |
+| 321 | Layer-major | 128 | 7.44 s | 38.7 GB |
+| 4,096 | Layer-major | 128 | 29.30 s | 47.3 GB |
+| 4,096 | Layer-major | 256 | 22.49 s | 47.0 GB |
+| 4,096 | Chunk-major | 512 | 21.18 s | 101.5 GB |
+| 4,096 | Layer-major | 512 | 20.21 s | 46.7 GB |
+| 8,192 | Chunk-major | 512 | 47.04 s | 251.9 GB |
+| 8,192 | Layer-major | 512 | 38.20 s | 60.3 GB |
+| 14,363 | Chunk-major | 512 | 386.65 s | 2,290.6 GB |
+| 14,363 | Layer-major | 512 | 105.81 s | 131.5 GB |
+
+Layer-major prefill is slower for the 321-token test. The runtime therefore
+uses it only when at least 4,096 prompt tokens are not already cached. Automatic
+step selection uses 128 below 1K, 256 below 4K, and 512 from 4K onward.
+The 14K prompt contains varied Tool-like names, parameters, and descriptions.
+Layer-major prefill was 3.65 times faster and reduced expert blob reads by about
+94.3 percent. It is not the original Codex request payload.
+
+A same-process 4K continuation reused 4,097 of 4,098 prompt tokens. Time to
+first token decreased from 20.89 seconds to 0.56 seconds. The current runtime
+also saves completed prompt cache entries for reuse after a server restart.
+
+## Batched layer-local MoE measurements
+
+These measurements use a varied Tool-like prompt. Each row generates one
+greedy token. The optimized path uses a 1,024-token attention step, a
+4,096-token MoE tile, two full-layer prefetch workers, strided routed expert
+views, and batched `gather_qmm`.
+
+| Context | Path | Time | Expert read time | Expert bytes | `gather_qmm` calls |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 4,097 | Grouped fallback | 44.03 s | 10.12 s | 128.64 GB | 0 |
+| 4,097 | Batched layer-local | 28.02 s | 11.74 s | 150.42 GB | 126 |
+| 14,363 | Previous layer-major | 105.81 s | 11.48 s | 131.50 GB | — |
+| 14,363 | Batched layer-local | 76.54 s | 11.85 s | 150.41 GB | 504 |
+
+The 4,097-token output matched the grouped fallback. The new path improved
+time to first token by 36.4%. The 14,363-token path improved time to first
+token by 27.7%. It reads every routed expert in 42 layers. The last layer does
+not run MoE during cache-only prefill.
+
+Four full-layer prefetch workers reduced measured SSD time to 11.30 seconds,
+but total time increased to 29.47 seconds. Two prefetch workers gave the lowest
+4,097-token time. FP4 and MXFP8 index paths produced the same 14,363-token
+greedy token. FP4 took 76.54 seconds. MXFP8 took 77.34 seconds.
+
+Persistent prompt cache now stores up to eight entries under
+`~/.dsmodel/prompt-cache/`. The restart test restores the complete cache state
+and reuses the matching token prefix.
+
 ## Partial-data smoke tests
 
 These smoke tests used the sparse partial install. They validate execution

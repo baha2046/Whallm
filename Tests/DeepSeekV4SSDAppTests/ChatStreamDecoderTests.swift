@@ -39,13 +39,18 @@ final class ChatStreamDecoderTests: XCTestCase {
     )
     XCTAssertEqual(
       try ChatStreamDecoder.decode(
-        line: #"data: {"choices":[],"usage":{"completion_tokens":12}}"#),
-      .usage(completionTokens: 12)
+        line: #"data: {"choices":[],"usage":{"prompt_tokens":34,"completion_tokens":12}}"#),
+      .usage(promptTokens: 34, completionTokens: 12)
     )
     XCTAssertEqual(try ChatStreamDecoder.decode(line: "data: [DONE]"), .done)
     XCTAssertNil(try ChatStreamDecoder.decode(line: ""))
     XCTAssertEqual(
-      ChatMetrics(completionTokens: 12, elapsedSeconds: 2).tokensPerSecond,
+      ChatMetrics(
+        promptTokens: 34,
+        completionTokens: 12,
+        elapsedSeconds: 3,
+        firstTokenSeconds: 1
+      ).tokensPerSecond,
       6
     )
 

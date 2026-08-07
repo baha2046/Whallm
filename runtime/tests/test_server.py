@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START
-from deepseek_v4_ssd.server import OpenAIServer
+from deepseek_v4_ssd.server import APIError, OpenAIServer, ServerDefaults, _options
 from deepseek_v4_ssd.tool_codec import AssistantTurn, ToolCall
 
 
@@ -41,11 +41,24 @@ class FakeRuntime:
             "runtime_prompt_tokens": 5,
             "runtime_generation_tokens": 2,
             "prompt_cache_reused_tokens": 3,
+            "completed_request_count": 1,
+            "request_seconds": 0.75,
             "time_to_first_token_seconds": 0.5,
+            "prefill_tokens_per_second": 4.0,
             "decode_seconds": 0.25,
             "decode_tokens_per_second": 4.0,
             "cache_state_eval_seconds": 0.01,
             "cache_state_eval_count": 2,
+            "request_prefill_step_size": 512,
+            "layer_major_prefill": True,
+            "request_expert_cache_hit_rate": 0.9,
+            "request_expert_cache_hits": 90,
+            "request_expert_cache_misses": 10,
+            "request_expert_evictions": 4,
+            "request_expert_bytes_read": 1_024,
+            "request_expert_read_seconds": 0.2,
+            "request_ssd_read_bytes_per_second": 5_120.0,
+            "request_routing_sync_seconds": 0.3,
         }
     )
 
@@ -105,6 +118,17 @@ class ServerTests(unittest.TestCase):
             },
         },
     }
+
+    def test_generation_defaults_match_app_defaults(self):
+        options = _options({}, ServerDefaults())
+        self.assertEqual(options.max_tokens, 272_000)
+        self.assertEqual(options.temperature, 0.2)
+        self.assertEqual(options.top_p, 0.98)
+
+    def test_generation_token_limit_is_272000(self):
+        self.assertEqual(_options({"max_tokens": 272_000}, ServerDefaults()).max_tokens, 272_000)
+        with self.assertRaises(APIError):
+            _options({"max_tokens": 272_001}, ServerDefaults())
 
     @classmethod
     def setUpClass(cls):
@@ -502,6 +526,62 @@ class ServerTests(unittest.TestCase):
             runtime.response_chunks = None
             runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
+    def test_responses_accepts_codex_namespace_tools(self):
+        runtime = self.server.runtime
+        runtime.response_chunks = [
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="multi_agent_v1__spawn_agent">\n',
+            '<｜DSML｜parameter name="task" string="true">inspect'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>',
+        ]
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("multi_agent_v1__spawn_agent", '{"task":"inspect"}'),),
+        )
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "Inspect the project.",
+                    "tools": [
+                        {
+                            "type": "namespace",
+                            "name": "multi_agent_v1",
+                            "description": "Agent tools.",
+                            "tools": [
+                                {
+                                    "type": "function",
+                                    "name": "spawn_agent",
+                                    "description": "Spawn an agent.",
+                                    "parameters": {
+                                        "type": "object",
+                                        "properties": {"task": {"type": "string"}},
+                                        "required": ["task"],
+                                    },
+                                }
+                            ],
+                        },
+                        {"type": "web_search"},
+                    ],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200)
+            call = events[-1]["response"]["output"][0]
+            self.assertEqual(call["type"], "function_call")
+            self.assertEqual(call["namespace"], "multi_agent_v1")
+            self.assertEqual(call["name"], "spawn_agent")
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
     def test_status_reports_live_performance_metrics(self):
         self.request(
             "/v1/chat/completions",
@@ -522,9 +602,16 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(performance["expert_eviction_seconds"], 0.01)
         self.assertEqual(performance["routing_sync_seconds"], 0.05)
         self.assertEqual(performance["time_to_first_token_seconds"], 0.5)
+        self.assertEqual(performance["prefill_tokens_per_second"], 4.0)
         self.assertEqual(performance["decode_tokens_per_second"], 4.0)
+        self.assertEqual(performance["completed_request_count"], 1)
+        self.assertEqual(performance["request_ssd_read_bytes_per_second"], 5_120.0)
         self.assertEqual(performance["prompt_cache_reused_tokens"], 3)
         self.assertEqual(performance["cache_state_eval_count"], 2)
+        self.assertEqual(performance["request_prefill_step_size"], 512)
+        self.assertTrue(performance["layer_major_prefill"])
+        self.assertEqual(performance["request_expert_bytes_read"], 1_024)
+        self.assertEqual(performance["request_expert_cache_hit_rate"], 0.9)
         self.assertEqual(performance["active_parameters_cache"]["hit_rate"], 0.75)
         self.assertEqual(performance["active_parameters_cache"]["resident_slots"], 3)
 
@@ -548,7 +635,7 @@ class ServerTests(unittest.TestCase):
             self.assertTrue(runtime.generation_entered.wait(timeout=1))
             status, _, body = self.request("/api/status")
             self.assertEqual(status, 200)
-            self.assertIn("performance", json.loads(body))
+            self.assertTrue(json.loads(body)["performance"]["generating"])
         finally:
             gate.set()
             request_thread.join(timeout=1)

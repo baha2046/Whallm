@@ -114,12 +114,12 @@ enum ModelOperationPhase: Equatable {
   var label: String {
     switch self {
     case .idle: ""
-    case .preparingDownload: "正在準備下載"
-    case .downloading: "正在下載並安裝模型"
-    case .cancelling: "正在停止"
-    case .verifying: "正在完整驗證模型"
-    case .preparingRepair: "正在準備修復"
-    case .repairing: "正在重新下載損壞資料"
+    case .preparingDownload: L10n.string("Preparing download")
+    case .downloading: L10n.string("Downloading and installing the model")
+    case .cancelling: L10n.string("Stopping")
+    case .verifying: L10n.string("Verifying the complete model")
+    case .preparingRepair: L10n.string("Preparing repair")
+    case .repairing: L10n.string("Downloading damaged data again")
     }
   }
 }
@@ -215,13 +215,13 @@ final class ModelLibrary: ObservableObject {
       invalidModelURLs = result.invalidModelURLs
       refreshPreflight()
       if models.isEmpty && invalidModelURLs.isEmpty && !hasPartialDownload {
-        message = "尚未安裝模型。請下載模型或選擇其他資料夾。"
+        message = L10n.string("No model is installed. Download a model or select another folder.")
       }
     } catch {
       models = []
       invalidModelURLs = []
       refreshPreflight()
-      message = "無法讀取模型資料夾。請選擇可寫入的資料夾。"
+      message = L10n.string("The model folder cannot be read. Select a writable folder.")
     }
     isScanning = false
   }
@@ -248,7 +248,7 @@ final class ModelLibrary: ObservableObject {
     guard !isBusy else { return }
     refreshPreflight()
     guard canDownload else {
-      message = "請先修正下載前檢查項目。"
+      message = L10n.string("Correct the failed download checks first.")
       return
     }
     let destination =
@@ -256,7 +256,7 @@ final class ModelLibrary: ObservableObject {
       ?? (hasPartialDownload
         ? partialDownloadURL.deletingPathExtension() : defaultDownloadDestination)
     guard !FileManager.default.fileExists(atPath: destination.path) else {
-      message = "此位置已有模型。請先驗證並修復現有模型。"
+      message = L10n.string("A model already exists in this location. Verify and repair the existing model first.")
       return
     }
     defaults.set(true, forKey: Self.activeDownloadPreference)
@@ -296,7 +296,7 @@ final class ModelLibrary: ObservableObject {
     guard !isBusy else { return }
     refreshPreflight()
     guard canDownload else {
-      message = "請先修正下載前檢查項目。"
+      message = L10n.string("Correct the failed download checks first.")
       return
     }
     do {
@@ -304,7 +304,7 @@ final class ModelLibrary: ObservableObject {
       try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
       startDownload(to: url)
     } catch {
-      message = "無法將損壞的模型移到垃圾桶。請檢查資料夾權限。"
+      message = L10n.string("The damaged model could not be moved to Trash. Check the folder permissions.")
     }
   }
 
@@ -342,16 +342,18 @@ final class ModelLibrary: ObservableObject {
       verificationIssues = verification.issues
       let resultMessage =
         verification.isValid
-        ? "模型已安裝並通過完整驗證。"
-        : "模型安裝完成，但有 \(verification.issues.count) 個檔案無法通過驗證。"
+        ? L10n.string("The model is installed and passed complete verification.")
+        : L10n.string(
+          "The model is installed, but %lld files failed verification.",
+          Int64(verification.issues.count))
       defaults.set(false, forKey: Self.activeDownloadPreference)
       await scan()
       message = resultMessage
     } catch is CancellationError {
-      message = "下載已停止。App 已保留進度。"
+      message = L10n.string("The download stopped. The app kept the progress.")
     } catch {
       defaults.set(false, forKey: Self.activeDownloadPreference)
-      message = "無法下載模型。請檢查網路後再試一次。\n\(String(describing: error))"
+      message = L10n.string("The model could not be downloaded. Check the network and try again.\n%@", String(describing: error))
     }
     finishOperation()
   }
@@ -363,12 +365,12 @@ final class ModelLibrary: ObservableObject {
       verificationIssues = verification.issues
       message =
         verification.isValid
-        ? "模型已通過完整驗證。"
-        : "模型有 \(verification.issues.count) 個檔案需要修復。"
+        ? L10n.string("The model passed complete verification.")
+        : L10n.string("%lld model files need repair.", Int64(verification.issues.count))
     } catch is CancellationError {
-      message = "驗證已停止。"
+      message = L10n.string("Verification stopped.")
     } catch {
-      message = "無法驗證模型。\(String(describing: error))"
+      message = L10n.string("The model could not be verified. %@", String(describing: error))
     }
     finishOperation()
   }
@@ -379,7 +381,7 @@ final class ModelLibrary: ObservableObject {
       verificationModelPath = url.path
       verificationIssues = verification.issues
       guard !verification.isValid else {
-        message = "模型不需要修復。"
+        message = L10n.string("The model does not need repair.")
         defaults.set(false, forKey: Self.activeDownloadPreference)
         finishOperation()
         return
@@ -398,17 +400,18 @@ final class ModelLibrary: ObservableObject {
       verificationIssues = repaired.issues
       let resultMessage =
         repaired.isValid
-        ? "模型已修復並通過完整驗證。"
-        : "仍有 \(repaired.issues.count) 個檔案需要修復。"
+        ? L10n.string("The model was repaired and passed complete verification.")
+        : L10n.string("%lld files still need repair.", Int64(repaired.issues.count))
       defaults.set(false, forKey: Self.activeDownloadPreference)
       await scan()
       message = resultMessage
     } catch is CancellationError {
       await scan()
-      message = "修復已停止。App 已保留進度。"
+      message = L10n.string("Repair stopped. The app kept the progress.")
     } catch {
       defaults.set(false, forKey: Self.activeDownloadPreference)
-      message = "無法修復模型。請檢查網路與儲存空間。\n\(String(describing: error))"
+      message = L10n.string(
+        "The model could not be repaired. Check the network and storage.\n%@", String(describing: error))
       await scan()
     }
     finishOperation()
@@ -469,21 +472,23 @@ final class ModelLibrary: ObservableObject {
 
     #if arch(arm64)
       let architecture = PreflightCheck(
-        id: "architecture", title: "Apple Silicon", detail: "此 Mac 使用 Apple Silicon。",
+        id: "architecture", title: L10n.string("Apple Silicon"),
+        detail: L10n.string("This Mac uses Apple Silicon."),
         status: .passed, blocksDownload: true)
     #else
       let architecture = PreflightCheck(
-        id: "architecture", title: "Apple Silicon", detail: "此 runtime 不支援 Intel Mac。",
+        id: "architecture", title: L10n.string("Apple Silicon"),
+        detail: L10n.string("This runtime does not support Intel Mac."),
         status: .failed, blocksDownload: true)
     #endif
 
     let memory = ProcessInfo.processInfo.physicalMemory
     let memoryCheck = PreflightCheck(
       id: "memory",
-      title: "記憶體",
+      title: L10n.string("Memory"),
       detail: memory >= minimumMemoryBytes
-        ? "此 Mac 有至少 64 GiB 記憶體。"
-        : "此 runtime 需要至少 64 GiB 記憶體。",
+        ? L10n.string("This Mac has at least 64 GiB of memory.")
+        : L10n.string("This runtime needs at least 64 GiB of memory."),
       status: memory >= minimumMemoryBytes ? .passed : .failed,
       blocksDownload: true
     )
@@ -499,8 +504,10 @@ final class ModelLibrary: ObservableObject {
     }
     let writableCheck = PreflightCheck(
       id: "writable",
-      title: "模型資料夾",
-      detail: writable ? "App 可以寫入 \(root.path)。" : "App 無法寫入此資料夾。請選擇其他資料夾。",
+      title: L10n.string("Model folder"),
+      detail: writable
+        ? L10n.string("The app can write to %@.", root.path)
+        : L10n.string("The app cannot write to this folder. Select another folder."),
       status: writable ? .passed : .failed,
       blocksDownload: true
     )
@@ -514,10 +521,10 @@ final class ModelLibrary: ObservableObject {
     let hasStorage = available.map { $0 >= 0 && UInt64($0) >= required } ?? false
     let storageCheck = PreflightCheck(
       id: "storage",
-      title: "儲存空間",
+      title: L10n.string("Storage"),
       detail: hasStorage
-        ? "可用空間足以完成安裝。"
-        : "此資料夾所在磁碟需要至少 \(formattedBytes(required)) 可用空間。",
+        ? L10n.string("There is enough free space to complete installation.")
+        : L10n.string("The disk for this folder needs at least %@ of free space.", formattedBytes(required)),
       status: hasStorage ? .passed : .failed,
       blocksDownload: true
     )
@@ -527,10 +534,10 @@ final class ModelLibrary: ObservableObject {
       ?? nil
     let storageTypeCheck = PreflightCheck(
       id: "ssd",
-      title: "SSD",
+      title: L10n.string("SSD"),
       detail: isInternal == false
-        ? "請確認外接磁碟是高速 SSD。慢速磁碟會降低生成速度。"
-        : "建議使用高速 SSD。",
+        ? L10n.string("Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed.")
+        : L10n.string("Use a high-speed SSD."),
       status: isInternal == false ? .warning : .passed,
       blocksDownload: false
     )

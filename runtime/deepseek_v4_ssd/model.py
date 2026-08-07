@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 import mlx.core as mx
 import mlx.nn as nn
 import numpy as np
 from mlx_lm.models import deepseek_v4
+from mlx_lm.models.cache import CacheList
+from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
 from .expert_cache import ExpertCache
 from .fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
@@ -20,9 +23,161 @@ _ORIGINAL_SPARSE_POOLED_ATTENTION = deepseek_v4._sparse_pooled_attention
 class RuntimeConfig:
     slots: int = 1024
     read_workers: int = 4
-    prefill_step_size: int = 128
+    prefetch_read_workers: int = 2
+    prefill_step_size: int = 0
     fp8_kv_cache: bool = True
     memory_limit_gib: int = 48
+    layer_major_prefill: bool = True
+    prompt_cache_entries: int = 2
+    prompt_cache_memory_gib: int = 8
+    persistent_prompt_cache: bool = True
+    persistent_prompt_cache_entries: int = 8
+    prompt_cache_directory: str | None = None
+    moe_prefill_step_size: int = 0
+    batched_expert_prefill: bool = True
+    fp4_index_cache: bool = True
+
+
+def _select_prefill_step_size(configured: int, prompt_tokens: int) -> int:
+    if configured > 0:
+        return configured
+    if prompt_tokens < 1_024:
+        return 128
+    if prompt_tokens < 4_096:
+        return 256
+    return 1_024
+
+
+def _select_moe_step_size(configured: int, prompt_tokens: int) -> int:
+    if configured > 0:
+        return configured
+    return 4_096 if prompt_tokens >= 4_096 else max(1, prompt_tokens)
+
+
+def layer_major_prefill(
+    model,
+    token_ids: list[int],
+    prompt_cache,
+    step_size: int,
+    expert_cache: ExpertCache,
+    moe_step_size: int = 0,
+    batched_experts: bool = True,
+) -> None:
+    """Populate the prompt cache while keeping one layer's experts resident."""
+    if not token_ids:
+        return
+    core = model.model
+    if len(prompt_cache) != len(core.pipeline_layers):
+        raise ValueError("prompt cache does not match the main model layers")
+    if getattr(core, "pipeline_size", 1) != 1:
+        raise ValueError("layer-major prefill supports one Apple Silicon device")
+
+    inputs = mx.array(token_ids)[None]
+    hidden = core.embed_tokens(inputs)
+    hidden = mx.broadcast_to(
+        hidden[:, :, None, :],
+        (hidden.shape[0], hidden.shape[1], core.args.hc_mult, hidden.shape[2]),
+    )
+    hidden = mx.contiguous(hidden)
+
+    last_layer = len(core.pipeline_layers) - 1
+    moe_step_size = _select_moe_step_size(moe_step_size, len(token_ids))
+    for layer_index, (layer, layer_cache) in enumerate(
+        zip(core.pipeline_layers, prompt_cache)
+    ):
+        if not all(
+            hasattr(layer, name)
+            for name in ("attn_hc", "attn_norm", "attn", "ffn_hc", "ffn_norm", "ffn")
+        ):
+            outputs = []
+            with expert_cache.pin_layer(layer_index):
+                for start in range(0, len(token_ids), step_size):
+                    end = min(start + step_size, len(token_ids))
+                    chunk = hidden[:, start:end]
+                    chunk_ids = inputs[:, start:end]
+                    mask_cache = (
+                        layer_cache[0]
+                        if isinstance(layer_cache, CacheList)
+                        else layer_cache
+                    )
+                    mask = deepseek_v4.create_attention_mask(
+                        chunk[:, :, 0, :],
+                        mask_cache,
+                        window_size=core.args.sliding_window,
+                        return_array=True,
+                    )
+                    output = layer(chunk, mask, layer_cache, chunk_ids)
+                    mx.eval(output, layer_cache.state)
+                    if layer_index != last_layer:
+                        outputs.append(output)
+                    mx.clear_cache()
+            if layer_index == last_layer:
+                return
+            hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+            mx.eval(hidden)
+            continue
+
+        prefetch = getattr(expert_cache, "prefetch_layer", None)
+        use_batched = bool(
+            batched_experts
+            and callable(prefetch)
+            and hasattr(expert_cache, "batched_layer")
+            and layer_index != last_layer
+        )
+        if use_batched:
+            prefetch(layer_index)
+
+        outputs = []
+        for start in range(0, len(token_ids), step_size):
+            end = min(start + step_size, len(token_ids))
+            chunk = hidden[:, start:end]
+            mask_cache = (
+                layer_cache[0] if isinstance(layer_cache, CacheList) else layer_cache
+            )
+            mask = deepseek_v4.create_attention_mask(
+                chunk[:, :, 0, :],
+                mask_cache,
+                window_size=core.args.sliding_window,
+                return_array=True,
+            )
+            residual = chunk
+            value, post, combine = layer.attn_hc(chunk)
+            value = layer.attn(layer.attn_norm(value), mask=mask, cache=layer_cache)
+            output = deepseek_v4.hc_expand(value, residual, post, combine)
+            mx.eval(output, layer_cache.state)
+            if layer_index != last_layer:
+                outputs.append(output)
+            mx.clear_cache()
+        if layer_index == last_layer:
+            return
+
+        attention_output = (
+            outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+        )
+        mx.eval(attention_output)
+        batch_context = (
+            expert_cache.batched_layer(layer_index)
+            if use_batched
+            else nullcontext()
+        )
+        outputs = []
+        with expert_cache.pin_layer(layer_index), batch_context:
+            if use_batched and layer_index + 1 < last_layer:
+                prefetch(layer_index + 1)
+            for start in range(0, len(token_ids), moe_step_size):
+                end = min(start + moe_step_size, len(token_ids))
+                residual = attention_output[:, start:end]
+                value, post, combine = layer.ffn_hc(residual)
+                value = layer.ffn(
+                    layer.ffn_norm(value),
+                    inputs[:, start:end],
+                )
+                output = deepseek_v4.hc_expand(value, residual, post, combine)
+                mx.eval(output)
+                outputs.append(output)
+                mx.clear_cache()
+        hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+        mx.eval(hidden)
 
 
 class _EmptySwitchGLU(nn.Module):
@@ -39,6 +194,53 @@ class _StreamingSwitchGLU(nn.Module):
         self.activation = activation
 
     def __call__(self, x: mx.array, indices: mx.array) -> mx.array:
+        current_batched = getattr(self.cache, "current_batched", None)
+        batched = current_batched(self.layer) if callable(current_batched) else None
+        if batched is not None:
+            source = mx.expand_dims(x, (-2, -3))
+            do_sort = indices.size >= 64
+            selected = indices
+            inverse = None
+            if do_sort:
+                source, selected, inverse = _gather_sort(source, indices)
+            up = mx.gather_qmm(
+                source,
+                batched.w3,
+                batched.w3_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=do_sort,
+            )
+            gate = mx.gather_qmm(
+                source,
+                batched.w1,
+                batched.w1_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=do_sort,
+            )
+            output = mx.gather_qmm(
+                self.activation(up, gate),
+                batched.w2,
+                batched.w2_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=do_sort,
+            )
+            if do_sort:
+                output = _scatter_unsort(output, inverse, indices.shape)
+            self.cache.record_gather_qmm()
+            return output.squeeze(-2)
+
         selected = np.asarray(indices, dtype=np.int32)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
         if x.shape[0] == 1 and x.shape[1] == 1:
@@ -91,12 +293,17 @@ def _streaming_moe(self, x: mx.array, input_ids: mx.array) -> mx.array:
     indices, scores = self.gate(x, input_ids)
     started = time.perf_counter()
     mx.eval(indices)
-    self.switch_mlp.cache.metrics.routing_sync_seconds += time.perf_counter() - started
+    self.switch_mlp.cache.record_routing_sync(time.perf_counter() - started)
     shared = self.shared_experts(x)
     mx.async_eval(shared)
     routed = self.switch_mlp(x, indices)
-    routed = (routed * scores[..., None].astype(routed.dtype)).sum(-2)
+    routed = _route_reduce(routed, scores)
     return routed + shared
+
+
+@mx.compile
+def _route_reduce(routed: mx.array, scores: mx.array) -> mx.array:
+    return (routed * scores[..., None].astype(routed.dtype)).sum(-2)
 
 
 def _correct_compressor(self, x: mx.array, pool_cache, offset) -> mx.array:
@@ -171,7 +378,7 @@ def _correct_indexer(
     query = position_rope(query.transpose(0, 2, 1, 3), offset)
     query = query.astype(mx.float32)
     scores = (
-        pooled.quantized_matmul(query)
+        pooled.index_matmul(query)
         if isinstance(pooled, MXFP8PoolingCache)
         else query @ pooled[:, None].swapaxes(-1, -2).astype(mx.float32)
     )
@@ -254,11 +461,17 @@ def load_model(
     deepseek_v4.PoolingCache = (
         MXFP8PoolingCache if config.fp8_kv_cache else CorrectPoolingCache
     )
+    MXFP8PoolingCache.fp4_index = config.fp4_index_cache
     deepseek_v4.Compressor.__call__ = _correct_compressor
     deepseek_v4.Indexer.__call__ = _correct_indexer
     deepseek_v4._sparse_pooled_attention = _sparse_pooled_attention
     model = deepseek_v4.Model(args)
-    cache = ExpertCache(installed_model, config.slots, config.read_workers)
+    cache = ExpertCache(
+        installed_model,
+        config.slots,
+        config.read_workers,
+        config.prefetch_read_workers,
+    )
     try:
         for layer_index, layer in enumerate(model.layers):
             layer.ffn.switch_mlp = _StreamingSwitchGLU(

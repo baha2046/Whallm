@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "DeepSeekV4SSD",
+  defaultLocalization: "en",
   platforms: [.macOS(.v15)],
   products: [
     .library(name: "DeepSeekRepack", targets: ["DeepSeekRepack"]),
@@ -21,7 +22,8 @@ let package = Package(
       dependencies: [
         "DeepSeekRepack",
         .product(name: "Sparkle", package: "Sparkle"),
-      ]),
+      ],
+      resources: [.process("Resources")]),
     .testTarget(name: "DeepSeekRepackTests", dependencies: ["DeepSeekRepack"]),
     .testTarget(name: "DeepSeekV4SSDAppTests", dependencies: ["DeepSeekV4SSDApp"]),
   ]
