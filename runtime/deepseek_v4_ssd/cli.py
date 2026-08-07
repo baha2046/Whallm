@@ -18,7 +18,7 @@ def main() -> None:
     parser.add_argument("--max-tokens", type=int, default=32)
     parser.add_argument("--slots", type=int, default=1024)
     parser.add_argument("--read-workers", type=int, default=4)
-    parser.add_argument("--prefill-step-size", type=int, default=32)
+    parser.add_argument("--prefill-step-size", type=int, default=128)
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--metrics-json")
     arguments = parser.parse_args()
@@ -77,6 +77,7 @@ def main() -> None:
             "peak_memory_bytes": mx.get_peak_memory(),
             "fp8_kv_cache": config.fp8_kv_cache,
             "prefill_step_size": config.prefill_step_size,
+            **runtime.metrics.snapshot(),
         }
         sys.stderr.write("\n" + json.dumps(result, indent=2) + "\n")
         if arguments.metrics_json:

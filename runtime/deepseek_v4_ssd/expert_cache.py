@@ -26,7 +26,7 @@ class ExpertWeights:
 
 @dataclass(frozen=True)
 class ResidentExperts:
-    weights: ExpertWeights
+    individual_weights: tuple[ExpertWeights, ...]
     slots: dict[int, int]
 
 
@@ -63,32 +63,29 @@ class _SlotPool:
         self._regions = {region.name: region for region in model.expert_regions}
         self._slots: list[mx.array | None] = [None] * slots
 
-    def select(self, slots: list[int]) -> ExpertWeights:
+    def select_individual(self, slots: list[int]) -> tuple[ExpertWeights, ...]:
         arrays = [self._slots[slot] for slot in slots]
         if any(array is None for array in arrays):
             raise RuntimeError("expert slot is empty")
-
-        def array(name: str) -> mx.array:
-            region = self._regions[name]
-            selected = []
-            for packed in arrays:
-                value = packed[region.offset : region.offset + region.length]
-                value = value.reshape(region.shape)
-                if region.dtype == "I8":
-                    value = value.view(mx.int8)
-                if name.endswith(".weight"):
-                    value = value.view(mx.uint32)
-                selected.append(value)
-            return mx.stack(selected)
-
-        return ExpertWeights(
-            w1=array("w1.weight"),
-            w1_scales=array("w1.scale"),
-            w2=array("w2.weight"),
-            w2_scales=array("w2.scale"),
-            w3=array("w3.weight"),
-            w3_scales=array("w3.scale"),
+        return tuple(
+            ExpertWeights(
+                w1=self._array(array, "w1.weight"),
+                w1_scales=self._array(array, "w1.scale"),
+                w2=self._array(array, "w2.weight"),
+                w2_scales=self._array(array, "w2.scale"),
+                w3=self._array(array, "w3.weight"),
+                w3_scales=self._array(array, "w3.scale"),
+            )
+            for array in arrays
         )
+
+    def _array(self, packed: mx.array, name: str) -> mx.array:
+        region = self._regions[name]
+        value = packed[region.offset : region.offset + region.length]
+        value = value.reshape(region.shape)
+        if region.dtype == "I8":
+            value = value.view(mx.int8)
+        return value.view(mx.uint32) if name.endswith(".weight") else value
 
     def store(self, slots: list[int], blobs: list[bytes]) -> None:
         arrays = [mx.array(np.frombuffer(blob, dtype=np.uint8)) for blob in blobs]
@@ -116,9 +113,7 @@ class ExpertCache:
         self._pool = _SlotPool(installed_model, slots)
         self._entries: dict[tuple[int, int], _Entry] = {}
         self._free_slots = list(reversed(range(slots)))
-        self._layer_heaps: list[list[tuple[int, int, int, int, int]]] = [
-            [] for _ in range(installed_model.layer_count)
-        ]
+        self._heap: list[tuple[int, int, int, int, int]] = []
         self._layer_counts = [0] * installed_model.layer_count
         base = slots // installed_model.layer_count
         self._layer_reserve = base // 2
@@ -217,10 +212,10 @@ class ExpertCache:
             self._decay_if_needed()
             physical_slots = [self._entries[(layer, expert)].slot for expert in unique]
             pack_started = time.perf_counter()
-            weights = self._pool.select(physical_slots)
+            individual_weights = self._pool.select_individual(physical_slots)
             self.metrics.pack_seconds += time.perf_counter() - pack_started
             return ResidentExperts(
-                weights,
+                individual_weights,
                 {expert: slot for slot, expert in enumerate(unique)},
             )
 
@@ -230,46 +225,17 @@ class ExpertCache:
         entry.last_access = self._clock
         entry.version += 1
         heapq.heappush(
-            self._layer_heaps[layer],
+            self._heap,
             (entry.frequency, entry.last_access, entry.version, layer, expert),
         )
 
     def _evict(self, protected: set[tuple[int, int]]) -> tuple[tuple[int, int], _Entry]:
-        candidates = [
-            victim
-            for layer in range(self.model.layer_count)
-            if (victim := self._pop_layer_victim(layer, protected)) is not None
-        ]
-        if not candidates:
-            raise RuntimeError("no expert cache slot can be evicted")
-        preferred = [
-            victim
-            for victim in candidates
-            if self._layer_counts[victim[0][0]] > self._layer_reserve
-        ]
-        chosen = min(
-            preferred or candidates,
-            key=lambda victim: (victim[1].frequency, victim[1].last_access),
-        )
-        for key, entry in candidates:
-            if key != chosen[0]:
-                heapq.heappush(
-                    self._layer_heaps[key[0]],
-                    (entry.frequency, entry.last_access, entry.version, *key),
-                )
-        return chosen
-
-    def _pop_layer_victim(
-        self,
-        layer: int,
-        protected: set[tuple[int, int]],
-    ) -> tuple[tuple[int, int], _Entry] | None:
-        heap = self._layer_heaps[layer]
-        held: list[tuple[int, int, int, int, int]] = []
+        protected_items: list[tuple[int, int, int, int, int]] = []
+        reserved_items: list[tuple[int, int, int, int, int]] = []
         try:
-            while heap:
-                item = heapq.heappop(heap)
-                frequency, last_access, version, _, expert = item
+            while self._heap:
+                item = heapq.heappop(self._heap)
+                frequency, last_access, version, layer, expert = item
                 key = (layer, expert)
                 entry = self._entries.get(key)
                 if entry is None or (
@@ -279,24 +245,31 @@ class ExpertCache:
                 ) != (frequency, last_access, version):
                     continue
                 if key in protected:
-                    held.append(item)
+                    protected_items.append(item)
+                    continue
+                if self._layer_counts[layer] <= self._layer_reserve:
+                    reserved_items.append(item)
                     continue
                 return key, entry
-            return None
+            if not reserved_items:
+                raise RuntimeError("no expert cache slot can be evicted")
+            item = reserved_items.pop(0)
+            key = (item[3], item[4])
+            return key, self._entries[key]
         finally:
-            for item in held:
-                heapq.heappush(heap, item)
+            for item in (*protected_items, *reserved_items):
+                heapq.heappush(self._heap, item)
 
     def _decay_if_needed(self) -> None:
         if self._clock - self._last_decay < max(self.slots * 8, 64):
             return
         self._last_decay = self._clock
-        self._layer_heaps = [[] for _ in range(self.model.layer_count)]
+        self._heap = []
         for (layer, expert), entry in self._entries.items():
             entry.frequency = max(1, entry.frequency // 2)
             entry.version += 1
             heapq.heappush(
-                self._layer_heaps[layer],
+                self._heap,
                 (entry.frequency, entry.last_access, entry.version, layer, expert),
             )
 

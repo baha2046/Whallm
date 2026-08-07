@@ -60,7 +60,12 @@ class InstalledModel:
             raise ValueError("installed model does not match the pinned model contract")
 
         files = {item["path"]: item["size"] for item in raw["files"]}
-        required = {"common.bin", "config.json", "tokenizer/tokenizer.json"}
+        required = {
+            "common.bin",
+            "config.json",
+            "encoding/encoding_dsv4.py",
+            "tokenizer/tokenizer.json",
+        }
         required.update(f"experts/layer_{layer:02d}.bin" for layer in range(LAYER_COUNT))
         missing = required.difference(files)
         if missing:

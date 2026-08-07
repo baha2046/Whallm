@@ -85,7 +85,7 @@ PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli \
   --max-tokens 32
 ```
 
-The M5 Pro defaults use 1,024 expert slots, four SSD read workers, 32-token
+The M5 Pro defaults use 1,024 expert slots, four SSD read workers, 128-token
 prefill chunks, and an MXFP8 compressed-attention cache. Use
 `--bf16-kv-cache` for the correctness baseline.
 
@@ -93,13 +93,17 @@ Each expert slot stores one packed expert blob. A cache miss creates one Metal
 array instead of six arrays. The cache uses layer-aware LFU heaps with frequency
 aging. MXFP8 index scoring and sparse pooled attention operate on cache chunks
 without rebuilding the complete index cache. The API status and CLI metrics
-include packing, eviction, and routing synchronization times.
+include time to first token, decode speed, cache-state evaluation, packing,
+eviction, and routing synchronization times. The runtime evaluates cache state
+after each output token. This limits Metal resource growth during long output.
+The runtime also reuses one in-memory prompt prefix for a continued chat.
+Single-token decode runs the six routed experts directly. Multi-token prefill
+groups token routes by expert. Neither path builds stacked weight buffers.
 
 Measured direct SSD throughput reached 14.30 GiB/s with four read workers.
-The short cached test generated about 1.48 token/s on its first BF16 run. A
-4,096-token BF16 prefill and one output token took 124 seconds. An 8,192-token
-prefill and one output token took about 264 seconds with either BF16 or MXFP8.
-See the validation record for the full measurements and their limits.
+After prefill grouping, a 4,096-token BF16 prefill and one output token took
+30.74 seconds. An 8,192-token MXFP8 prefill and one output token took 65.47
+seconds. See the validation record for the full measurements and their limits.
 
 ## Run the macOS app
 
@@ -122,8 +126,10 @@ model data. The default model folder is `~/.dsmodel/`.
 
 The app configures and controls the OpenAI-compatible API server and the
 DeepSeekV4SSD runtime. It also provides a small test chat. The server provides
-`/v1/models`, `/v1/chat/completions`, and `/v1/completions`. It supports normal
-JSON responses and SSE streaming.
+`/v1/models`, `/v1/responses`, `/v1/chat/completions`, and `/v1/completions`.
+It supports normal JSON responses, SSE streaming, and OpenAI function Tool
+calls. The test chat can expose `get_current_time` and display the model's Tool
+call while it streams. The App does not execute the Tool.
 
 Build a distributable macOS app:
 

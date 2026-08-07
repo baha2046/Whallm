@@ -64,6 +64,7 @@ class MXFP8PoolingCache(CorrectPoolingCache):
     def __init__(self, ratio: int):
         super().__init__(ratio)
         self._chunks: list[tuple[mx.array, mx.array]] = []
+        self._packed_cache: tuple[mx.array, mx.array] | None = None
         self._pending: mx.array | None = None
         self._length = 0
         self._last_shape: tuple[int, int] | None = None
@@ -98,6 +99,7 @@ class MXFP8PoolingCache(CorrectPoolingCache):
             )
             ready = self._pending.shape[1] // self.chunk_size * self.chunk_size
             if ready:
+                self._packed_cache = None
                 completed = self._pending[:, :ready]
                 self._pending = self._pending[:, ready:] if ready < self._pending.shape[1] else None
                 for start in range(0, ready, self.chunk_size):
@@ -111,18 +113,19 @@ class MXFP8PoolingCache(CorrectPoolingCache):
                     )
 
     def quantized_matmul(self, query: mx.array) -> mx.array:
-        scores = [
-            mx.quantized_matmul(
-                query,
-                weight,
-                scale,
-                transpose=True,
-                group_size=32,
-                bits=8,
-                mode="mxfp8",
+        scores = []
+        packed = self._packed()
+        if packed is not None:
+            scores.append(
+                mx.quantized_matmul(
+                    query,
+                    *packed,
+                    transpose=True,
+                    group_size=32,
+                    bits=8,
+                    mode="mxfp8",
+                )
             )
-            for weight, scale in self._chunks
-        ]
         if self._pending is not None:
             scores.append(query @ self._pending[:, None].swapaxes(-1, -2).astype(query.dtype))
         if not scores:
@@ -130,28 +133,59 @@ class MXFP8PoolingCache(CorrectPoolingCache):
         return scores[0] if len(scores) == 1 else mx.concatenate(scores, axis=-1)
 
     def gather(self, indices: mx.array) -> mx.array:
-        batch, length, count = indices.shape
-        _, width = self._last_shape
-        result = mx.zeros((batch, length, count, width), dtype=mx.bfloat16)
-        start = 0
-        chunks = [
-            mx.dequantize(*chunk, group_size=32, bits=8, mode="mxfp8")
-            for chunk in self._chunks
-        ]
-        if self._pending is not None:
-            chunks.append(self._pending)
-        for chunk in chunks:
-            local = mx.clip(indices - start, 0, chunk.shape[1] - 1)
-            source = mx.broadcast_to(chunk[:, None], (batch, length, *chunk.shape[1:]))
-            selected = mx.take_along_axis(
+        batch, length, _ = indices.shape
+
+        def take_rows(source: mx.array, rows: mx.array) -> mx.array:
+            source = mx.broadcast_to(
+                source[:, None],
+                (batch, length, *source.shape[1:]),
+            )
+            return mx.take_along_axis(
                 source,
-                mx.broadcast_to(local[..., None], (*local.shape, width)),
+                mx.broadcast_to(
+                    rows[..., None],
+                    (*rows.shape, source.shape[-1]),
+                ),
                 axis=2,
             )
-            mask = (indices >= start) & (indices < start + chunk.shape[1])
-            result = mx.where(mask[..., None], selected, result)
-            start += chunk.shape[1]
-        return result
+
+        completed = None
+        completed_length = len(self._chunks) * self.chunk_size
+        packed = self._packed()
+        if packed is not None:
+            weights, scales = packed
+            rows = mx.clip(indices, 0, completed_length - 1)
+            completed = mx.dequantize(
+                take_rows(weights, rows),
+                take_rows(scales, rows),
+                group_size=32,
+                bits=8,
+                mode="mxfp8",
+            )
+
+        if self._pending is None:
+            return completed
+        pending_rows = mx.clip(
+            indices - completed_length,
+            0,
+            self._pending.shape[1] - 1,
+        )
+        pending = take_rows(self._pending, pending_rows)
+        if completed is None:
+            return pending
+        return mx.where((indices >= completed_length)[..., None], pending, completed)
+
+    def _packed(self) -> tuple[mx.array, mx.array] | None:
+        if not self._chunks:
+            return None
+        if self._packed_cache is None:
+            weights = [weight for weight, _ in self._chunks]
+            scales = [scale for _, scale in self._chunks]
+            self._packed_cache = (
+                weights[0] if len(weights) == 1 else mx.concatenate(weights, axis=1),
+                scales[0] if len(scales) == 1 else mx.concatenate(scales, axis=1),
+            )
+        return self._packed_cache
 
     def fetch(self, batch: int, width: int, dtype):
         return self._fetch(batch, width, dtype)
@@ -203,6 +237,7 @@ class MXFP8PoolingCache(CorrectPoolingCache):
         self.remainder = 0
         self.buf_kv = self.buf_gate = None
         self._chunks = []
+        self._packed_cache = None
         self._pending = None
         self._length = 0
         self._last_shape = None

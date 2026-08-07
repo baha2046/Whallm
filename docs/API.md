@@ -48,6 +48,18 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
+Use the Responses API when your client expects typed output items:
+
+```python
+response = client.responses.create(
+    model="deepseek-v4-flash-0731",
+    instructions="Answer briefly.",
+    input="法國的首都是哪裡？",
+)
+
+print(response.output_text)
+```
+
 ## curl
 
 ```sh
@@ -69,6 +81,7 @@ Add `"stream": true` to receive `text/event-stream` chunks. Add
 
 - `GET /healthz`
 - `GET /v1/models`
+- `POST /v1/responses`
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
 - `GET /api/status`
@@ -81,7 +94,7 @@ defaults in memory. A server restart restores the command-line defaults.
 ## Supported request fields
 
 - `model`
-- `messages` with text content
+- `messages` with text content, assistant `tool_calls`, and `role: tool` results
 - `prompt` for text completions
 - `max_tokens` and `max_completion_tokens`
 - `temperature`
@@ -90,20 +103,44 @@ defaults in memory. A server restart restores the command-line defaults.
 - `stream_options.include_usage`
 - `n`, when its value is `1`
 - `thinking_mode`, with `chat` or `thinking`
+- `tools`, with OpenAI function definitions
+- `tool_choice`, with `auto`, `none`, `required`, or one named function
+
+`/v1/responses` accepts a text `input` or an array of text message items. It
+also accepts `instructions`, `max_output_tokens`, `reasoning.effort`, function
+`tools`, and `function_call_output` items. Set `stream: true` to receive typed
+Responses API events, including `response.output_text.delta`,
+`response.function_call_arguments.delta`, and `response.completed`.
 
 The response adds `reasoning_content` when `thinking_mode` is `thinking` and
 the model finishes a reasoning block. This is a DeepSeek extension.
+
+The server returns a tool request in `message.tool_calls`. The client must run
+the function and send its result in a later `role: tool` message. The server
+does not run functions or external commands.
+
+When a request uses both `stream: true` and `tools`, the server sends text and
+reasoning as the model generates them. It sends the function name when the
+DeepSeek tool block starts. It then sends `arguments` as SSE fragments. The
+official parser validates the complete response at the end. If validation
+fails, the stream sends an error event and then `[DONE]`.
 
 ## Current limits
 
 - The server supports one text generation at a time.
 - Message content supports strings and OpenAI text content parts.
-- Images, audio, tools, `response_format`, `stop`, and logprobs are not
+- Images, audio, `response_format`, `stop`, and logprobs are not
   supported.
+- `/v1/responses` is stateless. It does not support `previous_response_id`,
+  `conversation`, `store`, or `background`. Send earlier output items again in
+  `input` when you continue a Tool call.
+- `/v1/responses` supports function tools. It does not support OpenAI built-in
+  tools, such as web search, file search, computer use, or MCP.
 - The server returns an OpenAI error object when a request uses an unsupported
   field.
 - The request body limit is 1 MiB.
 - The maximum requested output is 32,768 tokens.
 
-DeepSeek-V4 uses its official special-token message format because the pinned
-tokenizer has no Jinja chat template.
+DeepSeek-V4 uses the official encoder stored in the installed model. The model
+installer pins this file to the same revision as the model weights. The Runtime
+checks its SHA-256 before it loads the file.

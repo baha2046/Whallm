@@ -26,8 +26,11 @@ shape check has no mismatch.
 
 ## Automated tests
 
-- Six Swift tests pass.
-- Five Python runtime tests pass.
+- Fifteen Swift tests pass.
+- Twenty-eight Python runtime tests pass.
+- Tool codec tests cover official encoder loading and Tool call parsing.
+- Server tests cover Tool results, incremental SSE output, single-character DSML
+  fragments, and invalid Tool output.
 - MXFP4 routed expert output matches a dequantized reference.
 - Ratio-4 compression gives the same result across prefill chunk boundaries.
 - Sparse top-k selection resolves equal scores by position.
@@ -81,11 +84,28 @@ The whole-model peak does not show an MXFP8 reduction at 8K. Model weights and
 temporary expert stacks dominate this peak. The cache unit test confirms that
 completed MXFP8 cache chunks use less storage than BF16 chunks.
 
+## Optimized prefill measurements
+
+These measurements use the 128-token prefill default and grouped routed expert
+execution. The older table remains as the fixed historical baseline.
+
+| Context | KV cache | Time | Greedy output | Cache hit rate | Expert bytes read | Peak memory |
+| ---: | --- | ---: | --- | ---: | ---: | ---: |
+| 4,096 | BF16 | 30.74 s | ` test` | 59.0% | 219.1 GB | 22.2 GiB |
+| 8,192 | MXFP8 | 65.47 s | ` test` | 58.7% | 488.8 GB | 22.2 GiB |
+
+The 4K and 8K greedy outputs match the historical baseline. The improvement
+includes the 128-token prefill step and grouped routed expert execution.
+The 8K result also includes packed-row MXFP8 gather and one packed matrix
+multiplication for completed index-cache chunks. The runtime reuses the packed
+cache until new completed chunks invalidate it.
+The expert cache uses one global LFU heap while it keeps the per-layer reserve.
+
 ## DSpark decision
 
 DSpark stays disabled for M4. It adds about 10.12 GiB of weights. The measured
 main-model baseline spends most time in model and expert work. SSD reads use
-about 34 seconds of the 264-second 8K run. There is no measured evidence that
+about 14.0 seconds of the 65.5-second 8K run. There is no measured evidence that
 DSpark gives a net speed increase in this runtime.
 
 ## Partial-data smoke tests

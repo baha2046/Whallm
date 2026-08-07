@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Iterator
 
 import mlx.core as mx
 from mlx_lm.generate import stream_generate
+from mlx_lm.models.cache import make_prompt_cache
 from mlx_lm.sample_utils import make_sampler
 from transformers import AutoTokenizer
 
 from .manifest import InstalledModel
 from .model import RuntimeConfig, load_model
+from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
 
-BOS = "<｜begin▁of▁sentence｜>"
-EOS = "<｜end▁of▁sentence｜>"
-USER = "<｜User｜>"
-ASSISTANT = "<｜Assistant｜>"
 THINK_START = "<think>"
 THINK_END = "</think>"
 
@@ -36,30 +35,57 @@ class GeneratedPiece:
     finish_reason: str | None
 
 
-def encode_chat(messages: list[dict[str, Any]], thinking_mode: str = "chat") -> str:
-    """Encode the supported OpenAI message subset for DeepSeek-V4."""
-    if thinking_mode not in {"chat", "thinking"}:
-        raise ValueError("thinking_mode must be 'chat' or 'thinking'")
+class RuntimeMetrics:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._time_to_first_token_seconds = 0.0
+        self._decode_seconds = 0.0
+        self._cache_state_eval_seconds = 0.0
+        self._cache_state_eval_count = 0
+        self._prompt_tokens = 0
+        self._generation_tokens = 0
+        self._prompt_cache_reused_tokens = 0
 
-    prompt = BOS
-    for index, message in enumerate(messages):
-        role = message["role"]
-        content = message.get("content") or ""
-        if role == "system":
-            prompt += content
-        elif role in {"user", "developer"}:
-            prompt += USER + content
-            next_role = messages[index + 1]["role"] if index + 1 < len(messages) else None
-            if next_role == "assistant" or next_role is None:
-                prompt += ASSISTANT
-                prompt += THINK_START if thinking_mode == "thinking" else THINK_END
-        elif role == "assistant":
-            if thinking_mode == "thinking":
-                prompt += (message.get("reasoning_content") or "") + THINK_END
-            prompt += content + EOS
-        else:
-            raise ValueError(f"unsupported message role: {role}")
-    return prompt
+    def start(self, prompt_tokens: int, reused_tokens: int) -> None:
+        with self._lock:
+            self._time_to_first_token_seconds = 0.0
+            self._decode_seconds = 0.0
+            self._cache_state_eval_seconds = 0.0
+            self._cache_state_eval_count = 0
+            self._prompt_tokens = prompt_tokens
+            self._generation_tokens = 0
+            self._prompt_cache_reused_tokens = reused_tokens
+
+    def record(
+        self,
+        response,
+        step_seconds: float,
+        cache_state_eval_seconds: float,
+    ) -> None:
+        with self._lock:
+            if response.generation_tokens == 1:
+                self._time_to_first_token_seconds = step_seconds
+            else:
+                self._decode_seconds += step_seconds
+            self._cache_state_eval_seconds += cache_state_eval_seconds
+            self._cache_state_eval_count += 1
+            self._generation_tokens = response.generation_tokens
+
+    def snapshot(self) -> dict[str, int | float]:
+        with self._lock:
+            decode_tokens = max(0, self._generation_tokens - 1)
+            return {
+                "runtime_prompt_tokens": self._prompt_tokens,
+                "runtime_generation_tokens": self._generation_tokens,
+                "prompt_cache_reused_tokens": self._prompt_cache_reused_tokens,
+                "time_to_first_token_seconds": self._time_to_first_token_seconds,
+                "decode_seconds": self._decode_seconds,
+                "decode_tokens_per_second": (
+                    decode_tokens / self._decode_seconds if self._decode_seconds else 0.0
+                ),
+                "cache_state_eval_seconds": self._cache_state_eval_seconds,
+                "cache_state_eval_count": self._cache_state_eval_count,
+            }
 
 
 class ModelRuntime:
@@ -68,6 +94,10 @@ class ModelRuntime:
     def __init__(self, installed: InstalledModel, config: RuntimeConfig):
         self.installed = installed
         self.config = config
+        self.metrics = RuntimeMetrics()
+        self._codec: ToolCodec | None = None
+        self._prompt_cache = None
+        self._prompt_cache_tokens: list[int] = []
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
         with mx.stream(self._generation_stream):
@@ -99,8 +129,17 @@ class ModelRuntime:
         self,
         messages: list[dict[str, Any]],
         thinking_mode: str = "chat",
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: ToolChoice = ToolChoice(),
     ) -> str:
-        return encode_chat(messages, thinking_mode)
+        if self._codec is None:
+            self._codec = ToolCodec.open(self.installed.root)
+        return self._codec.encode(messages, thinking_mode, tools, tool_choice)
+
+    def parse_chat(self, text: str, thinking_mode: str) -> AssistantTurn:
+        if self._codec is None:
+            self._codec = ToolCodec.open(self.installed.root)
+        return self._codec.parse(text, thinking_mode)
 
     def stream(
         self,
@@ -113,21 +152,65 @@ class ModelRuntime:
         )
         with self._generation_lock:
             with mx.stream(self._generation_stream):
-                for response in stream_generate(
-                    self.model,
-                    self.tokenizer,
-                    prompt,
-                    max_tokens=options.max_tokens,
-                    sampler=sampler,
-                    prefill_step_size=self.config.prefill_step_size,
+                prompt_tokens = self._encode_prompt(prompt)
+                reused_tokens = 0
+                if (
+                    self._prompt_cache is not None
+                    and len(self._prompt_cache_tokens) < len(prompt_tokens)
+                    and prompt_tokens[: len(self._prompt_cache_tokens)]
+                    == self._prompt_cache_tokens
                 ):
-                    yield GeneratedPiece(
-                        text=response.text,
-                        token=response.token,
-                        prompt_tokens=response.prompt_tokens,
-                        generation_tokens=response.generation_tokens,
-                        finish_reason=response.finish_reason,
+                    reused_tokens = len(self._prompt_cache_tokens)
+                else:
+                    self._prompt_cache = make_prompt_cache(self.model)
+                    self._prompt_cache_tokens = []
+                generation_prompt = prompt_tokens[reused_tokens:]
+                self._prompt_cache_tokens.extend(generation_prompt)
+                responses = iter(
+                    stream_generate(
+                        self.model,
+                        self.tokenizer,
+                        generation_prompt,
+                        max_tokens=options.max_tokens,
+                        sampler=sampler,
+                        prompt_cache=self._prompt_cache,
+                        prefill_step_size=self.config.prefill_step_size,
                     )
+                )
+                self.metrics.start(len(prompt_tokens), reused_tokens)
+                try:
+                    while True:
+                        started = time.perf_counter()
+                        try:
+                            response = next(responses)
+                        except StopIteration:
+                            break
+                        step_seconds = time.perf_counter() - started
+                        cache_started = time.perf_counter()
+                        mx.eval([cache.state for cache in self._prompt_cache])
+                        cache_seconds = time.perf_counter() - cache_started
+                        self.metrics.record(response, step_seconds, cache_seconds)
+                        if response.finish_reason != "stop":
+                            self._prompt_cache_tokens.append(int(response.token))
+                        yield GeneratedPiece(
+                            text=response.text,
+                            token=response.token,
+                            prompt_tokens=len(prompt_tokens),
+                            generation_tokens=response.generation_tokens,
+                            finish_reason=response.finish_reason,
+                        )
+                except Exception:
+                    self._prompt_cache = None
+                    self._prompt_cache_tokens = []
+                    raise
+
+    def _encode_prompt(self, prompt: str) -> list[int]:
+        add_special_tokens = self.tokenizer.bos_token is None or not prompt.startswith(
+            self.tokenizer.bos_token
+        )
+        return list(
+            self.tokenizer.encode(prompt, add_special_tokens=add_special_tokens)
+        )
 
     def close(self) -> None:
         self.expert_cache.close()

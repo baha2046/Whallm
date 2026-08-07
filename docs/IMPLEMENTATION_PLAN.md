@@ -108,7 +108,7 @@ Implementation result:
 
 Implementation result:
 
-- Generation uses a 32-token prefill chunk by default on the target M5 Pro.
+- Generation uses a 128-token prefill chunk by default on the target M5 Pro.
 - Completed compressed-attention cache chunks use MXFP8.
 - The 128-token local attention cache stays in BF16 because its size is bounded.
 - BF16 and MXFP8 produce the same greedy token for the 8,192-token test.

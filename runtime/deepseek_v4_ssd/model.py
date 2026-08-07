@@ -20,7 +20,7 @@ _ORIGINAL_SPARSE_POOLED_ATTENTION = deepseek_v4._sparse_pooled_attention
 class RuntimeConfig:
     slots: int = 1024
     read_workers: int = 4
-    prefill_step_size: int = 32
+    prefill_step_size: int = 128
     fp8_kv_cache: bool = True
     memory_limit_gib: int = 48
 
@@ -37,36 +37,47 @@ class _StreamingSwitchGLU(nn.Module):
         self.layer = layer
         self.cache = cache
         self.activation = activation
-        self._slot_lookup = np.empty(cache.model.expert_count, dtype=np.int32)
 
     def __call__(self, x: mx.array, indices: mx.array) -> mx.array:
         selected = np.asarray(indices, dtype=np.int32)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
-        experts = np.fromiter(resident.slots, dtype=np.int32)
-        slots = np.fromiter(resident.slots.values(), dtype=np.int32)
-        self._slot_lookup[experts] = slots
-        slot_indices = mx.array(self._slot_lookup[selected])
+        if x.shape[0] == 1 and x.shape[1] == 1:
+            outputs = []
+            for expert in selected.reshape(-1):
+                weights = resident.individual_weights[resident.slots[int(expert)]]
+                up = _mxfp4(x, weights.w3, weights.w3_scales)
+                gate = _mxfp4(x, weights.w1, weights.w1_scales)
+                hidden = self.activation(up, gate)
+                outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
+            return mx.stack(outputs, axis=-2)
 
-        expanded = mx.expand_dims(x, (-2, -3))
-        weights = resident.weights
-        up = _gather_mxfp4(expanded, weights.w3, weights.w3_scales, slot_indices)
-        gate = _gather_mxfp4(expanded, weights.w1, weights.w1_scales, slot_indices)
-        hidden = self.activation(up, gate)
-        output = _gather_mxfp4(hidden, weights.w2, weights.w2_scales, slot_indices)
-        return output.squeeze(-2)
+        flat_selected = selected.reshape(-1)
+        order = np.argsort(flat_selected, kind="stable")
+        boundaries = np.flatnonzero(np.diff(flat_selected[order])) + 1
+        flat_x = x.reshape(-1, x.shape[-1])
+        outputs = []
+        for positions in np.split(order, boundaries):
+            expert = int(flat_selected[positions[0]])
+            weights = resident.individual_weights[resident.slots[expert]]
+            source = mx.take(
+                flat_x,
+                mx.array(positions // selected.shape[-1]),
+                axis=0,
+            )
+            up = _mxfp4(source, weights.w3, weights.w3_scales)
+            gate = _mxfp4(source, weights.w1, weights.w1_scales)
+            hidden = self.activation(up, gate)
+            outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
+        grouped = mx.concatenate(outputs, axis=0)
+        restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
+        return restored.reshape(*selected.shape, -1)
 
 
-def _gather_mxfp4(
-    x: mx.array,
-    weight: mx.array,
-    scales: mx.array,
-    indices: mx.array,
-) -> mx.array:
-    return mx.gather_qmm(
+def _mxfp4(x: mx.array, weight: mx.array, scales: mx.array) -> mx.array:
+    return mx.quantized_matmul(
         x,
         weight,
         scales,
-        rhs_indices=indices,
         transpose=True,
         group_size=32,
         bits=4,

@@ -8,8 +8,9 @@ from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START, encode_chat
+from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START
 from deepseek_v4_ssd.server import OpenAIServer
+from deepseek_v4_ssd.tool_codec import AssistantTurn, ToolCall
 
 
 class FakeRuntime:
@@ -35,25 +36,76 @@ class FakeRuntime:
         ),
         resident_count=3,
     )
+    metrics = SimpleNamespace(
+        snapshot=lambda: {
+            "runtime_prompt_tokens": 5,
+            "runtime_generation_tokens": 2,
+            "prompt_cache_reused_tokens": 3,
+            "time_to_first_token_seconds": 0.5,
+            "decode_seconds": 0.25,
+            "decode_tokens_per_second": 4.0,
+            "cache_state_eval_seconds": 0.01,
+            "cache_state_eval_count": 2,
+        }
+    )
 
     def __init__(self):
         self.generation_gate = None
         self.generation_entered = threading.Event()
+        self.pause_after_chunks = None
+        self.chunk_paused = threading.Event()
+        self.chunk_gate = threading.Event()
+        self.response_chunks = None
+        self.parsed_turn = AssistantTurn("Hello", "", ())
+        self.last_messages = None
+        self.last_tools = None
+        self.last_tool_choice = None
+        self.last_parse_text = None
+        self.parse_error = False
 
-    def encode_chat(self, messages, thinking_mode="chat"):
-        return encode_chat(messages, thinking_mode)
+    def encode_chat(self, messages, thinking_mode="chat", tools=None, tool_choice=None):
+        self.last_messages = messages
+        self.last_tools = tools
+        self.last_tool_choice = tool_choice
+        return "prompt" + (THINK_START if thinking_mode == "thinking" else "")
+
+    def parse_chat(self, text, thinking_mode):
+        self.last_parse_text = text
+        if self.parse_error:
+            raise ValueError("invalid tool call")
+        return self.parsed_turn
 
     def stream(self, prompt, options):
         if self.generation_gate is not None:
             self.generation_entered.set()
             self.generation_gate.wait(timeout=2)
-        text = "plan</think>Hello" if prompt.endswith(THINK_START) else "Hello"
-        midpoint = max(1, len(text) // 2)
-        yield GeneratedPiece(text[:midpoint], 10, 5, 1, None)
-        yield GeneratedPiece(text[midpoint:], 11, 5, 2, "stop")
+        chunks = self.response_chunks
+        if chunks is None:
+            text = "plan</think>Hello" if prompt.endswith(THINK_START) else "Hello"
+            midpoint = max(1, len(text) // 2)
+            chunks = [text[:midpoint], text[midpoint:]]
+        for index, chunk in enumerate(chunks, 1):
+            finish = "stop" if index == len(chunks) else None
+            yield GeneratedPiece(chunk, 9 + index, 5, index, finish)
+            if index == self.pause_after_chunks:
+                self.chunk_paused.set()
+                self.chunk_gate.wait(timeout=2)
 
 
 class ServerTests(unittest.TestCase):
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "description": "Get the weather.",
+            "parameters": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+            },
+        },
+    }
+
     @classmethod
     def setUpClass(cls):
         cls.server = OpenAIServer(
@@ -88,22 +140,6 @@ class ServerTests(unittest.TestCase):
                 return error.code, error.headers, error.read()
             finally:
                 error.close()
-
-    def test_official_chat_subset_encoding(self):
-        prompt = encode_chat(
-            [
-                {"role": "system", "content": "Be brief."},
-                {"role": "user", "content": "Hi"},
-                {"role": "assistant", "content": "Hello"},
-                {"role": "user", "content": "Again"},
-            ]
-        )
-        self.assertEqual(
-            prompt,
-            "<｜begin▁of▁sentence｜>Be brief.<｜User｜>Hi"
-            "<｜Assistant｜></think>Hello<｜end▁of▁sentence｜>"
-            "<｜User｜>Again<｜Assistant｜></think>",
-        )
 
     def test_models_requires_bearer_key(self):
         status, _, body = self.request("/v1/models", authenticated=False)
@@ -152,6 +188,193 @@ class ServerTests(unittest.TestCase):
         self.assertIn('"usage":{"prompt_tokens":5', text)
         self.assertTrue(text.endswith("data: [DONE]\n\n"))
 
+    def test_chat_returns_tool_calls_and_accepts_tool_results(self):
+        runtime = self.server.runtime
+        runtime.response_chunks = ["raw", " tool", " output"]
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("get_weather", '{"city":"Taipei"}'),),
+        )
+        try:
+            status, _, body = self.request(
+                "/v1/chat/completions",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Weather?"}],
+                    "tools": [self.tool],
+                    "tool_choice": "required",
+                },
+            )
+            response = json.loads(body)
+            call = response["choices"][0]["message"]["tool_calls"][0]
+            self.assertEqual(status, 200)
+            self.assertEqual(response["choices"][0]["finish_reason"], "tool_calls")
+            self.assertEqual(call["function"]["name"], "get_weather")
+            self.assertEqual(call["function"]["arguments"], '{"city":"Taipei"}')
+            self.assertTrue(call["id"].startswith("call_"))
+            self.assertEqual(runtime.last_parse_text, "raw tool output")
+            self.assertEqual(runtime.last_tool_choice.mode, "required")
+
+            runtime.parsed_turn = AssistantTurn("It is sunny.", "", ())
+            status, _, _ = self.request(
+                "/v1/chat/completions",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [
+                        {"role": "user", "content": "Weather?"},
+                        {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [call],
+                        },
+                        {
+                            "role": "tool",
+                            "tool_call_id": call["id"],
+                            "content": "Sunny",
+                        },
+                    ],
+                    "tools": [self.tool],
+                },
+            )
+            self.assertEqual(status, 200)
+            self.assertEqual(runtime.last_messages[-1]["role"], "tool")
+            self.assertEqual(runtime.last_messages[-1]["content"], "Sunny")
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
+    def test_streaming_tool_call_handles_fragments_and_parse_errors(self):
+        runtime = self.server.runtime
+        raw = (
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n'
+            '<｜DSML｜parameter name="city" string="true">Taipei'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>'
+        )
+        runtime.response_chunks = list(raw)
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("get_weather", '{"city": "Taipei"}'),),
+        )
+        try:
+            status, _, body = self.request(
+                "/v1/chat/completions",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Weather?"}],
+                    "tools": [self.tool],
+                    "stream": True,
+                    "stream_options": {"include_usage": True},
+                },
+            )
+            text = body.decode()
+            self.assertEqual(status, 200)
+            self.assertEqual(runtime.last_parse_text, raw)
+            self.assertIn('"tool_calls":[{"index":0,', text)
+            self.assertIn('"id":"call_', text)
+            self.assertIn('"name":"get_weather"', text)
+            self.assertIn('"finish_reason":"tool_calls"', text)
+            self.assertIn('"usage":{"prompt_tokens":5', text)
+            self.assertTrue(text.endswith("data: [DONE]\n\n"))
+            streamed_calls = [
+                call
+                for line in text.splitlines()
+                if line.startswith("data: {")
+                for choice in json.loads(line[6:]).get("choices", [])
+                for call in choice.get("delta", {}).get("tool_calls", [])
+            ]
+            self.assertEqual(
+                "".join(call["function"].get("arguments", "") for call in streamed_calls),
+                '{"city": "Taipei"}',
+            )
+
+            runtime.parse_error = True
+            status, _, body = self.request(
+                "/v1/chat/completions",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Weather?"}],
+                    "tools": [self.tool],
+                    "stream": True,
+                },
+            )
+            text = body.decode()
+            self.assertEqual(status, 200)
+            self.assertIn('"code":"invalid_tool_call"', text)
+            self.assertTrue(text.endswith("data: [DONE]\n\n"))
+        finally:
+            runtime.parse_error = False
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
+    def test_streaming_tool_call_emits_before_generation_finishes(self):
+        runtime = self.server.runtime
+        runtime.response_chunks = [
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n',
+            '<｜DSML｜parameter name="city" string="true">Taipei'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>',
+        ]
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("get_weather", '{"city":"Taipei"}'),),
+        )
+        runtime.pause_after_chunks = 1
+        runtime.chunk_paused.clear()
+        runtime.chunk_gate.clear()
+        tool_delta_received = threading.Event()
+        client_errors = []
+
+        def consume_stream():
+            body = json.dumps(
+                {
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Weather?"}],
+                    "tools": [self.tool],
+                    "stream": True,
+                }
+            ).encode()
+            request = Request(
+                self.base + "/v1/chat/completions",
+                data=body,
+                headers={
+                    "Authorization": "Bearer secret",
+                    "Content-Type": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(request) as response:
+                    for line in response:
+                        if b'"tool_calls"' in line:
+                            tool_delta_received.set()
+                        if line == b"data: [DONE]\n":
+                            break
+            except Exception as error:
+                client_errors.append(error)
+
+        client = threading.Thread(target=consume_stream)
+        client.start()
+        try:
+            self.assertTrue(runtime.chunk_paused.wait(timeout=1))
+            self.assertTrue(
+                tool_delta_received.wait(timeout=0.5),
+                "Tool call was buffered until generation finished.",
+            )
+        finally:
+            runtime.chunk_gate.set()
+            client.join(timeout=2)
+            runtime.pause_after_chunks = None
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+        self.assertFalse(client.is_alive())
+        self.assertEqual(client_errors, [])
+
     def test_text_completion(self):
         status, _, body = self.request(
             "/v1/completions",
@@ -161,6 +384,123 @@ class ServerTests(unittest.TestCase):
         response = json.loads(body)
         self.assertEqual(status, 200)
         self.assertEqual(response["choices"][0]["text"], "Hello")
+
+    def test_responses_text(self):
+        status, _, body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "instructions": "Answer briefly.",
+                "input": "Hi",
+            },
+        )
+        response = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(response["object"], "response")
+        self.assertEqual(response["status"], "completed")
+        self.assertEqual(response["output"][0]["type"], "message")
+        self.assertEqual(response["output"][0]["content"][0]["text"], "Hello")
+        self.assertEqual(response["usage"]["total_tokens"], 7)
+
+    def test_responses_streams_text_and_tool_calls(self):
+        status, headers, body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "input": "Hi",
+                "stream": True,
+            },
+        )
+        events = [
+            json.loads(line[6:])
+            for line in body.decode().splitlines()
+            if line.startswith("data: {")
+        ]
+        self.assertEqual(status, 200)
+        self.assertEqual(headers.get_content_type(), "text/event-stream")
+        self.assertEqual(events[0]["type"], "response.created")
+        self.assertEqual(events[-1]["type"], "response.completed")
+        self.assertEqual(
+            "".join(
+                event["delta"]
+                for event in events
+                if event["type"] == "response.output_text.delta"
+            ),
+            "Hello",
+        )
+
+        runtime = self.server.runtime
+        raw = (
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n'
+            '<｜DSML｜parameter name="city" string="true">Taipei'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>'
+        )
+        runtime.response_chunks = list(raw)
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("get_weather", '{"city": "Taipei"}'),),
+        )
+        response_tool = {"type": "function", **self.tool["function"]}
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "Weather?",
+                    "tools": [response_tool],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200)
+            self.assertEqual(
+                "".join(
+                    event["delta"]
+                    for event in events
+                    if event["type"]
+                    == "response.function_call_arguments.delta"
+                ),
+                '{"city": "Taipei"}',
+            )
+            completed = events[-1]["response"]
+            call = completed["output"][0]
+            self.assertEqual(call["type"], "function_call")
+            self.assertEqual(call["name"], "get_weather")
+
+            runtime.response_chunks = ["It is sunny."]
+            runtime.parsed_turn = AssistantTurn("It is sunny.", "", ())
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": [
+                        {"role": "user", "content": "Weather?"},
+                        call,
+                        {
+                            "type": "function_call_output",
+                            "call_id": call["call_id"],
+                            "output": "Sunny",
+                        },
+                    ],
+                    "tools": [response_tool],
+                },
+            )
+            response = json.loads(body)
+            self.assertEqual(status, 200)
+            self.assertEqual(response["output"][0]["content"][0]["text"], "It is sunny.")
+            self.assertEqual(runtime.last_messages[-1]["role"], "tool")
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
     def test_status_reports_live_performance_metrics(self):
         self.request(
@@ -181,6 +521,10 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(performance["expert_pack_seconds"], 0.1)
         self.assertEqual(performance["expert_eviction_seconds"], 0.01)
         self.assertEqual(performance["routing_sync_seconds"], 0.05)
+        self.assertEqual(performance["time_to_first_token_seconds"], 0.5)
+        self.assertEqual(performance["decode_tokens_per_second"], 4.0)
+        self.assertEqual(performance["prompt_cache_reused_tokens"], 3)
+        self.assertEqual(performance["cache_state_eval_count"], 2)
         self.assertEqual(performance["active_parameters_cache"]["hit_rate"], 0.75)
         self.assertEqual(performance["active_parameters_cache"]["resident_slots"], 3)
 
@@ -229,7 +573,7 @@ class ServerTests(unittest.TestCase):
             },
         )
         self.assertEqual(status, 400)
-        self.assertEqual(json.loads(body)["error"]["param"], "tools")
+        self.assertEqual(json.loads(body)["error"]["param"], "tools.0.function")
 
         status, _, body = self.request(
             "/v1/chat/completions",
