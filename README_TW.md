@@ -14,6 +14,23 @@ SSD 讀取 routed expert。
 > DeepSeekV4SSD 是實驗性軟體。Mac 至少需要 64 GiB 統一記憶體。SSD 約需
 > 160 GiB 可用空間。APP 不包含模型權重。
 
+## 實測效能
+
+下列結果使用 `v1.0.2` runtime，並於 2026-08-08 完成實測。測試機器使用
+Apple M5 Pro、18 核心 CPU、20 核心 GPU 和 64 GiB 統一記憶體。runtime 使用
+512 個主模型 slot、4 個 read worker、MXFP8 KV cache、batch size 1 和 greedy
+decode。測試停用 DSpark。
+
+| 測試 | Prefill | Decode | 第一個 token 等待時間 | 完成時長 | MLX 峰值記憶體 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 5-token prompt，首次生成 32 個 token | — | 5.66 Tok/s | 2.12 s | 7.84 s | 15.05 GiB |
+| 同一個 runtime 第二次執行相同 request | — | 6.41 Tok/s | 1.20 s | 6.28 s | 15.05 GiB |
+| 4,096-token 重複 token prompt，生成 1 個 token | 144.53 Tok/s | — | 28.34 s | 28.34 s | 15.56 GiB |
+
+測試 SSD 使用 4 個 read worker 時，direct read 速度是 14.30 GiB/s。這些結果
+是參考值，不是效能保證。prompt 內容、SSD 速度和 cache 狀態都會改變效能。
+[完整驗證紀錄](docs/VALIDATION.md)包含更多實測結果和測試細節。
+
 ## 功能
 
 - APP 可以下載、安裝、驗證和修復支援的模型。

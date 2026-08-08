@@ -14,6 +14,24 @@ common tensors in unified memory and reads routed experts from a high-speed SSD.
 > memory and about 160 GiB of free SSD storage. Model weights are not included
 > with the app.
 
+## Measured performance
+
+These results were measured on 2026-08-08 with the `v1.0.2` runtime. The test
+Mac was an Apple M5 Pro with 18 CPU cores, 20 GPU cores, and 64 GiB of unified
+memory. The runtime used 512 main-model slots, four read workers, MXFP8 KV
+cache, batch size 1, and greedy decoding. DSpark was disabled.
+
+| Test | Prefill | Decode | First token | Total | MLX peak memory |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 5-token prompt, first 32-token request | — | 5.66 Tok/s | 2.12 s | 7.84 s | 15.05 GiB |
+| Same request, second run in one runtime | — | 6.41 Tok/s | 1.20 s | 6.28 s | 15.05 GiB |
+| Repeated-token 4,096-token prompt, one output token | 144.53 Tok/s | — | 28.34 s | 28.34 s | 15.56 GiB |
+
+The test SSD reached 14.30 GiB/s for direct reads with four workers. These
+results are a reference, not a guarantee. Prompt content, SSD speed, and cache
+state change performance. See the [validation record](docs/VALIDATION.md) for
+more measurements and test details.
+
 ## Features
 
 - Download, install, verify, and repair the supported model in the app.
