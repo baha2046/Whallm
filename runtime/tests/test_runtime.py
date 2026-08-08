@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import threading
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -123,15 +124,36 @@ class ModelRuntimeTests(unittest.TestCase):
             ),
         ]
         received_options = {}
+        route_phases = []
+        observed_phases = []
+
+        class ExpertCache:
+            active_phase = None
+
+            @contextmanager
+            def trace_routes(self, phase):
+                route_phases.append(phase)
+                self.active_phase = phase
+                try:
+                    yield
+                finally:
+                    self.active_phase = None
+
+            def close(self):
+                pass
+
+        expert_cache = ExpertCache()
 
         def fake_stream_generate(*_args, **options):
             received_options.update(options)
-            yield from responses
+            for response in responses:
+                observed_phases.append(expert_cache.active_phase)
+                yield response
 
         with (
             patch(
                 "deepseek_v4_ssd.generation.load_model",
-                return_value=(object(), SimpleNamespace(close=lambda: None)),
+                return_value=(object(), expert_cache),
             ),
             patch(
                 "deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained",
@@ -154,6 +176,8 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual([piece.text for piece in pieces], ["A", "B"])
         self.assertEqual(received_options["prompt_cache"], [cache])
         self.assertEqual(evaluate.call_count, 2)
+        self.assertEqual(route_phases, ["prefill", "decode", "decode"])
+        self.assertEqual(observed_phases, ["prefill", "decode"])
         self.assertEqual(metrics["runtime_prompt_tokens"], 4)
         self.assertEqual(metrics["runtime_generation_tokens"], 2)
         self.assertEqual(metrics["completed_request_count"], 1)
@@ -408,6 +432,7 @@ class ModelRuntimeTests(unittest.TestCase):
 class PrefillTests(unittest.TestCase):
     def test_runtime_uses_512_expert_slots_by_default(self):
         self.assertEqual(RuntimeConfig().slots, 512)
+        self.assertTrue(RuntimeConfig().ready_expert_decode)
 
     def test_automatic_step_size_uses_larger_chunks_for_long_prompts(self):
         self.assertEqual(_select_prefill_step_size(0, 1_000), 128)
@@ -729,11 +754,11 @@ class ExpertCacheTests(unittest.TestCase):
                 layer_count=1,
                 expert_directory=dspark_experts,
             ) as cache:
-                resident = cache.get_many(0, [0])
+                ready = dict(cache.iter_ready(0, [0]))
 
             self.assertEqual(cache.metrics.bytes_read, 15)
             self.assertEqual(
-                resident.individual_weights[0].w1.view(mx.uint8).tolist(),
+                ready[0].w1.view(mx.uint8).tolist(),
                 [[0, 1, 2, 3]],
             )
 
@@ -1027,6 +1052,49 @@ class MXFP8PoolingCacheTests(unittest.TestCase):
 
 
 class MXFP4Tests(unittest.TestCase):
+    def test_ready_experts_keep_router_selection_order(self):
+        def quantized(value: float):
+            return mx.quantize(
+                mx.full((32, 32), value),
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+            )
+
+        experts = []
+        for value in (0.125, 0.25):
+            w1, w1_scales = quantized(value)
+            w2, w2_scales = quantized(value + 0.125)
+            w3, w3_scales = quantized(value + 0.25)
+            experts.append(
+                ExpertWeights(w1, w1_scales, w2, w2_scales, w3, w3_scales)
+            )
+
+        cache = SimpleNamespace(
+            ready_expert_decode=True,
+            iter_ready=lambda _layer, _selected: iter(
+                [(0, experts[0]), (1, experts[1])]
+            ),
+        )
+        switch = _StreamingSwitchGLU(0, cache, lambda up, _gate: up)
+        source = mx.ones((1, 1, 32), dtype=mx.bfloat16)
+        selected = mx.array([[[1, 0]]])
+
+        actual = switch(source, selected)
+        reference_cache = SimpleNamespace(
+            get_many=lambda _layer, _selected: ResidentExperts(
+                tuple(experts), {0: 0, 1: 1}
+            )
+        )
+        expected = _StreamingSwitchGLU(
+            0,
+            reference_cache,
+            lambda up, _gate: up,
+        )(source, selected)
+        mx.eval(actual, expected)
+
+        self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
+
     def test_individual_experts_run_in_selected_order(self):
         def quantized(value: float):
             return mx.quantize(

@@ -7,6 +7,7 @@ import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
@@ -31,6 +32,11 @@ from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
 
 THINK_START = "<think>"
 THINK_END = "</think>"
+
+
+def _route_phase(expert_cache, phase: str):
+    trace_routes = getattr(expert_cache, "trace_routes", None)
+    return trace_routes(phase) if callable(trace_routes) else nullcontext()
 
 
 @dataclass(frozen=True)
@@ -459,15 +465,16 @@ class ModelRuntime:
                         completed = True
                         return
                     if use_layer_major:
-                        layer_major_prefill(
-                            self.model,
-                            generation_prompt[:-1],
-                            prompt_cache,
-                            step_size,
-                            self.expert_cache,
-                            getattr(self.config, "moe_prefill_step_size", 0),
-                            getattr(self.config, "batched_expert_prefill", True),
-                        )
+                        with _route_phase(self.expert_cache, "prefill"):
+                            layer_major_prefill(
+                                self.model,
+                                generation_prompt[:-1],
+                                prompt_cache,
+                                step_size,
+                                self.expert_cache,
+                                getattr(self.config, "moe_prefill_step_size", 0),
+                                getattr(self.config, "batched_expert_prefill", True),
+                            )
                         self._store_prompt_cache(
                             _PromptCacheEntry(
                                 copy.deepcopy(prompt_cache),
@@ -487,12 +494,16 @@ class ModelRuntime:
                             prefill_step_size=step_size,
                         )
                     )
+                    first_response = True
                     while True:
                         started = time.perf_counter()
                         try:
-                            response = next(responses)
+                            phase = "prefill" if first_response else "decode"
+                            with _route_phase(self.expert_cache, phase):
+                                response = next(responses)
                         except StopIteration:
                             break
+                        first_response = False
                         step_seconds = time.perf_counter() - started
                         cache_started = time.perf_counter()
                         mx.eval([cache.state for cache in prompt_cache])

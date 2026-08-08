@@ -1773,6 +1773,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--warmup-prompt-file")
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
+    parser.add_argument("--no-ready-expert-decode", action="store_true")
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument("--dspark-slots", type=int, default=256)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
@@ -1839,6 +1840,7 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        ready_expert_decode=not arguments.no_ready_expert_decode,
         dspark_enabled=arguments.dspark,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,

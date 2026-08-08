@@ -41,6 +41,8 @@ class RuntimeConfig:
     dspark_enabled: bool = False
     dspark_confidence_threshold: float = 0.6
     dspark_slots: int = 256
+    expert_route_trace: str | None = None
+    ready_expert_decode: bool = True
 
 
 def _select_prefill_step_size(configured: int, prompt_tokens: int) -> int:
@@ -199,6 +201,10 @@ class _StreamingSwitchGLU(nn.Module):
         self.activation = activation
 
     def __call__(self, x: mx.array, indices: mx.array) -> mx.array:
+        selected_array = None
+        if getattr(self.cache, "route_trace_enabled", False):
+            selected_array = np.asarray(indices, dtype=np.int32)
+            self.cache.record_routes(self.layer, selected_array)
         current_batched = getattr(self.cache, "current_batched", None)
         batched = current_batched(self.layer) if callable(current_batched) else None
         if batched is not None:
@@ -246,7 +252,31 @@ class _StreamingSwitchGLU(nn.Module):
             self.cache.record_gather_qmm()
             return output.squeeze(-2)
 
-        selected = np.asarray(indices, dtype=np.int32)
+        selected = (
+            selected_array
+            if selected_array is not None
+            else np.asarray(indices, dtype=np.int32)
+        )
+        if (
+            x.shape[0] == 1
+            and x.shape[1] == 1
+            and getattr(self.cache, "ready_expert_decode", False)
+        ):
+            outputs = {}
+            for expert, weights in self.cache.iter_ready(
+                self.layer,
+                selected.reshape(-1).tolist(),
+            ):
+                up = _mxfp4(x, weights.w3, weights.w3_scales)
+                gate = _mxfp4(x, weights.w1, weights.w1_scales)
+                hidden = self.activation(up, gate)
+                output = _mxfp4(hidden, weights.w2, weights.w2_scales)
+                mx.async_eval(output)
+                outputs[expert] = output
+            return mx.stack(
+                [outputs[int(expert)] for expert in selected.reshape(-1)],
+                axis=-2,
+            )
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
         if x.shape[0] == 1 and x.shape[1] == 1:
             outputs = []
@@ -476,6 +506,8 @@ def load_model(
         config.slots,
         config.read_workers,
         config.prefetch_read_workers,
+        route_trace_path=config.expert_route_trace,
+        ready_expert_decode=config.ready_expert_decode,
     )
     try:
         for layer_index, layer in enumerate(model.layers):

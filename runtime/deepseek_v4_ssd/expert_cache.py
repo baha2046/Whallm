@@ -5,11 +5,12 @@ import os
 import threading
 import time
 from collections import Counter
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
 from dataclasses import replace
 from pathlib import Path
+from typing import Iterator
 
 import mlx.core as mx
 import numpy as np
@@ -179,6 +180,8 @@ class ExpertCache:
         prefetch_read_workers: int = 2,
         layer_count: int | None = None,
         expert_directory: Path | None = None,
+        route_trace_path: str | Path | None = None,
+        ready_expert_decode: bool = False,
     ) -> None:
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
@@ -192,6 +195,7 @@ class ExpertCache:
         self.prefetch_read_workers = min(read_workers, prefetch_read_workers)
         self.layer_count = layer_count or installed_model.layer_count
         self.expert_directory = expert_directory or installed_model.root / "experts"
+        self.ready_expert_decode = ready_expert_decode
         if self.layer_count < 1:
             raise ValueError("expert cache layer count must be greater than zero")
         self.metrics = CacheMetrics()
@@ -209,6 +213,18 @@ class ExpertCache:
         self._executor = ThreadPoolExecutor(max_workers=read_workers)
         self._prefetched_layers: dict[int, _LayerRead] = {}
         self._batched_layer: tuple[int, BatchedExperts] | None = None
+        self._route_trace_path = route_trace_path
+        if route_trace_path is not None:
+            from .route_trace import RouteTraceRecorder
+
+            self._route_trace = RouteTraceRecorder(
+                self.layer_count,
+                installed_model.expert_count,
+                installed_model.selected_expert_count,
+                installed_model.expert_blob_size,
+            )
+        else:
+            self._route_trace = None
         self._descriptors: list[int] = []
         try:
             for layer in range(self.layer_count):
@@ -233,6 +249,8 @@ class ExpertCache:
         for descriptor in self._descriptors:
             os.close(descriptor)
         self._descriptors.clear()
+        if self._route_trace is not None and self._route_trace_path is not None:
+            self._route_trace.write(self._route_trace_path)
 
     def __enter__(self) -> ExpertCache:
         return self
@@ -256,6 +274,31 @@ class ExpertCache:
     def record_gather_qmm(self, calls: int = 3) -> None:
         with self._lock:
             self.metrics.gather_qmm_calls += calls
+
+    @property
+    def route_trace_enabled(self) -> bool:
+        return self._route_trace is not None
+
+    @contextmanager
+    def trace_routes(self, phase: str):
+        if self._route_trace is None:
+            yield
+            return
+        with self._route_trace.phase(phase):
+            yield
+
+    def record_routes(self, layer: int, selected: np.ndarray) -> None:
+        if self._route_trace is not None:
+            self._route_trace.record(layer, selected)
+
+    def _record_residency(
+        self,
+        layer: int,
+        selected: list[int],
+        missing: list[int],
+    ) -> None:
+        if self._route_trace is not None:
+            self._route_trace.record_residency(layer, selected, missing)
 
     def current_batched(self, layer: int) -> BatchedExperts | None:
         current = self._batched_layer
@@ -351,6 +394,7 @@ class ExpertCache:
                 else:
                     self.metrics.hits += 1
                     self._touch(layer, expert, entry, frequencies[expert])
+        self._record_residency(layer, expert_ids, missing)
 
         started = time.perf_counter()
         futures = {
@@ -392,6 +436,81 @@ class ExpertCache:
                 individual_weights,
                 {expert: slot for slot, expert in enumerate(unique)},
             )
+
+    def iter_ready(
+        self,
+        layer: int,
+        expert_ids: list[int],
+    ) -> Iterator[tuple[int, ExpertWeights]]:
+        """Yield resident and newly read experts without waiting for the slowest read."""
+        if not 0 <= layer < self.layer_count:
+            raise ValueError(f"invalid layer {layer}")
+        frequencies = Counter(expert_ids)
+        unique = sorted(frequencies)
+        if len(unique) > self.slots:
+            raise ValueError("selected experts exceed the expert slot count")
+        if any(not 0 <= expert < self.model.expert_count for expert in unique):
+            raise ValueError("selected experts contain an invalid expert ID")
+
+        resident: list[tuple[int, int]] = []
+        missing: list[int] = []
+        protected = {(layer, expert) for expert in unique}
+        with self._lock:
+            for expert in unique:
+                entry = self._entries.get((layer, expert))
+                if entry is None:
+                    self.metrics.misses += 1
+                    missing.append(expert)
+                else:
+                    self.metrics.hits += 1
+                    self._touch(layer, expert, entry, frequencies[expert])
+                    resident.append((expert, entry.slot))
+        self._record_residency(layer, expert_ids, missing)
+
+        started = time.perf_counter()
+        futures = {
+            self._executor.submit(self._read_blob_ready, layer, expert): expert
+            for expert in missing
+        }
+        for expert, slot in resident:
+            pack_started = time.perf_counter()
+            weights = self._pool.select_individual([slot])[0]
+            with self._lock:
+                self.metrics.pack_seconds += time.perf_counter() - pack_started
+            yield expert, weights
+
+        ready_at = started
+        for future in as_completed(futures):
+            expert = futures[future]
+            blob, finished = future.result()
+            ready_at = max(ready_at, finished)
+            with self._lock:
+                if self._free_slots:
+                    slot = self._free_slots.pop()
+                else:
+                    eviction_started = time.perf_counter()
+                    victim_key, victim = self._evict(protected)
+                    self.metrics.eviction_seconds += (
+                        time.perf_counter() - eviction_started
+                    )
+                    slot = victim.slot
+                    del self._entries[victim_key]
+                    self._layer_counts[victim_key[0]] -= 1
+                    self.metrics.evictions += 1
+                self._pool.store([slot], [blob])
+                entry = _Entry(slot, frequencies[expert], 0)
+                self._entries[(layer, expert)] = entry
+                self._layer_counts[layer] += 1
+                self._touch(layer, expert, entry, 0)
+                pack_started = time.perf_counter()
+                weights = self._pool.select_individual([slot])[0]
+                self.metrics.pack_seconds += time.perf_counter() - pack_started
+            yield expert, weights
+
+        with self._lock:
+            self.metrics.bytes_read += len(missing) * self.model.expert_blob_size
+            self.metrics.read_seconds += ready_at - started if missing else 0.0
+            self._decay_if_needed()
 
     def _touch(self, layer: int, expert: int, entry: _Entry, count: int) -> None:
         self._clock += 1
@@ -455,6 +574,9 @@ class ExpertCache:
     def _read_blob(self, layer: int, expert: int) -> bytes:
         offset = expert * self.model.expert_blob_size
         return self._read_exact(layer, offset, self.model.expert_blob_size)
+
+    def _read_blob_ready(self, layer: int, expert: int) -> tuple[bytes, float]:
+        return self._read_blob(layer, expert), time.perf_counter()
 
     def _read_into(
         self,

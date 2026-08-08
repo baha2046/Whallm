@@ -35,6 +35,8 @@ def main() -> None:
     parser.add_argument("--dspark-slots", type=int, default=256)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--metrics-json")
+    parser.add_argument("--expert-route-trace")
+    parser.add_argument("--no-ready-expert-decode", action="store_true")
     arguments = parser.parse_args()
     if arguments.max_tokens < 1:
         parser.error("--max-tokens must be greater than zero")
@@ -60,6 +62,8 @@ def main() -> None:
         parser.error("--dspark-confidence-threshold must be between zero and one")
     if arguments.dspark_slots < 30:
         parser.error("--dspark-slots must be at least 30")
+    if arguments.dspark and arguments.expert_route_trace:
+        parser.error("--expert-route-trace currently requires DSpark to be disabled")
 
     config = RuntimeConfig(
         slots=arguments.slots,
@@ -78,6 +82,8 @@ def main() -> None:
         dspark_enabled=arguments.dspark,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
+        expert_route_trace=arguments.expert_route_trace,
+        ready_expert_decode=not arguments.no_ready_expert_decode,
     )
     runtime = ModelRuntime.open(arguments.model, config)
 
@@ -126,6 +132,7 @@ def main() -> None:
             "moe_prefill_step_size": config.moe_prefill_step_size,
             "batched_expert_prefill": config.batched_expert_prefill,
             "fp4_index_cache": config.fp4_index_cache,
+            "ready_expert_decode": config.ready_expert_decode,
             "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
             "dspark_slots": config.dspark_slots,
             **runtime.metrics.snapshot(),
