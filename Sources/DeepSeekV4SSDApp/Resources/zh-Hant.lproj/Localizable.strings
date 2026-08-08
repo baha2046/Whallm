@@ -148,7 +148,7 @@
 "This Mac has at least 64 GiB of memory." = "此 Mac 有至少 64 GiB 記憶體。";
 "This Mac uses Apple Silicon." = "此 Mac 使用 Apple Silicon。";
 "This runtime does not support Intel Mac." = "此 runtime 不支援 Intel Mac。";
-"This runtime needs at least 64 GiB of memory." = "此 runtime 需要至少 64 GiB 記憶體。";
+"This Mac has less than 64 GiB of memory. Performance or stability may be reduced." = "此 Mac 的記憶體少於 64 GiB。效能或穩定性可能會降低。";
 "Cache Hit rate" = "快取命中率";
 "Maximum" = "歷史最高";
 "Tool call" = "工具呼叫";
