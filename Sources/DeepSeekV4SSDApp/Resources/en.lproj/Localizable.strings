@@ -148,7 +148,7 @@
 "This Mac has at least 64 GiB of memory." = "This Mac has at least 64 GiB of memory.";
 "This Mac uses Apple Silicon." = "This Mac uses Apple Silicon.";
 "This runtime does not support Intel Mac." = "This runtime does not support Intel Mac.";
-"This runtime needs at least 64 GiB of memory." = "This runtime needs at least 64 GiB of memory.";
+"This Mac has less than 64 GiB of memory. Performance or stability may be reduced." = "This Mac has less than 64 GiB of memory. Performance or stability may be reduced.";
 "Cache Hit rate" = "Cache Hit rate";
 "Maximum" = "Maximum";
 "Tool call" = "Tool call";

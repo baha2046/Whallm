@@ -149,7 +149,7 @@ final class ModelLibrary: ObservableObject {
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
-  nonisolated private static let minimumMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
+  nonisolated private static let recommendedMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
   nonisolated private static let requiredStorageBytes: UInt64 = 160 * 1_024 * 1_024 * 1_024
 
   @Published private(set) var rootURL: URL
@@ -553,14 +553,16 @@ final class ModelLibrary: ObservableObject {
     #endif
 
     let memory = ProcessInfo.processInfo.physicalMemory
+    let hasRecommendedMemory = memory >= recommendedMemoryBytes
     let memoryCheck = PreflightCheck(
       id: "memory",
       title: L10n.string("Memory"),
-      detail: memory >= minimumMemoryBytes
+      detail: hasRecommendedMemory
         ? L10n.string("This Mac has at least 64 GiB of memory.")
-        : L10n.string("This runtime needs at least 64 GiB of memory."),
-      status: memory >= minimumMemoryBytes ? .passed : .failed,
-      blocksDownload: true
+        : L10n.string(
+          "This Mac has less than 64 GiB of memory. Performance or stability may be reduced."),
+      status: hasRecommendedMemory ? .passed : .warning,
+      blocksDownload: false
     )
 
     let probe = root.appending(path: ".write-check-\(UUID().uuidString)")
