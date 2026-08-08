@@ -1,6 +1,10 @@
+<div align="right">
+  <a href="README.md">English</a> · <strong>繁體中文</strong>
+</div>
+
 # DeepSeekV4SSD
 
-[English](README.md) | 繁體中文
+![DeepSeekV4SSD APP 畫面](docs/assets/deepseekv4ssd-app.png)
 
 DeepSeekV4SSD 可在 Apple Silicon Mac 上執行 `DeepSeek-V4-Flash-0731`。
 DeepSeekV4SSD 會把 common tensor 保留在統一記憶體中。DeepSeekV4SSD 會從高速

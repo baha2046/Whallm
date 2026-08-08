@@ -1,6 +1,10 @@
+<div align="right">
+  <strong>English</strong> · <a href="README_TW.md">繁體中文</a>
+</div>
+
 # DeepSeekV4SSD
 
-English | [繁體中文](README_TW.md)
+![DeepSeekV4SSD app](docs/assets/deepseekv4ssd-app.png)
 
 Run `DeepSeek-V4-Flash-0731` locally on Apple Silicon. DeepSeekV4SSD keeps the
 common tensors in unified memory and reads routed experts from a high-speed SSD.
