@@ -54,6 +54,14 @@ struct CLI {
       let manifest = try InstalledModel.verify(at: URL(fileURLWithPath: model))
       print("verified: \(model)")
       print("files: \(manifest.files.count)")
+    case "install-dspark":
+      let model = try value(after: "--model", in: arguments)
+      let printer = ProgressPrinter()
+      let manifest = try await DeepSeekV4Checkpoint().installDSpark(
+        at: URL(fileURLWithPath: model)
+      ) { printer.update($0) }
+      print("DSpark installed: \(model)")
+      print("files: \(manifest.files.count)")
     case "benchmark":
       let model = try value(after: "--model", in: arguments)
       let samples = try integer(after: "--samples", in: arguments, default: 32)
@@ -124,6 +132,7 @@ struct CLI {
         dsv4-repack plan --output plan.json
         dsv4-repack repack --output deepseek-v4-flash-0731.dsv4 [--plan plan.json]
         dsv4-repack verify --model deepseek-v4-flash-0731.dsv4
+        dsv4-repack install-dspark --model deepseek-v4-flash-0731.dsv4
         dsv4-repack benchmark --model deepseek-v4-flash-0731.dsv4 [--samples 32]
       """)
   }

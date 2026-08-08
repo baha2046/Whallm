@@ -16,7 +16,9 @@ def main() -> None:
     parser.add_argument("--model", required=True)
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--max-tokens", type=int, default=272_000)
-    parser.add_argument("--slots", type=int, default=1024)
+    parser.add_argument("--temperature", type=float, default=0.2)
+    parser.add_argument("--top-p", type=float, default=0.98)
+    parser.add_argument("--slots", type=int, default=512)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
     parser.add_argument("--prefill-step-size", type=int, default=0)
@@ -29,10 +31,17 @@ def main() -> None:
     parser.add_argument("--prompt-cache-directory")
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
+    parser.add_argument("--dspark", action="store_true")
+    parser.add_argument("--dspark-slots", type=int, default=256)
+    parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--metrics-json")
     arguments = parser.parse_args()
     if arguments.max_tokens < 1:
         parser.error("--max-tokens must be greater than zero")
+    if not 0 <= arguments.temperature <= 2:
+        parser.error("--temperature must be between zero and two")
+    if not 0 < arguments.top_p <= 1:
+        parser.error("--top-p must be greater than zero and at most one")
     if arguments.slots < 6:
         parser.error("--slots must be at least 6")
     if arguments.read_workers < 1:
@@ -47,6 +56,10 @@ def main() -> None:
         parser.error("--prompt-cache-entries must be greater than zero")
     if arguments.prompt_cache_memory_gib < 1:
         parser.error("--prompt-cache-memory-gib must be greater than zero")
+    if not 0 <= arguments.dspark_confidence_threshold <= 1:
+        parser.error("--dspark-confidence-threshold must be between zero and one")
+    if arguments.dspark_slots < 30:
+        parser.error("--dspark-slots must be at least 30")
 
     config = RuntimeConfig(
         slots=arguments.slots,
@@ -62,6 +75,9 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        dspark_enabled=arguments.dspark,
+        dspark_slots=arguments.dspark_slots,
+        dspark_confidence_threshold=arguments.dspark_confidence_threshold,
     )
     runtime = ModelRuntime.open(arguments.model, config)
 
@@ -71,7 +87,11 @@ def main() -> None:
     try:
         for response in runtime.stream(
             arguments.prompt,
-            GenerationOptions(max_tokens=arguments.max_tokens),
+            GenerationOptions(
+                max_tokens=arguments.max_tokens,
+                temperature=arguments.temperature,
+                top_p=arguments.top_p,
+            ),
         ):
             sys.stdout.write(response.text)
             sys.stdout.flush()
@@ -106,6 +126,8 @@ def main() -> None:
             "moe_prefill_step_size": config.moe_prefill_step_size,
             "batched_expert_prefill": config.batched_expert_prefill,
             "fp4_index_cache": config.fp4_index_cache,
+            "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
+            "dspark_slots": config.dspark_slots,
             **runtime.metrics.snapshot(),
         }
         sys.stderr.write("\n" + json.dumps(result, indent=2) + "\n")

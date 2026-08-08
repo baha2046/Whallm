@@ -15,10 +15,16 @@ enum ModelContract {
   static let expertIntermediateSize = 2_048
   static let hashLayerCount = 3
   static let maximumContext = 1_048_576
+  static let dsparkLayerCount = 3
+  static let dsparkBlockSize = 5
+  static let dsparkNoiseTokenID = 128_799
+  static let dsparkTargetLayerIDs = [40, 41, 42]
+  static let dsparkMarkovRank = 256
   static let commonAlignment: UInt64 = 256
   static let companions = [
     CompanionFile(source: "config.json", destination: "config.json"),
     CompanionFile(source: "generation_config.json", destination: "generation_config.json"),
+    CompanionFile(source: "inference/config.json", destination: "inference/config.json"),
     CompanionFile(source: "tokenizer.json", destination: "tokenizer/tokenizer.json"),
     CompanionFile(
       source: "tokenizer_config.json", destination: "tokenizer/tokenizer_config.json"),
@@ -70,6 +76,24 @@ enum ModelContract {
       throw RepackError.incompatibleModel("\(mismatch.0) is \(mismatch.1); expected \(mismatch.2)")
     }
   }
+
+  static func validate(_ config: DSparkConfig) throws {
+    let actual: [(String, String, String)] = [
+      ("dim", String(config.hiddenSize), String(hiddenSize)),
+      ("n_mtp_layers", String(config.layerCount), String(dsparkLayerCount)),
+      ("dspark_block_size", String(config.blockSize), String(dsparkBlockSize)),
+      ("dspark_noise_token_id", String(config.noiseTokenID), String(dsparkNoiseTokenID)),
+      (
+        "dspark_target_layer_ids",
+        config.targetLayerIDs.map(String.init).joined(separator: ","),
+        dsparkTargetLayerIDs.map(String.init).joined(separator: ",")
+      ),
+      ("dspark_markov_rank", String(config.markovRank), String(dsparkMarkovRank)),
+    ]
+    if let mismatch = actual.first(where: { $0.1 != $0.2 }) {
+      throw RepackError.incompatibleModel("\(mismatch.0) is \(mismatch.1); expected \(mismatch.2)")
+    }
+  }
 }
 
 struct ModelConfig: Decodable, Sendable {
@@ -95,6 +119,24 @@ struct ModelConfig: Decodable, Sendable {
     case hiddenLayerCount = "num_hidden_layers"
     case hashLayerCount = "num_hash_layers"
     case maximumContext = "max_position_embeddings"
+  }
+}
+
+struct DSparkConfig: Decodable, Sendable {
+  let hiddenSize: Int
+  let layerCount: Int
+  let blockSize: Int
+  let noiseTokenID: Int
+  let targetLayerIDs: [Int]
+  let markovRank: Int
+
+  enum CodingKeys: String, CodingKey {
+    case hiddenSize = "dim"
+    case layerCount = "n_mtp_layers"
+    case blockSize = "dspark_block_size"
+    case noiseTokenID = "dspark_noise_token_id"
+    case targetLayerIDs = "dspark_target_layer_ids"
+    case markovRank = "dspark_markov_rank"
   }
 }
 
@@ -137,6 +179,15 @@ public struct TensorCopy: Codable, Equatable, Sendable {
   public let destinationOffset: UInt64
 }
 
+public struct DSparkDescriptor: Codable, Equatable, Sendable {
+  public let layerCount: Int
+  public let blockSize: Int
+  public let noiseTokenID: Int
+  public let targetLayerIDs: [Int]
+  public let markovRank: Int
+  public let commonTensors: [InstalledTensor]
+}
+
 public struct RepackPlan: Codable, Equatable, Sendable {
   public let formatVersion: Int
   public let modelID: String
@@ -149,9 +200,40 @@ public struct RepackPlan: Codable, Equatable, Sendable {
   public let files: [PlannedFile]
   public let commonTensors: [InstalledTensor]
   public let expertRegions: [ExpertRegion]
+  public let dspark: DSparkDescriptor?
   public let copies: [TensorCopy]
 
   public var installedBytes: UInt64 { files.reduce(0) { $0 + $1.size } }
+
+  public init(
+    formatVersion: Int,
+    modelID: String,
+    revision: String,
+    layerCount: Int,
+    expertCount: Int,
+    selectedExpertCount: Int,
+    expertBlobSize: UInt64,
+    checkpointTensorBytes: UInt64,
+    files: [PlannedFile],
+    commonTensors: [InstalledTensor],
+    expertRegions: [ExpertRegion],
+    dspark: DSparkDescriptor? = nil,
+    copies: [TensorCopy]
+  ) {
+    self.formatVersion = formatVersion
+    self.modelID = modelID
+    self.revision = revision
+    self.layerCount = layerCount
+    self.expertCount = expertCount
+    self.selectedExpertCount = selectedExpertCount
+    self.expertBlobSize = expertBlobSize
+    self.checkpointTensorBytes = checkpointTensorBytes
+    self.files = files
+    self.commonTensors = commonTensors
+    self.expertRegions = expertRegions
+    self.dspark = dspark
+    self.copies = copies
+  }
 }
 
 public struct InstalledFile: Codable, Equatable, Sendable {
@@ -171,6 +253,33 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
   public let files: [InstalledFile]
   public let commonTensors: [InstalledTensor]
   public let expertRegions: [ExpertRegion]
+  public let dspark: DSparkDescriptor?
+
+  public init(
+    formatVersion: Int,
+    modelID: String,
+    revision: String,
+    layerCount: Int,
+    expertCount: Int,
+    selectedExpertCount: Int,
+    expertBlobSize: UInt64,
+    files: [InstalledFile],
+    commonTensors: [InstalledTensor],
+    expertRegions: [ExpertRegion],
+    dspark: DSparkDescriptor? = nil
+  ) {
+    self.formatVersion = formatVersion
+    self.modelID = modelID
+    self.revision = revision
+    self.layerCount = layerCount
+    self.expertCount = expertCount
+    self.selectedExpertCount = selectedExpertCount
+    self.expertBlobSize = expertBlobSize
+    self.files = files
+    self.commonTensors = commonTensors
+    self.expertRegions = expertRegions
+    self.dspark = dspark
+  }
 }
 
 public struct RepackProgress: Sendable {

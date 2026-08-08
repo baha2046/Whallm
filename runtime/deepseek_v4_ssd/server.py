@@ -1015,6 +1015,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     config, "persistent_prompt_cache", False
                 ),
                 "fp4_index_cache": getattr(config, "fp4_index_cache", False),
+                "dspark_available": getattr(installed, "has_dspark", False),
+                "dspark_enabled": bool(
+                    getattr(getattr(self.app.runtime, "model", None), "dspark", None)
+                ),
+                "dspark_confidence_threshold": getattr(
+                    config, "dspark_confidence_threshold", 0.6
+                ),
+                "dspark_slots": getattr(config, "dspark_slots", 256),
                 "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
             },
             "performance": {
@@ -1746,7 +1754,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
     parser.add_argument("--public-model", default=PUBLIC_MODEL)
-    parser.add_argument("--slots", type=int, default=1024)
+    parser.add_argument("--slots", type=int, default=512)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
     parser.add_argument(
@@ -1765,6 +1773,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--warmup-prompt-file")
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
+    parser.add_argument("--dspark", action="store_true")
+    parser.add_argument("--dspark-slots", type=int, default=256)
+    parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--default-max-tokens", type=int, default=272_000)
     parser.add_argument("--default-temperature", type=float, default=0.2)
     parser.add_argument("--default-top-p", type=float, default=0.98)
@@ -1792,6 +1803,10 @@ def main() -> None:
         parser.error("--prompt-cache-entries must be greater than zero")
     if arguments.prompt_cache_memory_gib < 1:
         parser.error("--prompt-cache-memory-gib must be greater than zero")
+    if not 0 <= arguments.dspark_confidence_threshold <= 1:
+        parser.error("--dspark-confidence-threshold must be between zero and one")
+    if arguments.dspark_slots < 30:
+        parser.error("--dspark-slots must be at least 30")
     if not arguments.public_model:
         parser.error("--public-model must not be empty")
     try:
@@ -1824,6 +1839,9 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        dspark_enabled=arguments.dspark,
+        dspark_slots=arguments.dspark_slots,
+        dspark_confidence_threshold=arguments.dspark_confidence_threshold,
     )
     print(f"Loading {arguments.model}...", flush=True)
     runtime = ModelRuntime.open(arguments.model, config)

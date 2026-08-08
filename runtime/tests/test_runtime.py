@@ -17,10 +17,18 @@ from deepseek_v4_ssd.expert_cache import (
     ExpertWeights,
     ResidentExperts,
 )
+from deepseek_v4_ssd.dspark import (
+    DraftResult,
+    _confidence_prefix_length,
+    _should_fallback,
+    _verify,
+    generate_tokens,
+)
 from deepseek_v4_ssd.fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
 from deepseek_v4_ssd.generation import GenerationOptions, ModelRuntime
 from deepseek_v4_ssd.manifest import InstalledModel, Tensor
 from deepseek_v4_ssd.model import (
+    RuntimeConfig,
     _ORIGINAL_SPARSE_POOLED_ATTENTION,
     _StreamingSwitchGLU,
     _correct_compressor,
@@ -28,7 +36,9 @@ from deepseek_v4_ssd.model import (
     _select_prefill_step_size,
     _sparse_pooled_attention,
     _stable_topk_indices,
+    forward_with_hidden,
     layer_major_prefill,
+    verification_forward_with_hidden,
 )
 
 
@@ -396,6 +406,9 @@ class ModelRuntimeTests(unittest.TestCase):
 
 
 class PrefillTests(unittest.TestCase):
+    def test_runtime_uses_512_expert_slots_by_default(self):
+        self.assertEqual(RuntimeConfig().slots, 512)
+
     def test_automatic_step_size_uses_larger_chunks_for_long_prompts(self):
         self.assertEqual(_select_prefill_step_size(0, 1_000), 128)
         self.assertEqual(_select_prefill_step_size(0, 4_000), 256)
@@ -489,6 +502,184 @@ class PrefillTests(unittest.TestCase):
         self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
 
 
+class DSparkTests(unittest.TestCase):
+    def test_hardware_scheduler_falls_back_when_dspark_costs_more(self):
+        draft = DraftResult([2], [mx.zeros((5,))], [0.8], 0.2)
+
+        self.assertTrue(_should_fallback(0.1, draft, 0, 0.2))
+        self.assertFalse(_should_fallback(0.3, draft, 1, 0.1))
+
+    def test_confidence_scheduler_can_skip_the_whole_draft(self):
+        self.assertEqual(_confidence_prefix_length([0.4, 0.9], 0.6), 0)
+        self.assertEqual(_confidence_prefix_length([0.8, 0.5], 0.6), 1)
+
+    def test_next_round_receives_every_committed_hidden_state(self):
+        calls = []
+
+        class DSpark:
+            target_layers = (0,)
+
+            def reset_cache(self):
+                pass
+
+            def prefill_context(self, _hidden, _offset):
+                pass
+
+            def draft(
+                self,
+                _model,
+                _anchor,
+                hidden,
+                start_pos,
+                _temperature,
+                _top_p,
+                _threshold,
+            ):
+                calls.append((hidden.shape[1], start_pos))
+                return DraftResult(
+                    [2, 3],
+                    [mx.zeros((5,)), mx.zeros((5,))],
+                    [1.0, 1.0],
+                    0.0,
+                )
+
+        def forward(_model, inputs, _cache, _layers):
+            logits = mx.zeros((1, inputs.shape[1], 5))
+            logits[..., 1] = 1
+            hidden = mx.ones((1, inputs.shape[1], 1))
+            return logits, hidden
+
+        def verify(_model, tokens, _cache, _layers):
+            logits = mx.zeros((1, len(tokens), 5))
+            for index, token in enumerate((2, 3, 4)):
+                logits[0, index, token] = 1
+            hidden = mx.ones((1, len(tokens), 1))
+            return logits, hidden, [[None] for _ in tokens]
+
+        with (
+            patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
+            patch("deepseek_v4_ssd.dspark._target_sequence", side_effect=verify),
+            patch("deepseek_v4_ssd.dspark._should_fallback", return_value=False),
+        ):
+            list(
+                generate_tokens(
+                    [0],
+                    object(),
+                    DSpark(),
+                    [None],
+                    max_tokens=6,
+                    prefill_step_size=1,
+                    temperature=0,
+                    top_p=1,
+                )
+            )
+
+        self.assertEqual(calls, [(1, 1), (3, 2)])
+
+    def test_verification_batches_moe_without_changing_sequential_results(self):
+        mx.random.seed(7)
+        arguments = deepseek_v4.ModelArgs(
+            vocab_size=64,
+            hidden_size=32,
+            intermediate_size=64,
+            moe_intermediate_size=32,
+            num_hidden_layers=3,
+            num_attention_heads=2,
+            n_routed_experts=4,
+            num_experts_per_tok=2,
+            q_lora_rank=16,
+            qk_rope_head_dim=16,
+            head_dim=16,
+            o_groups=1,
+            o_lora_rank=16,
+            hc_mult=1,
+            compress_ratios=[0, 4, 128],
+            num_hash_layers=0,
+            sliding_window=8,
+        )
+        model = deepseek_v4.Model(arguments)
+        sequential_cache = model.make_cache()
+        verification_cache = model.make_cache()
+        prefix = mx.array([[1, 2, 3]])
+        forward_with_hidden(model, prefix, sequential_cache, (1, 2))
+        forward_with_hidden(model, prefix, verification_cache, (1, 2))
+
+        tokens = [4, 5, 6, 7, 8]
+        sequential_logits = []
+        sequential_hidden = []
+        for token in tokens:
+            logits, hidden = forward_with_hidden(
+                model,
+                mx.array([[token]]),
+                sequential_cache,
+                (1, 2),
+            )
+            mx.eval(logits, hidden)
+            sequential_logits.append(logits)
+            sequential_hidden.append(hidden)
+        expected_logits = mx.concatenate(sequential_logits, axis=1)
+        expected_hidden = mx.concatenate(sequential_hidden, axis=1)
+        actual_logits, actual_hidden, checkpoints = (
+            verification_forward_with_hidden(
+                model,
+                mx.array([tokens]),
+                verification_cache,
+                (1, 2),
+            )
+        )
+        mx.eval(expected_logits, expected_hidden, actual_logits, actual_hidden)
+
+        self.assertEqual(
+            mx.argmax(actual_logits, axis=-1).tolist(),
+            mx.argmax(expected_logits, axis=-1).tolist(),
+        )
+        self.assertLess(mx.max(mx.abs(actual_logits - expected_logits)).item(), 0.005)
+        self.assertLess(mx.max(mx.abs(actual_hidden - expected_hidden)).item(), 0.005)
+
+        retained_cache = model.make_cache()
+        forward_with_hidden(model, prefix, retained_cache, (1, 2))
+        for token in tokens[:3]:
+            forward_with_hidden(model, mx.array([[token]]), retained_cache, (1, 2))
+        verification_cache[:] = checkpoints[2]
+        expected, _ = forward_with_hidden(
+            model, mx.array([[9]]), retained_cache, (1, 2)
+        )
+        actual, _ = forward_with_hidden(
+            model, mx.array([[9]]), verification_cache, (1, 2)
+        )
+        mx.eval(expected, actual)
+        self.assertLess(mx.max(mx.abs(actual - expected)).item(), 0.005)
+
+    def test_greedy_verification_stops_at_the_first_mismatch(self):
+        draft = DraftResult(
+            tokens=[2, 4],
+            logprobs=[mx.zeros((5,)), mx.zeros((5,))],
+            confidence=[0.9, 0.8],
+            seconds=0.01,
+        )
+        target = mx.array(
+            [
+                [-4.0, -4.0, 0.0, -4.0, -4.0],
+                [-4.0, -4.0, -4.0, 0.0, -4.0],
+                [-4.0, 0.0, -4.0, -4.0, -4.0],
+            ]
+        )
+
+        accepted, token, _ = _verify(draft, target, temperature=0)
+
+        self.assertEqual(accepted, 1)
+        self.assertEqual(token, 3)
+
+    def test_sampling_verification_accepts_identical_distributions(self):
+        distribution = mx.array([-float("inf"), 0.0, -float("inf")])
+        draft = DraftResult([1], [distribution], [1.0], 0.01)
+        target = mx.stack([distribution, distribution])
+
+        accepted, token, _ = _verify(draft, target, temperature=1)
+
+        self.assertEqual(accepted, 1)
+        self.assertEqual(token, 1)
+
 class CacheMetricsTests(unittest.TestCase):
     def test_delta_reports_only_the_current_request(self):
         before = CacheMetrics(hits=10, misses=4, evictions=2, bytes_read=100)
@@ -503,6 +694,49 @@ class CacheMetricsTests(unittest.TestCase):
 
 
 class ExpertCacheTests(unittest.TestCase):
+    def test_cache_reads_an_independent_expert_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "experts").mkdir()
+            dspark_experts = root / "dspark/experts"
+            dspark_experts.mkdir(parents=True)
+            regions = (
+                Tensor("w1.weight", "I8", (1, 4), 0, 4),
+                Tensor("w1.scale", "F8_E8M0", (1, 1), 4, 1),
+                Tensor("w2.weight", "I8", (1, 4), 5, 4),
+                Tensor("w2.scale", "F8_E8M0", (1, 1), 9, 1),
+                Tensor("w3.weight", "I8", (1, 4), 10, 4),
+                Tensor("w3.scale", "F8_E8M0", (1, 1), 14, 1),
+            )
+            (root / "experts/layer_00.bin").write_bytes(bytes(15))
+            dspark_experts.joinpath("layer_00.bin").write_bytes(bytes(range(15)))
+            model = InstalledModel(
+                root=root,
+                model_id="fixture",
+                revision="fixture",
+                layer_count=1,
+                expert_count=1,
+                selected_expert_count=1,
+                expert_blob_size=15,
+                common_tensors=(),
+                expert_regions=regions,
+            )
+
+            with ExpertCache(
+                model,
+                slots=1,
+                read_workers=1,
+                layer_count=1,
+                expert_directory=dspark_experts,
+            ) as cache:
+                resident = cache.get_many(0, [0])
+
+            self.assertEqual(cache.metrics.bytes_read, 15)
+            self.assertEqual(
+                resident.individual_weights[0].w1.view(mx.uint8).tolist(),
+                [[0, 1, 2, 3]],
+            )
+
     def test_lfu_cache_reuses_and_evicts_slots(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -9,6 +9,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from dataclasses import replace
+from pathlib import Path
 
 import mlx.core as mx
 import numpy as np
@@ -173,9 +174,11 @@ class ExpertCache:
     def __init__(
         self,
         installed_model: InstalledModel,
-        slots: int = 1024,
+        slots: int = 512,
         read_workers: int = 4,
         prefetch_read_workers: int = 2,
+        layer_count: int | None = None,
+        expert_directory: Path | None = None,
     ) -> None:
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
@@ -187,13 +190,17 @@ class ExpertCache:
         self.slots = slots
         self.read_workers = read_workers
         self.prefetch_read_workers = min(read_workers, prefetch_read_workers)
+        self.layer_count = layer_count or installed_model.layer_count
+        self.expert_directory = expert_directory or installed_model.root / "experts"
+        if self.layer_count < 1:
+            raise ValueError("expert cache layer count must be greater than zero")
         self.metrics = CacheMetrics()
         self._pool = _SlotPool(installed_model, slots)
         self._entries: dict[tuple[int, int], _Entry] = {}
         self._free_slots = list(reversed(range(slots)))
         self._heap: list[tuple[int, int, int, int, int]] = []
-        self._layer_counts = [0] * installed_model.layer_count
-        base = slots // installed_model.layer_count
+        self._layer_counts = [0] * self.layer_count
+        base = slots // self.layer_count
         self._layer_reserve = base // 2
         self._clock = 0
         self._last_decay = 0
@@ -204,10 +211,10 @@ class ExpertCache:
         self._batched_layer: tuple[int, BatchedExperts] | None = None
         self._descriptors: list[int] = []
         try:
-            for layer in range(installed_model.layer_count):
+            for layer in range(self.layer_count):
                 self._descriptors.append(
                     os.open(
-                        installed_model.root / f"experts/layer_{layer:02d}.bin",
+                        self.expert_directory / f"layer_{layer:02d}.bin",
                         os.O_RDONLY,
                     )
                 )
@@ -255,7 +262,7 @@ class ExpertCache:
         return current[1] if current is not None and current[0] == layer else None
 
     def prefetch_layer(self, layer: int) -> None:
-        if not 0 <= layer < self.model.layer_count:
+        if not 0 <= layer < self.layer_count:
             return
         with self._lock:
             if layer not in self._prefetched_layers:
@@ -321,7 +328,7 @@ class ExpertCache:
                 self._pinned_layers.discard(layer)
 
     def get_many(self, layer: int, expert_ids: list[int]) -> ResidentExperts:
-        if not 0 <= layer < self.model.layer_count:
+        if not 0 <= layer < self.layer_count:
             raise ValueError(f"invalid layer {layer}")
         frequencies = Counter(expert_ids)
         unique = sorted(frequencies)

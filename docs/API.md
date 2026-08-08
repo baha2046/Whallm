@@ -158,7 +158,7 @@ fails, the stream sends an error event and then `[DONE]`.
 - The server returns an OpenAI error object when a request uses an unsupported
   field.
 - The request body limit is 1 MiB.
-- The maximum requested output is 32,768 tokens.
+- The maximum requested output is 272,000 tokens.
 
 `GET /api/status` reports both cumulative expert cache values and values for
 the latest request. Request fields include the selected prefill step, whether

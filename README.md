@@ -1,186 +1,227 @@
 # DeepSeekV4SSD
 
-DeepSeekV4SSD is an experimental Apple Silicon runtime for
-`DeepSeek-V4-Flash-0731`.
+English | [繁體中文](README_TW.md)
 
-The runtime targets a 64 GiB M5 Pro. MLX runs the model on Metal. The runtime
-keeps common tensors in memory and reads routed experts from SSD.
+Run `DeepSeek-V4-Flash-0731` locally on Apple Silicon. DeepSeekV4SSD keeps the
+common tensors in unified memory and reads routed experts from a high-speed SSD.
 
-## What works
+> [!IMPORTANT]
+> DeepSeekV4SSD is experimental. It needs a Mac with at least 64 GiB of unified
+> memory and about 160 GiB of free SSD storage. Model weights are not included
+> with the app.
 
-- The code validates the pinned official model contract.
-- The code reads safetensors headers with HTTP Range requests.
-- The code builds a deterministic repack plan for the 43-layer main model.
-- The code excludes DSpark weights.
-- The code copies selected byte ranges through an 8 MiB buffer.
-- A receipt resumes an interrupted repack.
-- The code writes SHA-256 values and verifies an installed model.
-- MLX provides the DeepSeek-V4 model operations.
-- A 1,024-slot LFU cache loads routed experts with four parallel `pread` calls.
-- Chunked prefill limits the routed experts needed by one model call.
-- MXFP8 stores the long compressed-attention cache. The 128-token local cache
-  stays in BF16.
-- The complete 145 GiB model is installed and its 49 files pass SHA-256
-  verification.
-- BF16 and MXFP8 pass greedy generation with the same output.
-- BF16 passes a 4K context. BF16 and MXFP8 pass the same 8K context.
+## Features
 
-## Commands
+- Download, install, verify, and repair the supported model in the app.
+- Resume an interrupted model download.
+- Use the default model folder at `~/.dsmodel/` or select another folder.
+- Run an OpenAI-compatible API server on your Mac.
+- Use `/v1/responses`, `/v1/chat/completions`, and `/v1/completions`.
+- Stream text, reasoning content, and function Tool calls.
+- Monitor prefill speed, decode speed, token counts, memory, SSD reads, cache
+  hit rate, first-token wait time, and completion time.
+- View live, minimum, average, and maximum metrics.
+- Use English, Simplified Chinese, or Traditional Chinese in the app.
+- Receive signed app updates through GitHub Releases and Sparkle.
 
-Inspect official metadata without downloading tensor data:
+## Requirements
 
-```sh
-swift run -c release dsv4-repack inspect
+| Item | Requirement |
+| --- | --- |
+| Mac | Apple Silicon |
+| macOS | macOS 15 or later |
+| Unified memory | 64 GiB or more |
+| Storage | About 160 GiB of free space |
+| Model storage | A high-speed internal or external SSD |
+| Internet | Required for model downloads and update checks |
+
+SSD speed has a direct effect on token generation speed. Use a fast Thunderbolt
+or USB4 SSD when you store the model on an external disk.
+
+## Install the app
+
+1. Download the latest signed and notarized ZIP from
+   [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
+2. Extract `DeepSeekV4SSD-macOS-arm64.zip`.
+3. Move `DeepSeekV4SSD.app` to the Applications folder.
+4. Open the app.
+
+The app checks GitHub Releases for updates. You can also select
+**Check for Updates…** from the app menu.
+
+## Install the model
+
+1. Open DeepSeekV4SSD.
+2. Keep the default model folder at `~/.dsmodel/`, or select another folder.
+3. Decide if you want to install DSpark with the model.
+4. Select **Download Model**.
+5. Wait for the download and installation to finish.
+
+The main model uses about 145 GiB. DSpark adds about 10.12 GiB. You can stop the
+download and resume it later. The app keeps verified partial data.
+
+To use an existing installed model, select the folder that contains the
+installed model or its parent folder. The app detects valid models
+automatically.
+
+## Start the local server
+
+1. Select an installed model.
+2. Review the server and runtime settings.
+3. Select **Start Server**.
+4. Use the test chat, or connect another client.
+
+The default server address is:
+
+```text
+http://127.0.0.1:11434
 ```
 
-Write the repack plan:
+The default OpenAI base URL is:
 
-```sh
-swift run -c release dsv4-repack plan --output plan.json
+```text
+http://127.0.0.1:11434/v1
 ```
 
-Run the complete main-model repack:
+A local server does not require an API key. A non-local host requires an API
+key. Do not expose the server directly to the public Internet.
+
+## Call the API
+
+### Chat Completions
 
 ```sh
-swift run -c release dsv4-repack repack \
-  --output deepseek-v4-flash-0731.dsv4 \
-  --plan plan.json
+curl -N http://127.0.0.1:11434/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  --data-binary '{
+    "model": "deepseek-v4-flash-0731",
+    "messages": [
+      {"role": "user", "content": "Explain why the sky is blue."}
+    ],
+    "stream": true,
+    "max_tokens": 256,
+    "temperature": 0.2,
+    "top_p": 0.98
+  }'
 ```
 
-The complete repack writes about 145 GiB. The command writes to a sibling
-`.partial` directory first. Run the same command again after an interruption.
-The command checks the receipt and continues completed data. The command never
-overwrites an existing destination.
-
-Verify an installed model:
+### Responses API
 
 ```sh
-swift run -c release dsv4-repack verify \
-  --model deepseek-v4-flash-0731.dsv4
+curl -N http://127.0.0.1:11434/v1/responses \
+  -H 'Content-Type: application/json' \
+  --data-binary '{
+    "model": "deepseek-v4-flash-0731",
+    "instructions": "Answer briefly.",
+    "input": "Explain why the sky is blue.",
+    "stream": true,
+    "max_output_tokens": 256
+  }'
 ```
 
-Measure expert SSD reads:
+Supported endpoints include:
 
-```sh
-swift run -c release dsv4-repack benchmark \
-  --model deepseek-v4-flash-0731.dsv4 \
-  --samples 32
-```
+- `GET /healthz`
+- `GET /v1/models`
+- `POST /v1/responses`
+- `POST /v1/chat/completions`
+- `POST /v1/completions`
 
-## Run the model
+The server supports OpenAI function tools. Your client must run each function
+and send the result back to the server. The server does not run tools or
+external commands.
 
-Create the local Python environment:
+Read the [API guide](docs/API.md) for request fields, Python examples, Codex
+tool support, and current limits.
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-```
+## DSpark
 
-Run greedy generation with the M5 Pro defaults:
+DSpark is an optional speculative decoding module. Installing DSpark adds about
+10.12 GiB to the model folder. Installing DSpark does not enable it.
 
-```sh
-PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli \
-  --model deepseek-v4-flash-0731.dsv4 \
-  --prompt "Explain why the sky is blue." \
-  --max-tokens 32
-```
+Enable **Use DSpark** in the runtime settings when you want to test it. The
+default DSpark cache holds 256 routed experts in independent SSD-backed slots.
+The runtime can stop using DSpark for the rest of a request when normal decode
+is faster.
 
-The M5 Pro defaults use 1,024 expert slots, four SSD read workers, automatic
-128-, 256-, or 512-token prefill chunks, and an MXFP8 compressed-attention
-cache. Prompts with at least 4,096 uncached tokens use layer-major prefill. Use
-`--bf16-kv-cache` for the correctness baseline.
+DSpark performance depends on the prompt, SSD, and cache state. DSpark is not
+faster for every request. You can disable DSpark without removing its files.
+Select **Remove DSpark** when you want to recover its storage space.
 
-Each expert slot stores one packed expert blob. A cache miss creates one Metal
-array instead of six arrays. The cache uses layer-aware LFU heaps with frequency
-aging. FP4 index scoring and MXFP8 sparse pooled attention operate on cache
-chunks without rebuilding the complete cache. The API status and CLI metrics
-include time to first token, decode speed, cache-state evaluation, packing,
-eviction, and routing synchronization times. The runtime evaluates cache state
-after each output token. This limits Metal resource growth during long output.
-The runtime keeps up to two in-memory prompt cache timelines for continued
-chats. Their combined default memory limit is 8 GiB. The runtime also stores
-up to eight restart-safe prompt caches under `~/.dsmodel/prompt-cache/`. Use
-`--warmup-prompt-file` to populate a fixed prompt prefix before the server
-starts accepting requests.
-Single-token decode runs the six routed experts directly. Multi-token prefill
-uses layer-local MoE tiles. It reads one routed expert layer into a strided
-tensor and runs three batched `gather_qmm` operations per MoE tile.
+## Metrics
 
-Measured direct SSD throughput reached 14.30 GiB/s with four read workers.
-The layer prefetch path uses two read workers to limit unified-memory bandwidth
-contention. A varied 4,097-token Tool-like prompt decreased from 44.03 to 28.02
-seconds. A varied 14,363-token Tool-like prompt decreased from 105.81 to 76.54
-seconds. Both measurements generated one greedy token.
-See the validation record for the full measurements and their limits.
+The app shows metrics for test-chat and API requests:
 
-## Run the macOS app
+- Prefill Tok/s
+- Decode Tok/s
+- Input Tokens
+- Output Tokens
+- Memory usage
+- SSD read speed
+- Cache Hit rate
+- First Token wait time
+- Completion time
 
-Start the SwiftUI control app:
+Each metric shows its live, minimum, average, and maximum value. The history
+uses one-second samples across all requests. Select **Clear metric history** to
+reset the minimum, average, and maximum values.
 
-```sh
-make run
-```
+## Privacy and network access
 
-The app detects installed models in the selected model folder. The app can
-download and repack the pinned model directly from Hugging Face. The complete
-installed model needs about 145 GiB of storage. An interrupted download resumes
-from its validated partial data.
+Inference runs on your Mac. Prompts and generated text stay in the local
+runtime unless the client that calls the API sends them elsewhere.
 
-Before downloading, the app checks Apple Silicon, memory, folder permissions,
-available storage, and the target SSD. The download view shows progress, speed,
-and estimated time. The user can stop a download and continue it later. The app
-can run a complete SHA-256 verification and redownload only missing or damaged
-model data. The default model folder is `~/.dsmodel/`.
+The app uses the network for these tasks:
 
-The app configures and controls the OpenAI-compatible API server and the
-DeepSeekV4SSD runtime. It also provides a small test chat. The server provides
-`/v1/models`, `/v1/responses`, `/v1/chat/completions`, and `/v1/completions`.
-It supports normal JSON responses, SSE streaming, and OpenAI function Tool
-calls. The test chat can expose `get_current_time` and display the model's Tool
-call while it streams. The App does not execute the Tool.
+- Download the model from Hugging Face.
+- Check and download app updates from GitHub Releases.
+- Accept API requests on the host and port that you configure.
 
-Build a distributable macOS app:
+Keep the default `127.0.0.1` host unless another device must connect. Set a
+strong API key before you use a non-local host.
 
-```sh
-make package
-```
+## Troubleshooting
 
-The package command embeds the Python framework, the current `.venv` packages,
-and the runtime. The output is `dist/DeepSeekV4SSD-macOS-arm64.zip`. Set
-`CODE_SIGN_IDENTITY` to a Developer ID Application identity for distribution.
-Without this value, the command uses an ad hoc signature for local testing.
-Set `NOTARY_PROFILE` to a `notarytool` keychain profile to submit the signed App
-to Apple and staple the accepted ticket.
+### The model download stopped
 
-The app uses Sparkle to check GitHub Releases for updates. Publish a signed and
-notarized update with a version that is higher than the previous release:
+Open the same model folder and select **Resume Download**. The app reuses the
+verified partial data.
 
-```sh
-CODE_SIGN_IDENTITY="Developer ID Application: Yanun Yang (Y366CJ66L6)" \
-NOTARY_PROFILE=DeepSeekV4SSD \
-make release VERSION=1.0.0
-```
+### The model is missing or damaged
 
-This command uploads the app ZIP and signed `appcast.xml` to the matching GitHub
-Release. The Sparkle private key stays in the local macOS Keychain under the
-`deepseek_ssd` account.
+Select **Verify Complete Model**. If the app reports damaged files, select
+**Verify and Repair**. The app downloads only missing or damaged data again.
 
-Use `make server` to start the server without the app. Set
-`DEEPSEEK_API_KEY=local-key` when a Bearer API key is needed.
+### The first response is slow
 
-The current runtime processes one generation request at a time because the
-model supports batch size 1. Later requests wait in the operating-system
-connection queue. See [the API guide](docs/API.md) for examples, supported
-parameters, security rules, and current limits.
+A cold expert cache and a long input increase first-token wait time. Later
+requests can be faster after the cache is warm. Check Prefill Tok/s, SSD read
+speed, and Cache Hit rate in the metrics panel.
 
-Run tests:
+### Memory use is too high
 
-```sh
-make test
-PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
-```
+Stop the server before you change runtime settings. Reduce **Prompt cache GiB**,
+reduce **Prompt cache entries**, disable DSpark, or reduce **DSpark slots**.
+DSpark needs at least 30 slots.
 
-See [the implementation plan](docs/IMPLEMENTATION_PLAN.md),
-[the validation record](docs/VALIDATION.md),
-[the API guide](docs/API.md), and
-[the feasibility report](research/deepseek-v4-flash-0731-turbofieldfare-feasibility.md).
+### API requests wait for a long time
+
+The current runtime processes one generation request at a time. A later request
+waits until the active request finishes. Long input also increases prefill time.
+
+### The server does not start
+
+Verify the selected model. Check that the configured port is available. Change
+the port when another app already uses `11434`.
+
+## Current limits
+
+- Only `DeepSeek-V4-Flash-0731` at the pinned revision is supported.
+- The runtime processes one generation request at a time.
+- Images, audio, logprobs, `response_format`, and `stop` are not supported.
+- The maximum requested output is 272,000 tokens.
+- Very long output needs more KV cache memory.
+- Performance depends on SSD speed, input length, and cache state.
+
+DeepSeekV4SSD is not affiliated with DeepSeek. Review the model terms before you
+download and use the model.

@@ -15,8 +15,9 @@ struct ContentView: View {
         configuration: $configuration,
         languageCode: $languageCode,
         server: server,
-        modelLibrary: modelLibrary)
-        .frame(minWidth: 480, idealWidth: 540, maxWidth: 680)
+        modelLibrary: modelLibrary
+      )
+      .frame(minWidth: 480, idealWidth: 540, maxWidth: 680)
     }
     .environment(\.locale, selectedLanguage.locale)
     .task {
@@ -55,6 +56,7 @@ private struct ServerView: View {
   @State private var repairTarget: InstalledModelInfo?
   @State private var confirmsReinstall = false
   @State private var reinstallTarget: URL?
+  @State private var confirmsDSparkRemoval = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -101,12 +103,13 @@ private struct ServerView: View {
               ScrollView {
                 Text(
                   server.log.isEmpty
-                    ? L10n.string("The log will appear here after the server starts.") : server.log)
-                  .font(.system(.callout, design: .monospaced))
-                  .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
-                  .textSelection(.enabled)
-                  .frame(maxWidth: .infinity, alignment: .topLeading)
-                  .padding(12)
+                    ? L10n.string("The log will appear here after the server starts.") : server.log
+                )
+                .font(.system(.callout, design: .monospaced))
+                .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(12)
               }
               .frame(minHeight: 140, maxHeight: 260)
               .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
@@ -130,7 +133,8 @@ private struct ServerView: View {
     } message: {
       Text(
         L10n.string(
-          "The app will install the model in %@. You can resume an interrupted download.", modelLibrary.rootURL.path))
+          "The app will install the model in %@. You can resume an interrupted download.",
+          modelLibrary.rootURL.path))
     }
     .confirmationDialog(
       L10n.string("Verify and repair the model?"),
@@ -142,7 +146,9 @@ private struct ServerView: View {
       }
       Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
-      Text(L10n.string("The app will verify the complete model. It will download only missing or damaged data."))
+      Text(
+        L10n.string(
+          "The app will verify the complete model. It will download only missing or damaged data."))
     }
     .confirmationDialog(
       L10n.string("Download the model again?"),
@@ -154,7 +160,22 @@ private struct ServerView: View {
       }
       Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
-      Text(L10n.string("The app will move the damaged model to Trash. It will then download the complete model."))
+      Text(
+        L10n.string(
+          "The app will move the damaged model to Trash. It will then download the complete model.")
+      )
+    }
+    .confirmationDialog(
+      L10n.string("Remove DSpark?"),
+      isPresented: $confirmsDSparkRemoval,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Remove DSpark"), role: .destructive) {
+        if let selectedModel { modelLibrary.removeDSpark(selectedModel) }
+      }
+      Button(L10n.string("Cancel"), role: .cancel) {}
+    } message: {
+      Text(L10n.string("The main model will remain installed."))
     }
     .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
   }
@@ -204,18 +225,32 @@ private struct ServerView: View {
   private var onboardingPanel: some View {
     VStack(alignment: .leading, spacing: 24) {
       VStack(alignment: .leading, spacing: 6) {
-        Text(L10n.string(modelLibrary.hasPartialDownload ? "Continue Model Installation" : "Install Model"))
-          .font(.title2.bold())
-        Text(L10n.string("Download a model or select an existing model folder. You can then start the local server."))
-          .foregroundStyle(.secondary)
+        Text(
+          L10n.string(
+            modelLibrary.hasPartialDownload ? "Continue Model Installation" : "Install Model")
+        )
+        .font(.title2.bold())
+        Text(
+          L10n.string(
+            "Download a model or select an existing model folder. You can then start the local server."
+          )
+        )
+        .foregroundStyle(.secondary)
       }
 
       preflightPanel
 
+      Toggle(
+        L10n.string("Install DSpark with the model (adds 10.12 GiB)"),
+        isOn: $modelLibrary.installDSparkWithModel
+      )
+      .disabled(modelLibrary.isBusy)
+
       HStack(spacing: 12) {
         Button(L10n.string("Select Model Folder")) { chooseModelDirectory() }
           .disabled(modelLibrary.isBusy)
-        Button(L10n.string(modelLibrary.hasPartialDownload ? "Resume Download" : "Download Model")) {
+        Button(L10n.string(modelLibrary.hasPartialDownload ? "Resume Download" : "Download Model"))
+        {
           if modelLibrary.hasPartialDownload {
             modelLibrary.startDownload()
           } else {
@@ -285,6 +320,17 @@ private struct ServerView: View {
               if let selectedModel { modelLibrary.startVerification(selectedModel) }
             }
             .disabled(server.isActive || modelLibrary.isBusy)
+            if let selectedModel, !selectedModel.hasDSpark {
+              Button(L10n.string("Install DSpark (10.12 GiB)")) {
+                modelLibrary.startDSparkInstallation(selectedModel)
+              }
+              .disabled(server.isActive || modelLibrary.isBusy)
+            } else if selectedModel?.hasDSpark == true {
+              Button(L10n.string("Remove DSpark"), role: .destructive) {
+                confirmsDSparkRemoval = true
+              }
+              .disabled(server.isActive || modelLibrary.isBusy)
+            }
           }
           HStack {
             Spacer()
@@ -309,8 +355,9 @@ private struct ServerView: View {
           } else {
             Label(
               L10n.string("%lld files need repair", Int64(issues.count)),
-              systemImage: "exclamationmark.triangle.fill")
-              .foregroundStyle(.red)
+              systemImage: "exclamationmark.triangle.fill"
+            )
+            .foregroundStyle(.red)
             Button(L10n.string("Verify and Repair")) {
               repairTarget = selectedModel
               confirmsRepair = true
@@ -429,10 +476,14 @@ private struct ServerView: View {
       GroupBox {
         VStack(spacing: 12) {
           integerField(
-            "Slots", hint: "Number of routed experts in the Active Parameters Cache. The recommended value is 1024.",
+            "Slots",
+            hint:
+              "Number of routed experts in the Active Parameters Cache. The recommended value is 512.",
             value: $configuration.slots)
           integerField(
-            "Read workers", hint: "Number of workers that read expert blobs at the same time. The recommended value is 4.",
+            "Read workers",
+            hint:
+              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
             value: $configuration.readWorkers)
           integerField(
             "Prefill step size", hint: "0 selects 128, 256, or 1024 based on the prompt length.",
@@ -441,18 +492,37 @@ private struct ServerView: View {
             L10n.string("Use layer-major prefill"),
             isOn: $configuration.layerMajorPrefill)
           integerField(
-            "Prompt cache entries", hint: "Number of linear conversations to keep. The recommended value is 2.",
+            "Prompt cache entries",
+            hint: "Number of linear conversations to keep. The recommended value is 2.",
             value: $configuration.promptCacheEntries)
           integerField(
-            "Prompt cache GiB", hint: "Memory limit for all prompt caches. The recommended value is 8.",
+            "Prompt cache GiB",
+            hint: "Memory limit for all prompt caches. The recommended value is 8.",
             value: $configuration.promptCacheMemoryGiB)
           LabeledContent(L10n.string("Warmup prompt")) {
             TextField(
               L10n.string("Optional UTF-8 prompt file path"),
-              text: $configuration.warmupPromptPath)
-              .textFieldStyle(.roundedBorder)
+              text: $configuration.warmupPromptPath
+            )
+            .textFieldStyle(.roundedBorder)
           }
           Toggle(L10n.string("Use BF16 KV cache"), isOn: $configuration.bf16KVCache)
+          Toggle(L10n.string("Use DSpark"), isOn: $configuration.dsparkEnabled)
+            .disabled(selectedModel?.hasDSpark != true)
+          integerField(
+            "DSpark slots",
+            hint:
+              "Number of DSpark routed experts kept in memory. The recommended value is 256.",
+            value: $configuration.dsparkSlots
+          )
+          .disabled(!configuration.dsparkEnabled || selectedModel?.hasDSpark != true)
+          doubleField(
+            "DSpark confidence threshold",
+            hint:
+              "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
+            value: $configuration.dsparkConfidenceThreshold
+          )
+          .disabled(!configuration.dsparkEnabled || selectedModel?.hasDSpark != true)
         }
         .padding(6)
       }
@@ -462,7 +532,8 @@ private struct ServerView: View {
       GroupBox {
         VStack(spacing: 12) {
           integerField(
-            "Max tokens", hint: "Default token limit for each request.", value: $configuration.defaultMaxTokens)
+            "Max tokens", hint: "Default token limit for each request.",
+            value: $configuration.defaultMaxTokens)
           doubleField(
             "Temperature", hint: "A higher value increases output variation.",
             value: $configuration.defaultTemperature)
@@ -494,10 +565,11 @@ private struct ServerView: View {
       TextField(
         L10n.string(label, language: selectedLanguage),
         value: value,
-        format: .number.grouping(.never))
-        .labelsHidden()
-        .textFieldStyle(.roundedBorder)
-        .frame(width: 120)
+        format: .number.grouping(.never)
+      )
+      .labelsHidden()
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 120)
     } label: {
       SettingLabel(label, hint: hint, language: selectedLanguage)
     }
@@ -508,10 +580,11 @@ private struct ServerView: View {
     LabeledContent {
       TextField(
         L10n.string(label, language: selectedLanguage), value: value,
-        format: .number.precision(.fractionLength(0...6)))
-        .labelsHidden()
-        .textFieldStyle(.roundedBorder)
-        .frame(width: 120)
+        format: .number.precision(.fractionLength(0...6))
+      )
+      .labelsHidden()
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 120)
     } label: {
       SettingLabel(label, hint: hint, language: selectedLanguage)
     }
@@ -587,6 +660,20 @@ private struct PerformancePanel: View {
             Text(localizedStateLabel)
               .font(.callout)
               .foregroundStyle(.secondary)
+            if performance.dsparkEnabled {
+              Text(
+                L10n.string(
+                  "DSpark · %@ accepted · %@ tokens per round",
+                  language: language,
+                  performance.dsparkAcceptanceRate.formatted(
+                    .percent.precision(.fractionLength(1))),
+                  performance.dsparkAverageAcceptedLength.formatted(
+                    .number.precision(.fractionLength(1)))
+                )
+              )
+              .font(.callout)
+              .foregroundStyle(.secondary)
+            }
           }
         }
         .accessibilityElement(children: .combine)
@@ -951,7 +1038,10 @@ private struct ChatView: View {
       }
       Button(localized("Cancel"), role: .cancel) {}
     } message: {
-      Text(localized("The app will clear only the local test chat. The server and other API clients are not affected."))
+      Text(
+        localized(
+          "The app will clear only the local test chat. The server and other API clients are not affected."
+        ))
     }
   }
 

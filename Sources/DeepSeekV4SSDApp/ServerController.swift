@@ -21,6 +21,9 @@ struct ServerStatus: Decodable {
     let decodeTokensPerSecond: Double
     let requestSsdReadBytesPerSecond: Double
     let requestExpertCacheHitRate: Double
+    let dsparkEnabled: Bool?
+    let dsparkAcceptanceRate: Double?
+    let dsparkAverageAcceptedLength: Double?
     let ssdBytesRead: UInt64
     let activeParametersCache: ActiveParametersCache
   }
@@ -119,6 +122,9 @@ struct LivePerformance: Equatable {
   var generating = false
   var completedRequestCount = 0
   var snapshot = PerformanceSnapshot()
+  var dsparkEnabled = false
+  var dsparkAcceptanceRate = 0.0
+  var dsparkAverageAcceptedLength = 0.0
 }
 
 private struct RuntimeEnvironment {
@@ -174,6 +180,9 @@ struct ServerConfiguration {
   var promptCacheMemoryGiB: Int
   var warmupPromptPath: String
   var bf16KVCache: Bool
+  var dsparkEnabled: Bool
+  var dsparkSlots: Int
+  var dsparkConfidenceThreshold: Double
   var defaultMaxTokens: Int
   var defaultTemperature: Double
   var defaultTopP: Double
@@ -190,7 +199,7 @@ struct ServerConfiguration {
       port: 11_434,
       apiKey: "",
       publicModel: "deepseek-v4-flash-0731",
-      slots: 1_024,
+      slots: 512,
       readWorkers: 4,
       prefillStepSize: 0,
       layerMajorPrefill: true,
@@ -198,6 +207,9 @@ struct ServerConfiguration {
       promptCacheMemoryGiB: 8,
       warmupPromptPath: "",
       bf16KVCache: false,
+      dsparkEnabled: false,
+      dsparkSlots: 256,
+      dsparkConfidenceThreshold: 0.6,
       defaultMaxTokens: 272_000,
       defaultTemperature: 0.2,
       defaultTopP: 0.98
@@ -231,6 +243,9 @@ struct ServerConfiguration {
       values += ["--warmup-prompt-file", warmupPromptPath]
     }
     if bf16KVCache { values.append("--bf16-kv-cache") }
+    if dsparkEnabled { values.append("--dspark") }
+    values += ["--dspark-slots", String(dsparkSlots)]
+    values += ["--dspark-confidence-threshold", String(dsparkConfidenceThreshold)]
     return values
   }
 
@@ -242,7 +257,8 @@ struct ServerConfiguration {
       throw ConfigurationError(L10n.string("The app runtime is missing. Install the app again."))
     }
     guard FileManager.default.isExecutableFile(atPath: pythonExecutable) else {
-      throw ConfigurationError(L10n.string("Python is missing from the app. Install the app again."))
+      throw ConfigurationError(
+        L10n.string("Python is missing from the app. Install the app again."))
     }
     guard
       FileManager.default.fileExists(
@@ -270,12 +286,16 @@ struct ServerConfiguration {
     guard slots >= 6 else {
       throw ConfigurationError(L10n.string("Slots must be at least 6."))
     }
+    guard dsparkSlots >= 30 else {
+      throw ConfigurationError(L10n.string("DSpark slots must be at least 30."))
+    }
     guard readWorkers >= 1, prefillStepSize >= 0 else {
       throw ConfigurationError(
         L10n.string("Read workers must be greater than 0. Prefill step size must be 0 or greater."))
     }
     guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
-      throw ConfigurationError(L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
+      throw ConfigurationError(
+        L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
     }
     if !warmupPromptPath.isEmpty {
       guard FileManager.default.isReadableFile(atPath: warmupPromptPath) else {
@@ -284,7 +304,8 @@ struct ServerConfiguration {
     }
     guard (1...272_000).contains(defaultMaxTokens),
       (0...2).contains(defaultTemperature),
-      (0.000_001...1).contains(defaultTopP)
+      (0.000_001...1).contains(defaultTopP),
+      (0...1).contains(dsparkConfidenceThreshold)
     else {
       throw ConfigurationError(L10n.string("Correct the default generation parameters."))
     }
@@ -475,7 +496,8 @@ final class ServerController: ObservableObject {
       previousSSDTime = now
       let cache = status.performance.activeParametersCache
       let requestCompleted = status.performance.completedRequestCount > 0
-      let cacheHitRate = status.performance.generating || !requestCompleted
+      let cacheHitRate =
+        status.performance.generating || !requestCompleted
         ? cache.hitRate : status.performance.requestExpertCacheHitRate
       let live = LivePerformance(
         hasStatus: true,
@@ -491,7 +513,10 @@ final class ServerController: ObservableObject {
           cacheHitRate: cacheHitRate,
           firstTokenWaitTime: status.performance.timeToFirstTokenSeconds,
           completionTime: status.performance.requestSeconds
-        )
+        ),
+        dsparkEnabled: status.performance.dsparkEnabled ?? false,
+        dsparkAcceptanceRate: status.performance.dsparkAcceptanceRate ?? 0,
+        dsparkAverageAcceptedLength: status.performance.dsparkAverageAcceptedLength ?? 0
       )
       performance = live
       recordPerformanceSample(live)

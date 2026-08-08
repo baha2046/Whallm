@@ -62,6 +62,29 @@ final class DeepSeekRepackTests: XCTestCase {
     }
   }
 
+  func testPlannerAddsOptionalDSparkLayout() throws {
+    let fixture = makePlannerFixture(includeDSpark: true)
+    let plan = try RepackPlanner.makePlan(
+      index: fixture.index,
+      tensors: fixture.tensors,
+      includeDSpark: true
+    )
+
+    XCTAssertEqual(plan.files.count, 48)
+    XCTAssertEqual(plan.dspark?.layerCount, 3)
+    XCTAssertEqual(plan.dspark?.blockSize, 5)
+    XCTAssertEqual(plan.dspark?.targetLayerIDs, [40, 41, 42])
+    XCTAssertEqual(plan.dspark?.commonTensors.map(\.name), ["mtp.0.main_proj.weight"])
+    XCTAssertEqual(
+      plan.files.first { $0.path == "dspark/experts/layer_00.bin" }?.size,
+      256 * 13_369_344
+    )
+    let expert = try XCTUnwrap(
+      plan.copies.first { $0.tensor == "mtp.2.ffn.experts.255.w3.scale" }
+    )
+    XCTAssertEqual(expert.destinationFile, "dspark/experts/layer_02.bin")
+  }
+
   func testSafeTensorsHeaderDecodesTensorMetadata() throws {
     let data = Data(
       #"{"tensor":{"dtype":"I8","shape":[2,3],"data_offsets":[4,10]},"__metadata__":{"format":"pt"}}"#
@@ -221,7 +244,7 @@ private struct PlannerFixture {
   var tensors: [String: SafeTensor]
 }
 
-private func makePlannerFixture() -> PlannerFixture {
+private func makePlannerFixture(includeDSpark: Bool = false) -> PlannerFixture {
   var tensors: [String: SafeTensor] = [:]
   var weightMap: [String: String] = [:]
   var offset: UInt64 = 0
@@ -252,6 +275,37 @@ private func makePlannerFixture() -> PlannerFixture {
         tensors[name] = tensor
         weightMap[name] = tensor.sourceFile
         offset += tensor.length
+      }
+    }
+  }
+  if includeDSpark {
+    let dsparkCommon = SafeTensor(
+      name: "mtp.0.main_proj.weight",
+      sourceFile: "dspark.safetensors",
+      dtype: "BF16",
+      shape: [2, 2],
+      sourceOffset: offset,
+      length: 8
+    )
+    tensors[dsparkCommon.name] = dsparkCommon
+    weightMap[dsparkCommon.name] = dsparkCommon.sourceFile
+    offset += dsparkCommon.length
+    for layer in 0..<ModelContract.dsparkLayerCount {
+      for expert in 0..<ModelContract.expertCount {
+        for region in ModelContract.expertRegions {
+          let name = "mtp.\(layer).ffn.experts.\(expert).\(region.name)"
+          let tensor = SafeTensor(
+            name: name,
+            sourceFile: "dspark.safetensors",
+            dtype: region.dtype,
+            shape: region.shape,
+            sourceOffset: offset,
+            length: region.length
+          )
+          tensors[name] = tensor
+          weightMap[name] = tensor.sourceFile
+          offset += tensor.length
+        }
       }
     }
   }

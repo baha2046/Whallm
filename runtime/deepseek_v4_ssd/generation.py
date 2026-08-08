@@ -15,9 +15,11 @@ import mlx.core as mx
 from mlx_lm.generate import stream_generate
 from mlx_lm.models.cache import make_prompt_cache
 from mlx_lm.sample_utils import make_sampler
+from mlx_lm.tokenizer_utils import TokenizerWrapper
 from transformers import AutoTokenizer
 
 from .expert_cache import CacheMetrics
+from .dspark import DraftResult, generate_tokens
 from .manifest import InstalledModel
 from .model import (
     RuntimeConfig,
@@ -104,6 +106,22 @@ class RuntimeMetrics:
         self._completed_request_count = 0
         self._expert_before = CacheMetrics()
         self._expert_request = CacheMetrics()
+        self._dspark_enabled = False
+        self._dspark_rounds = 0
+        self._dspark_proposed_tokens = 0
+        self._dspark_accepted_tokens = 0
+        self._dspark_draft_seconds = 0.0
+        self._dspark_verification_seconds = 0.0
+        self._dspark_confidence_sum = 0.0
+        self._dspark_confidence_count = 0
+        self._dspark_last_proposed_tokens = 0
+        self._dspark_last_accepted_tokens = 0
+        self._dspark_last_draft_seconds = 0.0
+        self._dspark_last_verification_seconds = 0.0
+        self._dspark_fallback = False
+        self._dspark_cache = None
+        self._dspark_expert_before = CacheMetrics()
+        self._dspark_expert_request = CacheMetrics()
 
     def start(
         self,
@@ -112,6 +130,8 @@ class RuntimeMetrics:
         prefill_step_size: int,
         layer_major_prefill_enabled: bool,
         expert_before: CacheMetrics,
+        dspark_enabled: bool = False,
+        dspark_cache=None,
     ) -> None:
         with self._lock:
             self._time_to_first_token_seconds = 0.0
@@ -128,6 +148,26 @@ class RuntimeMetrics:
             self._request_active = True
             self._expert_before = expert_before
             self._expert_request = CacheMetrics()
+            self._dspark_enabled = dspark_enabled
+            self._dspark_rounds = 0
+            self._dspark_proposed_tokens = 0
+            self._dspark_accepted_tokens = 0
+            self._dspark_draft_seconds = 0.0
+            self._dspark_verification_seconds = 0.0
+            self._dspark_confidence_sum = 0.0
+            self._dspark_confidence_count = 0
+            self._dspark_last_proposed_tokens = 0
+            self._dspark_last_accepted_tokens = 0
+            self._dspark_last_draft_seconds = 0.0
+            self._dspark_last_verification_seconds = 0.0
+            self._dspark_fallback = False
+            self._dspark_cache = dspark_cache
+            self._dspark_expert_before = (
+                dspark_cache.metrics_snapshot()
+                if dspark_cache is not None
+                else CacheMetrics()
+            )
+            self._dspark_expert_request = CacheMetrics()
 
     def record(
         self,
@@ -135,8 +175,20 @@ class RuntimeMetrics:
         step_seconds: float,
         cache_state_eval_seconds: float,
     ) -> None:
+        self.record_token(
+            response.generation_tokens,
+            step_seconds,
+            cache_state_eval_seconds,
+        )
+
+    def record_token(
+        self,
+        generation_tokens: int,
+        step_seconds: float,
+        cache_state_eval_seconds: float,
+    ) -> None:
         with self._lock:
-            if response.generation_tokens == 1:
+            if generation_tokens == 1:
                 self._time_to_first_token_seconds = (
                     time.perf_counter() - self._request_started
                 )
@@ -144,13 +196,40 @@ class RuntimeMetrics:
                 self._decode_seconds += step_seconds
             self._cache_state_eval_seconds += cache_state_eval_seconds
             self._cache_state_eval_count += 1
-            self._generation_tokens = response.generation_tokens
+            self._generation_tokens = generation_tokens
+
+    def record_dspark_round(
+        self,
+        draft: DraftResult,
+        accepted: int,
+        verification_seconds: float,
+    ) -> None:
+        with self._lock:
+            self._dspark_rounds += 1
+            self._dspark_proposed_tokens += len(draft.tokens)
+            self._dspark_accepted_tokens += accepted
+            self._dspark_draft_seconds += draft.seconds
+            self._dspark_verification_seconds += verification_seconds
+            self._dspark_confidence_sum += sum(draft.confidence)
+            self._dspark_confidence_count += len(draft.confidence)
+            self._dspark_last_proposed_tokens = len(draft.tokens)
+            self._dspark_last_accepted_tokens = accepted
+            self._dspark_last_draft_seconds = draft.seconds
+            self._dspark_last_verification_seconds = verification_seconds
+
+    def record_dspark_fallback(self) -> None:
+        with self._lock:
+            self._dspark_fallback = True
 
     def finish(self, expert_after: CacheMetrics) -> None:
         with self._lock:
             self._request_seconds = time.perf_counter() - self._request_started
             self._request_active = False
             self._expert_request = expert_after.delta(self._expert_before)
+            if self._dspark_cache is not None:
+                self._dspark_expert_request = self._dspark_cache.metrics_snapshot().delta(
+                    self._dspark_expert_before
+                )
             if self._generation_tokens > 0:
                 self._completed_request_count += 1
 
@@ -160,6 +239,11 @@ class RuntimeMetrics:
             request_seconds = self._request_seconds
             if self._request_active:
                 request_seconds = time.perf_counter() - self._request_started
+            dspark_expert = self._dspark_expert_request
+            if self._request_active and self._dspark_cache is not None:
+                dspark_expert = self._dspark_cache.metrics_snapshot().delta(
+                    self._dspark_expert_before
+                )
             prefill_tokens = max(
                 0, self._prompt_tokens - self._prompt_cache_reused_tokens
             )
@@ -203,6 +287,60 @@ class RuntimeMetrics:
                 "request_prefetched_layer_hits": (
                     self._expert_request.prefetched_layer_hits
                 ),
+                "dspark_enabled": self._dspark_enabled,
+                "dspark_fallback": self._dspark_fallback,
+                "dspark_rounds": self._dspark_rounds,
+                "dspark_proposed_tokens": self._dspark_proposed_tokens,
+                "dspark_accepted_tokens": self._dspark_accepted_tokens,
+                "dspark_rejected_tokens": (
+                    self._dspark_proposed_tokens - self._dspark_accepted_tokens
+                ),
+                "dspark_acceptance_rate": (
+                    self._dspark_accepted_tokens / self._dspark_proposed_tokens
+                    if self._dspark_proposed_tokens
+                    else 0.0
+                ),
+                "dspark_average_accepted_length": (
+                    self._dspark_accepted_tokens / self._dspark_rounds
+                    if self._dspark_rounds
+                    else 0.0
+                ),
+                "dspark_average_confidence": (
+                    self._dspark_confidence_sum / self._dspark_confidence_count
+                    if self._dspark_confidence_count
+                    else 0.0
+                ),
+                "dspark_draft_seconds": self._dspark_draft_seconds,
+                "dspark_verification_seconds": self._dspark_verification_seconds,
+                "dspark_last_proposed_tokens": self._dspark_last_proposed_tokens,
+                "dspark_last_accepted_tokens": self._dspark_last_accepted_tokens,
+                "dspark_last_draft_seconds": self._dspark_last_draft_seconds,
+                "dspark_last_verification_seconds": (
+                    self._dspark_last_verification_seconds
+                ),
+                "dspark_seconds_per_output_token": (
+                    (self._dspark_draft_seconds + self._dspark_verification_seconds)
+                    / (self._dspark_accepted_tokens + self._dspark_rounds)
+                    if self._dspark_rounds
+                    else 0.0
+                ),
+                "dspark_expert_cache_hit_rate": dspark_expert.hit_rate,
+                "dspark_expert_cache_hits": dspark_expert.hits,
+                "dspark_expert_cache_misses": dspark_expert.misses,
+                "dspark_expert_evictions": dspark_expert.evictions,
+                "dspark_expert_bytes_read": dspark_expert.bytes_read,
+                "dspark_expert_read_seconds": dspark_expert.read_seconds,
+                "dspark_expert_resident_slots": (
+                    self._dspark_cache.resident_count
+                    if self._dspark_cache is not None
+                    else 0
+                ),
+                "dspark_expert_capacity_slots": (
+                    self._dspark_cache.slots
+                    if self._dspark_cache is not None
+                    else 0
+                ),
+                "peak_memory_bytes": mx.get_peak_memory(),
             }
 
 
@@ -228,6 +366,9 @@ class ModelRuntime:
                     trust_remote_code=True,
                 )
             except Exception:
+                dspark = getattr(self.model, "dspark", None)
+                if dspark is not None:
+                    dspark.expert_cache.close()
                 self.expert_cache.close()
                 raise
         self._prompt_cache_directory = self._open_prompt_cache_directory()
@@ -277,7 +418,12 @@ class ModelRuntime:
         with self._generation_lock:
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
-                entry = self._acquire_prompt_cache(prompt_tokens)
+                dspark = getattr(self.model, "dspark", None)
+                entry = (
+                    _PromptCacheEntry(make_prompt_cache(self.model), [])
+                    if dspark is not None
+                    else self._acquire_prompt_cache(prompt_tokens)
+                )
                 prompt_cache = entry.cache
                 cache_tokens = entry.tokens
                 reused_tokens = len(cache_tokens)
@@ -297,9 +443,21 @@ class ModelRuntime:
                     step_size,
                     use_layer_major,
                     self._expert_metrics(),
+                    dspark_enabled=dspark is not None,
+                    dspark_cache=(dspark.expert_cache if dspark is not None else None),
                 )
                 completed = False
                 try:
+                    if dspark is not None:
+                        yield from self._stream_dspark(
+                            prompt_tokens,
+                            prompt_cache,
+                            dspark,
+                            options,
+                            step_size,
+                        )
+                        completed = True
+                        return
                     if use_layer_major:
                         layer_major_prefill(
                             self.model,
@@ -353,8 +511,85 @@ class ModelRuntime:
                         )
                 finally:
                     self.metrics.finish(self._expert_metrics())
-                    if completed:
+                    if completed and dspark is None:
                         self._store_prompt_cache(entry, persist=True)
+
+    def _stream_dspark(
+        self,
+        prompt_tokens: list[int],
+        prompt_cache,
+        dspark,
+        options: GenerationOptions,
+        step_size: int,
+    ) -> Iterator[GeneratedPiece]:
+        tokenizer = TokenizerWrapper(self.tokenizer)
+        detokenizer = tokenizer.detokenizer
+        responses = iter(
+            generate_tokens(
+                prompt_tokens,
+                self.model,
+                dspark,
+                prompt_cache,
+                max_tokens=options.max_tokens,
+                prefill_step_size=step_size,
+                temperature=options.temperature,
+                top_p=options.top_p,
+                confidence_threshold=getattr(
+                    self.config,
+                    "dspark_confidence_threshold",
+                    0.6,
+                ),
+                record_round=self.metrics.record_dspark_round,
+                record_fallback=self.metrics.record_dspark_fallback,
+            )
+        )
+        generation_tokens = 0
+        last_token = 0
+        pending_text = ""
+        finish_reason = "length"
+        while generation_tokens < options.max_tokens:
+            started = time.perf_counter()
+            try:
+                token, _, _ = next(responses)
+            except StopIteration:
+                break
+            step_seconds = time.perf_counter() - started
+            generation_tokens += 1
+            last_token = token
+            if token in tokenizer.eos_token_ids:
+                finish_reason = "stop"
+                break
+            detokenizer.add_token(token)
+            cache_started = time.perf_counter()
+            mx.eval([cache.state for cache in prompt_cache])
+            cache_seconds = time.perf_counter() - cache_started
+            self.metrics.record_token(
+                generation_tokens,
+                step_seconds,
+                cache_seconds,
+            )
+            if generation_tokens == options.max_tokens:
+                pending_text = detokenizer.last_segment
+                break
+            yield GeneratedPiece(
+                text=detokenizer.last_segment,
+                token=token,
+                prompt_tokens=len(prompt_tokens),
+                generation_tokens=generation_tokens,
+                finish_reason=None,
+            )
+        detokenizer.finalize()
+        final_text = detokenizer.last_segment
+        if pending_text and not final_text.startswith(pending_text):
+            final_text = pending_text + final_text
+        self.metrics.record_token(generation_tokens, 0.0, 0.0)
+        yield GeneratedPiece(
+            text=final_text,
+            token=last_token,
+            prompt_tokens=len(prompt_tokens),
+            generation_tokens=generation_tokens,
+            finish_reason=finish_reason,
+        )
 
     def warm_prompt(self, prompt: str) -> int:
         tokens = self._encode_prompt(prompt)
@@ -593,6 +828,9 @@ class ModelRuntime:
         if self._prompt_cache_writer is not None:
             self._prompt_cache_writer.shutdown(wait=True)
             self._prompt_cache_writer = None
+        dspark = getattr(self.model, "dspark", None)
+        if dspark is not None:
+            dspark.expert_cache.close()
         self.expert_cache.close()
 
     def __enter__(self) -> ModelRuntime:

@@ -40,6 +40,16 @@ class InstalledModel:
     expert_blob_size: int
     common_tensors: tuple[Tensor, ...]
     expert_regions: tuple[Tensor, ...]
+    dspark_layer_count: int = 0
+    dspark_block_size: int = 0
+    dspark_noise_token_id: int = 0
+    dspark_target_layer_ids: tuple[int, ...] = ()
+    dspark_markov_rank: int = 0
+    dspark_common_tensors: tuple[Tensor, ...] = ()
+
+    @property
+    def has_dspark(self) -> bool:
+        return self.dspark_layer_count > 0
 
     @classmethod
     def open(cls, root: str | Path) -> InstalledModel:
@@ -67,6 +77,21 @@ class InstalledModel:
             "tokenizer/tokenizer.json",
         }
         required.update(f"experts/layer_{layer:02d}.bin" for layer in range(LAYER_COUNT))
+        dspark = raw.get("dspark")
+        if dspark is not None:
+            expected_dspark = (
+                dspark.get("layerCount") == 3
+                and dspark.get("blockSize") == 5
+                and dspark.get("noiseTokenID") == 128_799
+                and dspark.get("targetLayerIDs") == [40, 41, 42]
+                and dspark.get("markovRank") == 256
+            )
+            if not expected_dspark:
+                raise ValueError("installed model has an invalid DSpark contract")
+            required.add("dspark/common.bin")
+            required.update(
+                f"dspark/experts/layer_{layer:02d}.bin" for layer in range(3)
+            )
         missing = required.difference(files)
         if missing:
             raise ValueError(f"installed model is missing {sorted(missing)[0]}")
@@ -81,6 +106,13 @@ class InstalledModel:
             path = f"experts/layer_{layer:02d}.bin"
             if files[path] != expected_layer_size:
                 raise ValueError(f"installed expert layer has an invalid size: {path}")
+        if dspark is not None:
+            for layer in range(3):
+                path = f"dspark/experts/layer_{layer:02d}.bin"
+                if files[path] != expected_layer_size:
+                    raise ValueError(
+                        f"installed DSpark expert layer has an invalid size: {path}"
+                    )
 
         def tensors(key: str) -> tuple[Tensor, ...]:
             return tuple(
@@ -96,6 +128,20 @@ class InstalledModel:
 
         common_tensors = tensors("commonTensors")
         expert_regions = tensors("expertRegions")
+        dspark_common_tensors = (
+            tuple(
+                Tensor(
+                    name=item["name"],
+                    dtype=item["dtype"],
+                    shape=tuple(item["shape"]),
+                    offset=item["offset"],
+                    length=item["length"],
+                )
+                for item in dspark["commonTensors"]
+            )
+            if dspark is not None
+            else ()
+        )
         actual_regions = tuple(
             (item.name, item.dtype, item.shape, item.offset, item.length)
             for item in expert_regions
@@ -113,6 +159,21 @@ class InstalledModel:
             for item in common_tensors
         ):
             raise ValueError("installed common tensor is outside common.bin")
+        if dspark is not None:
+            dspark_size = files["dspark/common.bin"]
+            dspark_names = {item.name for item in dspark_common_tensors}
+            if (
+                not dspark_common_tensors
+                or len(dspark_names) != len(dspark_common_tensors)
+                or any(
+                    not item.name.startswith("mtp.")
+                    or item.offset < 0
+                    or item.length < 0
+                    or item.offset + item.length > dspark_size
+                    for item in dspark_common_tensors
+                )
+            ):
+                raise ValueError("installed DSpark common tensor table is invalid")
 
         return cls(
             root=root,
@@ -124,4 +185,14 @@ class InstalledModel:
             expert_blob_size=raw["expertBlobSize"],
             common_tensors=common_tensors,
             expert_regions=expert_regions,
+            dspark_layer_count=dspark["layerCount"] if dspark is not None else 0,
+            dspark_block_size=dspark["blockSize"] if dspark is not None else 0,
+            dspark_noise_token_id=(
+                dspark["noiseTokenID"] if dspark is not None else 0
+            ),
+            dspark_target_layer_ids=(
+                tuple(dspark["targetLayerIDs"]) if dspark is not None else ()
+            ),
+            dspark_markov_rank=dspark["markovRank"] if dspark is not None else 0,
+            dspark_common_tensors=dspark_common_tensors,
         )

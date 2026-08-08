@@ -7,6 +7,7 @@ struct InstalledModelInfo: Identifiable, Equatable, Sendable {
   let url: URL
   let size: UInt64
   let quickIssues: [InstalledFileIssue]
+  let hasDSpark: Bool
 
   var id: String { url.path }
   var name: String { url.deletingPathExtension().lastPathComponent }
@@ -84,7 +85,12 @@ enum InstalledModelDiscovery {
       guard !sum.overflow else { return nil }
       totalSize = sum.partialValue
     }
-    return InstalledModelInfo(url: root, size: totalSize, quickIssues: issues)
+    return InstalledModelInfo(
+      url: root,
+      size: totalSize,
+      quickIssues: issues,
+      hasDSpark: manifest.dspark != nil
+    )
   }
 }
 
@@ -110,6 +116,7 @@ enum ModelOperationPhase: Equatable {
   case verifying
   case preparingRepair
   case repairing
+  case installingDSpark
 
   var label: String {
     switch self {
@@ -120,6 +127,7 @@ enum ModelOperationPhase: Equatable {
     case .verifying: L10n.string("Verifying the complete model")
     case .preparingRepair: L10n.string("Preparing repair")
     case .repairing: L10n.string("Downloading damaged data again")
+    case .installingDSpark: L10n.string("Installing DSpark")
     }
   }
 }
@@ -154,6 +162,7 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var message: String?
   @Published private(set) var verificationModelPath: String?
   @Published private(set) var verificationIssues: [InstalledFileIssue]?
+  @Published var installDSparkWithModel = true
 
   private let defaults: UserDefaults
   private var operationTask: Task<Void, Never>?
@@ -256,7 +265,8 @@ final class ModelLibrary: ObservableObject {
       ?? (hasPartialDownload
         ? partialDownloadURL.deletingPathExtension() : defaultDownloadDestination)
     guard !FileManager.default.fileExists(atPath: destination.path) else {
-      message = L10n.string("A model already exists in this location. Verify and repair the existing model first.")
+      message = L10n.string(
+        "A model already exists in this location. Verify and repair the existing model first.")
       return
     }
     defaults.set(true, forKey: Self.activeDownloadPreference)
@@ -292,6 +302,30 @@ final class ModelLibrary: ObservableObject {
     }
   }
 
+  func startDSparkInstallation(_ model: InstalledModelInfo) {
+    guard !isBusy, !model.hasDSpark else { return }
+    operationPhase = .installingDSpark
+    operationProgress = nil
+    downloadStart = nil
+    message = nil
+    operationTask = Task { [weak self] in
+      await self?.performDSparkInstallation(model.url)
+    }
+  }
+
+  func removeDSpark(_ model: InstalledModelInfo) {
+    guard !isBusy, model.hasDSpark else { return }
+    do {
+      _ = try InstalledModel.removeDSpark(at: model.url)
+      Task { [weak self] in
+        await self?.scan()
+        self?.message = L10n.string("DSpark was removed.")
+      }
+    } catch {
+      message = L10n.string("DSpark could not be removed. %@", String(describing: error))
+    }
+  }
+
   func reinstall(_ url: URL) {
     guard !isBusy else { return }
     refreshPreflight()
@@ -304,7 +338,8 @@ final class ModelLibrary: ObservableObject {
       try FileManager.default.trashItem(at: url, resultingItemURL: &trashedURL)
       startDownload(to: url)
     } catch {
-      message = L10n.string("The damaged model could not be moved to Trash. Check the folder permissions.")
+      message = L10n.string(
+        "The damaged model could not be moved to Trash. Check the folder permissions.")
     }
   }
 
@@ -333,7 +368,10 @@ final class ModelLibrary: ObservableObject {
 
   private func performDownload(to destination: URL) async {
     do {
-      _ = try await DeepSeekV4Checkpoint().repack(to: destination) { [weak self] progress in
+      _ = try await DeepSeekV4Checkpoint().repack(
+        to: destination,
+        includeDSpark: installDSparkWithModel
+      ) { [weak self] progress in
         Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
       }
       try Task.checkCancellation()
@@ -353,7 +391,9 @@ final class ModelLibrary: ObservableObject {
       message = L10n.string("The download stopped. The app kept the progress.")
     } catch {
       defaults.set(false, forKey: Self.activeDownloadPreference)
-      message = L10n.string("The model could not be downloaded. Check the network and try again.\n%@", String(describing: error))
+      message = L10n.string(
+        "The model could not be downloaded. Check the network and try again.\n%@",
+        String(describing: error))
     }
     finishOperation()
   }
@@ -411,8 +451,38 @@ final class ModelLibrary: ObservableObject {
     } catch {
       defaults.set(false, forKey: Self.activeDownloadPreference)
       message = L10n.string(
-        "The model could not be repaired. Check the network and storage.\n%@", String(describing: error))
+        "The model could not be repaired. Check the network and storage.\n%@",
+        String(describing: error))
       await scan()
+    }
+    finishOperation()
+  }
+
+  private func performDSparkInstallation(_ url: URL) async {
+    do {
+      _ = try await DeepSeekV4Checkpoint().installDSpark(at: url) { [weak self] progress in
+        Task { @MainActor in
+          self?.updateRepackProgress(progress, phase: .installingDSpark)
+        }
+      }
+      try Task.checkCancellation()
+      let verification = try await audit(url)
+      verificationModelPath = url.path
+      verificationIssues = verification.issues
+      await scan()
+      message =
+        verification.isValid
+        ? L10n.string("DSpark is installed and ready.")
+        : L10n.string("DSpark installation did not pass verification.")
+    } catch is CancellationError {
+      await scan()
+      message = L10n.string("DSpark installation stopped. The app kept the progress.")
+    } catch {
+      await scan()
+      message = L10n.string(
+        "DSpark could not be installed. Check the network and storage.\n%@",
+        String(describing: error)
+      )
     }
     finishOperation()
   }
@@ -524,7 +594,8 @@ final class ModelLibrary: ObservableObject {
       title: L10n.string("Storage"),
       detail: hasStorage
         ? L10n.string("There is enough free space to complete installation.")
-        : L10n.string("The disk for this folder needs at least %@ of free space.", formattedBytes(required)),
+        : L10n.string(
+          "The disk for this folder needs at least %@ of free space.", formattedBytes(required)),
       status: hasStorage ? .passed : .failed,
       blocksDownload: true
     )
@@ -536,7 +607,9 @@ final class ModelLibrary: ObservableObject {
       id: "ssd",
       title: L10n.string("SSD"),
       detail: isInternal == false
-        ? L10n.string("Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed.")
+        ? L10n.string(
+          "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed."
+        )
         : L10n.string("Use a high-speed SSD."),
       status: isInternal == false ? .warning : .passed,
       blocksDownload: false

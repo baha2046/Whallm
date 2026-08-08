@@ -64,7 +64,7 @@ public struct DeepSeekV4Checkpoint: Sendable {
     self.source = source
   }
 
-  public func makeRepackPlan() async throws -> RepackPlan {
+  public func makeRepackPlan(includeDSpark: Bool = true) async throws -> RepackPlan {
     let configData = try await source.data(path: "config.json")
     let config: ModelConfig
     do {
@@ -74,17 +74,33 @@ public struct DeepSeekV4Checkpoint: Sendable {
     }
     try ModelContract.validate(config)
 
+    if includeDSpark {
+      let dsparkData = try await source.data(path: "inference/config.json")
+      let dsparkConfig: DSparkConfig
+      do {
+        dsparkConfig = try JSONDecoder().decode(DSparkConfig.self, from: dsparkData)
+      } catch {
+        throw RepackError.incompatibleModel("cannot decode DSpark config: \(error)")
+      }
+      try ModelContract.validate(dsparkConfig)
+    }
+
     let indexData = try await source.data(path: "model.safetensors.index.json")
     let index = try CheckpointIndex.decode(indexData)
     let tensors = try await readTensors(index: index)
-    return try RepackPlanner.makePlan(index: index, tensors: tensors)
+    return try RepackPlanner.makePlan(
+      index: index,
+      tensors: tensors,
+      includeDSpark: includeDSpark
+    )
   }
 
   public func repack(
     to output: URL,
+    includeDSpark: Bool = true,
     progress: (@Sendable (RepackProgress) -> Void)? = nil
   ) async throws -> InstalledManifest {
-    let plan = try await makeRepackPlan()
+    let plan = try await makeRepackPlan(includeDSpark: includeDSpark)
     return try await repack(plan: plan, to: output, progress: progress)
   }
 
@@ -93,6 +109,15 @@ public struct DeepSeekV4Checkpoint: Sendable {
     to output: URL,
     progress: (@Sendable (RepackProgress) -> Void)? = nil
   ) async throws -> InstalledManifest {
+    let dsparkMatches =
+      plan.dspark.map { descriptor in
+        descriptor.layerCount == ModelContract.dsparkLayerCount
+          && descriptor.blockSize == ModelContract.dsparkBlockSize
+          && descriptor.noiseTokenID == ModelContract.dsparkNoiseTokenID
+          && descriptor.targetLayerIDs == ModelContract.dsparkTargetLayerIDs
+          && descriptor.markovRank == ModelContract.dsparkMarkovRank
+          && !descriptor.commonTensors.isEmpty
+      } ?? true
     guard plan.formatVersion == 1,
       plan.modelID == ModelContract.modelID,
       plan.revision == ModelContract.revision,
@@ -100,7 +125,8 @@ public struct DeepSeekV4Checkpoint: Sendable {
       plan.expertCount == ModelContract.expertCount,
       plan.selectedExpertCount == ModelContract.selectedExpertCount,
       plan.expertBlobSize == ModelContract.expertBlobSize,
-      plan.expertRegions == ModelContract.expertRegions
+      plan.expertRegions == ModelContract.expertRegions,
+      dsparkMatches
     else {
       throw RepackError.incompatibleModel("repack plan does not match the pinned model contract")
     }
@@ -112,12 +138,33 @@ public struct DeepSeekV4Checkpoint: Sendable {
     invalidFiles: Set<String>,
     progress: (@Sendable (RepackProgress) -> Void)? = nil
   ) async throws -> InstalledManifest {
-    _ = try InstalledModel.loadManifest(at: output)
-    let plan = try await makeRepackPlan()
+    let manifest = try InstalledModel.loadManifest(at: output)
+    let plan = try await makeRepackPlan(includeDSpark: manifest.dspark != nil)
     return try await Repacker(source: source).repair(
       plan: plan,
       output: output,
       invalidFiles: invalidFiles,
+      progress: progress
+    )
+  }
+
+  public func installDSpark(
+    at output: URL,
+    progress: (@Sendable (RepackProgress) -> Void)? = nil
+  ) async throws -> InstalledManifest {
+    let manifest = try InstalledModel.loadManifest(at: output)
+    if manifest.dspark != nil {
+      return try InstalledModel.verify(at: output)
+    }
+    let plan = try await makeRepackPlan(includeDSpark: true)
+    let dsparkFiles = Set(
+      plan.files.lazy.map(\.path).filter { $0.hasPrefix("dspark/") }
+        + ["inference/config.json"]
+    )
+    return try await Repacker(source: source).repair(
+      plan: plan,
+      output: output,
+      invalidFiles: dsparkFiles,
       progress: progress
     )
   }

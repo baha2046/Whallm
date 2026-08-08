@@ -7,13 +7,16 @@ final class ServerConfigurationTests: XCTestCase {
     let configuration = ServerConfiguration.localDefault
 
     XCTAssertEqual(configuration.port, 11_434)
+    XCTAssertEqual(configuration.slots, 512)
     XCTAssertEqual(configuration.defaultMaxTokens, 272_000)
     XCTAssertEqual(configuration.defaultTemperature, 0.2)
     XCTAssertEqual(configuration.defaultTopP, 0.98)
+    XCTAssertEqual(configuration.dsparkSlots, 256)
     XCTAssertTrue(configuration.arguments.contains("272000"))
     XCTAssertTrue(configuration.arguments.contains("0.2"))
     XCTAssertTrue(configuration.arguments.contains("0.98"))
     XCTAssertTrue(configuration.arguments.contains("11434"))
+    XCTAssertTrue(configuration.arguments.contains("--dspark-slots"))
   }
 
   func testLocalizationSupportsAllSelectableLanguages() {

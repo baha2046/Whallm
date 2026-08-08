@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import time
 from contextlib import nullcontext
@@ -12,6 +13,7 @@ from mlx_lm.models import deepseek_v4
 from mlx_lm.models.cache import CacheList
 from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
+from .dspark import load_dspark_model
 from .expert_cache import ExpertCache
 from .fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
 from .manifest import InstalledModel, Tensor
@@ -21,7 +23,7 @@ _ORIGINAL_SPARSE_POOLED_ATTENTION = deepseek_v4._sparse_pooled_attention
 
 @dataclass(frozen=True)
 class RuntimeConfig:
-    slots: int = 1024
+    slots: int = 512
     read_workers: int = 4
     prefetch_read_workers: int = 2
     prefill_step_size: int = 0
@@ -36,6 +38,9 @@ class RuntimeConfig:
     moe_prefill_step_size: int = 0
     batched_expert_prefill: bool = True
     fp4_index_cache: bool = True
+    dspark_enabled: bool = False
+    dspark_confidence_threshold: float = 0.6
+    dspark_slots: int = 256
 
 
 def _select_prefill_step_size(configured: int, prompt_tokens: int) -> int:
@@ -288,7 +293,7 @@ def _mxfp4(x: mx.array, weight: mx.array, scales: mx.array) -> mx.array:
 
 
 def _streaming_moe(self, x: mx.array, input_ids: mx.array) -> mx.array:
-    if self.sharding_group is not None:
+    if getattr(self, "sharding_group", None) is not None:
         raise ValueError("SSD expert streaming supports one Apple Silicon device")
     indices, scores = self.gate(x, input_ids)
     started = time.perf_counter()
@@ -500,6 +505,9 @@ def load_model(
         )
         model.eval()
         model.load_weights(list(weights.items()), strict=False)
+        model.dspark = None
+        if config.dspark_enabled and installed_model.has_dspark:
+            model.dspark = _load_dspark(installed_model, model, args, config)
         mx.eval(model.parameters())
         return model, cache
     except Exception:
@@ -507,11 +515,186 @@ def load_model(
         raise
 
 
+def forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array]:
+    """Run the main model and return DSpark target-layer hidden states."""
+    core = model.model
+    hidden = core.embed_tokens(inputs)
+    hidden = mx.broadcast_to(
+        hidden[:, :, None, :],
+        (*hidden.shape[:2], core.args.hc_mult, hidden.shape[-1]),
+    )
+    hidden = mx.contiguous(hidden)
+    if getattr(core, "pipeline_size", 1) != 1:
+        raise ValueError("DSpark supports one Apple Silicon device")
+    if cache is None:
+        cache = [None] * len(core.pipeline_layers)
+    first_cache = cache[0]
+    mask_cache = first_cache[0] if isinstance(first_cache, CacheList) else first_cache
+    mask = deepseek_v4.create_attention_mask(
+        hidden[:, :, 0, :],
+        mask_cache,
+        window_size=core.args.sliding_window,
+        return_array=True,
+    )
+    captured = []
+    target_set = set(target_layers)
+    for index, (layer, layer_cache) in enumerate(zip(core.pipeline_layers, cache)):
+        hidden = layer(hidden, mask, layer_cache, inputs)
+        if index in target_set:
+            captured.append(hidden.mean(axis=2))
+    if len(captured) != len(target_layers):
+        raise ValueError("DSpark target layers do not match the main model")
+    output = core.norm(core.hc_head(hidden))
+    return model.lm_head(output), mx.concatenate(captured, axis=-1)
+
+
+def verification_forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array, list[list]]:
+    """Verify a token block with exact sequential attention and batched MoE."""
+    core = model.model
+    if inputs.shape[0] != 1:
+        raise ValueError("DSpark verification supports batch size one")
+    if getattr(core, "pipeline_size", 1) != 1:
+        raise ValueError("DSpark supports one Apple Silicon device")
+    if len(cache) != len(core.pipeline_layers):
+        raise ValueError("prompt cache does not match the main model layers")
+
+    hidden = core.embed_tokens(inputs)
+    hidden = mx.broadcast_to(
+        hidden[:, :, None, :],
+        (*hidden.shape[:2], core.args.hc_mult, hidden.shape[-1]),
+    )
+    hidden = mx.contiguous(hidden)
+    captured = []
+    target_set = set(target_layers)
+    checkpoints = [
+        [None] * len(core.pipeline_layers) for _ in range(inputs.shape[1] - 1)
+    ]
+
+    for index, (layer, layer_cache) in enumerate(zip(core.pipeline_layers, cache)):
+        residual = hidden
+        value, post, combine = layer.attn_hc(hidden)
+        value = layer.attn_norm(value)
+        attention = []
+        for position in range(inputs.shape[1]):
+            token = value[:, position : position + 1]
+            mask_cache = (
+                layer_cache[0] if isinstance(layer_cache, CacheList) else layer_cache
+            )
+            mask = deepseek_v4.create_attention_mask(
+                token,
+                mask_cache,
+                window_size=core.args.sliding_window,
+                return_array=True,
+            )
+            output = layer.attn(token, mask=mask, cache=layer_cache)
+            mx.eval(output, layer_cache.state)
+            attention.append(output)
+            if position < len(checkpoints):
+                checkpoints[position][index] = _copy_layer_cache(layer_cache)
+        value = (
+            attention[0]
+            if len(attention) == 1
+            else mx.concatenate(attention, axis=1)
+        )
+        hidden = deepseek_v4.hc_expand(value, residual, post, combine)
+
+        residual = hidden
+        value, post, combine = layer.ffn_hc(hidden)
+        value = layer.ffn(layer.ffn_norm(value), inputs)
+        hidden = deepseek_v4.hc_expand(value, residual, post, combine)
+        mx.eval(hidden)
+        if index in target_set:
+            captured.append(hidden.mean(axis=2))
+
+    if len(captured) != len(target_layers):
+        raise ValueError("DSpark target layers do not match the main model")
+    output = core.norm(core.hc_head(hidden))
+    return model.lm_head(output), mx.concatenate(captured, axis=-1), checkpoints
+
+
+def _copy_layer_cache(layer_cache):
+    checkpoint = copy.deepcopy(layer_cache)
+    arrays = []
+    pending = (
+        list(checkpoint.caches)
+        if isinstance(checkpoint, CacheList)
+        else [checkpoint]
+    )
+    for item in pending:
+        for name in (
+            "keys",
+            "values",
+            "buf_kv",
+            "buf_gate",
+            "previous_window_kv",
+            "previous_window_gate",
+        ):
+            value = getattr(item, name, None)
+            if isinstance(value, mx.array):
+                copied = value + mx.zeros((), value.dtype)
+                setattr(item, name, copied)
+                arrays.append(copied)
+    mx.eval(*arrays)
+    return checkpoint
+
+
+def _load_dspark(installed_model: InstalledModel, main_model, args, config):
+    minimum_slots = (
+        installed_model.selected_expert_count * installed_model.dspark_block_size
+    )
+    if config.dspark_slots < minimum_slots:
+        raise ValueError(f"DSpark needs at least {minimum_slots} expert slots")
+    common = _load_tensor_file(
+        installed_model.root / "dspark/common.bin",
+        installed_model.dspark_common_tensors,
+    )
+    expert_cache = ExpertCache(
+        installed_model,
+        config.dspark_slots,
+        config.read_workers,
+        config.prefetch_read_workers,
+        layer_count=installed_model.dspark_layer_count,
+        expert_directory=installed_model.root / "dspark/experts",
+    )
+    try:
+        dspark = load_dspark_model(
+            main_model,
+            args,
+            common,
+            expert_cache,
+            block_size=installed_model.dspark_block_size,
+            noise_token_id=installed_model.dspark_noise_token_id,
+            target_layers=installed_model.dspark_target_layer_ids,
+            markov_rank=installed_model.dspark_markov_rank,
+        )
+        mx.eval(dspark.parameters())
+        return dspark
+    except Exception:
+        expert_cache.close()
+        raise
+
+
 def _load_common_weights(installed_model: InstalledModel) -> dict[str, mx.array]:
-    path = installed_model.root / "common.bin"
+    return _load_tensor_file(
+        installed_model.root / "common.bin",
+        installed_model.common_tensors,
+    )
+
+
+def _load_tensor_file(path, tensors: tuple[Tensor, ...]) -> dict[str, mx.array]:
     mapped = np.memmap(path, mode="r", dtype=np.uint8)
     weights: dict[str, mx.array] = {}
-    for tensor in installed_model.common_tensors:
+    for tensor in tensors:
         weights[tensor.name] = _tensor_from_buffer(mapped, tensor)
     return weights
 
