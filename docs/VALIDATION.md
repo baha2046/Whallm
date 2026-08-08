@@ -166,6 +166,34 @@ Persistent prompt cache now stores up to eight entries under
 `~/.dsmodel/prompt-cache/`. The restart test restores the complete cache state
 and reuses the matching token prefix.
 
+## Ready expert decode measurements
+
+Ready expert decode submits all missing routed expert reads first. The runtime
+starts compute for each resident or completed routed expert without waiting for
+the slowest read. The runtime keeps the native router output order.
+
+Five paired tests used 4,096 prompt tokens, 256 output tokens, 512 slots,
+greedy decoding, and disabled DSpark. The prompt types were repeated text,
+code, Traditional Chinese technical text, English prose, and mixed math. The
+run order alternated between baseline-first and ready-first.
+
+| Result | Measurement |
+| --- | ---: |
+| Median decode throughput improvement | 12.9% |
+| Minimum improvement | 8.1% |
+| Maximum improvement | 14.0% |
+| Aggregate decode-time reduction | 10.5% |
+| Matching 256-token hashes | 5 of 5 |
+
+A 2,000-token repeated-text stability pair measured 10.67 Tok/s for the
+baseline and 11.92 Tok/s for ready expert decode. This is an 11.7% throughput
+improvement. Both runs generated all 2,000 tokens and produced the same token
+hash. The ready run did not report a Metal-resource or slot-lifetime error.
+
+Ready expert decode is now the default. CLI and server users can pass
+`--no-ready-expert-decode` to run the old baseline. These tests are paired
+measurements, not a throughput guarantee.
+
 ## Partial-data smoke tests
 
 These smoke tests used the sparse partial install. They validate execution

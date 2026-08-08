@@ -40,6 +40,7 @@ decode。測試停用 DSpark。
 - API 支援 `/v1/responses`、`/v1/chat/completions` 和 `/v1/completions`。
 - API 支援文字、推理內容和 function Tool call 的流式回覆。
 - APP 會顯示 prefill、decode、token、記憶體、SSD 和 cache 指標。
+- runtime 會在每個 routed expert ready 後立即開始計算。
 - 每個指標會顯示即時值、最低值、平均值和最高值。
 - APP 支援英文、簡體中文和繁體中文。
 - APP 會透過 GitHub Releases 和 Sparkle 接收簽章更新。

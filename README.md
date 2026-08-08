@@ -42,6 +42,7 @@ more measurements and test details.
 - Stream text, reasoning content, and function Tool calls.
 - Monitor prefill speed, decode speed, token counts, memory, SSD reads, cache
   hit rate, first-token wait time, and completion time.
+- Start routed expert compute as soon as each required expert is ready.
 - View live, minimum, average, and maximum metrics.
 - Use English, Simplified Chinese, or Traditional Chinese in the app.
 - Receive signed app updates through GitHub Releases and Sparkle.
