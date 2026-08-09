@@ -1,5 +1,9 @@
 # DeepSeekV4SSD
 
+<p align="center">
+  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD APP Icon" width="160">
+</p>
+
 [![English](https://img.shields.io/badge/English-Click-yellow)](README.md)
 [![繁體中文](https://img.shields.io/badge/繁體中文-點擊查看-orange)](README-tw.md)
 [![简体中文](https://img.shields.io/badge/简体中文-点击查看-orange)](README-cn.md)
@@ -9,8 +13,6 @@
 DeepSeekV4SSD 讓 M 系列 Mac 使用約 30 GB 記憶體執行
 `DeepSeek-V4-Flash-0731` 的全部 284B 參數，並從 SSD 串流 routed expert
 （啟發自 [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare)）。
-
-![DeepSeekV4SSD APP 畫面](docs/assets/deepseekv4ssd-app.png)
 
 ## Benchmark
 
@@ -41,6 +43,8 @@ SSD 速度和 cache 狀態會改變效能。[完整驗證紀錄](docs/VALIDATION
 5. 使用 APP 的對話功能，或使用下方設定連接 Codex。
 
 預設本機 server 位址是 `http://127.0.0.1:11434`。
+
+![DeepSeekV4SSD APP 畫面](docs/assets/deepseekv4ssd-app.png)
 
 ## 使用需求
 

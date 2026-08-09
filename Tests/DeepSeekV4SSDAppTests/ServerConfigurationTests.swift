@@ -7,6 +7,7 @@ final class ServerConfigurationTests: XCTestCase {
     let configuration = ServerConfiguration.localDefault
 
     XCTAssertEqual(configuration.port, 11_434)
+    XCTAssertEqual(configuration.host, "127.0.0.1")
     XCTAssertEqual(configuration.slots, 1_152)
     XCTAssertEqual(configuration.readWorkers, 4)
     XCTAssertEqual(configuration.defaultMaxTokens, 272_000)
@@ -32,6 +33,15 @@ final class ServerConfigurationTests: XCTestCase {
         "A higher value increases output variation.", language: .traditionalChinese),
       "較高的值會增加輸出變化。")
     XCTAssertEqual(L10n.string("Memory usage", language: .simplifiedChinese), "内存用量")
+    XCTAssertEqual(
+      AppLanguage.system.displayName(language: .traditionalChinese), "跟隨系統")
+    XCTAssertEqual(AppLanguage.system.displayName(language: .english), "Follow System")
+    XCTAssertEqual(L10n.string("Advance", language: .traditionalChinese), "進階")
+    XCTAssertEqual(L10n.string("Logs", language: .traditionalChinese), "日誌")
+    XCTAssertEqual(
+      L10n.string("127.0.0.1 (Local only)", language: .traditionalChinese),
+      "127.0.0.1（僅本機）"
+    )
   }
 
   func testSystemLanguageUsesSupportedLanguageOrFallsBackToEnglish() {

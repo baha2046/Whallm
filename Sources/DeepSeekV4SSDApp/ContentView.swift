@@ -10,53 +10,86 @@ struct ContentView: View {
   @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
 
   var body: some View {
-    VStack(spacing: 0) {
-      HStack(spacing: 16) {
-        Text(selectedPage.title(language: selectedLanguage))
-          .font(.title2.bold())
-        Spacer()
-        HStack(spacing: 8) {
-          ForEach(AppPage.allCases) { page in
-            Button {
-              selectedPage = page
-            } label: {
-              Image(systemName: page.icon)
-                .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.bordered)
-            .tint(page == selectedPage ? .accentColor : .secondary)
-            .frame(width: 40, height: 40)
-            .accessibilityLabel(page.title(language: selectedLanguage))
-            .accessibilityAddTraits(page == selectedPage ? .isSelected : [])
-            .help(page.title(language: selectedLanguage))
+    NavigationSplitView {
+      List(selection: $selectedPage) {
+        Section {
+          ForEach(AppPage.primaryPages) { page in
+            Label(page.title(language: selectedLanguage), systemImage: page.icon)
+              .padding(.vertical, 6)
+              .tag(page)
           }
         }
+        Section(L10n.string("General", language: selectedLanguage)) {
+          Label(
+            AppPage.settings.title(language: selectedLanguage),
+            systemImage: AppPage.settings.icon
+          )
+          .padding(.vertical, 6)
+          .tag(AppPage.settings)
+        }
       }
-      .padding(.horizontal, 24)
-      .padding(.vertical, 14)
+      .listStyle(.sidebar)
+      .scrollContentBackground(.hidden)
+      .background(AppTheme.sidebarBackground)
+      .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 250)
+    } detail: {
+      VStack(spacing: 0) {
+        HStack {
+          Text(selectedPage.title(language: selectedLanguage))
+            .font(.title2.bold())
+          Spacer()
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 16)
 
-      Divider()
+        Divider()
 
-      ZStack {
-        ServerView(
-          configuration: $configuration,
-          server: server,
-          modelLibrary: modelLibrary,
-          language: selectedLanguage
-        )
-        .pageVisibility(selectedPage == .server)
+        ZStack {
+          ServerView(
+            configuration: $configuration,
+            server: server,
+            modelLibrary: modelLibrary,
+            language: selectedLanguage
+          )
+          .pageVisibility(selectedPage == .server)
 
-        ChatView(configuration: configuration, server: server, language: selectedLanguage)
-          .pageVisibility(selectedPage == .chat)
+          AdvancedView(
+            configuration: $configuration,
+            serverActive: server.isActive,
+            dsparkAvailable: selectedModel?.hasDSpark == true,
+            language: selectedLanguage
+          )
+          .pageVisibility(selectedPage == .advanced)
 
-        SettingsView(
-          languageCode: $languageCode,
-          language: selectedLanguage,
-          checkForUpdates: checkForUpdates
-        )
-        .pageVisibility(selectedPage == .settings)
+          ChatView(configuration: configuration, server: server, language: selectedLanguage)
+            .pageVisibility(selectedPage == .chat)
+
+          MetricView(
+            model: configuration.publicModel,
+            state: server.state,
+            performance: server.performance,
+            history: server.performanceHistory,
+            language: selectedLanguage,
+            clearHistory: server.clearPerformanceHistory
+          )
+          .pageVisibility(selectedPage == .metric)
+
+          LogsView(server: server, language: selectedLanguage)
+            .pageVisibility(selectedPage == .logs)
+
+          SettingsView(
+            languageCode: $languageCode,
+            language: selectedLanguage,
+            checkForUpdates: checkForUpdates
+          )
+          .pageVisibility(selectedPage == .settings)
+        }
       }
+      .background(AppTheme.pageBackground)
     }
+    .navigationSplitViewStyle(.balanced)
+    .background(AppTheme.pageBackground)
+    .preferredColorScheme(.dark)
     .environment(\.locale, selectedLanguage.locale)
     .task {
       await modelLibrary.scan()
@@ -74,6 +107,10 @@ struct ContentView: View {
     (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
   }
 
+  private var selectedModel: InstalledModelInfo? {
+    modelLibrary.usableModels.first { $0.url.path == configuration.modelPath }
+  }
+
   private func selectDetectedModel() {
     guard
       !modelLibrary.usableModels.contains(where: { $0.url.path == configuration.modelPath })
@@ -86,15 +123,23 @@ struct ContentView: View {
 
 private enum AppPage: String, CaseIterable, Identifiable {
   case server
+  case advanced
   case chat
+  case metric
+  case logs
   case settings
 
   var id: String { rawValue }
 
+  static let primaryPages: [AppPage] = [.server, .advanced, .chat, .metric, .logs]
+
   var icon: String {
     switch self {
     case .server: "externaldrive"
+    case .advanced: "slider.horizontal.3"
     case .chat: "bubble"
+    case .metric: "gauge.with.dots.needle.50percent"
+    case .logs: "doc.text"
     case .settings: "gearshape"
     }
   }
@@ -102,9 +147,64 @@ private enum AppPage: String, CaseIterable, Identifiable {
   func title(language: AppLanguage) -> String {
     switch self {
     case .server: L10n.string("Server", language: language)
+    case .advanced: L10n.string("Advance", language: language)
     case .chat: L10n.string("Chat", language: language)
+    case .metric: L10n.string("Metric", language: language)
+    case .logs: L10n.string("Logs", language: language)
     case .settings: L10n.string("Settings", language: language)
     }
+  }
+}
+
+private enum AppTheme {
+  static let pageBackground = Color(red: 0.095, green: 0.095, blue: 0.1)
+  static let sidebarBackground = Color(red: 0.12, green: 0.12, blue: 0.125)
+  static let cardBackground = Color(red: 0.15, green: 0.15, blue: 0.155)
+  static let fieldBackground = Color(red: 0.075, green: 0.075, blue: 0.08)
+  static let cardRadius: CGFloat = 16
+  static let fieldRadius: CGFloat = 8
+}
+
+private struct SectionHeader: View {
+  let title: String
+
+  var body: some View {
+    Text(title.uppercased())
+      .font(.callout.weight(.semibold))
+      .tracking(1.1)
+      .foregroundStyle(.secondary)
+      .accessibilityAddTraits(.isHeader)
+  }
+}
+
+private struct AppCardModifier: ViewModifier {
+  let padding: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .padding(padding)
+      .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius))
+      .overlay(
+        RoundedRectangle(cornerRadius: AppTheme.cardRadius)
+          .stroke(Color.primary.opacity(0.06))
+      )
+  }
+}
+
+private struct AppInputModifier: ViewModifier {
+  let width: CGFloat?
+
+  func body(content: Content) -> some View {
+    content
+      .textFieldStyle(.plain)
+      .padding(.horizontal, 11)
+      .frame(width: width)
+      .frame(minHeight: 34)
+      .background(AppTheme.fieldBackground, in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius))
+      .overlay(
+        RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+          .stroke(Color.primary.opacity(0.12))
+      )
   }
 }
 
@@ -115,6 +215,14 @@ extension View {
       .disabled(!isVisible)
       .accessibilityHidden(!isVisible)
   }
+
+  fileprivate func appCard(padding: CGFloat = 16) -> some View {
+    modifier(AppCardModifier(padding: padding))
+  }
+
+  fileprivate func appInput(width: CGFloat? = nil) -> some View {
+    modifier(AppInputModifier(width: width))
+  }
 }
 
 private struct ServerView: View {
@@ -122,8 +230,6 @@ private struct ServerView: View {
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
   let language: AppLanguage
-  @State private var showsLog = false
-  @State private var showsAdvancedSettings = false
   @State private var confirmsDownload = false
   @State private var confirmsRepair = false
   @State private var repairTarget: InstalledModelInfo?
@@ -132,7 +238,12 @@ private struct ServerView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 24) {
+      VStack(alignment: .leading, spacing: 18) {
+        serverSummaryCard
+
+        SectionHeader(title: L10n.string("Model", language: language))
+          .padding(.top, 10)
+
         if modelLibrary.usableModels.isEmpty {
           onboardingPanel
         } else {
@@ -157,60 +268,16 @@ private struct ServerView: View {
           damagedModelsPanel
         }
 
+        SectionHeader(title: L10n.string("Server", language: language))
+          .padding(.top, 10)
         serverPanel
-
-        GroupBox(L10n.string("Metrics", language: language)) {
-          PerformancePanel(
-            model: configuration.publicModel,
-            state: server.state,
-            performance: server.performance,
-            history: server.performanceHistory,
-            language: language,
-            clearHistory: server.clearPerformanceHistory
-          )
-          .padding(8)
-        }
-
-        if selectedModel != nil {
-          GroupBox {
-            DisclosureGroup(
-              L10n.string("Advanced Settings", language: language),
-              isExpanded: $showsAdvancedSettings
-            ) {
-              advancedSettings
-                .disabled(server.isActive)
-                .padding(.top, 16)
-            }
-            .padding(8)
-          }
-
-          GroupBox {
-            DisclosureGroup(L10n.string("Server log"), isExpanded: $showsLog) {
-              ScrollView {
-                Text(
-                  server.log.isEmpty
-                    ? L10n.string("The log will appear here after the server starts.") : server.log
-                )
-                .font(.system(.callout, design: .monospaced))
-                .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(12)
-              }
-              .frame(minHeight: 140, maxHeight: 260)
-              .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
-              .accessibilityLabel(L10n.string("Server log"))
-              .padding(.top, 12)
-            }
-            .padding(8)
-          }
-        }
       }
-      .frame(maxWidth: 1_000)
+      .frame(maxWidth: 980)
       .frame(maxWidth: .infinity)
-      .padding(24)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
     }
-    .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+    .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
     .confirmationDialog(
       L10n.string("Download and install the model?"),
@@ -256,83 +323,119 @@ private struct ServerView: View {
     }
   }
 
-  private var serverPanel: some View {
-    GroupBox(L10n.string("Server", language: language)) {
-      VStack(alignment: .leading, spacing: 16) {
-        HStack(spacing: 12) {
-          Image(systemName: server.state.symbol)
+  private var serverSummaryCard: some View {
+    HStack(spacing: 18) {
+      Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+        .resizable()
+        .interpolation(.high)
+        .frame(width: 56, height: 56)
+        .accessibilityHidden(true)
+
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 10) {
+          Text(selectedModel?.name ?? configuration.publicModel)
+            .font(.title3.bold())
+            .lineLimit(1)
+          Label(server.state.label, systemImage: "circle.fill")
+            .font(.callout.weight(.semibold))
             .foregroundStyle(statusColor)
-            .accessibilityHidden(true)
-          VStack(alignment: .leading, spacing: 2) {
-            Text(server.state.label).font(.headline)
-            Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
-              .font(.callout.monospaced())
-              .foregroundStyle(.secondary)
-              .textSelection(.enabled)
-          }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(statusColor.opacity(0.12), in: Capsule())
         }
-        .accessibilityElement(children: .combine)
-
-        if case .failed(let message) = server.state {
-          Label(message, systemImage: "exclamationmark.triangle.fill")
-            .foregroundStyle(.red)
-            .accessibilityLabel(L10n.string("Error: %@", language: language, message))
-        }
-
-        HStack(alignment: .top, spacing: 16) {
-          VStack(alignment: .leading, spacing: 6) {
-            Text(L10n.string("Host", language: language))
-              .foregroundStyle(.secondary)
-            TextField("127.0.0.1", text: $configuration.host)
-              .textFieldStyle(.roundedBorder)
-              .accessibilityLabel(L10n.string("Host", language: language))
-          }
-          VStack(alignment: .leading, spacing: 6) {
-            Text(L10n.string("Port", language: language))
-              .foregroundStyle(.secondary)
-            TextField("11434", value: $configuration.port, format: .number.grouping(.never))
-              .textFieldStyle(.roundedBorder)
-              .frame(width: 140)
-              .accessibilityLabel(L10n.string("Port", language: language))
-          }
-        }
-        .disabled(server.isActive)
-
-        LabeledContent(L10n.string("API key", language: language)) {
-          SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
-            .textFieldStyle(.roundedBorder)
-        }
-        .disabled(server.isActive)
-
-        LabeledContent(L10n.string("Model ID", language: language)) {
-          TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
-            .textFieldStyle(.roundedBorder)
-        }
-        .disabled(server.isActive)
-
-        Button {
-          if server.isActive {
-            server.stop()
-          } else {
-            server.start(configuration)
-          }
-        } label: {
-          HStack {
-            Spacer()
-            Label(
-              L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
-              systemImage: server.isActive ? "stop.fill" : "play.fill"
-            )
-            Spacer()
-          }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .disabled(!server.isActive && !modelLibrary.canUseModel(at: configuration.modelPath))
-        .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
+        Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
+          .font(.callout.monospaced())
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
       }
-      .padding(8)
+      .accessibilityElement(children: .combine)
+
+      Spacer(minLength: 20)
+
+      Button {
+        if server.isActive {
+          server.stop()
+        } else {
+          server.start(configuration)
+        }
+      } label: {
+        Label(
+          L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
+          systemImage: server.isActive ? "stop.fill" : "play.fill"
+        )
+      }
+      .buttonStyle(.borderedProminent)
+      .tint(.blue)
+      .controlSize(.large)
+      .disabled(!server.isActive && !modelLibrary.canUseModel(at: configuration.modelPath))
+      .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
     }
+    .appCard(padding: 22)
+  }
+
+  private var serverPanel: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if case .failed(let message) = server.state {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+          .foregroundStyle(.red)
+          .accessibilityLabel(L10n.string("Error: %@", language: language, message))
+          .padding(.bottom, 12)
+      }
+
+      SettingRow(
+        "Listen Address",
+        hint: "Choose which devices can connect to the server.",
+        language: language
+      ) {
+        Picker(L10n.string("Listen Address", language: language), selection: $configuration.host) {
+          Text(L10n.string("127.0.0.1 (Local only)", language: language))
+            .tag("127.0.0.1")
+          Text(L10n.string("0.0.0.0 (All networks)", language: language))
+            .tag("0.0.0.0")
+        }
+        .labelsHidden()
+        .frame(width: 290)
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "Port",
+        hint: "Default 11434. Restart the server after changing it.",
+        language: language
+      ) {
+        TextField("11434", value: $configuration.port, format: .number.grouping(.never))
+          .appInput(width: 120)
+          .accessibilityLabel(L10n.string("Port", language: language))
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "API key",
+        hint: "Optional for local use",
+        language: language
+      ) {
+        SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
+          .appInput(width: 320)
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "Model ID",
+        hint: "Model name exposed by the OpenAI-compatible API.",
+        language: language
+      ) {
+        TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
+          .appInput(width: 320)
+      }
+      .disabled(server.isActive)
+    }
+    .appCard()
   }
 
   private var onboardingPanel: some View {
@@ -371,12 +474,12 @@ private struct ServerView: View {
           }
         }
         .buttonStyle(.borderedProminent)
+        .tint(.blue)
         .disabled(modelLibrary.isBusy || !modelLibrary.canStartDownload)
       }
     }
-    .padding(20)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+    .appCard()
   }
 
   private var preflightPanel: some View {
@@ -402,85 +505,83 @@ private struct ServerView: View {
   }
 
   private var modelPanel: some View {
-    GroupBox(L10n.string("Model")) {
-      VStack(alignment: .leading, spacing: 12) {
-        HStack(spacing: 12) {
-          if modelLibrary.isScanning {
-            ProgressView().controlSize(.small)
-          } else {
-            Image(systemName: selectedModel == nil ? "externaldrive" : "checkmark.circle.fill")
-              .foregroundStyle(selectedModel == nil ? Color.secondary : Color.green)
-              .accessibilityHidden(true)
-          }
-
-          Picker(L10n.string("Installed model"), selection: $configuration.modelPath) {
-            ForEach(modelLibrary.usableModels) { model in
-              Text(L10n.string("%@ · %@", model.name, formattedBytes(model.size)))
-                .tag(model.url.path)
-            }
-          }
-          .labelsHidden()
-          .frame(maxWidth: .infinity)
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(spacing: 12) {
+        if modelLibrary.isScanning {
+          ProgressView().controlSize(.small)
+        } else {
+          Image(systemName: selectedModel == nil ? "externaldrive" : "checkmark.circle.fill")
+            .foregroundStyle(selectedModel == nil ? Color.secondary : Color.green)
+            .accessibilityHidden(true)
         }
 
-        VStack(alignment: .trailing, spacing: 10) {
-          HStack(spacing: 12) {
-            Spacer()
-            Button(L10n.string("Show in Finder")) {
-              if let selectedModel { modelLibrary.reveal(selectedModel.url) }
-            }
-            Button(L10n.string("Verify Complete Model")) {
-              if let selectedModel { modelLibrary.startVerification(selectedModel) }
-            }
-            .disabled(server.isActive || modelLibrary.isBusy)
-            if let selectedModel, !selectedModel.hasDSpark {
-              Button(L10n.string("Install DSpark (10.12 GiB)")) {
-                modelLibrary.startDSparkInstallation(selectedModel)
-              }
-              .disabled(server.isActive || modelLibrary.isBusy)
-            }
-          }
-          HStack {
-            Spacer()
-            Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
-              .disabled(server.isActive || modelLibrary.isBusy)
+        Text(L10n.string("Installed model"))
+          .font(.body.weight(.medium))
+        Spacer()
+        Picker(L10n.string("Installed model"), selection: $configuration.modelPath) {
+          ForEach(modelLibrary.usableModels) { model in
+            Text(L10n.string("%@ · %@", model.name, formattedBytes(model.size)))
+              .tag(model.url.path)
           }
         }
+        .labelsHidden()
+        .frame(width: 420)
+      }
 
-        Text(modelLibrary.rootURL.path)
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .textSelection(.enabled)
+      Divider()
 
-        if modelLibrary.verificationModelPath == configuration.modelPath,
-          let issues = modelLibrary.verificationIssues
-        {
-          if issues.isEmpty {
-            Label(L10n.string("Complete verification passed"), systemImage: "checkmark.seal.fill")
-              .foregroundStyle(.green)
-          } else {
-            Label(
-              L10n.string("%lld files need repair", Int64(issues.count)),
-              systemImage: "exclamationmark.triangle.fill"
-            )
-            .foregroundStyle(.red)
-            Button(L10n.string("Verify and Repair")) {
-              repairTarget = selectedModel
-              confirmsRepair = true
-            }
-            .disabled(modelLibrary.isBusy || server.isActive)
+      HStack(spacing: 10) {
+        Button(L10n.string("Show in Finder")) {
+          if let selectedModel { modelLibrary.reveal(selectedModel.url) }
+        }
+        Button(L10n.string("Verify Complete Model")) {
+          if let selectedModel { modelLibrary.startVerification(selectedModel) }
+        }
+        .disabled(server.isActive || modelLibrary.isBusy)
+        if let selectedModel, !selectedModel.hasDSpark {
+          Button(L10n.string("Install DSpark (10.12 GiB)")) {
+            modelLibrary.startDSparkInstallation(selectedModel)
           }
+          .disabled(server.isActive || modelLibrary.isBusy)
+        }
+        Spacer()
+        Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
+          .disabled(server.isActive || modelLibrary.isBusy)
+      }
+
+      Text(modelLibrary.rootURL.path)
+        .font(.callout.monospaced())
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+        .textSelection(.enabled)
+
+      if modelLibrary.verificationModelPath == configuration.modelPath,
+        let issues = modelLibrary.verificationIssues
+      {
+        if issues.isEmpty {
+          Label(L10n.string("Complete verification passed"), systemImage: "checkmark.seal.fill")
+            .foregroundStyle(.green)
+        } else {
+          Label(
+            L10n.string("%lld files need repair", Int64(issues.count)),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .foregroundStyle(.red)
+          Button(L10n.string("Verify and Repair")) {
+            repairTarget = selectedModel
+            confirmsRepair = true
+          }
+          .disabled(modelLibrary.isBusy || server.isActive)
         }
       }
-      .padding(8)
     }
+    .appCard()
   }
 
   private var operationPanel: some View {
-    GroupBox(modelLibrary.operationPhase.label) {
-      VStack(alignment: .leading, spacing: 10) {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(modelLibrary.operationPhase.label).font(.headline)
         if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
           ProgressView(value: fraction)
             .accessibilityLabel(modelLibrary.operationPhase.label)
@@ -505,14 +606,13 @@ private struct ServerView: View {
         }
         Button(L10n.string("Stop Current Operation")) { modelLibrary.cancelOperation() }
           .disabled(modelLibrary.operationPhase == .cancelling)
-      }
-      .padding(8)
     }
+    .appCard()
   }
 
   private var damagedModelsPanel: some View {
-    GroupBox(L10n.string("Models That Need Attention")) {
-      VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(L10n.string("Models That Need Attention")).font(.headline)
         ForEach(modelLibrary.damagedModels) { model in
           HStack(alignment: .top, spacing: 12) {
             Label(
@@ -547,82 +647,8 @@ private struct ServerView: View {
             .disabled(modelLibrary.isBusy || server.isActive || !modelLibrary.canDownload)
           }
         }
-      }
-      .padding(8)
     }
-  }
-
-  private var advancedSettings: some View {
-    VStack(alignment: .leading, spacing: 20) {
-      GroupBox(L10n.string("Generate", language: language)) {
-        VStack(spacing: 12) {
-          integerField(
-            "Max tokens", hint: "Default token limit for each request.",
-            value: $configuration.defaultMaxTokens)
-          doubleField(
-            "Temperature", hint: "A higher value increases output variation.",
-            value: $configuration.defaultTemperature)
-          doubleField(
-            "Top P", hint: "A lower value reduces the candidate token range.",
-            value: $configuration.defaultTopP)
-        }
-        .padding(6)
-      }
-
-      GroupBox(L10n.string("Runtime", language: language)) {
-        VStack(spacing: 12) {
-          integerField(
-            "Slots",
-            hint:
-              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
-            value: $configuration.slots)
-          integerField(
-            "Read workers",
-            hint:
-              "Number of workers that read expert blobs at the same time. The recommended value is 8.",
-            value: $configuration.readWorkers)
-          integerField(
-            "Prefill step size", hint: "0 selects 128, 256, or 1024 based on the prompt length.",
-            value: $configuration.prefillStepSize)
-          Toggle(
-            L10n.string("Use layer-major prefill"),
-            isOn: $configuration.layerMajorPrefill)
-          integerField(
-            "Prompt cache entries",
-            hint: "Number of linear conversations to keep. The recommended value is 2.",
-            value: $configuration.promptCacheEntries)
-          integerField(
-            "Prompt cache GiB",
-            hint: "Memory limit for all prompt caches. The recommended value is 8.",
-            value: $configuration.promptCacheMemoryGiB)
-          LabeledContent(L10n.string("Warmup prompt")) {
-            TextField(
-              L10n.string("Optional UTF-8 prompt file path"),
-              text: $configuration.warmupPromptPath
-            )
-            .textFieldStyle(.roundedBorder)
-          }
-          Toggle(L10n.string("Use BF16 KV cache"), isOn: $configuration.bf16KVCache)
-          Toggle(L10n.string("Use DSpark"), isOn: $configuration.dsparkEnabled)
-            .disabled(selectedModel?.hasDSpark != true)
-          integerField(
-            "DSpark slots",
-            hint:
-              "Number of DSpark routed experts kept in memory. The recommended value is 768.",
-            value: $configuration.dsparkSlots
-          )
-          .disabled(!configuration.dsparkEnabled || selectedModel?.hasDSpark != true)
-          doubleField(
-            "DSpark confidence threshold",
-            hint:
-              "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
-            value: $configuration.dsparkConfidenceThreshold
-          )
-          .disabled(!configuration.dsparkEnabled || selectedModel?.hasDSpark != true)
-        }
-        .padding(6)
-      }
-    }
+    .appCard()
   }
 
   private var selectedModel: InstalledModelInfo? {
@@ -636,41 +662,6 @@ private struct ServerView: View {
     case .starting, .stopping: .orange
     case .stopped: .secondary
     }
-  }
-
-  @ViewBuilder
-  private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
-    LabeledContent {
-      TextField(
-        L10n.string(label, language: selectedLanguage),
-        value: value,
-        format: .number.grouping(.never)
-      )
-      .labelsHidden()
-      .textFieldStyle(.roundedBorder)
-      .frame(width: 120)
-    } label: {
-      SettingLabel(label, hint: hint, language: selectedLanguage)
-    }
-  }
-
-  @ViewBuilder
-  private func doubleField(_ label: String, hint: String, value: Binding<Double>) -> some View {
-    LabeledContent {
-      TextField(
-        L10n.string(label, language: selectedLanguage), value: value,
-        format: .number.precision(.fractionLength(0...6))
-      )
-      .labelsHidden()
-      .textFieldStyle(.roundedBorder)
-      .frame(width: 120)
-    } label: {
-      SettingLabel(label, hint: hint, language: selectedLanguage)
-    }
-  }
-
-  private var selectedLanguage: AppLanguage {
-    language
   }
 
   private func chooseModelDirectory() {
@@ -716,6 +707,196 @@ private struct ServerView: View {
   }
 }
 
+private struct AdvancedView: View {
+  @Binding var configuration: ServerConfiguration
+  let serverActive: Bool
+  let dsparkAvailable: Bool
+  let language: AppLanguage
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: L10n.string("Generate", language: language))
+        VStack(spacing: 0) {
+          integerField(
+            "Max tokens",
+            hint: "Default token limit for each request.",
+            value: $configuration.defaultMaxTokens
+          )
+          Divider()
+          doubleField(
+            "Temperature",
+            hint: "A higher value increases output variation.",
+            value: $configuration.defaultTemperature
+          )
+          Divider()
+          doubleField(
+            "Top P",
+            hint: "A lower value reduces the candidate token range.",
+            value: $configuration.defaultTopP
+          )
+        }
+        .appCard()
+        .disabled(serverActive)
+
+        SectionHeader(title: L10n.string("Runtime", language: language))
+          .padding(.top, 12)
+        VStack(spacing: 0) {
+          integerField(
+            "Slots",
+            hint:
+              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
+            value: $configuration.slots
+          )
+          Divider()
+          integerField(
+            "Read workers",
+            hint:
+              "Number of workers that read expert blobs at the same time. The recommended value is 8.",
+            value: $configuration.readWorkers
+          )
+          Divider()
+          integerField(
+            "Prefill step size",
+            hint: "0 selects 128, 256, or 1024 based on the prompt length.",
+            value: $configuration.prefillStepSize
+          )
+          Divider()
+          toggleField(
+            "Use layer-major prefill",
+            hint: "Loads routed experts by layer during prefill.",
+            value: $configuration.layerMajorPrefill
+          )
+          Divider()
+          integerField(
+            "Prompt cache entries",
+            hint: "Number of linear conversations to keep. The recommended value is 2.",
+            value: $configuration.promptCacheEntries
+          )
+          Divider()
+          integerField(
+            "Prompt cache GiB",
+            hint: "Memory limit for all prompt caches. The recommended value is 8.",
+            value: $configuration.promptCacheMemoryGiB
+          )
+          Divider()
+          SettingRow(
+            "Warmup prompt",
+            hint: "Optional UTF-8 prompt file path",
+            language: language
+          ) {
+            TextField(
+              L10n.string("Optional UTF-8 prompt file path", language: language),
+              text: $configuration.warmupPromptPath
+            )
+            .appInput(width: 340)
+          }
+          Divider()
+          toggleField(
+            "Use BF16 KV cache",
+            hint: "Stores the KV cache in BF16 format.",
+            value: $configuration.bf16KVCache
+          )
+          Divider()
+          toggleField(
+            "Use DSpark",
+            hint: "Uses DSpark speculative decoding when it is installed.",
+            value: $configuration.dsparkEnabled
+          )
+          .disabled(!dsparkAvailable)
+          Divider()
+          integerField(
+            "DSpark slots",
+            hint:
+              "Number of DSpark routed experts kept in memory. The recommended value is 768.",
+            value: $configuration.dsparkSlots
+          )
+          .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+          Divider()
+          doubleField(
+            "DSpark confidence threshold",
+            hint:
+              "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
+            value: $configuration.dsparkConfidenceThreshold
+          )
+          .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+        }
+        .appCard()
+        .disabled(serverActive)
+      }
+      .frame(maxWidth: 980)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+
+  private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      TextField(
+        L10n.string(label, language: language),
+        value: value,
+        format: .number.grouping(.never)
+      )
+      .labelsHidden()
+      .appInput(width: 120)
+    }
+  }
+
+  private func doubleField(_ label: String, hint: String, value: Binding<Double>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      TextField(
+        L10n.string(label, language: language),
+        value: value,
+        format: .number.precision(.fractionLength(0...6))
+      )
+      .labelsHidden()
+      .appInput(width: 120)
+    }
+  }
+
+  private func toggleField(_ label: String, hint: String, value: Binding<Bool>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      Toggle(L10n.string(label, language: language), isOn: value)
+        .labelsHidden()
+    }
+  }
+}
+
+private struct LogsView: View {
+  @ObservedObject var server: ServerController
+  let language: AppLanguage
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      SectionHeader(title: L10n.string("Server log", language: language))
+      ScrollView {
+        Text(
+          server.log.isEmpty
+            ? L10n.string(
+              "The log will appear here after the server starts.", language: language)
+            : server.log
+        )
+        .font(.system(.callout, design: .monospaced))
+        .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .appCard()
+      .accessibilityLabel(L10n.string("Server log", language: language))
+    }
+    .frame(maxWidth: 980)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 40)
+    .padding(.vertical, 24)
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+}
+
 private struct SettingsView: View {
   @Binding var languageCode: String
   let language: AppLanguage
@@ -723,18 +904,47 @@ private struct SettingsView: View {
 
   var body: some View {
     ScrollView {
-      GroupBox {
-        VStack(alignment: .leading, spacing: 20) {
-          LabeledContent(L10n.string("Version", language: language)) {
-            Text(appVersion)
-              .font(.body.monospacedDigit())
-              .textSelection(.enabled)
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(spacing: 20) {
+          Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+            .resizable()
+            .interpolation(.high)
+            .frame(width: 76, height: 76)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 5) {
+            Text("DeepSeekV4SSD")
+              .font(.title.bold())
+            Text(L10n.string("Local DeepSeek inference from SSD.", language: language))
+              .font(.title3)
+              .foregroundStyle(.secondary)
+            Text(
+              L10n.string(
+                "Version %@ · build %@",
+                language: language,
+                appVersion,
+                buildVersion
+              )
+            )
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.tertiary)
+            .textSelection(.enabled)
           }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard(padding: 22)
 
-          LabeledContent(L10n.string("Language", language: language)) {
+        SectionHeader(title: L10n.string("Preferences", language: language))
+          .padding(.top, 12)
+
+        VStack(alignment: .leading, spacing: 0) {
+          SettingRow(
+            "Language",
+            hint: "Select the language used by the app.",
+            language: language
+          ) {
             Picker(L10n.string("Language", language: language), selection: $languageCode) {
               ForEach(AppLanguage.allCases) { option in
-                Text(option.displayName).tag(option.rawValue)
+                Text(option.displayName(language: language)).tag(option.rawValue)
               }
             }
             .labelsHidden()
@@ -742,27 +952,122 @@ private struct SettingsView: View {
             .frame(minWidth: 180)
           }
 
-          Button(action: checkForUpdates) {
-            Label(
-              L10n.string("Check for Updates…", language: language), systemImage: "arrow.clockwise")
+          Divider()
+
+          SettingRow(
+            "Software Updates",
+            hint: "Check GitHub Releases for a newer app version.",
+            language: language
+          ) {
+            Button(action: checkForUpdates) {
+              Label(
+                L10n.string("Check for Updates…", language: language),
+                systemImage: "arrow.clockwise"
+              )
+            }
           }
         }
-        .padding(10)
+        .appCard()
+
+        SectionHeader(title: L10n.string("Project", language: language))
+          .padding(.top, 12)
+
+        VStack(spacing: 0) {
+          projectLink(
+            title: "GitHub Repository",
+            note: "Source, issues, and roadmap",
+            icon: "chevron.left.forwardslash.chevron.right",
+            url: "https://github.com/yanun0323/deepseek_ssd"
+          )
+          Divider()
+          projectLink(
+            title: "Releases",
+            note: "Download the latest macOS app",
+            icon: "shippingbox",
+            url: "https://github.com/yanun0323/deepseek_ssd/releases"
+          )
+          Divider()
+          projectLink(
+            title: "Documentation",
+            note: "Setup, model management, and API usage",
+            icon: "book.closed",
+            url: "https://github.com/yanun0323/deepseek_ssd#readme"
+          )
+          Divider()
+          projectLink(
+            title: "Report an Issue",
+            note: "Report bugs and request features on GitHub",
+            icon: "exclamationmark.bubble",
+            url: "https://github.com/yanun0323/deepseek_ssd/issues"
+          )
+        }
+        .appCard()
+
+        SectionHeader(title: L10n.string("License", language: language))
+          .padding(.top, 12)
+
+        VStack(alignment: .leading, spacing: 6) {
+          Label(L10n.string("MIT License", language: language), systemImage: "point.3.connected.trianglepath.dotted")
+            .font(.headline)
+          Text(
+            L10n.string(
+              "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text.",
+              language: language
+            )
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
       }
-      .frame(maxWidth: 680)
+      .frame(maxWidth: 980)
       .frame(maxWidth: .infinity)
-      .padding(24)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
     }
-    .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+    .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
   }
 
   private var appVersion: String {
     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
   }
+
+  private var buildVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
+  }
+
+  private func projectLink(title: String, note: String, icon: String, url: String) -> some View {
+    Link(destination: URL(string: url)!) {
+      HStack(spacing: 14) {
+        Image(systemName: icon)
+          .font(.title3)
+          .foregroundStyle(.secondary)
+          .frame(width: 28)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(L10n.string(title, language: language))
+            .font(.body.weight(.semibold))
+          Text(L10n.string(note, language: language))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Image(systemName: "arrow.up.right.square")
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+      }
+      .padding(.vertical, 9)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(L10n.string(title, language: language))
+    .accessibilityHint(L10n.string(note, language: language))
+  }
 }
 
-private struct PerformancePanel: View {
+private struct MetricView: View {
   let model: String
   let state: ServerController.State
   let performance: LivePerformance
@@ -771,91 +1076,81 @@ private struct PerformancePanel: View {
   let clearHistory: () -> Void
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 14) {
-      HStack(spacing: 12) {
-        HStack(spacing: 9) {
-          Circle()
-            .fill(statusColor)
-            .frame(width: 9, height: 9)
-            .accessibilityHidden(true)
-          VStack(alignment: .leading, spacing: 2) {
-            Text(model)
-              .font(.headline)
-              .lineLimit(1)
-            Text(localizedStateLabel)
-              .font(.callout)
-              .foregroundStyle(.secondary)
-            if performance.dsparkEnabled {
-              Text(
-                L10n.string(
-                  "DSpark · %@ accepted · %@ tokens per round",
-                  language: language,
-                  performance.dsparkAcceptanceRate.formatted(
-                    .percent.precision(.fractionLength(1))),
-                  performance.dsparkAverageAcceptedLength.formatted(
-                    .number.precision(.fractionLength(1)))
-                )
-              )
-              .font(.callout)
-              .foregroundStyle(.secondary)
-            }
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        HStack(alignment: .center) {
+          SectionHeader(title: localized("Serving Stats"))
+          Spacer()
+          Button(action: clearHistory) {
+            Label(localized("Clear metric history"), systemImage: "trash")
+              .labelStyle(.iconOnly)
           }
+          .buttonStyle(.borderless)
+          .frame(width: 36, height: 36)
+          .disabled(history.isEmpty)
+          .help(localized("Clear metric history"))
+          .accessibilityLabel(localized("Clear metric history"))
         }
-        .accessibilityElement(children: .combine)
 
-        Spacer(minLength: 8)
-
-        Button(action: clearHistory) {
-          Label(localized("Clear metric history"), systemImage: "trash")
+        LazyVGrid(
+          columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
+          spacing: 14
+        ) {
+          metricCard(.inputTokens)
+          metricCard(.outputTokens)
+          metricCard(.cacheHitRate)
         }
-        .controlSize(.small)
-        .disabled(history.isEmpty)
+
+        SectionHeader(title: localized("Average Speed"))
+          .padding(.top, 10)
+
+        LazyVGrid(
+          columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 2),
+          spacing: 14
+        ) {
+          metricCard(.prefillTokensPerSecond)
+          metricCard(.decodeTokensPerSecond)
+        }
+
+        SectionHeader(title: localized("Active Now"))
+          .padding(.top, 10)
+        activeCard
+
+        SectionHeader(title: localized("System"))
+          .padding(.top, 10)
+        systemCard
       }
-
-      ScrollView(.horizontal) {
-        Grid(alignment: .trailing, horizontalSpacing: 24, verticalSpacing: 9) {
-          GridRow {
-            Text(localized("Metric"))
-              .gridColumnAlignment(.leading)
-            Text(localized("Live"))
-            Text(localized("Maximum"))
-            Text("P95")
-          }
-          .font(.callout.weight(.semibold))
-          .foregroundStyle(.secondary)
-
-          ForEach(PerformanceMetric.allCases) { metric in
-            metricRow(metric)
-          }
-        }
-        .padding(.horizontal, 1)
-      }
+      .frame(maxWidth: 980)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
     }
-    .padding(.horizontal, 18)
-    .padding(.vertical, 14)
-    .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-    .overlay(
-      RoundedRectangle(cornerRadius: 16)
-        .stroke(Color.primary.opacity(0.06))
-    )
+    .background(AppTheme.pageBackground)
     .accessibilityElement(children: .contain)
     .environment(\.locale, language.locale)
   }
 
-  private func metricRow(_ metric: PerformanceMetric) -> some View {
+  private func metricCard(_ metric: PerformanceMetric) -> some View {
     let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
     let statistics = history[metric]
     let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
     let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
-    return GridRow {
+    return VStack(spacing: 14) {
       Text(localized(metricTitle(metric)))
-        .font(.callout.weight(.medium))
+        .font(.callout.weight(.semibold))
         .foregroundStyle(.secondary)
-        .gridColumnAlignment(.leading)
-      metricValue(live)
-      metricValue(maximum)
-      metricValue(p95)
+        .multilineTextAlignment(.center)
+      Text(live)
+        .font(.title2.weight(.semibold).monospacedDigit())
+        .lineLimit(1)
+      HStack(spacing: 16) {
+        statisticLabel(localized("Maximum"), value: maximum)
+        Divider().frame(height: 28)
+        statisticLabel("P95", value: p95)
+      }
     }
+    .frame(maxWidth: .infinity, minHeight: 126)
+    .appCard(padding: 18)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(
       "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
@@ -863,11 +1158,101 @@ private struct PerformancePanel: View {
     )
   }
 
-  private func metricValue(_ value: String) -> some View {
-    Text(value)
-      .font(.callout.monospacedDigit())
-      .lineLimit(1)
-      .frame(minWidth: 88, alignment: .trailing)
+  private func statisticLabel(_ title: String, value: String) -> some View {
+    VStack(spacing: 2) {
+      Text(title)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(value)
+        .font(.callout.monospacedDigit())
+        .lineLimit(1)
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  private var activeCard: some View {
+    HStack(spacing: 12) {
+      Circle()
+        .fill(statusColor)
+        .frame(width: 9, height: 9)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(model)
+          .font(.headline)
+          .lineLimit(1)
+        Text(localizedStateLabel)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      Spacer()
+      if performance.dsparkEnabled {
+        Text(
+          L10n.string(
+            "DSpark · %@ accepted · %@ tokens per round",
+            language: language,
+            performance.dsparkAcceptanceRate.formatted(
+              .percent.precision(.fractionLength(1))),
+            performance.dsparkAverageAcceptedLength.formatted(
+              .number.precision(.fractionLength(1)))
+          )
+        )
+        .font(.callout.monospacedDigit())
+        .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+    .appCard()
+    .accessibilityElement(children: .combine)
+  }
+
+  private var systemCard: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Text(localized("Metric"))
+        Spacer()
+        Text(localized("Live")).frame(width: 120, alignment: .trailing)
+        Text(localized("Maximum")).frame(width: 120, alignment: .trailing)
+        Text("P95").frame(width: 120, alignment: .trailing)
+      }
+      .font(.callout.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .padding(.bottom, 12)
+
+      ForEach(
+        [
+          PerformanceMetric.memoryUsage,
+          .ssdReadSpeed,
+          .firstTokenWaitTime,
+          .completionTime,
+        ]
+      ) { metric in
+        Divider()
+        metricRow(metric)
+      }
+    }
+    .appCard()
+  }
+
+  private func metricRow(_ metric: PerformanceMetric) -> some View {
+    let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
+    let statistics = history[metric]
+    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
+    let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
+    return HStack {
+      Text(localized(metricTitle(metric)))
+        .font(.body.weight(.medium))
+      Spacer()
+      Text(live).frame(width: 120, alignment: .trailing)
+      Text(maximum).frame(width: 120, alignment: .trailing)
+      Text(p95).frame(width: 120, alignment: .trailing)
+    }
+    .font(.body.monospacedDigit())
+    .padding(.vertical, 10)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(
+      "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
+        + "\(localized("Maximum"))：\(maximum)。P95：\(p95)"
+    )
   }
 
   private func localized(_ key: String) -> String {
@@ -961,16 +1346,46 @@ private struct SettingLabel: View {
   }
 
   var body: some View {
-    HStack(spacing: 4) {
+    VStack(alignment: .leading, spacing: 2) {
       Text(L10n.string(title, language: language))
-      Image(systemName: "info.circle")
+        .font(.body.weight(.medium))
+      Text(L10n.string(hint, language: language))
+        .font(.callout)
         .foregroundStyle(.secondary)
-        .accessibilityHidden(true)
     }
     .help(L10n.string(hint, language: language))
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(L10n.string(title, language: language))
-    .accessibilityHint(L10n.string(hint, language: language))
+    .accessibilityElement(children: .combine)
+  }
+}
+
+private struct SettingRow<Value: View>: View {
+  let title: String
+  let hint: String
+  let language: AppLanguage
+  let value: Value
+
+  init(
+    _ title: String,
+    hint: String,
+    language: AppLanguage,
+    @ViewBuilder value: () -> Value
+  ) {
+    self.title = title
+    self.hint = hint
+    self.language = language
+    self.value = value()
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 32) {
+      SettingLabel(title, hint: hint, language: language)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      value
+        .fixedSize(horizontal: true, vertical: false)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 8)
   }
 }
 
@@ -997,15 +1412,17 @@ private struct ChatView: View {
         }
         .accessibilityElement(children: .combine)
         Spacer()
-        Picker(localized("Thinking mode"), selection: $thinkingMode) {
+        Picker(localized("Mode"), selection: $thinkingMode) {
           Text(localized("Chat")).tag("chat")
           Text(localized("Thinking")).tag("thinking")
         }
         .pickerStyle(.segmented)
+        .tint(.blue)
         .frame(width: 220)
       }
+      .appCard(padding: 16)
 
-      GroupBox {
+      VStack(spacing: 0) {
         ScrollViewReader { scroll in
           ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
@@ -1082,6 +1499,7 @@ private struct ChatView: View {
         }
       }
       .frame(maxHeight: .infinity)
+      .appCard(padding: 10)
 
       if let errorMessage {
         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -1101,7 +1519,16 @@ private struct ChatView: View {
           TextEditor(text: $input)
             .font(.body)
             .scrollContentBackground(.hidden)
+            .padding(8)
             .frame(minHeight: 90, maxHeight: 180)
+            .background(
+              AppTheme.fieldBackground,
+              in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+                .stroke(Color.primary.opacity(0.12))
+            )
             .accessibilityLabel(localized("Test message"))
         }
 
@@ -1130,20 +1557,20 @@ private struct ChatView: View {
               Label(localized("Generate"), systemImage: "arrow.up")
             }
             .buttonStyle(.borderedProminent)
+            .tint(.blue)
             .controlSize(.large)
             .disabled(server.state != .running)
             .keyboardShortcut(.return, modifiers: .command)
           }
         }
       }
-      .padding(14)
-      .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-      .overlay(
-        RoundedRectangle(cornerRadius: 16)
-          .stroke(Color.primary.opacity(0.06))
-      )
+      .appCard(padding: 16)
     }
-    .padding(22)
+    .frame(maxWidth: 980)
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 40)
+    .padding(.vertical, 24)
+    .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
     .onDisappear { generationTask?.cancel() }
     .confirmationDialog(

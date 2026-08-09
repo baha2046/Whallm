@@ -1,5 +1,9 @@
 # DeepSeekV4SSD
 
+<p align="center">
+  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD 앱 아이콘" width="160">
+</p>
+
 [![English](https://img.shields.io/badge/English-Click-yellow)](README.md)
 [![繁體中文](https://img.shields.io/badge/繁體中文-點擊查看-orange)](README-tw.md)
 [![简体中文](https://img.shields.io/badge/简体中文-点击查看-orange)](README-cn.md)
@@ -9,8 +13,6 @@
 DeepSeekV4SSD는 [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare)에서 영감을 받아
 SSD에서 routed expert를 스트리밍하고, M 시리즈 Mac에서 약 30 GB 메모리로
 `DeepSeek-V4-Flash-0731`의 전체 2,840억 파라미터를 실행합니다.
-
-![DeepSeekV4SSD 앱](docs/assets/deepseekv4ssd-app.png)
 
 ## 벤치마크
 
@@ -41,6 +43,8 @@ SSD 속도, cache 상태에 따라 달라집니다. 자세한 내용은
 5. 앱에서 대화하거나 아래 설정으로 Codex를 연결합니다.
 
 기본 로컬 server 주소는 `http://127.0.0.1:11434`입니다.
+
+![DeepSeekV4SSD 앱](docs/assets/deepseekv4ssd-app.png)
 
 ## 요구 사항
 

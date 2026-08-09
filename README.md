@@ -1,5 +1,9 @@
 # DeepSeekV4SSD
 
+<p align="center">
+  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD App Icon" width="160">
+</p>
+
 [![English](https://img.shields.io/badge/English-Click-yellow)](README.md)
 [![繁體中文](https://img.shields.io/badge/繁體中文-點擊查看-orange)](README-tw.md)
 [![简体中文](https://img.shields.io/badge/简体中文-点击查看-orange)](README-cn.md)
@@ -9,8 +13,6 @@
 Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
 DeepSeekV4SSD streams routed experts from SSD to run all 284 billion parameters
 of `DeepSeek-V4-Flash-0731` on an M-series Mac with about 30 GB of memory.
-
-![DeepSeekV4SSD app](docs/assets/deepseekv4ssd-app.png)
 
 ## Benchmark
 
@@ -41,6 +43,8 @@ server → Chat in the app or connect Codex**
 5. Use the chat in the app, or connect Codex with the configuration below.
 
 The local server starts at `http://127.0.0.1:11434` by default.
+
+![DeepSeekV4SSD app](docs/assets/deepseekv4ssd-app.png)
 
 ## Requirements
 

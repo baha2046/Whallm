@@ -10,9 +10,9 @@ enum AppLanguage: String, CaseIterable, Identifiable {
 
   var id: String { rawValue }
 
-  var displayName: String {
+  func displayName(language: AppLanguage) -> String {
     switch self {
-    case .system: L10n.string("Follow System")
+    case .system: L10n.string("Follow System", language: language)
     case .english: "English"
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"

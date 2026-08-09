@@ -1,5 +1,9 @@
 # DeepSeekV4SSD
 
+<p align="center">
+  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD アプリアイコン" width="160">
+</p>
+
 [![English](https://img.shields.io/badge/English-Click-yellow)](README.md)
 [![繁體中文](https://img.shields.io/badge/繁體中文-點擊查看-orange)](README-tw.md)
 [![简体中文](https://img.shields.io/badge/简体中文-点击查看-orange)](README-cn.md)
@@ -9,8 +13,6 @@
 DeepSeekV4SSD は、[Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare) から着想を得て、
 SSD から routed expert をストリーミングし、M シリーズ Mac で約 30 GB のメモリーを
 使って `DeepSeek-V4-Flash-0731` の全 2840 億パラメーターを実行します。
-
-![DeepSeekV4SSD アプリ](docs/assets/deepseekv4ssd-app.png)
 
 ## ベンチマーク
 
@@ -41,6 +43,8 @@ server を起動 → アプリで対話または Codex に接続**
 5. アプリ内で対話するか、下記の設定で Codex を接続します。
 
 既定のローカル server アドレスは `http://127.0.0.1:11434` です。
+
+![DeepSeekV4SSD アプリ](docs/assets/deepseekv4ssd-app.png)
 
 ## 必要環境
 

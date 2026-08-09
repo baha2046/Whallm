@@ -30,6 +30,7 @@ struct DeepSeekV4SSDApp: App {
       .onDisappear { server.stop() }
     }
     .defaultSize(width: 1_440, height: 900)
+    .windowStyle(.hiddenTitleBar)
     .commands {
       CommandGroup(after: .appInfo) {
         Button(L10n.string("Check for Updates…")) {
