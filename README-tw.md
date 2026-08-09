@@ -4,11 +4,13 @@
   <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD APP Icon" width="160">
 </p>
 
-[![English](https://img.shields.io/badge/English-Click-yellow)](README.md)
-[![繁體中文](https://img.shields.io/badge/繁體中文-點擊查看-orange)](README-tw.md)
-[![简体中文](https://img.shields.io/badge/简体中文-点击查看-orange)](README-cn.md)
-[![日本語](https://img.shields.io/badge/日本語-クリック-青)](README-ja.md)
-[![한국어](https://img.shields.io/badge/한국어-클릭-yellow)](README-ko.md)
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/English-Click-yellow" alt="English"></a>
+  <a href="README-tw.md"><img src="https://img.shields.io/badge/繁體中文-點擊查看-orange" alt="繁體中文"></a>
+  <a href="README-cn.md"><img src="https://img.shields.io/badge/简体中文-点击查看-orange" alt="简体中文"></a>
+  <a href="README-ja.md"><img src="https://img.shields.io/badge/日本語-クリック-青" alt="日本語"></a>
+  <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
+</p>
 
 DeepSeekV4SSD 讓 M 系列 Mac 使用約 30 GB 記憶體執行
 `DeepSeek-V4-Flash-0731` 的全部 284B 參數，並從 SSD 串流 routed expert
