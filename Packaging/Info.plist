@@ -14,6 +14,8 @@
   <string>DeepSeekV4SSD</string>
   <key>CFBundleExecutable</key>
   <string>dsv4-app</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon.icns</string>
   <key>CFBundleIdentifier</key>
   <string>com.deepseekv4ssd.app</string>
   <key>CFBundleInfoDictionaryVersion</key>

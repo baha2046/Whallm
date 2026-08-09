@@ -23,3 +23,4 @@ Makefile.env
 *.dsv4.partial/
 plan.json
 scratch/
+reference*.png
