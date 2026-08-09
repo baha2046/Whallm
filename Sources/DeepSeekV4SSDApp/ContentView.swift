@@ -3,21 +3,59 @@ import SwiftUI
 
 struct ContentView: View {
   @ObservedObject var server: ServerController
+  let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
   @State private var configuration = ServerConfiguration.localDefault
+  @State private var selectedPage = AppPage.server
   @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
 
   var body: some View {
-    HSplitView {
-      ChatView(configuration: configuration, server: server, language: selectedLanguage)
-        .frame(minWidth: 680, idealWidth: 880, maxWidth: .infinity)
-      ServerView(
-        configuration: $configuration,
-        languageCode: $languageCode,
-        server: server,
-        modelLibrary: modelLibrary
-      )
-      .frame(minWidth: 480, idealWidth: 540, maxWidth: 680)
+    VStack(spacing: 0) {
+      HStack(spacing: 16) {
+        Text(selectedPage.title(language: selectedLanguage))
+          .font(.title2.bold())
+        Spacer()
+        HStack(spacing: 8) {
+          ForEach(AppPage.allCases) { page in
+            Button {
+              selectedPage = page
+            } label: {
+              Image(systemName: page.icon)
+                .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.bordered)
+            .tint(page == selectedPage ? .accentColor : .secondary)
+            .frame(width: 40, height: 40)
+            .accessibilityLabel(page.title(language: selectedLanguage))
+            .accessibilityAddTraits(page == selectedPage ? .isSelected : [])
+            .help(page.title(language: selectedLanguage))
+          }
+        }
+      }
+      .padding(.horizontal, 24)
+      .padding(.vertical, 14)
+
+      Divider()
+
+      ZStack {
+        ServerView(
+          configuration: $configuration,
+          server: server,
+          modelLibrary: modelLibrary,
+          language: selectedLanguage
+        )
+        .pageVisibility(selectedPage == .server)
+
+        ChatView(configuration: configuration, server: server, language: selectedLanguage)
+          .pageVisibility(selectedPage == .chat)
+
+        SettingsView(
+          languageCode: $languageCode,
+          language: selectedLanguage,
+          checkForUpdates: checkForUpdates
+        )
+        .pageVisibility(selectedPage == .settings)
+      }
     }
     .environment(\.locale, selectedLanguage.locale)
     .task {
@@ -29,10 +67,11 @@ struct ContentView: View {
     .onChange(of: configuration.modelPath) {
       UserDefaults.standard.set(configuration.modelPath, forKey: "selectedModelPath")
     }
+    .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
   }
 
   private var selectedLanguage: AppLanguage {
-    AppLanguage(rawValue: languageCode) ?? .appDefault
+    (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
   }
 
   private func selectDetectedModel() {
@@ -45,60 +84,107 @@ struct ContentView: View {
   }
 }
 
+private enum AppPage: String, CaseIterable, Identifiable {
+  case server
+  case chat
+  case settings
+
+  var id: String { rawValue }
+
+  var icon: String {
+    switch self {
+    case .server: "externaldrive"
+    case .chat: "bubble"
+    case .settings: "gearshape"
+    }
+  }
+
+  func title(language: AppLanguage) -> String {
+    switch self {
+    case .server: L10n.string("Server", language: language)
+    case .chat: L10n.string("Chat", language: language)
+    case .settings: L10n.string("Settings", language: language)
+    }
+  }
+}
+
+extension View {
+  fileprivate func pageVisibility(_ isVisible: Bool) -> some View {
+    opacity(isVisible ? 1 : 0)
+      .allowsHitTesting(isVisible)
+      .disabled(!isVisible)
+      .accessibilityHidden(!isVisible)
+  }
+}
+
 private struct ServerView: View {
   @Binding var configuration: ServerConfiguration
-  @Binding var languageCode: String
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
+  let language: AppLanguage
   @State private var showsLog = false
+  @State private var showsAdvancedSettings = false
   @State private var confirmsDownload = false
   @State private var confirmsRepair = false
   @State private var repairTarget: InstalledModelInfo?
   @State private var confirmsReinstall = false
   @State private var reinstallTarget: URL?
-  @State private var confirmsDSparkRemoval = false
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      serverHeader
-      languagePicker
+    ScrollView {
+      VStack(alignment: .leading, spacing: 24) {
+        if modelLibrary.usableModels.isEmpty {
+          onboardingPanel
+        } else {
+          modelPanel
+        }
 
-      if case .failed(let message) = server.state {
-        Label(message, systemImage: "exclamationmark.triangle.fill")
-          .foregroundStyle(.red)
-          .accessibilityLabel(L10n.string("Error: %@", message))
-      }
+        if modelLibrary.isBusy {
+          operationPanel
+        }
 
-      ScrollView {
-        VStack(alignment: .leading, spacing: 28) {
-          if modelLibrary.usableModels.isEmpty {
-            onboardingPanel
-          } else {
-            modelPanel
+        if let message = modelLibrary.message {
+          Label(
+            message,
+            systemImage: message.hasPrefix("無法") ? "exclamationmark.triangle.fill" : "info.circle"
+          )
+          .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
+          .textSelection(.enabled)
+          .accessibilityLabel(L10n.string("Model status: %@", language: language, message))
+        }
+
+        if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
+          damagedModelsPanel
+        }
+
+        serverPanel
+
+        GroupBox(L10n.string("Metrics", language: language)) {
+          PerformancePanel(
+            model: configuration.publicModel,
+            state: server.state,
+            performance: server.performance,
+            history: server.performanceHistory,
+            language: language,
+            clearHistory: server.clearPerformanceHistory
+          )
+          .padding(8)
+        }
+
+        if selectedModel != nil {
+          GroupBox {
+            DisclosureGroup(
+              L10n.string("Advanced Settings", language: language),
+              isExpanded: $showsAdvancedSettings
+            ) {
+              advancedSettings
+                .disabled(server.isActive)
+                .padding(.top, 16)
+            }
+            .padding(8)
           }
 
-          if modelLibrary.isBusy {
-            operationPanel
-          }
-
-          if let message = modelLibrary.message {
-            Label(
-              message,
-              systemImage: message.hasPrefix("無法") ? "exclamationmark.triangle.fill" : "info.circle"
-            )
-            .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
-            .textSelection(.enabled)
-            .accessibilityLabel(L10n.string("Model status: %@", message))
-          }
-
-          if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
-            damagedModelsPanel
-          }
-
-          if selectedModel != nil {
-            advancedSettings
-              .disabled(server.isActive)
-
+          GroupBox {
             DisclosureGroup(L10n.string("Server log"), isExpanded: $showsLog) {
               ScrollView {
                 Text(
@@ -116,13 +202,16 @@ private struct ServerView: View {
               .accessibilityLabel(L10n.string("Server log"))
               .padding(.top, 12)
             }
+            .padding(8)
           }
         }
-        .padding(.vertical, 2)
       }
+      .frame(maxWidth: 1_000)
+      .frame(maxWidth: .infinity)
+      .padding(24)
     }
-    .padding(22)
     .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+    .environment(\.locale, language.locale)
     .confirmationDialog(
       L10n.string("Download and install the model?"),
       isPresented: $confirmsDownload,
@@ -165,60 +254,84 @@ private struct ServerView: View {
           "The app will move the damaged model to Trash. It will then download the complete model.")
       )
     }
-    .confirmationDialog(
-      L10n.string("Remove DSpark?"),
-      isPresented: $confirmsDSparkRemoval,
-      titleVisibility: .visible
-    ) {
-      Button(L10n.string("Remove DSpark"), role: .destructive) {
-        if let selectedModel { modelLibrary.removeDSpark(selectedModel) }
-      }
-      Button(L10n.string("Cancel"), role: .cancel) {}
-    } message: {
-      Text(L10n.string("The main model will remain installed."))
-    }
-    .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
   }
 
-  private var languagePicker: some View {
-    HStack(spacing: 12) {
-      Text(L10n.string("Language"))
-        .foregroundStyle(.secondary)
-      Spacer()
-      Picker(L10n.string("Language"), selection: $languageCode) {
-        ForEach(AppLanguage.allCases) { language in
-          Text(language.displayName).tag(language.rawValue)
+  private var serverPanel: some View {
+    GroupBox(L10n.string("Server", language: language)) {
+      VStack(alignment: .leading, spacing: 16) {
+        HStack(spacing: 12) {
+          Image(systemName: server.state.symbol)
+            .foregroundStyle(statusColor)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(server.state.label).font(.headline)
+            Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
+              .font(.callout.monospaced())
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+          }
         }
-      }
-      .labelsHidden()
-      .pickerStyle(.menu)
-      .frame(minWidth: 160, alignment: .trailing)
-    }
-  }
+        .accessibilityElement(children: .combine)
 
-  private var serverHeader: some View {
-    HStack(spacing: 12) {
-      Image(systemName: server.state.symbol)
-        .foregroundStyle(statusColor)
-        .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(server.state.label).font(.headline)
-        Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
+        if case .failed(let message) = server.state {
+          Label(message, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.red)
+            .accessibilityLabel(L10n.string("Error: %@", language: language, message))
+        }
+
+        HStack(alignment: .top, spacing: 16) {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.string("Host", language: language))
+              .foregroundStyle(.secondary)
+            TextField("127.0.0.1", text: $configuration.host)
+              .textFieldStyle(.roundedBorder)
+              .accessibilityLabel(L10n.string("Host", language: language))
+          }
+          VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.string("Port", language: language))
+              .foregroundStyle(.secondary)
+            TextField("11434", value: $configuration.port, format: .number.grouping(.never))
+              .textFieldStyle(.roundedBorder)
+              .frame(width: 140)
+              .accessibilityLabel(L10n.string("Port", language: language))
+          }
+        }
+        .disabled(server.isActive)
+
+        LabeledContent(L10n.string("API key", language: language)) {
+          SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
+            .textFieldStyle(.roundedBorder)
+        }
+        .disabled(server.isActive)
+
+        LabeledContent(L10n.string("Model ID", language: language)) {
+          TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
+            .textFieldStyle(.roundedBorder)
+        }
+        .disabled(server.isActive)
+
+        Button {
+          if server.isActive {
+            server.stop()
+          } else {
+            server.start(configuration)
+          }
+        } label: {
+          HStack {
+            Spacer()
+            Label(
+              L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
+              systemImage: server.isActive ? "stop.fill" : "play.fill"
+            )
+            Spacer()
+          }
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .disabled(!server.isActive && !modelLibrary.canUseModel(at: configuration.modelPath))
+        .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
       }
-      .accessibilityElement(children: .combine)
-      Spacer()
-      if server.isActive {
-        Button(L10n.string("Stop Server"), action: server.stop)
-          .keyboardShortcut(".", modifiers: .command)
-      } else {
-        Button(L10n.string("Start Server")) { server.start(configuration) }
-          .buttonStyle(.borderedProminent)
-          .disabled(!modelLibrary.canUseModel(at: configuration.modelPath))
-          .keyboardShortcut(.return, modifiers: .command)
-      }
+      .padding(8)
     }
   }
 
@@ -323,11 +436,6 @@ private struct ServerView: View {
             if let selectedModel, !selectedModel.hasDSpark {
               Button(L10n.string("Install DSpark (10.12 GiB)")) {
                 modelLibrary.startDSparkInstallation(selectedModel)
-              }
-              .disabled(server.isActive || modelLibrary.isBusy)
-            } else if selectedModel?.hasDSpark == true {
-              Button(L10n.string("Remove DSpark"), role: .destructive) {
-                confirmsDSparkRemoval = true
               }
               .disabled(server.isActive || modelLibrary.isBusy)
             }
@@ -445,35 +553,23 @@ private struct ServerView: View {
   }
 
   private var advancedSettings: some View {
-    VStack(alignment: .leading, spacing: 18) {
-      Text(L10n.string("Server"))
-        .font(.headline)
-      GroupBox {
+    VStack(alignment: .leading, spacing: 20) {
+      GroupBox(L10n.string("Generate", language: language)) {
         VStack(spacing: 12) {
-          LabeledContent(L10n.string("Host")) {
-            TextField("127.0.0.1", text: $configuration.host)
-              .textFieldStyle(.roundedBorder)
-          }
-          LabeledContent(L10n.string("Port")) {
-            TextField("11434", value: $configuration.port, format: .number.grouping(.never))
-              .textFieldStyle(.roundedBorder)
-              .frame(width: 100)
-          }
-          LabeledContent(L10n.string("API key")) {
-            SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
-              .textFieldStyle(.roundedBorder)
-          }
-          LabeledContent(L10n.string("Model ID")) {
-            TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
-              .textFieldStyle(.roundedBorder)
-          }
+          integerField(
+            "Max tokens", hint: "Default token limit for each request.",
+            value: $configuration.defaultMaxTokens)
+          doubleField(
+            "Temperature", hint: "A higher value increases output variation.",
+            value: $configuration.defaultTemperature)
+          doubleField(
+            "Top P", hint: "A lower value reduces the candidate token range.",
+            value: $configuration.defaultTopP)
         }
         .padding(6)
       }
 
-      Text(L10n.string("Runtime"))
-        .font(.headline)
-      GroupBox {
+      GroupBox(L10n.string("Runtime", language: language)) {
         VStack(spacing: 12) {
           integerField(
             "Slots",
@@ -526,23 +622,6 @@ private struct ServerView: View {
         }
         .padding(6)
       }
-
-      Text(L10n.string("Generate"))
-        .font(.headline)
-      GroupBox {
-        VStack(spacing: 12) {
-          integerField(
-            "Max tokens", hint: "Default token limit for each request.",
-            value: $configuration.defaultMaxTokens)
-          doubleField(
-            "Temperature", hint: "A higher value increases output variation.",
-            value: $configuration.defaultTemperature)
-          doubleField(
-            "Top P", hint: "A lower value reduces the candidate token range.",
-            value: $configuration.defaultTopP)
-        }
-        .padding(6)
-      }
     }
   }
 
@@ -591,7 +670,7 @@ private struct ServerView: View {
   }
 
   private var selectedLanguage: AppLanguage {
-    AppLanguage(rawValue: languageCode) ?? .appDefault
+    language
   }
 
   private func chooseModelDirectory() {
@@ -634,6 +713,52 @@ private struct ServerView: View {
     case .warning: .orange
     case .failed: .red
     }
+  }
+}
+
+private struct SettingsView: View {
+  @Binding var languageCode: String
+  let language: AppLanguage
+  let checkForUpdates: () -> Void
+
+  var body: some View {
+    ScrollView {
+      GroupBox {
+        VStack(alignment: .leading, spacing: 20) {
+          LabeledContent(L10n.string("Version", language: language)) {
+            Text(appVersion)
+              .font(.body.monospacedDigit())
+              .textSelection(.enabled)
+          }
+
+          LabeledContent(L10n.string("Language", language: language)) {
+            Picker(L10n.string("Language", language: language), selection: $languageCode) {
+              ForEach(AppLanguage.allCases) { option in
+                Text(option.displayName).tag(option.rawValue)
+              }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(minWidth: 180)
+          }
+
+          Button(action: checkForUpdates) {
+            Label(
+              L10n.string("Check for Updates…", language: language), systemImage: "arrow.clockwise")
+          }
+        }
+        .padding(10)
+      }
+      .frame(maxWidth: 680)
+      .frame(maxWidth: .infinity)
+      .padding(24)
+    }
+    .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+    .environment(\.locale, language.locale)
+  }
+
+  private var appVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
   }
 }
 
@@ -693,9 +818,8 @@ private struct PerformancePanel: View {
             Text(localized("Metric"))
               .gridColumnAlignment(.leading)
             Text(localized("Live"))
-            Text(localized("Minimum"))
-            Text(localized("Average"))
             Text(localized("Maximum"))
+            Text("P95")
           }
           .font(.callout.weight(.semibold))
           .foregroundStyle(.secondary)
@@ -721,24 +845,21 @@ private struct PerformancePanel: View {
   private func metricRow(_ metric: PerformanceMetric) -> some View {
     let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
     let statistics = history[metric]
-    let minimum = statistics.map { formattedValue($0.minimum, for: metric) } ?? "—"
-    let average = statistics.map { formattedValue($0.average, for: metric) } ?? "—"
-    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "—"
+    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
+    let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
     return GridRow {
       Text(localized(metricTitle(metric)))
         .font(.callout.weight(.medium))
         .foregroundStyle(.secondary)
         .gridColumnAlignment(.leading)
       metricValue(live)
-      metricValue(minimum)
-      metricValue(average)
       metricValue(maximum)
+      metricValue(p95)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(
       "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
-        + "\(localized("Minimum"))：\(minimum)。\(localized("Average"))：\(average)。"
-        + "\(localized("Maximum"))：\(maximum)"
+        + "\(localized("Maximum"))：\(maximum)。P95：\(p95)"
     )
   }
 
@@ -783,7 +904,7 @@ private struct PerformancePanel: View {
     live: Bool = false
   ) -> String {
     if value == 0 { return "-" }
-    if live && !hasLiveValue(metric, value: value) { return "—" }
+    if live && !hasLiveValue(metric, value: value) { return "-" }
     switch metric {
     case .prefillTokensPerSecond, .decodeTokensPerSecond:
       return value.formatted(.number.precision(.fractionLength(1)))
@@ -861,23 +982,20 @@ private struct ChatView: View {
   @State private var input = ""
   @State private var thinkingMode = "chat"
   @State private var isSending = false
+  @State private var generationTask: Task<Void, Never>?
   @State private var errorMessage: String?
   @State private var showingClearConfirmation = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
-      PerformancePanel(
-        model: configuration.publicModel,
-        state: server.state,
-        performance: server.performance,
-        history: server.performanceHistory,
-        language: language,
-        clearHistory: server.clearPerformanceHistory
-      )
-
       HStack(spacing: 12) {
-        Text(localized("Chat"))
-          .font(.title2.bold())
+        HStack(spacing: 8) {
+          Text(localized("Decode Tok/s"))
+            .foregroundStyle(.secondary)
+          Text(liveDecodeRate)
+            .font(.headline.monospacedDigit())
+        }
+        .accessibilityElement(children: .combine)
         Spacer()
         Picker(localized("Thinking mode"), selection: $thinkingMode) {
           Text(localized("Chat")).tag("chat")
@@ -1000,21 +1118,22 @@ private struct ChatView: View {
             Label(localized("Clear Chat"), systemImage: "trash")
           }
           .disabled(messages.isEmpty || isSending)
-          Button {
-            send()
-          } label: {
-            if isSending {
-              ProgressView()
-                .controlSize(.small)
-                .frame(minWidth: 72)
-            } else {
+          if isSending {
+            Button(action: stopGenerating) {
+              Label(localized("Stop Generating"), systemImage: "stop.fill")
+            }
+            .controlSize(.large)
+          } else {
+            Button {
+              send()
+            } label: {
               Label(localized("Generate"), systemImage: "arrow.up")
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(server.state != .running)
+            .keyboardShortcut(.return, modifiers: .command)
           }
-          .buttonStyle(.borderedProminent)
-          .controlSize(.large)
-          .disabled(isSending || server.state != .running)
-          .keyboardShortcut(.return, modifiers: .command)
         }
       }
       .padding(14)
@@ -1026,6 +1145,7 @@ private struct ChatView: View {
     }
     .padding(22)
     .environment(\.locale, language.locale)
+    .onDisappear { generationTask?.cancel() }
     .confirmationDialog(
       localized("Clear the test chat?"),
       isPresented: $showingClearConfirmation,
@@ -1053,6 +1173,12 @@ private struct ChatView: View {
       }
   }
 
+  private var liveDecodeRate: String {
+    let value = server.performance.snapshot.decodeTokensPerSecond
+    guard server.performance.generating, value > 0 else { return "-" }
+    return value.formatted(.number.precision(.fractionLength(1)))
+  }
+
   private func localized(_ key: String) -> String {
     L10n.string(key, language: language)
   }
@@ -1068,7 +1194,11 @@ private struct ChatView: View {
     let requestMessages = messages
     let assistantID = UUID()
     messages.append(ChatMessage(id: assistantID, role: "assistant", content: ""))
-    Task {
+    generationTask = Task {
+      defer {
+        isSending = false
+        generationTask = nil
+      }
       do {
         _ = try await ChatClient.stream(
           messages: requestMessages,
@@ -1082,6 +1212,10 @@ private struct ChatView: View {
           messages[index].append(delta)
         }
       } catch {
+        if Task.isCancelled {
+          removeEmptyAssistantMessage(id: assistantID)
+          return
+        }
         if let index = messages.firstIndex(where: { $0.id == assistantID }),
           messages[index].content.isEmpty,
           messages[index].reasoningContent.isEmpty,
@@ -1092,7 +1226,18 @@ private struct ChatView: View {
         errorMessage = L10n.string(
           "Could not get a response. %@", language: language, error.localizedDescription)
       }
-      isSending = false
+    }
+  }
+
+  private func stopGenerating() {
+    generationTask?.cancel()
+  }
+
+  private func removeEmptyAssistantMessage(id: UUID) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    let message = messages[index]
+    if message.content.isEmpty && message.reasoningContent.isEmpty && message.toolCalls.isEmpty {
+      messages.remove(at: index)
     }
   }
 }

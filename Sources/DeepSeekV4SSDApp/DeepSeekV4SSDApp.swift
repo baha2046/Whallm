@@ -18,14 +18,16 @@ struct DeepSeekV4SSDApp: App {
 
   var body: some Scene {
     WindowGroup {
-      ContentView(server: server)
-        .font(.body)
-        .dynamicTypeSize(.xLarge ... .accessibility5)
-        .controlSize(.large)
-        .frame(minWidth: 1_180, minHeight: 760)
-        .environment(\.locale, selectedLanguage.locale)
-        .onAppear { NSApplication.shared.activate() }
-        .onDisappear { server.stop() }
+      ContentView(server: server) {
+        updaterController.checkForUpdates(nil)
+      }
+      .font(.body)
+      .dynamicTypeSize(.xLarge ... .accessibility5)
+      .controlSize(.large)
+      .frame(minWidth: 1_180, minHeight: 760)
+      .environment(\.locale, selectedLanguage.locale)
+      .onAppear { NSApplication.shared.activate() }
+      .onDisappear { server.stop() }
     }
     .defaultSize(width: 1_440, height: 900)
     .commands {
@@ -39,6 +41,6 @@ struct DeepSeekV4SSDApp: App {
   }
 
   private var selectedLanguage: AppLanguage {
-    AppLanguage(rawValue: languageCode) ?? .appDefault
+    (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
   }
 }

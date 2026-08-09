@@ -21,7 +21,7 @@ final class ServerConfigurationTests: XCTestCase {
   }
 
   func testLocalizationSupportsAllSelectableLanguages() {
-    XCTAssertEqual(AppLanguage.appDefault, .english)
+    XCTAssertEqual(AppLanguage.appDefault, .system)
     XCTAssertEqual(L10n.string("Stopped", language: .english), "Stopped")
     XCTAssertEqual(L10n.string("Language", language: .simplifiedChinese), "语言")
     XCTAssertEqual(L10n.string("Language", language: .traditionalChinese), "語言")
@@ -32,6 +32,15 @@ final class ServerConfigurationTests: XCTestCase {
         "A higher value increases output variation.", language: .traditionalChinese),
       "較高的值會增加輸出變化。")
     XCTAssertEqual(L10n.string("Memory usage", language: .simplifiedChinese), "内存用量")
+  }
+
+  func testSystemLanguageUsesSupportedLanguageOrFallsBackToEnglish() {
+    XCTAssertEqual(
+      AppLanguage.systemDefault(preferredLanguages: ["zh-Hant-TW"]), .traditionalChinese)
+    XCTAssertEqual(
+      AppLanguage.systemDefault(preferredLanguages: ["zh-Hans-CN"]), .simplifiedChinese)
+    XCTAssertEqual(AppLanguage.systemDefault(preferredLanguages: ["en-US"]), .english)
+    XCTAssertEqual(AppLanguage.systemDefault(preferredLanguages: ["ja-JP"]), .english)
   }
 
   func testConfigurationBuildsServerArgumentsWithoutExposingAPIKey() {

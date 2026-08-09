@@ -13,6 +13,7 @@
 "A lower value reduces the candidate token range." = "较低的值会缩小候选 token 范围。";
 "A model already exists in this location. Verify and repair the existing model first." = "此位置已有模型。请先验证并修复现有模型。";
 "About %@ remaining" = "约剩 %@";
+"Advanced Settings" = "进阶设置";
 "An API key is required for a non-local host." = "非本机 Host 必须设置 API key。";
 "API key" = "API 密钥";
 "Apple Silicon" = "Apple Silicon";
@@ -43,6 +44,7 @@
 "Enter a message…" = "输入消息…";
 "Error: %@" = "错误：%@";
 "First Token wait time" = "首个 Token 等待时间";
+"Follow System" = "跟随系统";
 "Function" = "函数";
 "Generate" = "生成";
 "Generating" = "正在生成";
@@ -59,6 +61,7 @@
 "Memory" = "内存";
 "Memory usage" = "内存用量";
 "Metric" = "指标";
+"Metrics" = "指标";
 "Minimum" = "历史最低";
 "Memory limit for all prompt caches. The recommended value is 8." = "所有 prompt cache 的内存上限。建议值是 8。";
 "Model" = "模型";
@@ -97,6 +100,7 @@
 "Select Folder" = "选择文件夹";
 "Select Model Folder" = "选择模型文件夹";
 "Server" = "服务器";
+"Settings" = "设置";
 "Server log" = "Server 日志";
 "Show in Finder" = "在 Finder 中显示";
 "Slots" = "槽位数";
@@ -109,6 +113,7 @@
 "Start the server. Then send a message." = "启动 server，然后发送一条消息。";
 "Starting" = "正在启动";
 "Stop Current Operation" = "停止当前操作";
+"Stop Generating" = "停止生成";
 "Stop Server" = "停止 server";
 "Stopped" = "已停止";
 "Stopping" = "正在停止";
@@ -157,6 +162,7 @@
 "Use BF16 KV cache" = "使用 BF16 KV cache";
 "Use layer-major prefill" = "使用 layer-major prefill";
 "Verification stopped." = "验证已停止。";
+"Version" = "版本";
 "Verify and Repair" = "验证并修复模型";
 "Verify and repair the model?" = "验证并修复模型？";
 "Verify Complete Model" = "完整验证模型";

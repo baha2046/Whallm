@@ -1,23 +1,46 @@
 import Foundation
 
 enum AppLanguage: String, CaseIterable, Identifiable {
+  case system
   case english = "en"
   case simplifiedChinese = "zh-Hans"
   case traditionalChinese = "zh-Hant"
 
-  static let appDefault = AppLanguage.english
+  static let appDefault = AppLanguage.system
 
   var id: String { rawValue }
 
   var displayName: String {
     switch self {
+    case .system: L10n.string("Follow System")
     case .english: "English"
     case .simplifiedChinese: "简体中文"
     case .traditionalChinese: "繁體中文"
     }
   }
 
-  var locale: Locale { Locale(identifier: rawValue) }
+  var resolved: AppLanguage {
+    self == .system ? Self.systemDefault() : self
+  }
+
+  var locale: Locale { Locale(identifier: resolved.rawValue) }
+
+  static func systemDefault(preferredLanguages: [String] = Locale.preferredLanguages) -> AppLanguage
+  {
+    guard let identifier = preferredLanguages.first else { return .english }
+    let parts = identifier.replacingOccurrences(of: "_", with: "-")
+      .split(separator: "-")
+      .map { $0.lowercased() }
+    guard let language = parts.first else { return .english }
+    if language == "en" { return .english }
+    guard language == "zh" else { return .english }
+    if parts.contains("hant") || parts.contains("tw") || parts.contains("hk")
+      || parts.contains("mo")
+    {
+      return .traditionalChinese
+    }
+    return .simplifiedChinese
+  }
 }
 
 enum L10n {
@@ -25,7 +48,7 @@ enum L10n {
 
   static var selectedLanguage: AppLanguage {
     let value = UserDefaults.standard.string(forKey: preferenceKey)
-    return AppLanguage(rawValue: value ?? "") ?? .appDefault
+    return (AppLanguage(rawValue: value ?? "") ?? .appDefault).resolved
   }
 
   static func string(
@@ -39,8 +62,9 @@ enum L10n {
   }
 
   private static func bundle(for language: AppLanguage) -> Bundle {
+    let resolvedLanguage = language.resolved
     for base in [Bundle.main, Bundle.module] {
-      guard let path = base.path(forResource: language.rawValue, ofType: "lproj"),
+      guard let path = base.path(forResource: resolvedLanguage.rawValue, ofType: "lproj"),
         let bundle = Bundle(path: path)
       else { continue }
       return bundle

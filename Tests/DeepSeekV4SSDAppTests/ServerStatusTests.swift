@@ -55,11 +55,21 @@ final class ServerStatusTests: XCTestCase {
     XCTAssertEqual(prefill?.minimum, 10)
     XCTAssertEqual(prefill?.average, 20)
     XCTAssertEqual(prefill?.maximum, 30)
+    XCTAssertEqual(prefill?.p95, 30)
     XCTAssertEqual(history[.firstTokenWaitTime]?.minimum, 2)
     XCTAssertEqual(history[.firstTokenWaitTime]?.maximum, 4)
 
     history.clear()
     XCTAssertTrue(history.isEmpty)
+  }
+
+  func testMetricStatisticsUsesNearestRankP95() {
+    var statistics = MetricStatistics()
+    for value in 1...20 {
+      statistics.record(Double(value))
+    }
+
+    XCTAssertEqual(statistics.p95, 19)
   }
 
   @MainActor

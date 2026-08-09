@@ -13,6 +13,7 @@
 "A lower value reduces the candidate token range." = "A lower value reduces the candidate token range.";
 "A model already exists in this location. Verify and repair the existing model first." = "A model already exists in this location. Verify and repair the existing model first.";
 "About %@ remaining" = "About %@ remaining";
+"Advanced Settings" = "Advanced Settings";
 "An API key is required for a non-local host." = "An API key is required for a non-local host.";
 "API key" = "API key";
 "Apple Silicon" = "Apple Silicon";
@@ -43,6 +44,7 @@
 "Enter a message…" = "Enter a message…";
 "Error: %@" = "Error: %@";
 "First Token wait time" = "First Token wait time";
+"Follow System" = "Follow System";
 "Function" = "Function";
 "Generate" = "Generate";
 "Generating" = "Generating";
@@ -59,6 +61,7 @@
 "Memory" = "Memory";
 "Memory usage" = "Memory usage";
 "Metric" = "Metric";
+"Metrics" = "Metrics";
 "Minimum" = "Minimum";
 "Memory limit for all prompt caches. The recommended value is 8." = "Memory limit for all prompt caches. The recommended value is 8.";
 "Model" = "Model";
@@ -97,6 +100,7 @@
 "Select Folder" = "Select Folder";
 "Select Model Folder" = "Select Model Folder";
 "Server" = "Server";
+"Settings" = "Settings";
 "Server log" = "Server log";
 "Show in Finder" = "Show in Finder";
 "Slots" = "Slots";
@@ -109,6 +113,7 @@
 "Start the server. Then send a message." = "Start the server. Then send a message.";
 "Starting" = "Starting";
 "Stop Current Operation" = "Stop Current Operation";
+"Stop Generating" = "Stop Generating";
 "Stop Server" = "Stop Server";
 "Stopped" = "Stopped";
 "Stopping" = "Stopping";
@@ -157,6 +162,7 @@
 "Use BF16 KV cache" = "Use BF16 KV cache";
 "Use layer-major prefill" = "Use layer-major prefill";
 "Verification stopped." = "Verification stopped.";
+"Version" = "Version";
 "Verify and Repair" = "Verify and Repair";
 "Verify and repair the model?" = "Verify and repair the model?";
 "Verify Complete Model" = "Verify Complete Model";

@@ -82,8 +82,13 @@ struct MetricStatistics: Equatable {
   private(set) var minimum = 0.0
   private(set) var total = 0.0
   private(set) var maximum = 0.0
+  private var sortedValues: [Double] = []
 
   var average: Double { count == 0 ? 0 : total / Double(count) }
+  var p95: Double {
+    guard count > 0 else { return 0 }
+    return sortedValues[Int(ceil(Double(count) * 0.95)) - 1]
+  }
 
   mutating func record(_ value: Double) {
     guard value.isFinite else { return }
@@ -96,6 +101,17 @@ struct MetricStatistics: Equatable {
     }
     count += 1
     total += value
+    var lowerBound = 0
+    var upperBound = sortedValues.count
+    while lowerBound < upperBound {
+      let middle = lowerBound + (upperBound - lowerBound) / 2
+      if sortedValues[middle] < value {
+        lowerBound = middle + 1
+      } else {
+        upperBound = middle
+      }
+    }
+    sortedValues.insert(value, at: lowerBound)
   }
 }
 
