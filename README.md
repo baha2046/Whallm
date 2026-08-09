@@ -138,3 +138,8 @@ runtime design, and measured engineering decisions.
 
 DeepSeekV4SSD is not affiliated with DeepSeek. Review the model terms before
 you download and use the model.
+
+## License
+
+The DeepSeekV4SSD source code is available under the [MIT License](LICENSE).
+Model weights are not included and remain subject to their own terms.

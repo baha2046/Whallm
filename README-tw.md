@@ -133,3 +133,8 @@ runtime 會在 Mac 上執行推論。prompt 和生成文字會保留在本機 ru
 工程決策。
 
 DeepSeekV4SSD 與 DeepSeek 沒有從屬關係。下載和使用模型前，請先閱讀模型條款。
+
+## 授權
+
+DeepSeekV4SSD 原始碼依照 [MIT License](LICENSE)開放。專案不包含模型權重。
+模型權重適用個別條款。

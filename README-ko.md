@@ -131,3 +131,8 @@ API client가 데이터를 다른 위치로 전송할 수는 있습니다.
 
 DeepSeekV4SSD는 DeepSeek와 제휴하지 않습니다. 모델을 다운로드하고 사용하기 전에 모델 약관을
 확인하세요.
+
+## 라이선스
+
+DeepSeekV4SSD 소스 코드는 [MIT License](LICENSE)로 공개됩니다. 모델 가중치는 포함되지
+않으며 별도 약관이 적용됩니다.

@@ -130,3 +130,8 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 [实现计划](docs/IMPLEMENTATION_PLAN.md)包含模型合约、runtime 设计和已测量的工程决策。
 
 DeepSeekV4SSD 与 DeepSeek 没有从属关系。下载和使用模型前，请先阅读模型条款。
+
+## 许可证
+
+DeepSeekV4SSD 源代码使用 [MIT 许可证](LICENSE)开放。项目不包含模型权重。
+模型权重适用其自身条款。
