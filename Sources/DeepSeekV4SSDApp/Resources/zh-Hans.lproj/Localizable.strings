@@ -70,8 +70,8 @@
 "No model is installed. Download a model or select another folder." = "尚未安装模型。请下载模型或选择其他文件夹。";
 "No Test Messages" = "暂无测试消息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的线性对话数量。建议值是 2。";
-"Number of routed experts in the Active Parameters Cache. The recommended value is 512." = "Active Parameters Cache 的 routed expert 数量。建议值是 512。";
-"Number of workers that read expert blobs at the same time. The recommended value is 4." = "同时读取 expert blob 的工作数量。建议值是 4。";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 数量。建议值是 1152。";
+"Number of workers that read expert blobs at the same time. The recommended value is 8." = "同时读取 expert blob 的工作数量。建议值是 8。";
 "Optional for local use" = "本机使用时可留空";
 "Optional UTF-8 prompt file path" = "可选的 UTF-8 prompt 文件路径";
 "Port" = "端口";
@@ -168,7 +168,7 @@
 "Use DSpark" = "使用 DSpark";
 "DSpark confidence threshold" = "DSpark 置信度阈值";
 "DSpark slots" = "DSpark 槽位";
-"Number of DSpark routed experts kept in memory. The recommended value is 256." = "保留在内存中的 DSpark 路由专家数量。建议值为 256。";
+"Number of DSpark routed experts kept in memory. The recommended value is 768." = "保留在内存中的 DSpark 路由专家数量。建议值为 768。";
 "DSpark slots must be at least 30." = "DSpark 槽位必须至少为 30。";
 "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early." = "0 会保留所有 draft token。较高的值会提前拒绝低置信度的 draft token。";
 "DSpark is installed and ready." = "DSpark 已安装并可使用。";

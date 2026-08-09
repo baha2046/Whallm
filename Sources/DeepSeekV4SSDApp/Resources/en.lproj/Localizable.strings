@@ -70,8 +70,8 @@
 "No model is installed. Download a model or select another folder." = "No model is installed. Download a model or select another folder.";
 "No Test Messages" = "No Test Messages";
 "Number of linear conversations to keep. The recommended value is 2." = "Number of linear conversations to keep. The recommended value is 2.";
-"Number of routed experts in the Active Parameters Cache. The recommended value is 512." = "Number of routed experts in the Active Parameters Cache. The recommended value is 512.";
-"Number of workers that read expert blobs at the same time. The recommended value is 4." = "Number of workers that read expert blobs at the same time. The recommended value is 4.";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.";
+"Number of workers that read expert blobs at the same time. The recommended value is 8." = "Number of workers that read expert blobs at the same time. The recommended value is 8.";
 "Optional for local use" = "Optional for local use";
 "Optional UTF-8 prompt file path" = "Optional UTF-8 prompt file path";
 "Port" = "Port";
@@ -168,7 +168,7 @@
 "Use DSpark" = "Use DSpark";
 "DSpark confidence threshold" = "DSpark confidence threshold";
 "DSpark slots" = "DSpark slots";
-"Number of DSpark routed experts kept in memory. The recommended value is 256." = "Number of DSpark routed experts kept in memory. The recommended value is 256.";
+"Number of DSpark routed experts kept in memory. The recommended value is 768." = "Number of DSpark routed experts kept in memory. The recommended value is 768.";
 "DSpark slots must be at least 30." = "DSpark slots must be at least 30.";
 "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early." = "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.";
 "DSpark is installed and ready." = "DSpark is installed and ready.";

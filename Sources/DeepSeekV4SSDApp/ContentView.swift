@@ -478,12 +478,12 @@ private struct ServerView: View {
           integerField(
             "Slots",
             hint:
-              "Number of routed experts in the Active Parameters Cache. The recommended value is 512.",
+              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
             value: $configuration.slots)
           integerField(
             "Read workers",
             hint:
-              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
+              "Number of workers that read expert blobs at the same time. The recommended value is 8.",
             value: $configuration.readWorkers)
           integerField(
             "Prefill step size", hint: "0 selects 128, 256, or 1024 based on the prompt length.",
@@ -512,7 +512,7 @@ private struct ServerView: View {
           integerField(
             "DSpark slots",
             hint:
-              "Number of DSpark routed experts kept in memory. The recommended value is 256.",
+              "Number of DSpark routed experts kept in memory. The recommended value is 768.",
             value: $configuration.dsparkSlots
           )
           .disabled(!configuration.dsparkEnabled || selectedModel?.hasDSpark != true)
