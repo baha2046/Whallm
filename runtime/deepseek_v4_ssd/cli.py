@@ -18,7 +18,7 @@ def main() -> None:
     parser.add_argument("--max-tokens", type=int, default=272_000)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-p", type=float, default=0.98)
-    parser.add_argument("--slots", type=int, default=512)
+    parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
     parser.add_argument("--prefill-step-size", type=int, default=0)
@@ -32,7 +32,7 @@ def main() -> None:
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--dspark", action="store_true")
-    parser.add_argument("--dspark-slots", type=int, default=256)
+    parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--metrics-json")
     parser.add_argument("--expert-route-trace")
@@ -122,6 +122,7 @@ def main() -> None:
                 else 0.0
             ),
             "expert_read_seconds": metrics.read_seconds,
+            "expert_upload_seconds": metrics.upload_seconds,
             "expert_pack_seconds": metrics.pack_seconds,
             "expert_eviction_seconds": metrics.eviction_seconds,
             "routing_sync_seconds": metrics.routing_sync_seconds,

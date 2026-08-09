@@ -137,7 +137,7 @@ class MXFP8PoolingCache(CorrectPoolingCache):
         return scores[0] if len(scores) == 1 else mx.concatenate(scores, axis=-1)
 
     def index_matmul(self, query: mx.array) -> mx.array:
-        if not self.fp4_index:
+        if not self.fp4_index or not self._index_chunks:
             return self.quantized_matmul(query)
         scores = []
         packed = self._packed_index()
@@ -288,6 +288,40 @@ class MXFP8PoolingCache(CorrectPoolingCache):
             self.accumulate_windows(buf_kv, buf_gate, 0)
         if pooled is not None:
             self.update_and_fetch(pooled)
+
+    def persistence_state(self) -> dict:
+        """Return the quantized arrays without rebuilding a BF16 cache."""
+        return {
+            "ratio": self.ratio,
+            "remainder": self.remainder,
+            "buf_kv": self.buf_kv,
+            "buf_gate": self.buf_gate,
+            "previous_window_kv": self.previous_window_kv,
+            "previous_window_gate": self.previous_window_gate,
+            "chunks": self._chunks,
+            "index_chunks": self._index_chunks,
+            "pending": self._pending,
+            "length": self._length,
+            "last_shape": self._last_shape,
+        }
+
+    def restore_persistence_state(self, value: dict) -> None:
+        """Restore quantized arrays saved by :meth:`persistence_state`."""
+        self.ratio = int(value["ratio"])
+        self.remainder = int(value["remainder"])
+        self.buf_kv = value["buf_kv"]
+        self.buf_gate = value["buf_gate"]
+        self.previous_window_kv = value["previous_window_kv"]
+        self.previous_window_gate = value["previous_window_gate"]
+        self._chunks = [tuple(chunk) for chunk in value["chunks"]]
+        self._index_chunks = [tuple(chunk) for chunk in value["index_chunks"]]
+        self._pending = value["pending"]
+        self._length = int(value["length"])
+        last_shape = value["last_shape"]
+        self._last_shape = tuple(last_shape) if last_shape is not None else None
+        self._packed_cache = None
+        self._packed_index_cache = None
+        self.pooled = None
 
     def is_trimmable(self):
         return self._length == 0

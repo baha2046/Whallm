@@ -24,8 +24,8 @@ class ToolCodecTests(unittest.TestCase):
                 '''
 eos_token = "<eos>"
 
-def encode_messages(messages, thinking_mode):
-    return repr((messages, thinking_mode))
+def encode_messages(messages, thinking_mode, reasoning_effort=None):
+    return repr((messages, thinking_mode, reasoning_effort))
 
 def parse_message_from_completion_text(text, thinking_mode):
     assert text.endswith(eos_token)
@@ -58,11 +58,13 @@ def parse_message_from_completion_text(text, thinking_mode):
                 "thinking",
                 tools,
                 ToolChoice("required"),
+                "max",
             )
             turn = codec.parse("raw", "thinking")
 
             self.assertIn("Call one or more tools", prompt)
             self.assertIn("get_weather", prompt)
+            self.assertIn("'max'", prompt)
             self.assertEqual(turn.reasoning_content, "plan")
             self.assertEqual(turn.tool_calls[0].name, "get_weather")
             self.assertEqual(turn.tool_calls[0].arguments, '{"city":"Taipei"}')

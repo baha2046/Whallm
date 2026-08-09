@@ -72,6 +72,7 @@ response = client.responses.create(
     model="deepseek-v4-flash-0731",
     instructions="Answer briefly.",
     input="法國的首都是哪裡？",
+    reasoning={"effort": "high"},
 )
 
 print(response.output_text)
@@ -120,6 +121,7 @@ defaults in memory. A server restart restores the command-line defaults.
 - `stream_options.include_usage`
 - `n`, when its value is `1`
 - `thinking_mode`, with `chat` or `thinking`
+- `reasoning_effort` for Chat Completions
 - `tools`, with OpenAI function definitions
 - `tool_choice`, with `auto`, `none`, `required`, or one named function
 
@@ -129,6 +131,19 @@ also accepts `instructions`, `max_output_tokens`, `reasoning.effort`, function
 `stream: true` to receive typed
 Responses API events, including `response.output_text.delta`,
 `response.function_call_arguments.delta`, and `response.completed`.
+
+The API maps Codex effort values to the DeepSeek-V4 encoder levels:
+
+| API effort | Thinking mode | DeepSeek-V4 effort |
+|---|---|---|
+| `none` | `chat` | `low` has no effect in chat mode |
+| `minimal`, `low`, `medium` | `thinking` | `low` |
+| `high` | `thinking` | `high` |
+| `xhigh`, `max` | `thinking` | `max` |
+
+Chat Completions uses `reasoning_effort`. Responses API uses
+`reasoning.effort`. An explicit `thinking_mode` overrides only the mode. The
+server still validates and forwards the selected effort.
 
 The response adds `reasoning_content` when `thinking_mode` is `thinking` and
 the model finishes a reasoning block. This is a DeepSeek extension.

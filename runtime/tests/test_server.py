@@ -73,13 +73,24 @@ class FakeRuntime:
         self.last_messages = None
         self.last_tools = None
         self.last_tool_choice = None
+        self.last_thinking_mode = None
+        self.last_reasoning_effort = None
         self.last_parse_text = None
         self.parse_error = False
 
-    def encode_chat(self, messages, thinking_mode="chat", tools=None, tool_choice=None):
+    def encode_chat(
+        self,
+        messages,
+        thinking_mode="chat",
+        tools=None,
+        tool_choice=None,
+        reasoning_effort="low",
+    ):
         self.last_messages = messages
         self.last_tools = tools
         self.last_tool_choice = tool_choice
+        self.last_thinking_mode = thinking_mode
+        self.last_reasoning_effort = reasoning_effort
         return "prompt" + (THINK_START if thinking_mode == "thinking" else "")
 
     def parse_chat(self, text, thinking_mode):
@@ -189,6 +200,22 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response["choices"][0]["message"]["content"], "Hello")
         self.assertEqual(response["choices"][0]["message"]["reasoning_content"], "plan")
         self.assertEqual(response["usage"]["total_tokens"], 7)
+
+    def test_chat_completion_accepts_reasoning_effort(self):
+        status, _, body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "reasoning_effort": "high",
+            },
+        )
+        response = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(response["choices"][0]["message"]["reasoning_content"], "plan")
+        self.assertEqual(self.server.runtime.last_thinking_mode, "thinking")
+        self.assertEqual(self.server.runtime.last_reasoning_effort, "high")
 
     def test_streaming_chat_uses_openai_sse_shape(self):
         status, headers, body = self.request(
@@ -426,6 +453,47 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response["output"][0]["type"], "message")
         self.assertEqual(response["output"][0]["content"][0]["text"], "Hello")
         self.assertEqual(response["usage"]["total_tokens"], 7)
+
+    def test_responses_maps_codex_reasoning_effort(self):
+        cases = (
+            ("none", "chat", "low"),
+            ("minimal", "thinking", "low"),
+            ("low", "thinking", "low"),
+            ("medium", "thinking", "low"),
+            ("high", "thinking", "high"),
+            ("xhigh", "thinking", "max"),
+            ("max", "thinking", "max"),
+        )
+        for effort, thinking_mode, native_effort in cases:
+            with self.subTest(effort=effort):
+                status, _, body = self.request(
+                    "/v1/responses",
+                    method="POST",
+                    body={
+                        "model": "deepseek-v4-flash-0731",
+                        "input": "Hi",
+                        "reasoning": {"effort": effort, "summary": "auto"},
+                    },
+                )
+                self.assertEqual(status, 200, body)
+                self.assertEqual(self.server.runtime.last_thinking_mode, thinking_mode)
+                self.assertEqual(
+                    self.server.runtime.last_reasoning_effort,
+                    native_effort,
+                )
+
+    def test_responses_rejects_invalid_reasoning_effort(self):
+        status, _, body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "input": "Hi",
+                "reasoning": {"effort": "extreme"},
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["param"], "reasoning.effort")
 
     def test_responses_streams_text_and_tool_calls(self):
         status, headers, body = self.request(

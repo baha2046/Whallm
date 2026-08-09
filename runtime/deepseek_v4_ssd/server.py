@@ -268,17 +268,13 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         options, stream = self._common(payload)
         tools, tool_choice = _tool_request(payload)
         messages = _messages(payload.get("messages"))
-        thinking_mode = payload.get("thinking_mode", "chat")
-        if thinking_mode not in {"chat", "thinking"}:
-            raise APIError(
-                "thinking_mode must be 'chat' or 'thinking'.",
-                param="thinking_mode",
-            )
+        thinking_mode, reasoning_effort = _reasoning_settings(payload)
         prompt = self.app.runtime.encode_chat(
             messages,
             thinking_mode,
             tools,
             tool_choice,
+            reasoning_effort,
         )
         request_id = "chatcmpl-" + uuid.uuid4().hex
         pieces = self.app.track(self.app.runtime.stream(prompt, options))
@@ -372,13 +368,17 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         options, stream = self._common(request)
         messages = _response_messages(payload)
         tools, tool_choice, response_tools = _response_tool_request(payload)
-        thinking_mode = _response_thinking_mode(payload)
+        thinking_mode, reasoning_effort = _reasoning_settings(
+            payload,
+            responses_api=True,
+        )
         _validate_response_request(payload)
         prompt = self.app.runtime.encode_chat(
             messages,
             thinking_mode,
             tools,
             tool_choice,
+            reasoning_effort,
         )
         request_id = "resp_" + uuid.uuid4().hex
         pieces = self.app.track(self.app.runtime.stream(prompt, options))
@@ -1022,7 +1022,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "dspark_confidence_threshold": getattr(
                     config, "dspark_confidence_threshold", 0.6
                 ),
-                "dspark_slots": getattr(config, "dspark_slots", 256),
+                "dspark_slots": getattr(config, "dspark_slots", 768),
                 "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
             },
             "performance": {
@@ -1133,7 +1133,21 @@ def _validate_response_request(payload: dict[str, Any]) -> None:
             raise APIError("Only plain text output is supported.", param="text.format")
 
 
-def _response_thinking_mode(payload: dict[str, Any]) -> str:
+_REASONING_EFFORT_MAP = {
+    "minimal": "low",
+    "low": "low",
+    "medium": "low",
+    "high": "high",
+    "xhigh": "max",
+    "max": "max",
+}
+
+
+def _reasoning_settings(
+    payload: dict[str, Any],
+    *,
+    responses_api: bool = False,
+) -> tuple[str, str]:
     thinking_mode = payload.get("thinking_mode")
     if thinking_mode is not None:
         if thinking_mode not in {"chat", "thinking"}:
@@ -1141,16 +1155,23 @@ def _response_thinking_mode(payload: dict[str, Any]) -> str:
                 "thinking_mode must be 'chat' or 'thinking'.",
                 param="thinking_mode",
             )
-        return thinking_mode
-    reasoning = payload.get("reasoning")
-    if reasoning is None:
-        return "chat"
-    if not isinstance(reasoning, dict):
-        raise APIError("reasoning must be an object.", param="reasoning")
-    effort = reasoning.get("effort")
-    if effort not in {None, "none", "low", "medium", "high", "xhigh", "max"}:
-        raise APIError("reasoning.effort is invalid.", param="reasoning.effort")
-    return "chat" if effort in {None, "none"} else "thinking"
+    if responses_api:
+        reasoning = payload.get("reasoning")
+        if reasoning is not None and not isinstance(reasoning, dict):
+            raise APIError("reasoning must be an object.", param="reasoning")
+        effort = reasoning.get("effort") if isinstance(reasoning, dict) else None
+        param = "reasoning.effort"
+    else:
+        effort = payload.get("reasoning_effort")
+        param = "reasoning_effort"
+    if effort is not None and not isinstance(effort, str):
+        raise APIError(f"{param} must be a string.", param=param)
+    if effort not in {None, "none", *_REASONING_EFFORT_MAP}:
+        raise APIError(f"{param} is invalid.", param=param)
+    if thinking_mode is None:
+        thinking_mode = "chat" if effort in {None, "none"} else "thinking"
+    native_effort = _REASONING_EFFORT_MAP.get(effort, "low")
+    return thinking_mode, native_effort
 
 
 def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1754,7 +1775,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
     parser.add_argument("--public-model", default=PUBLIC_MODEL)
-    parser.add_argument("--slots", type=int, default=512)
+    parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
     parser.add_argument(
@@ -1775,7 +1796,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--no-ready-expert-decode", action="store_true")
     parser.add_argument("--dspark", action="store_true")
-    parser.add_argument("--dspark-slots", type=int, default=256)
+    parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--default-max-tokens", type=int, default=272_000)
     parser.add_argument("--default-temperature", type=float, default=0.2)

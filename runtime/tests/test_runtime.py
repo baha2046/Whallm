@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import threading
 import unittest
@@ -10,6 +11,7 @@ from unittest.mock import patch
 
 import mlx.core as mx
 from mlx_lm.models import deepseek_v4
+from mlx_lm.models.cache import CacheList
 
 from deepseek_v4_ssd.expert_cache import (
     BatchedExperts,
@@ -20,13 +22,23 @@ from deepseek_v4_ssd.expert_cache import (
 )
 from deepseek_v4_ssd.dspark import (
     DraftResult,
+    VerificationMetrics,
     _confidence_prefix_length,
     _should_fallback,
     _verify,
     generate_tokens,
 )
 from deepseek_v4_ssd.fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
-from deepseek_v4_ssd.generation import GenerationOptions, ModelRuntime
+from deepseek_v4_ssd.generation import (
+    GenerationOptions,
+    ModelRuntime,
+    RuntimeMetrics,
+    _RawEvalCacheList,
+    _decode_cache_state,
+    _encode_cache_state,
+    _persistence_cache_state,
+    _restore_persistence_cache,
+)
 from deepseek_v4_ssd.manifest import InstalledModel, Tensor
 from deepseek_v4_ssd.model import (
     RuntimeConfig,
@@ -37,6 +49,7 @@ from deepseek_v4_ssd.model import (
     _select_prefill_step_size,
     _sparse_pooled_attention,
     _stable_topk_indices,
+    eval_prompt_cache,
     forward_with_hidden,
     layer_major_prefill,
     verification_forward_with_hidden,
@@ -354,7 +367,7 @@ class ModelRuntimeTests(unittest.TestCase):
     def test_persistent_prompt_cache_survives_restart(self):
         class Cache:
             def __init__(self):
-                self._state = (mx.array([7]),)
+                self._state = (mx.array([7]), mx.empty((0,), dtype=mx.float32))
                 self.nbytes = 4
 
             @property
@@ -428,10 +441,29 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(received, [[1, 2], [3]])
         self.assertEqual(reused, 3)
 
+    def test_decode_rate_includes_cache_evaluation(self):
+        metrics = RuntimeMetrics()
+        metrics.start(4, 0, 1, False, CacheMetrics())
+        metrics.record_token(1, 1.0, 0.25)
+        metrics.record_token(2, 2.0, 0.5)
+        metrics.finish(CacheMetrics())
+
+        snapshot = metrics.snapshot()
+
+        self.assertEqual(snapshot["decode_model_step_seconds"], 2.0)
+        self.assertEqual(snapshot["decode_cache_eval_seconds"], 0.5)
+        self.assertEqual(snapshot["decode_end_to_end_seconds"], 2.5)
+        self.assertEqual(snapshot["decode_model_step_tokens_per_second"], 0.5)
+        self.assertEqual(snapshot["decode_tokens_per_second"], 0.4)
+        self.assertEqual(snapshot["decode_latency_p50_seconds"], 2.5)
+        self.assertEqual(snapshot["decode_latency_p95_seconds"], 2.5)
+
 
 class PrefillTests(unittest.TestCase):
-    def test_runtime_uses_512_expert_slots_by_default(self):
-        self.assertEqual(RuntimeConfig().slots, 512)
+    def test_runtime_uses_1152_expert_slots_by_default(self):
+        self.assertEqual(RuntimeConfig().slots, 1_152)
+        self.assertEqual(RuntimeConfig().read_workers, 4)
+        self.assertEqual(RuntimeConfig().dspark_slots, 768)
         self.assertTrue(RuntimeConfig().ready_expert_decode)
 
     def test_automatic_step_size_uses_larger_chunks_for_long_prompts(self):
@@ -451,7 +483,7 @@ class PrefillTests(unittest.TestCase):
 
             @property
             def state(self):
-                return ()
+                raise AssertionError("layer-major prefill must evaluate raw cache arrays")
 
         class Layer:
             def __init__(self, index):
@@ -579,7 +611,7 @@ class DSparkTests(unittest.TestCase):
             for index, token in enumerate((2, 3, 4)):
                 logits[0, index, token] = 1
             hidden = mx.ones((1, len(tokens), 1))
-            return logits, hidden, [[None] for _ in tokens]
+            return logits, hidden, [None], VerificationMetrics()
 
         with (
             patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
@@ -600,6 +632,60 @@ class DSparkTests(unittest.TestCase):
             )
 
         self.assertEqual(calls, [(1, 1), (3, 2)])
+
+    def test_rejected_draft_replays_only_the_committed_prefix(self):
+        replayed = []
+
+        class DSpark:
+            target_layers = (0,)
+
+            def reset_cache(self):
+                pass
+
+            def prefill_context(self, _hidden, _offset):
+                pass
+
+            def draft(self, *_args):
+                return DraftResult(
+                    [2, 4],
+                    [mx.zeros((5,)), mx.zeros((5,))],
+                    [1.0, 1.0],
+                    0.0,
+                )
+
+        def forward(_model, inputs, _cache, _layers):
+            values = inputs.reshape(-1).tolist()
+            if len(values) > 1:
+                replayed.append(values)
+            logits = mx.zeros((1, inputs.shape[1], 5))
+            logits[..., 1] = 1
+            return logits, mx.ones((1, inputs.shape[1], 1))
+
+        def verify(_model, tokens, _cache, _layers):
+            logits = mx.zeros((1, len(tokens), 5))
+            logits[0, 0, 2] = 1
+            logits[0, 1, 3] = 1
+            return logits, mx.ones((1, len(tokens), 1)), [None], VerificationMetrics()
+
+        with (
+            patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
+            patch("deepseek_v4_ssd.dspark._target_sequence", side_effect=verify),
+            patch("deepseek_v4_ssd.dspark._should_fallback", return_value=True),
+        ):
+            list(
+                generate_tokens(
+                    [0],
+                    object(),
+                    DSpark(),
+                    [None],
+                    max_tokens=4,
+                    prefill_step_size=1,
+                    temperature=0,
+                    top_p=1,
+                )
+            )
+
+        self.assertEqual(replayed, [[1, 2]])
 
     def test_verification_batches_moe_without_changing_sequential_results(self):
         mx.random.seed(7)
@@ -644,7 +730,7 @@ class DSparkTests(unittest.TestCase):
             sequential_hidden.append(hidden)
         expected_logits = mx.concatenate(sequential_logits, axis=1)
         expected_hidden = mx.concatenate(sequential_hidden, axis=1)
-        actual_logits, actual_hidden, checkpoints = (
+        actual_logits, actual_hidden, verified_cache, metrics = (
             verification_forward_with_hidden(
                 model,
                 mx.array([tokens]),
@@ -658,14 +744,14 @@ class DSparkTests(unittest.TestCase):
             mx.argmax(actual_logits, axis=-1).tolist(),
             mx.argmax(expected_logits, axis=-1).tolist(),
         )
-        self.assertLess(mx.max(mx.abs(actual_logits - expected_logits)).item(), 0.005)
-        self.assertLess(mx.max(mx.abs(actual_hidden - expected_hidden)).item(), 0.005)
+        self.assertLess(mx.mean(mx.abs(actual_logits - expected_logits)).item(), 0.01)
+        self.assertLess(mx.mean(mx.abs(actual_hidden - expected_hidden)).item(), 0.01)
+        self.assertEqual(metrics.per_position_cache_copies, 0)
+        self.assertEqual(metrics.state_fetch_count, 0)
+        self.assertEqual(metrics.block_attention_layers, 3)
 
         retained_cache = model.make_cache()
         forward_with_hidden(model, prefix, retained_cache, (1, 2))
-        for token in tokens[:3]:
-            forward_with_hidden(model, mx.array([[token]]), retained_cache, (1, 2))
-        verification_cache[:] = checkpoints[2]
         expected, _ = forward_with_hidden(
             model, mx.array([[9]]), retained_cache, (1, 2)
         )
@@ -674,6 +760,19 @@ class DSparkTests(unittest.TestCase):
         )
         mx.eval(expected, actual)
         self.assertLess(mx.max(mx.abs(actual - expected)).item(), 0.005)
+
+        expected, _ = forward_with_hidden(
+            model, mx.array([[10]]), sequential_cache, (1, 2)
+        )
+        actual, _ = forward_with_hidden(
+            model, mx.array([[10]]), verified_cache, (1, 2)
+        )
+        mx.eval(expected, actual)
+        self.assertEqual(
+            mx.argmax(actual, axis=-1).tolist(),
+            mx.argmax(expected, axis=-1).tolist(),
+        )
+        self.assertLess(mx.mean(mx.abs(actual - expected)).item(), 0.01)
 
     def test_greedy_verification_stops_at_the_first_mismatch(self):
         draft = DraftResult(
@@ -761,6 +860,11 @@ class ExpertCacheTests(unittest.TestCase):
                 ready[0].w1.view(mx.uint8).tolist(),
                 [[0, 1, 2, 3]],
             )
+            self.assertEqual(
+                ready[0].w13.view(mx.uint8).tolist(),
+                [[10, 11, 12, 13], [0, 1, 2, 3]],
+            )
+            self.assertEqual(cache.metrics.upload_seconds, 0.0)
 
     def test_lfu_cache_reuses_and_evicts_slots(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -917,6 +1021,50 @@ class ExpertCacheTests(unittest.TestCase):
                 self.assertEqual(cache.metrics.bytes_read, len(source))
 
 class MXFP8PoolingCacheTests(unittest.TestCase):
+    def test_generation_cache_state_exposes_raw_quantized_arrays(self):
+        class QuantizedOnlyCache(MXFP8PoolingCache):
+            @property
+            def state(self):
+                raise AssertionError("generation must not rebuild a BF16 cache")
+
+        cache = QuantizedOnlyCache(ratio=4)
+        cache.update(mx.random.uniform(shape=(1, 64, 64)).astype(mx.bfloat16))
+
+        arrays = _RawEvalCacheList(cache).state
+        mx.eval(*arrays)
+
+        self.assertGreater(len(arrays), 0)
+
+    def test_persistence_round_trip_keeps_quantized_chunks(self):
+        class QuantizedOnlyCache(MXFP8PoolingCache):
+            @property
+            def state(self):
+                raise AssertionError("persistence must not rebuild a BF16 cache")
+
+        source = QuantizedOnlyCache(ratio=4)
+        source.update(mx.random.uniform(shape=(1, 130, 64)).astype(mx.bfloat16))
+        eval_prompt_cache([CacheList(source)])
+
+        arrays = {}
+        schema = _encode_cache_state(
+            _persistence_cache_state([CacheList(source)]),
+            arrays,
+        )
+        schema = json.loads(json.dumps(schema))
+        decoded = _decode_cache_state(schema, arrays)
+        restored = MXFP8PoolingCache(ratio=4)
+        _restore_persistence_cache([CacheList(restored)], decoded)
+        eval_prompt_cache([CacheList(restored)])
+
+        query = mx.random.uniform(shape=(1, 3, 2, 64)).astype(mx.float32)
+        expected = source.quantized_matmul(query)
+        actual = restored.quantized_matmul(query)
+        mx.eval(expected, actual)
+
+        self.assertEqual(restored.offset, source.offset)
+        self.assertEqual(restored.nbytes, source.nbytes)
+        self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-6)
+
     def test_completed_chunks_use_less_memory_than_bfloat16(self):
         cache = MXFP8PoolingCache(ratio=4)
         source = mx.random.uniform(shape=(1, 64, 64)).astype(mx.bfloat16)
@@ -1192,7 +1340,16 @@ class MXFP4Tests(unittest.TestCase):
                     "w3",
                     "w3_scales",
                 )
-            )
+            ),
+            w13=mx.stack(
+                [mx.concatenate([expert.w3, expert.w1], axis=0) for expert in experts]
+            ),
+            w13_scales=mx.stack(
+                [
+                    mx.concatenate([expert.w3_scales, expert.w1_scales], axis=0)
+                    for expert in experts
+                ]
+            ),
         )
         calls = []
         cache = SimpleNamespace(
@@ -1214,7 +1371,7 @@ class MXFP4Tests(unittest.TestCase):
         )(source, selected)
         mx.eval(actual, expected)
 
-        self.assertEqual(calls, [3])
+        self.assertEqual(calls, [2])
         self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
 
 

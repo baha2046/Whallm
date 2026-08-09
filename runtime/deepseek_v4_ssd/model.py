@@ -13,17 +13,23 @@ from mlx_lm.models import deepseek_v4
 from mlx_lm.models.cache import CacheList
 from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
-from .dspark import load_dspark_model
-from .expert_cache import ExpertCache
+from .dspark import VerificationMetrics, load_dspark_model
+from .expert_cache import BatchedExperts, ExpertCache
 from .fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
 from .manifest import InstalledModel, Tensor
 
 _ORIGINAL_SPARSE_POOLED_ATTENTION = deepseek_v4._sparse_pooled_attention
+_CACHE_CLEAR_THRESHOLD_BYTES = 512 * 1024**2
+
+
+def _clear_memory_cache() -> None:
+    if mx.get_cache_memory() >= _CACHE_CLEAR_THRESHOLD_BYTES:
+        mx.clear_cache()
 
 
 @dataclass(frozen=True)
 class RuntimeConfig:
-    slots: int = 512
+    slots: int = 1_152
     read_workers: int = 4
     prefetch_read_workers: int = 2
     prefill_step_size: int = 0
@@ -40,7 +46,7 @@ class RuntimeConfig:
     fp4_index_cache: bool = True
     dspark_enabled: bool = False
     dspark_confidence_threshold: float = 0.6
-    dspark_slots: int = 256
+    dspark_slots: int = 768
     expert_route_trace: str | None = None
     ready_expert_decode: bool = True
 
@@ -114,14 +120,15 @@ def layer_major_prefill(
                         return_array=True,
                     )
                     output = layer(chunk, mask, layer_cache, chunk_ids)
-                    mx.eval(output, layer_cache.state)
+                    eval_prompt_cache([layer_cache], output)
                     if layer_index != last_layer:
                         outputs.append(output)
-                    mx.clear_cache()
             if layer_index == last_layer:
+                _clear_memory_cache()
                 return
             hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
             mx.eval(hidden)
+            _clear_memory_cache()
             continue
 
         prefetch = getattr(expert_cache, "prefetch_layer", None)
@@ -151,17 +158,18 @@ def layer_major_prefill(
             value, post, combine = layer.attn_hc(chunk)
             value = layer.attn(layer.attn_norm(value), mask=mask, cache=layer_cache)
             output = deepseek_v4.hc_expand(value, residual, post, combine)
-            mx.eval(output, layer_cache.state)
+            eval_prompt_cache([layer_cache], output)
             if layer_index != last_layer:
                 outputs.append(output)
-            mx.clear_cache()
         if layer_index == last_layer:
+            _clear_memory_cache()
             return
 
         attention_output = (
             outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
         )
         mx.eval(attention_output)
+        _clear_memory_cache()
         batch_context = (
             expert_cache.batched_layer(layer_index)
             if use_batched
@@ -182,9 +190,9 @@ def layer_major_prefill(
                 output = deepseek_v4.hc_expand(value, residual, post, combine)
                 mx.eval(output)
                 outputs.append(output)
-                mx.clear_cache()
         hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
         mx.eval(hidden)
+        _clear_memory_cache()
 
 
 class _EmptySwitchGLU(nn.Module):
@@ -208,12 +216,85 @@ class _StreamingSwitchGLU(nn.Module):
         current_batched = getattr(self.cache, "current_batched", None)
         batched = current_batched(self.layer) if callable(current_batched) else None
         if batched is not None:
-            source = mx.expand_dims(x, (-2, -3))
-            do_sort = indices.size >= 64
-            selected = indices
-            inverse = None
-            if do_sort:
-                source, selected, inverse = _gather_sort(source, indices)
+            return self._gather_qmm(x, indices, batched)
+
+        selected = (
+            selected_array
+            if selected_array is not None
+            else np.asarray(indices, dtype=np.int32)
+        )
+        if (
+            x.shape[0] == 1
+            and x.shape[1] == 1
+            and getattr(self.cache, "ready_expert_decode", False)
+        ):
+            outputs = {}
+            for expert, weights in self.cache.iter_ready(
+                self.layer,
+                selected.reshape(-1).tolist(),
+            ):
+                hidden = _mxfp4_swiglu(x, weights, self.activation)
+                output = _mxfp4(hidden, weights.w2, weights.w2_scales)
+                mx.async_eval(output)
+                outputs[expert] = output
+            return mx.stack(
+                [outputs[int(expert)] for expert in selected.reshape(-1)],
+                axis=-2,
+            )
+        resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
+        if x.shape[0] == 1 and x.shape[1] == 1:
+            outputs = []
+            for expert in selected.reshape(-1):
+                weights = resident.individual_weights[resident.slots[int(expert)]]
+                hidden = _mxfp4_swiglu(x, weights, self.activation)
+                outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
+            return mx.stack(outputs, axis=-2)
+        flat_selected = selected.reshape(-1)
+        order = np.argsort(flat_selected, kind="stable")
+        boundaries = np.flatnonzero(np.diff(flat_selected[order])) + 1
+        flat_x = x.reshape(-1, x.shape[-1])
+        outputs = []
+        for positions in np.split(order, boundaries):
+            expert = int(flat_selected[positions[0]])
+            weights = resident.individual_weights[resident.slots[expert]]
+            source = mx.take(
+                flat_x,
+                mx.array(positions // selected.shape[-1]),
+                axis=0,
+            )
+            hidden = _mxfp4_swiglu(source, weights, self.activation)
+            outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
+        grouped = mx.concatenate(outputs, axis=0)
+        restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
+        return restored.reshape(*selected.shape, -1)
+
+    def _gather_qmm(
+        self,
+        x: mx.array,
+        indices: mx.array,
+        batched: BatchedExperts,
+    ) -> mx.array:
+        source = mx.expand_dims(x, (-2, -3))
+        do_sort = indices.size >= 64
+        selected = indices
+        inverse = None
+        if do_sort:
+            source, selected, inverse = _gather_sort(source, indices)
+        if batched.w13 is not None and batched.w13_scales is not None:
+            projected = mx.gather_qmm(
+                source,
+                batched.w13,
+                batched.w13_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=do_sort,
+            )
+            up, gate = mx.split(projected, 2, axis=-1)
+            qmm_calls = 2
+        else:
             up = mx.gather_qmm(
                 source,
                 batched.w3,
@@ -236,78 +317,24 @@ class _StreamingSwitchGLU(nn.Module):
                 mode="mxfp4",
                 sorted_indices=do_sort,
             )
-            output = mx.gather_qmm(
-                self.activation(up, gate),
-                batched.w2,
-                batched.w2_scales,
-                rhs_indices=selected,
-                transpose=True,
-                group_size=32,
-                bits=4,
-                mode="mxfp4",
-                sorted_indices=do_sort,
-            )
-            if do_sort:
-                output = _scatter_unsort(output, inverse, indices.shape)
-            self.cache.record_gather_qmm()
-            return output.squeeze(-2)
-
-        selected = (
-            selected_array
-            if selected_array is not None
-            else np.asarray(indices, dtype=np.int32)
+            qmm_calls = 3
+        output = mx.gather_qmm(
+            self.activation(up, gate),
+            batched.w2,
+            batched.w2_scales,
+            rhs_indices=selected,
+            transpose=True,
+            group_size=32,
+            bits=4,
+            mode="mxfp4",
+            sorted_indices=do_sort,
         )
-        if (
-            x.shape[0] == 1
-            and x.shape[1] == 1
-            and getattr(self.cache, "ready_expert_decode", False)
-        ):
-            outputs = {}
-            for expert, weights in self.cache.iter_ready(
-                self.layer,
-                selected.reshape(-1).tolist(),
-            ):
-                up = _mxfp4(x, weights.w3, weights.w3_scales)
-                gate = _mxfp4(x, weights.w1, weights.w1_scales)
-                hidden = self.activation(up, gate)
-                output = _mxfp4(hidden, weights.w2, weights.w2_scales)
-                mx.async_eval(output)
-                outputs[expert] = output
-            return mx.stack(
-                [outputs[int(expert)] for expert in selected.reshape(-1)],
-                axis=-2,
-            )
-        resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
-        if x.shape[0] == 1 and x.shape[1] == 1:
-            outputs = []
-            for expert in selected.reshape(-1):
-                weights = resident.individual_weights[resident.slots[int(expert)]]
-                up = _mxfp4(x, weights.w3, weights.w3_scales)
-                gate = _mxfp4(x, weights.w1, weights.w1_scales)
-                hidden = self.activation(up, gate)
-                outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
-            return mx.stack(outputs, axis=-2)
-
-        flat_selected = selected.reshape(-1)
-        order = np.argsort(flat_selected, kind="stable")
-        boundaries = np.flatnonzero(np.diff(flat_selected[order])) + 1
-        flat_x = x.reshape(-1, x.shape[-1])
-        outputs = []
-        for positions in np.split(order, boundaries):
-            expert = int(flat_selected[positions[0]])
-            weights = resident.individual_weights[resident.slots[expert]]
-            source = mx.take(
-                flat_x,
-                mx.array(positions // selected.shape[-1]),
-                axis=0,
-            )
-            up = _mxfp4(source, weights.w3, weights.w3_scales)
-            gate = _mxfp4(source, weights.w1, weights.w1_scales)
-            hidden = self.activation(up, gate)
-            outputs.append(_mxfp4(hidden, weights.w2, weights.w2_scales))
-        grouped = mx.concatenate(outputs, axis=0)
-        restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
-        return restored.reshape(*selected.shape, -1)
+        if do_sort:
+            output = _scatter_unsort(output, inverse, indices.shape)
+        record = getattr(self.cache, "record_gather_qmm", None)
+        if callable(record):
+            record(qmm_calls)
+        return output.squeeze(-2)
 
 
 def _mxfp4(x: mx.array, weight: mx.array, scales: mx.array) -> mx.array:
@@ -322,15 +349,29 @@ def _mxfp4(x: mx.array, weight: mx.array, scales: mx.array) -> mx.array:
     )
 
 
+def _mxfp4_swiglu(x: mx.array, weights, activation) -> mx.array:
+    if weights.w13 is not None and weights.w13_scales is not None:
+        projected = _mxfp4(x, weights.w13, weights.w13_scales)
+        up, gate = mx.split(projected, 2, axis=-1)
+    else:
+        up = _mxfp4(x, weights.w3, weights.w3_scales)
+        gate = _mxfp4(x, weights.w1, weights.w1_scales)
+    return activation(up, gate)
+
+
 def _streaming_moe(self, x: mx.array, input_ids: mx.array) -> mx.array:
     if getattr(self, "sharding_group", None) is not None:
         raise ValueError("SSD expert streaming supports one Apple Silicon device")
     indices, scores = self.gate(x, input_ids)
-    started = time.perf_counter()
-    mx.eval(indices)
-    self.switch_mlp.cache.record_routing_sync(time.perf_counter() - started)
     shared = self.shared_experts(x)
     mx.async_eval(shared)
+    cache = self.switch_mlp.cache
+    current_batched = getattr(cache, "current_batched", None)
+    batched = current_batched(self.switch_mlp.layer) if callable(current_batched) else None
+    if batched is None or getattr(cache, "route_trace_enabled", False):
+        started = time.perf_counter()
+        mx.eval(indices)
+        cache.record_routing_sync(time.perf_counter() - started)
     routed = self.switch_mlp(x, indices)
     routed = _route_reduce(routed, scores)
     return routed + shared
@@ -382,6 +423,7 @@ def _correct_compressor(self, x: mx.array, pool_cache, offset) -> mx.array:
     return pool_cache.update_and_fetch(new_pooled) if pool_cache is not None else new_pooled
 
 
+@mx.compile
 def _stable_topk_indices(scores: mx.array, count: int) -> mx.array:
     selected = mx.argpartition(-scores, kth=count - 1, axis=-1)[..., :count]
     threshold = mx.min(mx.take_along_axis(scores, selected, axis=-1), axis=-1, keepdims=True)
@@ -590,8 +632,8 @@ def verification_forward_with_hidden(
     inputs: mx.array,
     cache,
     target_layers: tuple[int, ...],
-) -> tuple[mx.array, mx.array, list[list]]:
-    """Verify a token block with exact sequential attention and batched MoE."""
+) -> tuple[mx.array, mx.array, list, VerificationMetrics]:
+    """Verify one token block on a round-level cache fork."""
     core = model.model
     if inputs.shape[0] != 1:
         raise ValueError("DSpark verification supports batch size one")
@@ -599,6 +641,12 @@ def verification_forward_with_hidden(
         raise ValueError("DSpark supports one Apple Silicon device")
     if len(cache) != len(core.pipeline_layers):
         raise ValueError("prompt cache does not match the main model layers")
+
+    fork_started = time.perf_counter()
+    fork, fork_arrays = _fork_prompt_cache(cache)
+    if fork_arrays:
+        mx.eval(*fork_arrays)
+    fork_seconds = time.perf_counter() - fork_started
 
     hidden = core.embed_tokens(inputs)
     hidden = mx.broadcast_to(
@@ -608,53 +656,89 @@ def verification_forward_with_hidden(
     hidden = mx.contiguous(hidden)
     captured = []
     target_set = set(target_layers)
-    checkpoints = [
-        [None] * len(core.pipeline_layers) for _ in range(inputs.shape[1] - 1)
-    ]
-
-    for index, (layer, layer_cache) in enumerate(zip(core.pipeline_layers, cache)):
-        residual = hidden
-        value, post, combine = layer.attn_hc(hidden)
-        value = layer.attn_norm(value)
-        attention = []
-        for position in range(inputs.shape[1]):
-            token = value[:, position : position + 1]
-            mask_cache = (
-                layer_cache[0] if isinstance(layer_cache, CacheList) else layer_cache
-            )
-            mask = deepseek_v4.create_attention_mask(
-                token,
-                mask_cache,
-                window_size=core.args.sliding_window,
-                return_array=True,
-            )
-            output = layer.attn(token, mask=mask, cache=layer_cache)
-            mx.eval(output, layer_cache.state)
-            attention.append(output)
-            if position < len(checkpoints):
-                checkpoints[position][index] = _copy_layer_cache(layer_cache)
-        value = (
-            attention[0]
-            if len(attention) == 1
-            else mx.concatenate(attention, axis=1)
-        )
-        hidden = deepseek_v4.hc_expand(value, residual, post, combine)
-
-        residual = hidden
-        value, post, combine = layer.ffn_hc(hidden)
-        value = layer.ffn(layer.ffn_norm(value), inputs)
-        hidden = deepseek_v4.hc_expand(value, residual, post, combine)
-        mx.eval(hidden)
+    first_cache = fork[0]
+    mask_cache = first_cache[0] if isinstance(first_cache, CacheList) else first_cache
+    mask = deepseek_v4.create_attention_mask(
+        hidden[:, :, 0, :],
+        mask_cache,
+        window_size=core.args.sliding_window,
+        return_array=True,
+    )
+    layer_seconds = []
+    cache_eval_bytes = 0
+    for index, (layer, layer_cache) in enumerate(zip(core.pipeline_layers, fork)):
+        layer_started = time.perf_counter()
+        hidden = layer(hidden, mask, layer_cache, inputs)
+        _, evaluated_bytes = eval_prompt_cache([layer_cache], hidden)
+        cache_eval_bytes += evaluated_bytes
+        layer_seconds.append(time.perf_counter() - layer_started)
         if index in target_set:
             captured.append(hidden.mean(axis=2))
 
     if len(captured) != len(target_layers):
         raise ValueError("DSpark target layers do not match the main model")
     output = core.norm(core.hc_head(hidden))
-    return model.lm_head(output), mx.concatenate(captured, axis=-1), checkpoints
+    metrics = VerificationMetrics(
+        cache_fork_seconds=fork_seconds,
+        layer_seconds=tuple(layer_seconds),
+        cache_eval_count=len(layer_seconds),
+        cache_eval_bytes=cache_eval_bytes,
+        cache_fork_layers=len(fork),
+        block_attention_layers=len(layer_seconds),
+    )
+    return model.lm_head(output), mx.concatenate(captured, axis=-1), fork, metrics
 
 
-def _copy_layer_cache(layer_cache):
+def eval_prompt_cache(cache, *dependencies: mx.array) -> tuple[int, int]:
+    """Evaluate cache arrays without materializing persistence state."""
+    arrays = _cache_arrays(cache)
+    mx.eval(*dependencies, *arrays)
+    return len(arrays), sum(array.nbytes for array in arrays)
+
+
+def _cache_arrays(cache) -> list[mx.array]:
+    arrays = []
+    seen = set()
+    for layer_cache in cache:
+        items = (
+            layer_cache.caches
+            if isinstance(layer_cache, CacheList)
+            else (layer_cache,)
+        )
+        for item in items:
+            values = [
+                getattr(item, name, None)
+                for name in (
+                    "keys",
+                    "values",
+                    "buf_kv",
+                    "buf_gate",
+                    "previous_window_kv",
+                    "previous_window_gate",
+                    "_pending",
+                )
+            ]
+            for name in ("_chunks", "_index_chunks"):
+                for pair in getattr(item, name, ()):
+                    values.extend(pair)
+            for value in values:
+                if isinstance(value, mx.array) and id(value) not in seen:
+                    seen.add(id(value))
+                    arrays.append(value)
+    return arrays
+
+
+def _fork_prompt_cache(cache) -> tuple[list, list[mx.array]]:
+    fork = []
+    arrays = []
+    for layer_cache in cache:
+        checkpoint, copied = _clone_layer_cache(layer_cache)
+        fork.append(checkpoint)
+        arrays.extend(copied)
+    return fork, arrays
+
+
+def _clone_layer_cache(layer_cache):
     checkpoint = copy.deepcopy(layer_cache)
     arrays = []
     pending = (
@@ -676,8 +760,7 @@ def _copy_layer_cache(layer_cache):
                 copied = value + mx.zeros((), value.dtype)
                 setattr(item, name, copied)
                 arrays.append(copied)
-    mx.eval(*arrays)
-    return checkpoint
+    return checkpoint, arrays
 
 
 def _load_dspark(installed_model: InstalledModel, main_model, args, config):

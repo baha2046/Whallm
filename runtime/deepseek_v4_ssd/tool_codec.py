@@ -302,6 +302,7 @@ class ToolCodec:
         thinking_mode: str,
         tools: list[dict[str, Any]] | None = None,
         tool_choice: ToolChoice = ToolChoice(),
+        reasoning_effort: str = "low",
     ) -> str:
         prepared = copy.deepcopy(messages)
         active_tools = [] if tool_choice.mode == "none" else list(tools or [])
@@ -321,6 +322,7 @@ class ToolCodec:
         return self._encoding.encode_messages(
             prepared,
             thinking_mode=thinking_mode,
+            reasoning_effort=reasoning_effort,
         )
 
     def parse(self, text: str, thinking_mode: str) -> AssistantTurn:

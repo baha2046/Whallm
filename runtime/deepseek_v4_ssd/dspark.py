@@ -178,6 +178,19 @@ class DraftResult:
     seconds: float
 
 
+@dataclass(frozen=True)
+class VerificationMetrics:
+    cache_fork_seconds: float = 0.0
+    cache_replay_seconds: float = 0.0
+    layer_seconds: tuple[float, ...] = ()
+    cache_eval_count: int = 0
+    cache_eval_bytes: int = 0
+    cache_fork_layers: int = 0
+    per_position_cache_copies: int = 0
+    state_fetch_count: int = 0
+    block_attention_layers: int = 0
+
+
 class DSparkModel(nn.Module):
     def __init__(
         self,
@@ -253,7 +266,7 @@ class DSparkModel(nn.Module):
         base_logits = main_model.lm_head(self.norm(head_hidden)).astype(mx.float32)
 
         previous = mx.array([anchor], dtype=mx.int32)
-        tokens: list[int] = []
+        token_arrays: list[mx.array] = []
         distributions: list[mx.array] = []
         markov: list[mx.array] = []
         for position in range(self.block_size):
@@ -263,18 +276,24 @@ class DSparkModel(nn.Module):
                 temperature,
                 top_p,
             )
-            token = int(mx.argmax(logprobs, axis=-1).item()) if temperature == 0 else int(
-                mx.random.categorical(logprobs).item()
+            token = (
+                mx.argmax(logprobs, axis=-1)
+                if temperature == 0
+                else mx.random.categorical(logprobs)
             )
-            tokens.append(token)
+            token_arrays.append(token)
             distributions.append(logprobs[0])
             markov.append(embedding)
-            previous = mx.array([token], dtype=mx.int32)
+            previous = token.astype(mx.int32)
 
         confidence = mx.sigmoid(
             self.confidence_head(head_hidden, mx.stack(markov, axis=1))
         )[0]
-        mx.eval(confidence, *distributions)
+        mx.eval(confidence, *token_arrays, *(distributions if temperature else ()))
+        tokens = [int(token.item()) for token in token_arrays]
+        if temperature == 0:
+            empty = mx.array([], dtype=mx.float32)
+            distributions = [empty] * len(tokens)
         values = [float(value) for value in confidence.tolist()]
         if confidence_threshold > 0:
             keep = _confidence_prefix_length(values, confidence_threshold)
@@ -294,9 +313,9 @@ def sampling_logprobs(
     temperature: float,
     top_p: float,
 ) -> mx.array:
-    logprobs = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
     if temperature == 0:
-        return logprobs
+        return logits
+    logprobs = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
     if 0 < top_p < 1:
         logprobs = apply_top_p(logprobs, top_p)
     scaled = logprobs / max(temperature, 1e-5)
@@ -438,13 +457,16 @@ def generate_tokens(
     temperature: float,
     top_p: float,
     confidence_threshold: float = 0.0,
-    record_round: Callable[[DraftResult, int, float], None] | None = None,
+    record_round: Callable[
+        [DraftResult, int, float, VerificationMetrics], None
+    ]
+    | None = None,
     record_fallback: Callable[[], None] | None = None,
 ) -> Iterator[tuple[int, mx.array, bool]]:
     """Yield tokens after target-model verification."""
     if not prompt or max_tokens < 1:
         return
-    from .model import forward_with_hidden
+    from .model import eval_prompt_cache, forward_with_hidden
 
     dspark.reset_cache()
     final_logits = final_hidden = None
@@ -508,11 +530,13 @@ def generate_tokens(
         verification_inputs = [anchor, *draft.tokens]
         verify_started = time.perf_counter()
         if draft.tokens:
-            logits, verified_hidden, cache_checkpoints = _target_sequence(
-                main_model,
-                verification_inputs,
-                prompt_cache,
-                dspark.target_layers,
+            (
+                logits,
+                verified_hidden,
+                verified_cache,
+                verification_metrics,
+            ) = _target_sequence(
+                main_model, verification_inputs, prompt_cache, dspark.target_layers
             )
         else:
             logits, verified_hidden = forward_with_hidden(
@@ -521,23 +545,47 @@ def generate_tokens(
                 prompt_cache,
                 dspark.target_layers,
             )
-            cache_checkpoints = None
+            verified_cache = None
+            verification_metrics = VerificationMetrics()
         target_logprobs = sampling_logprobs(logits[0], temperature, top_p)
         mx.eval(target_logprobs, verified_hidden)
-        verification_seconds = time.perf_counter() - verify_started
 
         accepted, next_token, next_logprobs = _verify(
             draft,
             target_logprobs,
             temperature,
         )
-        if accepted < len(draft.tokens):
-            assert cache_checkpoints is not None
-            prompt_cache[:] = cache_checkpoints[accepted]
-        del cache_checkpoints
+        if draft.tokens:
+            assert verified_cache is not None
+            if accepted == len(draft.tokens):
+                prompt_cache[:] = verified_cache
+            else:
+                replay_started = time.perf_counter()
+                replay_inputs = mx.array(
+                    [[anchor, *draft.tokens[:accepted]]],
+                    dtype=mx.int32,
+                )
+                replay_logits, replay_hidden = forward_with_hidden(
+                    main_model,
+                    replay_inputs,
+                    prompt_cache,
+                    dspark.target_layers,
+                )
+                mx.eval(replay_logits, replay_hidden)
+                eval_prompt_cache(prompt_cache)
+                verification_metrics = replace(
+                    verification_metrics,
+                    cache_replay_seconds=time.perf_counter() - replay_started,
+                )
+        verification_seconds = time.perf_counter() - verify_started
 
         if record_round is not None:
-            record_round(draft, accepted, verification_seconds)
+            record_round(
+                draft,
+                accepted,
+                verification_seconds,
+                verification_metrics,
+            )
         if not draft.tokens:
             target_step_seconds = min(
                 target_step_seconds,
@@ -618,31 +666,40 @@ def _verify(
     target_logprobs: mx.array,
     temperature: float,
 ) -> tuple[int, int, mx.array]:
+    if temperature == 0:
+        greedy_tokens = mx.argmax(
+            target_logprobs[: len(draft.tokens) + 1],
+            axis=-1,
+        ).tolist()
+        for index, (token, target_token) in enumerate(
+            zip(draft.tokens, greedy_tokens)
+        ):
+            if token != target_token:
+                return index, int(target_token), target_logprobs[index]
+        bonus_index = len(draft.tokens)
+        return bonus_index, int(greedy_tokens[bonus_index]), target_logprobs[bonus_index]
+
     accepted = 0
     for index, (token, draft_logprobs) in enumerate(
         zip(draft.tokens, draft.logprobs)
     ):
         target = target_logprobs[index]
-        if temperature == 0:
-            if token != int(mx.argmax(target).item()):
-                return accepted, int(mx.argmax(target).item()), target
-        else:
-            probability = mx.minimum(
-                1.0,
-                mx.exp(target[token] - draft_logprobs[token]),
+        probability = mx.minimum(
+            1.0,
+            mx.exp(target[token] - draft_logprobs[token]),
+        )
+        if float(mx.random.uniform().item()) > float(probability.item()):
+            difference = mx.maximum(
+                mx.exp(target) - mx.exp(draft_logprobs),
+                0,
             )
-            if float(mx.random.uniform().item()) > float(probability.item()):
-                difference = mx.maximum(
-                    mx.exp(target) - mx.exp(draft_logprobs),
-                    0,
-                )
-                total = difference.sum()
-                correction = mx.where(
-                    total > 0,
-                    mx.log(difference / total),
-                    target,
-                )
-                return accepted, _sample(correction, temperature), correction
+            total = difference.sum()
+            correction = mx.where(
+                total > 0,
+                mx.log(difference / total),
+                target,
+            )
+            return accepted, _sample(correction, temperature), correction
         accepted += 1
     bonus = target_logprobs[len(draft.tokens)]
     return accepted, _sample(bonus, temperature), bonus
