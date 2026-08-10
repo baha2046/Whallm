@@ -9,6 +9,7 @@
 "%lld min" = "%lld 分鐘";
 "%lld model files need repair." = "模型有 %lld 個檔案需要修復。";
 "0 selects 128, 256, or 1024 based on the prompt length." = "0 會依 prompt 長度自動選擇 128、256 或 1024。";
+"0 automatically uses Metal's recommended maximum." = "0 會自動使用 Metal 建議的最大值。";
 "A higher value increases output variation." = "較高的值會增加輸出變化。";
 "A lower value reduces the candidate token range." = "較低的值會縮小候選 token 範圍。";
 "A model already exists in this location. Verify and repair the existing model first." = "此位置已有模型。請先驗證並修復現有模型。";
@@ -60,6 +61,7 @@
 "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed." = "請確認外接磁碟是高速 SSD。慢速磁碟會降低生成速度。";
 "Max tokens" = "最大 token 數";
 "Memory" = "記憶體";
+"Memory limit GiB" = "記憶體上限（GiB）";
 "Memory usage" = "記憶體用量";
 "Metric" = "指標";
 "Metrics" = "指標";
@@ -90,7 +92,7 @@
 "Prefill Tok/s" = "預填 Token/秒";
 "Python is missing from the app. Install the app again." = "App 缺少 Python。請重新安裝 App。";
 "Read workers" = "讀取工作數";
-"Read workers must be greater than 0. Prefill step size must be 0 or greater." = "Read workers 必須大於 0。Prefill step size 不可小於 0。";
+"Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater." = "Read workers 必須大於 0。記憶體上限和 Prefill step size 不可小於 0。";
 "Reasoning" = "思考過程";
 "Repair stopped. The app kept the progress." = "修復已停止。App 已保留進度。";
 "Resume Download" = "繼續下載";

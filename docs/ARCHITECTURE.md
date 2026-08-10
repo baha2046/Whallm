@@ -167,7 +167,7 @@ Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
 | `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
 | persistent cache entries | 8 | revision 專用的磁碟 cache 上限。 |
-| `memory_limit_gib` | 48 | MLX memory 和 wired memory limit。 |
+| `memory_limit_gib` | 0 | 0 使用 Metal 建議上限；正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
 | `dspark_enabled` | `false` | DSpark 預設停用。 |
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |
 

@@ -9,6 +9,7 @@
 "%lld min" = "%lld min";
 "%lld model files need repair." = "%lld model files need repair.";
 "0 selects 128, 256, or 1024 based on the prompt length." = "0 selects 128, 256, or 1024 based on the prompt length.";
+"0 automatically uses Metal's recommended maximum." = "0 automatically uses Metal's recommended maximum.";
 "A higher value increases output variation." = "A higher value increases output variation.";
 "A lower value reduces the candidate token range." = "A lower value reduces the candidate token range.";
 "A model already exists in this location. Verify and repair the existing model first." = "A model already exists in this location. Verify and repair the existing model first.";
@@ -60,6 +61,7 @@
 "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed." = "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed.";
 "Max tokens" = "Max tokens";
 "Memory" = "Memory";
+"Memory limit GiB" = "Memory limit GiB";
 "Memory usage" = "Memory usage";
 "Metric" = "Metric";
 "Metrics" = "Metrics";
@@ -90,7 +92,7 @@
 "Prefill Tok/s" = "Prefill Tok/s";
 "Python is missing from the app. Install the app again." = "Python is missing from the app. Install the app again.";
 "Read workers" = "Read workers";
-"Read workers must be greater than 0. Prefill step size must be 0 or greater." = "Read workers must be greater than 0. Prefill step size must be 0 or greater.";
+"Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater." = "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater.";
 "Reasoning" = "Reasoning";
 "Repair stopped. The app kept the progress." = "Repair stopped. The app kept the progress.";
 "Resume Download" = "Resume Download";

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import tempfile
@@ -46,6 +47,7 @@ from deepseek_v4_ssd.model import (
     RuntimeConfig,
     _ORIGINAL_SPARSE_POOLED_ATTENTION,
     _StreamingSwitchGLU,
+    _configure_memory_limits,
     _correct_compressor,
     _select_moe_step_size,
     _select_prefill_step_size,
@@ -57,10 +59,13 @@ from deepseek_v4_ssd.model import (
     verification_forward_with_hidden,
 )
 
+_mlx_lm_generate = importlib.import_module("mlx_lm.generate")
+
 
 class ModelRuntimeTests(unittest.TestCase):
     def test_model_load_and_request_share_cross_thread_stream(self):
         load_stream = None
+        pending = None
 
         def fake_load_model(_installed, _config):
             nonlocal load_stream
@@ -82,6 +87,7 @@ class ModelRuntimeTests(unittest.TestCase):
             runtime = ModelRuntime(installed, config)
 
         self.assertEqual(runtime._generation_stream, load_stream)
+        self.assertEqual(_mlx_lm_generate.generation_stream, load_stream)
         response = SimpleNamespace(
             text="OK",
             token=1,
@@ -93,10 +99,12 @@ class ModelRuntimeTests(unittest.TestCase):
         errors = []
 
         def fake_stream_generate(*_args, **_kwargs):
-            value = mx.ones((1,)) + 1
-            mx.async_eval(value)
-            mx.eval(value)
-            yield response
+            nonlocal pending
+            with mx.stream(_mlx_lm_generate.generation_stream):
+                if pending is not None:
+                    mx.eval(pending)
+                pending = mx.ones((1,)) + 1
+                yield response
 
         def generate():
             try:
@@ -111,12 +119,13 @@ class ModelRuntimeTests(unittest.TestCase):
                 side_effect=fake_stream_generate,
             ),
         ):
-            thread = threading.Thread(target=generate)
-            thread.start()
-            thread.join()
+            for _ in range(2):
+                thread = threading.Thread(target=generate)
+                thread.start()
+                thread.join()
 
         self.assertEqual(errors, [])
-        self.assertEqual([piece.text for piece in pieces], ["OK"])
+        self.assertEqual([piece.text for piece in pieces], ["OK", "OK"])
 
     def test_generation_tracks_phases_and_evaluates_cache_state(self):
         installed = SimpleNamespace(root=Path("/tmp/tokenizer"))
@@ -476,10 +485,46 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(metrics.snapshot()["accumulated_generation_tokens"], 5)
 
 
+class MemoryLimitTests(unittest.TestCase):
+    def test_automatic_memory_limit_uses_metals_recommended_maximum(self):
+        maximum = 40_200_896_512
+        with (
+            patch(
+                "deepseek_v4_ssd.model.mx.device_info",
+                return_value={"max_recommended_working_set_size": maximum},
+            ),
+            patch("deepseek_v4_ssd.model.mx.set_memory_limit") as set_memory_limit,
+            patch("deepseek_v4_ssd.model.mx.set_wired_limit") as set_wired_limit,
+        ):
+            selected = _configure_memory_limits(RuntimeConfig())
+
+        self.assertEqual(selected, maximum)
+        set_memory_limit.assert_called_once_with(maximum)
+        set_wired_limit.assert_called_once_with(maximum)
+
+    def test_explicit_memory_limit_caps_wired_memory_at_metals_maximum(self):
+        maximum = 40_200_896_512
+        requested = 48 * 1024**3
+        with (
+            patch(
+                "deepseek_v4_ssd.model.mx.device_info",
+                return_value={"max_recommended_working_set_size": maximum},
+            ),
+            patch("deepseek_v4_ssd.model.mx.set_memory_limit") as set_memory_limit,
+            patch("deepseek_v4_ssd.model.mx.set_wired_limit") as set_wired_limit,
+        ):
+            selected = _configure_memory_limits(RuntimeConfig(memory_limit_gib=48))
+
+        self.assertEqual(selected, requested)
+        set_memory_limit.assert_called_once_with(requested)
+        set_wired_limit.assert_called_once_with(maximum)
+
+
 class PrefillTests(unittest.TestCase):
     def test_runtime_uses_1152_expert_slots_by_default(self):
         self.assertEqual(RuntimeConfig().slots, 1_152)
         self.assertEqual(RuntimeConfig().read_workers, 4)
+        self.assertEqual(RuntimeConfig().memory_limit_gib, 0)
         self.assertEqual(RuntimeConfig().dspark_slots, 768)
         self.assertTrue(RuntimeConfig().ready_expert_decode)
 

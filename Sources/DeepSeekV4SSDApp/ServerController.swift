@@ -197,6 +197,7 @@ struct ServerConfiguration: Codable, Equatable {
   var slots: Int
   var readWorkers: Int
   var powerSavingLimitGBps: Double?
+  var memoryLimitGiB: Int
   var prefillStepSize: Int
   var layerMajorPrefill: Bool
   var promptCacheEntries: Int
@@ -229,6 +230,7 @@ struct ServerConfiguration: Codable, Equatable {
       slots: 1_152,
       readWorkers: 4,
       powerSavingLimitGBps: nil,
+      memoryLimitGiB: 0,
       prefillStepSize: 0,
       layerMajorPrefill: true,
       promptCacheEntries: 2,
@@ -243,7 +245,7 @@ struct ServerConfiguration: Codable, Equatable {
       defaultTopP: 0.98
     )
     if let data = defaults.data(forKey: preferenceKey),
-      var saved = try? JSONDecoder().decode(ServerConfiguration.self, from: data)
+      var saved = decodeSavedConfiguration(data)
     {
       saved.runtimeDirectory = configuration.runtimeDirectory
       saved.pythonExecutable = configuration.pythonExecutable
@@ -260,6 +262,19 @@ struct ServerConfiguration: Codable, Equatable {
       configuration.apiKey = apiKey
     }
     return configuration
+  }
+
+  private static func decodeSavedConfiguration(_ data: Data) -> ServerConfiguration? {
+    if let configuration = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
+      return configuration
+    }
+    guard
+      var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      payload["memoryLimitGiB"] == nil
+    else { return nil }
+    payload["memoryLimitGiB"] = 0
+    guard let migrated = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+    return try? JSONDecoder().decode(ServerConfiguration.self, from: migrated)
   }
 
   func save(defaults: UserDefaults = .standard) {
@@ -289,6 +304,7 @@ struct ServerConfiguration: Codable, Equatable {
       "--public-model", publicModel,
       "--slots", String(slots),
       "--read-workers", String(readWorkers),
+      "--memory-limit-gib", String(memoryLimitGiB),
       "--prefill-step-size", String(prefillStepSize),
       "--prompt-cache-entries", String(promptCacheEntries),
       "--prompt-cache-memory-gib", String(promptCacheMemoryGiB),
@@ -350,9 +366,11 @@ struct ServerConfiguration: Codable, Equatable {
     guard dsparkSlots >= 30 else {
       throw ConfigurationError(L10n.string("DSpark slots must be at least 30."))
     }
-    guard readWorkers >= 1, prefillStepSize >= 0 else {
+    guard readWorkers >= 1, memoryLimitGiB >= 0, prefillStepSize >= 0 else {
       throw ConfigurationError(
-        L10n.string("Read workers must be greater than 0. Prefill step size must be 0 or greater."))
+        L10n.string(
+          "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater."
+        ))
     }
     guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
       throw ConfigurationError(

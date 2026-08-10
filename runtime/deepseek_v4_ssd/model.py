@@ -35,7 +35,7 @@ class RuntimeConfig:
     prefetch_read_workers: int = 2
     prefill_step_size: int = 0
     fp8_kv_cache: bool = True
-    memory_limit_gib: int = 48
+    memory_limit_gib: int = 0
     layer_major_prefill: bool = True
     prompt_cache_entries: int = 2
     prompt_cache_memory_gib: int = 8
@@ -51,6 +51,15 @@ class RuntimeConfig:
     expert_route_trace: str | None = None
     ready_expert_decode: bool = True
     power_saving_limit_gbps: float | None = None
+
+
+def _configure_memory_limits(config: RuntimeConfig) -> int:
+    maximum = mx.device_info()["max_recommended_working_set_size"]
+    requested = config.memory_limit_gib * 1024**3
+    memory_limit = requested if requested > 0 else maximum
+    mx.set_memory_limit(memory_limit)
+    mx.set_wired_limit(min(memory_limit, maximum))
+    return memory_limit
 
 
 def _select_prefill_step_size(configured: int, prompt_tokens: int) -> int:
@@ -534,8 +543,7 @@ def load_model(
         raise ValueError(
             "power saving limit must be 0.5, 1, 2, 3, 5, 10, or 25 GB/s"
         )
-    mx.set_memory_limit(config.memory_limit_gib * 1024**3)
-    mx.set_wired_limit(config.memory_limit_gib * 1024**3)
+    _configure_memory_limits(config)
     mx.set_cache_limit(1024**3)
 
     with (installed_model.root / "config.json").open("rb") as file:
