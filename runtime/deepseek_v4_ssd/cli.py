@@ -1,20 +1,38 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
+from pathlib import Path
 
 import mlx.core as mx
 
 from .generation import GenerationOptions, ModelRuntime
-from .model import RuntimeConfig
+from .model import (
+    RuntimeConfig,
+    _select_moe_step_size,
+)
+
+
+def _read_prompt(prompt: str | None, prompt_file: str | None) -> str:
+    if prompt_file is None:
+        assert prompt is not None
+        return prompt
+    return Path(prompt_file).read_text(encoding="utf-8")
+
+
+def _token_sha256(tokens) -> str:
+    return hashlib.sha256(",".join(map(str, tokens)).encode()).hexdigest()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run DeepSeek-V4 from an installed model")
     parser.add_argument("--model", required=True)
-    parser.add_argument("--prompt", required=True)
+    prompt = parser.add_mutually_exclusive_group(required=True)
+    prompt.add_argument("--prompt")
+    prompt.add_argument("--prompt-file")
     parser.add_argument("--max-tokens", type=int, default=272_000)
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--top-p", type=float, default=0.98)
@@ -38,6 +56,10 @@ def main() -> None:
     parser.add_argument("--expert-route-trace")
     parser.add_argument("--no-ready-expert-decode", action="store_true")
     arguments = parser.parse_args()
+    try:
+        prompt_text = _read_prompt(arguments.prompt, arguments.prompt_file)
+    except OSError as error:
+        parser.error(f"cannot read --prompt-file: {error}")
     if arguments.max_tokens < 1:
         parser.error("--max-tokens must be greater than zero")
     if not 0 <= arguments.temperature <= 2:
@@ -86,13 +108,15 @@ def main() -> None:
         ready_expert_decode=not arguments.no_ready_expert_decode,
     )
     runtime = ModelRuntime.open(arguments.model, config)
+    prompt_token_sha256 = _token_sha256(runtime._encode_prompt(prompt_text))
 
     started = time.perf_counter()
     generated = 0
+    generated_token_ids: list[int] = []
     prompt_tokens = 0
     try:
         for response in runtime.stream(
-            arguments.prompt,
+            prompt_text,
             GenerationOptions(
                 max_tokens=arguments.max_tokens,
                 temperature=arguments.temperature,
@@ -102,12 +126,38 @@ def main() -> None:
             sys.stdout.write(response.text)
             sys.stdout.flush()
             generated += 1
+            generated_token_ids.append(int(response.token))
             prompt_tokens = response.prompt_tokens
     finally:
         elapsed = time.perf_counter() - started
         metrics = runtime.expert_cache.metrics
+        runtime_metrics = runtime.metrics.snapshot()
+        prefill_kernel_tokens = runtime_metrics["layer_major_prefill_tokens"]
+        selected_moe_step_size = (
+            _select_moe_step_size(
+                config.moe_prefill_step_size,
+                prefill_kernel_tokens,
+            )
+            if prefill_kernel_tokens
+            else 0
+        )
+        selected_attention_step_size = runtime_metrics["request_prefill_step_size"]
+        attention_chunk_sizes = [
+            min(selected_attention_step_size, prefill_kernel_tokens - start)
+            for start in range(
+                0,
+                prefill_kernel_tokens,
+                selected_attention_step_size or 1,
+            )
+        ]
+        moe_chunk_sizes = [
+            min(selected_moe_step_size, prefill_kernel_tokens - start)
+            for start in range(0, prefill_kernel_tokens, selected_moe_step_size or 1)
+        ]
         result = {
             "generated_tokens": generated,
+            "prompt_token_sha256": prompt_token_sha256,
+            "token_sha256": _token_sha256(generated_token_ids),
             "prompt_tokens": prompt_tokens,
             "seconds": elapsed,
             "tokens_per_second": generated / elapsed if elapsed else 0.0,
@@ -131,12 +181,15 @@ def main() -> None:
             "fp8_kv_cache": config.fp8_kv_cache,
             "prefill_step_size": config.prefill_step_size,
             "moe_prefill_step_size": config.moe_prefill_step_size,
+            "selected_moe_prefill_step_size": selected_moe_step_size,
+            "prefill_attention_chunk_sizes": attention_chunk_sizes,
+            "prefill_moe_chunk_sizes": moe_chunk_sizes,
             "batched_expert_prefill": config.batched_expert_prefill,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
             "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
             "dspark_slots": config.dspark_slots,
-            **runtime.metrics.snapshot(),
+            **runtime_metrics,
         }
         sys.stderr.write("\n" + json.dumps(result, indent=2) + "\n")
         if arguments.metrics_json:

@@ -194,7 +194,6 @@ def layer_major_prefill(
         mx.eval(hidden)
         _clear_memory_cache()
 
-
 class _EmptySwitchGLU(nn.Module):
     def __init__(self, *_: object, activation: nn.Module, **__: object):
         super().__init__()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import threading
 import unittest
@@ -474,6 +475,12 @@ class PrefillTests(unittest.TestCase):
         self.assertEqual(_select_moe_step_size(0, 14_000), 4_096)
         self.assertEqual(_select_moe_step_size(2_048, 14_000), 2_048)
 
+    def test_metrics_report_layer_major_prefill_token_count(self):
+        metrics = RuntimeMetrics()
+        metrics.start(4_098, 0, 1_024, True, CacheMetrics())
+
+        self.assertEqual(metrics.snapshot()["layer_major_prefill_tokens"], 4_097)
+
     def test_layer_major_prefill_finishes_one_layer_before_the_next(self):
         calls = []
 
@@ -557,7 +564,6 @@ class PrefillTests(unittest.TestCase):
         mx.eval(expected, actual)
 
         self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
-
 
 class DSparkTests(unittest.TestCase):
     def test_hardware_scheduler_falls_back_when_dspark_costs_more(self):

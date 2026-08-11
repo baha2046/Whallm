@@ -28,6 +28,7 @@ class RouteTraceRecorder:
         self.expert_blob_size = expert_blob_size
         self._phase: str | None = None
         self._prefill = np.zeros((layer_count, expert_count), dtype=np.uint64)
+        self._prefill_chunks = [[] for _ in range(layer_count)]
         self._decode = [array("H") for _ in range(layer_count)]
         self._decode_misses = [array("B") for _ in range(layer_count)]
 
@@ -53,10 +54,12 @@ class RouteTraceRecorder:
         if values.size and (values.min() < 0 or values.max() >= self.expert_count):
             raise ValueError("route trace contains an invalid expert ID")
         if self._phase == "prefill":
-            self._prefill[layer] += np.bincount(
+            histogram = np.bincount(
                 values,
                 minlength=self.expert_count,
             ).astype(np.uint64)
+            self._prefill[layer] += histogram
+            self._prefill_chunks[layer].append(histogram.tolist())
         else:
             self._decode[layer].extend(values.tolist())
 
@@ -83,6 +86,7 @@ class RouteTraceRecorder:
             "selected_expert_count": self.selected_expert_count,
             "expert_blob_size": self.expert_blob_size,
             "prefill_histograms": self._prefill.tolist(),
+            "prefill_chunk_histograms": self._prefill_chunks,
             "decode_routes": [
                 [
                     list(routes[start : start + self.selected_expert_count])

@@ -457,6 +457,11 @@ class RuntimeMetrics:
                     if self._time_to_first_token_seconds
                     else 0.0
                 ),
+                "layer_major_prefill_tokens": (
+                    max(0, prefill_tokens - 1)
+                    if self._layer_major_prefill
+                    else 0
+                ),
                 "decode_seconds": self._decode_seconds,
                 "decode_model_step_seconds": self._decode_seconds,
                 "decode_cache_eval_seconds": self._decode_cache_eval_seconds,

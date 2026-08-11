@@ -1782,7 +1782,7 @@ def _parser() -> argparse.ArgumentParser:
         "--prefill-step-size",
         type=int,
         default=0,
-        help="prompt chunk size; 0 selects 128, 256, or 512 automatically",
+        help="prompt chunk size; 0 selects 128, 256, or 1,024 automatically",
     )
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
     parser.add_argument("--no-layer-major-prefill", action="store_true")

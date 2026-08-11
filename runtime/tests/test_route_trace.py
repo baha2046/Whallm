@@ -11,6 +11,22 @@ from deepseek_v4_ssd.route_trace import RouteTraceRecorder, analyze_handoff
 
 
 class RouteTraceTests(unittest.TestCase):
+    def test_trace_preserves_each_prefill_chunk_histogram(self):
+        recorder = RouteTraceRecorder(1, 4, 2, 10)
+        with recorder.phase("prefill"):
+            recorder.record(0, np.array([0, 1, 0, 2]))
+            recorder.record(0, np.array([1, 1, 1, 3]))
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "routes.json"
+            recorder.write(path)
+            trace = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            trace["prefill_chunk_histograms"],
+            [[[2, 1, 1, 0], [0, 3, 0, 1]]],
+        )
+
     def test_trace_measures_prefill_hot_set_decode_coverage(self):
         recorder = RouteTraceRecorder(2, 4, 2, 10)
         with recorder.phase("prefill"):
