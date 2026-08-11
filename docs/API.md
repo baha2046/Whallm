@@ -1,51 +1,127 @@
-# OpenAI-compatible server
+# OpenAI 相容 API
 
-The server keeps one installed model resident. It processes one generation
-request at a time. This matches the current batch size 1 runtime.
+server 預設監聽 `http://127.0.0.1:11434`。
+server 載入一個 installed model。
+server 一次只執行一個 generation request。
 
-## Start the macOS app
+本 API 是相容子集。
+本 API 不是 OpenAI API 的完整實作。
+
+## 啟動 server
+
+使用 APP：
 
 ```sh
-cd /Users/Shared/Project/test/llm_ssd
 make run
 ```
 
-Use the SwiftUI app to select the installed model, configure the runtime, and
-start the server. The default address is `http://127.0.0.1:11434`.
-
-Start the server without the app when needed:
+使用 command line：
 
 ```sh
 DEEPSEEK_API_KEY=local-key make server
 ```
 
-The server allows a local address without an API key. The server requires
-`--api-key` or `DEEPSEEK_API_KEY` when `--host` is not local.
-
-Use `--prefill-step-size 0` to select 128, 256, or 1,024 tokens automatically.
-Layer-major prefill is enabled for requests with at least 4,096 uncached
-tokens. The default layer-local MoE tile is 4,096 tokens. The runtime uses a
-strided routed expert layer and batched `gather_qmm` during this path. Use
-`--no-batched-expert-prefill` or `--no-layer-major-prefill` only for comparison.
-
-The server keeps two prompt cache timelines within an 8 GiB limit. It keeps up
-to eight persistent cache entries under `~/.dsmodel/prompt-cache/`. Use
-`--no-persistent-prompt-cache` to disable disk cache. Use
-`--warmup-prompt-file PATH` to populate a fixed UTF-8 prompt prefix during
-startup.
-
-The runtime uses four workers for individual routed expert reads. It uses two
-workers for full-layer prefetch. Use `--prefetch-read-workers` to change the
-second value. The indexer uses an FP4 cache by default. Use
-`--no-fp4-index-cache` for the MXFP8 comparison path.
-
-## OpenAI Python client
-
-Install the OpenAI client in the environment that calls the server:
+`MODEL`、`HOST` 和 `PORT` 可以由 Make 變數覆寫。
 
 ```sh
-python -m pip install openai
+MODEL=/path/to/model.dsv4 HOST=127.0.0.1 PORT=11434 make server
 ```
+
+## 驗證與網路邊界
+
+本機 host 可以不設定 API key。
+非本機 host 必須設定 `--api-key` 或 `DEEPSEEK_API_KEY`。
+
+需要驗證的 request 使用：
+
+```http
+Authorization: Bearer local-key
+```
+
+| Endpoint | 設定 key 後是否驗證 |
+| --- | --- |
+| `/v1/*` | 是 |
+| `GET /api/settings` | 是 |
+| `PUT /api/settings` | 是 |
+| `GET /` | 否 |
+| `GET /healthz` | 否 |
+| `GET /api/status` | 否 |
+
+`/api/status` 會回傳本機 `model_path`。
+server 不提供 TLS、CORS 或 rate limit。
+請勿把 server 直接暴露到不受信任的網路。
+
+## Endpoint
+
+| Method | Path | 用途 |
+| --- | --- | --- |
+| `GET` | `/` | 回傳 server 名稱和 API base。 |
+| `GET` | `/favicon.ico` | 回傳空的 `204` response。 |
+| `GET` | `/healthz` | 回傳基本存活狀態。 |
+| `GET` | `/v1/models` | 回傳目前公開 model ID。 |
+| `POST` | `/v1/chat/completions` | Chat Completions 相容子集。 |
+| `POST` | `/v1/responses` | Responses 相容子集。 |
+| `POST` | `/v1/completions` | Text Completions 相容子集。 |
+| `GET` | `/api/status` | 回傳 APP 和 profiling 使用的 runtime 狀態。 |
+| `GET` | `/api/settings` | 讀取目前 generation 預設值。 |
+| `PUT` | `/api/settings` | 修改目前 process 的 generation 預設值。 |
+
+未知 route 回傳 `404`。
+
+## 共用 request 欄位
+
+| 欄位 | 規則 |
+| --- | --- |
+| `model` | 必須等於 server 的公開 model ID。預設值是 `deepseek-v4-flash-0731`。 |
+| `max_tokens` | 1 至 272,000。預設值是 272,000。 |
+| `temperature` | 0 至 2。預設值是 0.2。 |
+| `top_p` | 0.000001 至 1。預設值是 0.98。 |
+| `stream` | 必須是 boolean。 |
+| `stream_options.include_usage` | 必須是 boolean。只影響 streaming response。 |
+| `n` | 只接受 `1`。 |
+
+`max_completion_tokens` 可以取代 Chat Completions 的 `max_tokens`。
+`max_output_tokens` 可以取代 Responses 的 `max_tokens`。
+
+server 明確拒絕下列 request：
+
+- `response_format` 不是 `null` 或 `[]`。
+- `stop` 不是 `null` 或 `[]`。
+- 非零的 `frequency_penalty`。
+- 非零的 `presence_penalty`。
+- 任何 `seed`。
+- `logprobs: true`。
+- `echo: true`。
+- `n` 不等於 `1`。
+
+未列出的未知欄位可能被忽略。
+client 不應依賴未知欄位。
+
+## Chat Completions
+
+### Request
+
+`messages` 必須是非空 array。
+
+支援下列 role：
+
+- `system`
+- `developer`
+- `user`
+- `assistant`
+- `tool`
+
+最後一個 message 必須是 `user`、`developer` 或 `tool`。
+
+`content` 可以是 string。
+`content` 也可以是 text part array。
+支援的 part type 是 `text`、`input_text` 和 `output_text`。
+
+assistant message 可以包含 `tool_calls`。
+tool message 必須包含對應的 `tool_call_id`。
+client 必須先提供所有 tool result，才能要求下一個 response。
+
+### Python 範例
 
 ```python
 from openai import OpenAI
@@ -65,20 +141,7 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)
 ```
 
-Use the Responses API when your client expects typed output items:
-
-```python
-response = client.responses.create(
-    model="deepseek-v4-flash-0731",
-    instructions="Answer briefly.",
-    input="法國的首都是哪裡？",
-    reasoning={"effort": "high"},
-)
-
-print(response.output_text)
-```
-
-## curl
+### curl 範例
 
 ```sh
 curl http://127.0.0.1:11434/v1/chat/completions \
@@ -92,94 +155,219 @@ curl http://127.0.0.1:11434/v1/chat/completions \
   }'
 ```
 
-Add `"stream": true` to receive `text/event-stream` chunks. Add
-`"stream_options": {"include_usage": true}` to receive a final usage chunk.
+### Response
 
-## Endpoints
+非 streaming response 使用 `chat.completion` shape。
+response 包含 `choices` 和 `usage`。
 
-- `GET /healthz`
-- `GET /v1/models`
-- `POST /v1/responses`
-- `POST /v1/chat/completions`
-- `POST /v1/completions`
-- `GET /api/status`
-- `GET /api/settings`
-- `PUT /api/settings`
+thinking mode 完成後，assistant message 可以包含 `reasoning_content`。
+`reasoning_content` 是 DeepSeekV4SSD extension。
 
-The `/api/settings` endpoint changes `max_tokens`, `temperature`, and `top_p`
-defaults in memory. A server restart restores the command-line defaults.
+## Responses
 
-## Supported request fields
+### 支援的 input
 
-- `model`
-- `messages` with text content, assistant `tool_calls`, and `role: tool` results
-- `prompt` for text completions
-- `max_tokens` and `max_completion_tokens`
-- `temperature`
-- `top_p`
-- `stream`
-- `stream_options.include_usage`
-- `n`, when its value is `1`
-- `thinking_mode`, with `chat` or `thinking`
-- `reasoning_effort` for Chat Completions
-- `tools`, with OpenAI function definitions
-- `tool_choice`, with `auto`, `none`, `required`, or one named function
+`input` 可以是 string。
+`input` 也可以是非空 item array。
 
-`/v1/responses` accepts a text `input` or an array of text message items. It
-also accepts `instructions`, `max_output_tokens`, `reasoning.effort`, function
-`tools`, Codex namespace tools, and `function_call_output` items. Set
-`stream: true` to receive typed
-Responses API events, including `response.output_text.delta`,
-`response.function_call_arguments.delta`, and `response.completed`.
+支援下列 item：
 
-The API maps Codex effort values to the DeepSeek-V4 encoder levels:
+- text `message`
+- `function_call`
+- `function_call_output`
+- `reasoning`
 
-| API effort | Thinking mode | DeepSeek-V4 effort |
-|---|---|---|
-| `none` | `chat` | `low` has no effect in chat mode |
-| `minimal`, `low`, `medium` | `thinking` | `low` |
+server 接受 replay 的 `reasoning` item，但不把該 item 加入 prompt。
+client 必須在後續 `input` 中重送需要的歷史 message 和 tool item。
+
+`instructions` 必須是 string。
+server 會把 `instructions` 轉成 `developer` message。
+
+### Python 範例
+
+```python
+response = client.responses.create(
+    model="deepseek-v4-flash-0731",
+    instructions="Answer briefly.",
+    input="法國的首都是哪裡？",
+    reasoning={"effort": "high"},
+)
+
+print(response.output_text)
+```
+
+### Stateless 限制
+
+Responses endpoint 不保存 server-side conversation。
+
+server 拒絕：
+
+- 非空的 `previous_response_id`。
+- 非空的 `conversation`。
+- `store: true`。
+- `background: true`。
+- `truncation` 不是 `disabled`。
+- `text.format` 不是 plain text。
+
+`metadata` 會原樣放入 response。
+`parallel_tool_calls` 只接受 boolean。
+該欄位不會讓本機 generation 並行。
+
+## Text Completions
+
+`POST /v1/completions` 需要 string `prompt`。
+response 使用 `text_completion` shape。
+
+Text Completions 不支援 `tools`。
+Text Completions 只接受 `tool_choice: none` 或省略該欄位。
+
+## Reasoning effort
+
+Chat Completions 使用 `reasoning_effort`。
+Responses 使用 `reasoning.effort`。
+
+| API effort | 預設 thinking mode | DeepSeek encoder effort |
+| --- | --- | --- |
+| 省略、`none` | `chat` | `low` |
+| `minimal`、`low`、`medium` | `thinking` | `low` |
 | `high` | `thinking` | `high` |
-| `xhigh`, `max` | `thinking` | `max` |
+| `xhigh`、`max` | `thinking` | `max` |
 
-Chat Completions uses `reasoning_effort`. Responses API uses
-`reasoning.effort`. An explicit `thinking_mode` overrides only the mode. The
-server still validates and forwards the selected effort.
+`thinking_mode` 可以是 `chat` 或 `thinking`。
+明確的 `thinking_mode` 只覆寫 mode。
+server 仍會驗證並傳送 encoder effort。
 
-The response adds `reasoning_content` when `thinking_mode` is `thinking` and
-the model finishes a reasoning block. This is a DeepSeek extension.
+## Tool
 
-The server returns a tool request in `message.tool_calls`. The client must run
-the function and send its result in a later `role: tool` message. The server
-does not run functions or external commands.
+### Chat Completions tool
 
-When a request uses both `stream: true` and `tools`, the server sends text and
-reasoning as the model generates them. It sends the function name when the
-DeepSeek tool block starts. It then sends `arguments` as SSE fragments. The
-official parser validates the complete response at the end. If validation
-fails, the stream sends an error event and then `[DONE]`.
+Chat Completions 支援 OpenAI function tool shape。
 
-## Current limits
+`tool_choice` 支援：
 
-- The server supports one text generation at a time.
-- Message content supports strings and OpenAI text content parts.
-- Images, audio, `response_format`, `stop`, and logprobs are not
-  supported.
-- `/v1/responses` is stateless. It does not support `previous_response_id`,
-  `conversation`, `store`, or `background`. Send earlier output items again in
-  `input` when you continue a Tool call.
-- `/v1/responses` supports function tools and Codex namespace tools. The server
-  ignores hosted `web_search` declarations because the local runtime cannot
-  execute them. It rejects other unsupported built-in tools.
-- The server returns an OpenAI error object when a request uses an unsupported
-  field.
-- The request body limit is 1 MiB.
-- The maximum requested output is 272,000 tokens.
+- `auto`
+- `none`
+- `required`
+- 指定一個 function
 
-`GET /api/status` reports both cumulative expert cache values and values for
-the latest request. Request fields include the selected prefill step, whether
-layer-major prefill ran, expert cache hits and misses, expert evictions, expert
-bytes read, SSD read time, and routing synchronization time.
+function name 必須使用 1 至 64 個字母、數字、底線或連字號。
+function name 在同一個 request 中必須唯一。
 
-DeepSeek-V4 uses the official encoder stored in the installed model. The model
-installer pins this file to the same revision as the model weights. The Runtime
-checks its SHA-256 before it loads the file.
+### Responses tool
+
+Responses 支援：
+
+- top-level function tool
+- Codex namespace tool
+- `function_call_output`
+
+server 會忽略 `web_search` tool declaration。
+server 不會執行 web search。
+server 會拒絕其他不支援的 built-in tool。
+
+server 只產生 tool request。
+client 必須執行 tool。
+client 必須把 tool result 傳回 server。
+
+## Streaming
+
+設定 `stream: true` 後，server 使用
+`text/event-stream; charset=utf-8`。
+
+Chat Completions 會傳送 `chat.completion.chunk`。
+Text Completions 會傳送 `text_completion` chunk。
+Chat Completions 和 Text Completions 的最後一個 SSE frame 是：
+
+```text
+data: [DONE]
+```
+
+設定 `stream_options.include_usage: true` 後，Chat Completions 會在結束前
+傳送 usage chunk。
+
+Responses 會傳送 typed event。
+主要 event 包含：
+
+- `response.created`
+- `response.in_progress`
+- `response.output_item.added`
+- `response.output_text.delta`
+- `response.function_call_arguments.delta`
+- `response.output_item.done`
+- `response.completed`
+
+Responses 不傳送 `[DONE]`。
+server 會在 `response.completed` 或 `error` 後關閉連線。
+
+tool streaming 會在 generation 過程中傳送 function name 和 arguments fragment。
+server 會在 generation 結束時驗證完整 tool block。
+Chat Completions 驗證失敗時會傳送 error object，然後傳送 `[DONE]`。
+Responses 驗證失敗時會傳送 `error` event，然後關閉連線。
+
+## APP 設定 API
+
+`GET /api/settings` 回傳：
+
+```json
+{
+  "max_tokens": 272000,
+  "temperature": 0.2,
+  "top_p": 0.98
+}
+```
+
+`PUT /api/settings` 可以更新一個或多個欄位。
+server 會拒絕未知設定。
+設定只存在目前 process 的記憶體。
+server restart 會還原 command-line 預設值。
+
+## Status API
+
+`GET /api/status` 回傳三類資料。
+
+| 區域 | 內容 |
+| --- | --- |
+| root | model ID、checkpoint model ID、installed model path 和 key 狀態。 |
+| `runtime` | slot、worker、prefill、cache 和 DSpark 設定。 |
+| `performance` | generation、時間、記憶體、SSD 和 expert cache 指標。 |
+
+`performance` 同時包含累計值和最近一次 request 值。
+欄位語意請見[效能與瓶頸](PERFORMANCE.md)。
+
+## Error
+
+錯誤使用 OpenAI error object shape。
+
+```json
+{
+  "error": {
+    "message": "model must be 'deepseek-v4-flash-0731'.",
+    "type": "invalid_request_error",
+    "param": "model",
+    "code": "model_not_found"
+  }
+}
+```
+
+常見 status code：
+
+| Status | 條件 |
+| ---: | --- |
+| 400 | JSON、欄位或 request 狀態無效。 |
+| 401 | Bearer API key 無效。 |
+| 404 | route 不存在。 |
+| 411 | 缺少 `Content-Length`。 |
+| 413 | request body 超過限制。 |
+| 500 | runtime 或 model output 發生內部錯誤。 |
+
+## 限制
+
+- request body 上限是 1 MiB。
+- request 必須包含 `Content-Length`。
+- server 不支援 chunked request body。
+- requested output 上限是 272,000 token。
+- output 上限不是已驗證 context 長度。
+- API 只支援文字。
+- API 不支援 image、audio、logprobs、stop 和 structured output。
+- server 一次只執行一個 generation request。
+- server 不執行 tool、web search 或外部 command。

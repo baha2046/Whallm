@@ -131,9 +131,8 @@ API client가 데이터를 다른 위치로 전송할 수는 있습니다.
 - 매우 긴 input과 output에는 더 많은 KV cache 메모리가 필요합니다.
 - 성능은 SSD 속도, input 길이, cache 상태에 따라 달라집니다.
 
-모델 계약, runtime 설계, 측정 결과에 따른 기술 판단은
-[runtime 연구](docs/RUNTIME_RESEARCH_2026-08-07.md)와
-[구현 계획](docs/IMPLEMENTATION_PLAN.md)을 확인하세요.
+모델 계약, runtime 설계, 검증, 성능, 연구 결론은
+[현재 문서](docs/README.md)를 확인하세요.
 
 DeepSeekV4SSD는 DeepSeek와 제휴하지 않습니다. 모델을 다운로드하고 사용하기 전에 모델 약관을
 확인하세요.

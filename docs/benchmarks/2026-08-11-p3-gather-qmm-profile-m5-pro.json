@@ -1,0 +1,327 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-08-11",
+  "timezone": "Asia/Taipei",
+  "evidence_kind": "current local P3 shader profile gate",
+  "experiment": {
+    "id": "P3-gather-qmm-profile-gate",
+    "stage": "profile gate",
+    "candidate_implemented": false,
+    "isolated_mlx_build_created": false
+  },
+  "source": {
+    "commit": "57e440e48b79fb0399beae7e9965481f74b35b25",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_capture": "115767735922976cde070f020d1a717e11cbc30f6a73b4e95c79ec2b013aa2f2",
+    "runtime_tracked_diff_sha256_at_capture": "131048e21f9b48cc193def0c81029a8387660042167c1569d924ecca12541b47",
+    "runtime_python_tree_sha256_at_capture": "b6040774303eb33c6b70d820cf0a2136d17e0c76a9851e0910c009d4905bbb4a",
+    "source_hash_timing": "Recorded after capture and before any later runtime source edit."
+  },
+  "hardware": {
+    "model": "MacBook Pro Mac17,8",
+    "chip": "Apple M5 Pro",
+    "cpu_cores": 18,
+    "gpu_cores": 20,
+    "unified_memory_gb": 64,
+    "model_storage": "internal APFS SSD over Apple Fabric",
+    "filevault": true,
+    "power_source": "AC",
+    "power_mode": 2,
+    "thermal_warning": false
+  },
+  "software": {
+    "macos": "27.0 (26A5388g)",
+    "xcode_and_xctrace": "27.0 (27A5218g)",
+    "python": "3.14.6",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1",
+    "numpy": "2.3.5"
+  },
+  "checkpoint": {
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
+  },
+  "workload": {
+    "name": "tool_like",
+    "prompt_tokens": 4096,
+    "layer_major_prefill_tokens": 4095,
+    "requested_output_tokens": 1,
+    "generated_tokens": 1,
+    "batch_size": 1,
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "prompt_text_sha256": "94140f4a5939265fb0367244ac1d1f5dc6164a73119605c88f0c667ee10d64d7",
+    "prompt_token_sha256": "f6ae5790bf4c79f610012c03c993afcf1297adff5b5ffd0ace5e3cf843fa3f15",
+    "output_token_sha256": "59e19706d51d39f66711c2653cd7eb1291c94d9b55eb14bda74ce4dc636d015a"
+  },
+  "runtime_config": {
+    "slots": 1152,
+    "read_workers": 4,
+    "prefetch_read_workers": 2,
+    "prefill_step_size": 0,
+    "moe_prefill_step_size": 0,
+    "selected_moe_prefill_step_size": 4095,
+    "layer_major_prefill": true,
+    "batched_expert_prefill": true,
+    "fp8_kv_cache": true,
+    "fp4_index_cache": true,
+    "ready_expert_decode": true,
+    "persistent_prompt_cache": false,
+    "dspark_enabled": false
+  },
+  "cache_state": {
+    "process": "fresh process",
+    "prompt_cache_reused_tokens": 0,
+    "persistent_prompt_cache": "disabled",
+    "os_page_cache": "not purged",
+    "other_system_activity": "not independently audited"
+  },
+  "capture_metrics": {
+    "request_seconds": 23.220004834001884,
+    "time_to_first_token_seconds": 23.219874292000895,
+    "prefill_tokens_per_second": 176.40061046372878,
+    "request_expert_bytes_read": 150070886400,
+    "request_expert_read_seconds": 15.821826781932032,
+    "request_ssd_read_bytes_per_second": 9485054315.685953,
+    "request_batched_expert_layers": 42,
+    "request_gather_qmm_calls": 84,
+    "peak_memory_bytes": 21407176748,
+    "note": "Metal GPU Counters changes runtime overhead. These values are capture context, not production wall-time results."
+  },
+  "shader_profile": {
+    "capture_started_at": "2026-08-11T15:32:37.571+08:00",
+    "capture_ended_at": "2026-08-11T15:33:06.890+08:00",
+    "capture_duration_seconds": 29.319171,
+    "template": "Metal System Trace",
+    "additional_instrument": "Metal GPU Counters",
+    "gpu_counter_set": "Performance Limiters",
+    "shader_timeline": "Enabled",
+    "command": "PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli --model scratch/deepseek-v4-flash-0731.dsv4 --prompt-file scratch/r0-profile/prompts/tool_like-4096.txt --max-tokens 1 --temperature 0 --top-p 1 --no-persistent-prompt-cache --metrics-json scratch/p3-gather-qmm-2026-08-11/tool-like-4096-gpu-counters.json",
+    "process_exit_status": 0,
+    "trace_bundle": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-gpu-counters.trace",
+      "file_count": 696,
+      "bytes": 930863054,
+      "note": "The bundle is ignored by git. Exported XML files are hashed below."
+    },
+    "request_alignment": {
+      "method": "Use the last Python GPU interval as request end, then subtract the runtime request_seconds value.",
+      "request_start_trace_seconds": 5.952490749,
+      "request_end_trace_seconds": 29.172495583
+    },
+    "python_gpu_busy_seconds": 13.305770397,
+    "python_gpu_busy_percent_of_request": 57.30304748910251,
+    "python_shader_interval_rows": 15404,
+    "python_shader_sample_work_seconds": 12.146058897,
+    "shader_sample_work_percent_of_gpu_busy": 91.28414616066519,
+    "gather_qmm_shader_intervals": 108,
+    "gather_qmm_layer_bursts": 42,
+    "runtime_gather_qmm_calls": 84,
+    "kernel_labels": [
+      {
+        "metal_shader_label": "mxfp4_gather_qmm_rhs_nax_nt_bfloat16_t_gs_32_b_4_bm_64_bn_64_bk_64_wm_2_wn_2_align_M_n_align_N_t_align_K_t (2)",
+        "shader_intervals": 82,
+        "sample_duration_seconds": 2.460733085
+      },
+      {
+        "metal_shader_label": "mxfp4_gather_qmm_rhs_nax_nt_bfloat16_t_gs_32_b_4_bm_64_bn_64_bk_64_wm_2_wn_2_align_M_n_align_N_t_align_K_t (64)",
+        "shader_intervals": 26,
+        "sample_duration_seconds": 0.505298959
+      }
+    ],
+    "kernel_contract": {
+      "operation": "mxfp4_gather_qmm_rhs_nax",
+      "transpose": "nt",
+      "output_dtype": "bfloat16",
+      "group_size": 32,
+      "bits": 4,
+      "bm": 64,
+      "bn": 64,
+      "bk": 64,
+      "wm": 2,
+      "wn": 2,
+      "note": "The trailing values in parentheses are Metal shader labels. They are not tile sizes."
+    },
+    "measured_gather_qmm_gpu_seconds": 2.966032044,
+    "measured_gather_qmm_percent_of_request": 12.773606488043159,
+    "gather_qmm_percent_of_sampled_shader_work": 24.419707405935526,
+    "coverage_normalized_gather_qmm_gpu_seconds": 3.249230199052986,
+    "coverage_normalized_gather_qmm_percent_of_request": 13.99323653152312,
+    "coverage_normalization_assumption": "Unassigned GPU busy time has the same shader mix as sampled shader work.",
+    "profile_gate": {
+      "threshold_percent_of_prefill": 15.0,
+      "measured_value_passes": false,
+      "coverage_normalized_value_passes": false
+    }
+  },
+  "route_distribution": {
+    "evidence_scope": "Supporting R0 route trace for the same fixed prompt. This route trace is not the timed capture run.",
+    "artifact": {
+      "path": "scratch/r0-profile/routes/tool_like-4096-routes.json",
+      "bytes": 105729,
+      "sha256": "87205d17592a0330c2c739347d9ca659ff6e2c83baf5de6547f1ca44459641a6"
+    },
+    "prompt_manifest": {
+      "path": "scratch/r0-profile/prompts/manifest.json",
+      "bytes": 5064,
+      "sha256": "82bf41ef8cb55306273cccf524e92784ac9e4d0306be7eeb03969d1bcde9c7db"
+    },
+    "prompt_text_sha256": "94140f4a5939265fb0367244ac1d1f5dc6164a73119605c88f0c667ee10d64d7",
+    "prompt_token_sha256": "f6ae5790bf4c79f610012c03c993afcf1297adff5b5ffd0ace5e3cf843fa3f15",
+    "batched_expert_layers": 42,
+    "experts_per_layer": 256,
+    "selected_experts_per_token": 6,
+    "expert_runs": 10752,
+    "active_expert_runs": 8115,
+    "active_expert_runs_percent": 75.47433035714286,
+    "routed_rows": 1031940,
+    "all_expert_runs": {
+      "count": 10752,
+      "min": 0,
+      "mean": 95.9765625,
+      "p50_nearest_rank": 13,
+      "p95_nearest_rank": 447,
+      "max": 2906
+    },
+    "active_expert_run_distribution": {
+      "count": 8115,
+      "min": 1,
+      "mean": 127.1645101663586,
+      "p50_nearest_rank": 39,
+      "p95_nearest_rank": 536,
+      "max": 2906
+    },
+    "bins": [
+      {
+        "rows_per_expert": "0",
+        "expert_runs": 2637,
+        "expert_runs_percent": 24.525669642857142,
+        "routed_rows": 0,
+        "routed_rows_percent": 0.0
+      },
+      {
+        "rows_per_expert": "1-15",
+        "expert_runs": 2943,
+        "expert_runs_percent": 27.371651785714285,
+        "routed_rows": 15463,
+        "routed_rows_percent": 1.498439831773165
+      },
+      {
+        "rows_per_expert": "16-31",
+        "expert_runs": 856,
+        "expert_runs_percent": 7.961309523809524,
+        "routed_rows": 19257,
+        "routed_rows_percent": 1.8660968660968662
+      },
+      {
+        "rows_per_expert": "32-63",
+        "expert_runs": 936,
+        "expert_runs_percent": 8.705357142857142,
+        "routed_rows": 42686,
+        "routed_rows_percent": 4.13648080314747
+      },
+      {
+        "rows_per_expert": "64-127",
+        "expert_runs": 1274,
+        "expert_runs_percent": 11.848958333333334,
+        "routed_rows": 123312,
+        "routed_rows_percent": 11.94953194953195
+      },
+      {
+        "rows_per_expert": "128-255",
+        "expert_runs": 958,
+        "expert_runs_percent": 8.909970238095237,
+        "routed_rows": 177826,
+        "routed_rows_percent": 17.232203422679614
+      },
+      {
+        "rows_per_expert": "256+",
+        "expert_runs": 1148,
+        "expert_runs_percent": 10.677083333333334,
+        "routed_rows": 653396,
+        "routed_rows_percent": 63.31724712677094
+      }
+    ],
+    "theoretical_tile_padding": [
+      {
+        "tile_rows": 64,
+        "allocated_rows": 1365504,
+        "padding_rows": 333564,
+        "padding_percent_of_allocated_rows": 24.427903543307085
+      },
+      {
+        "tile_rows": 32,
+        "allocated_rows": 1187808,
+        "padding_rows": 155868,
+        "padding_percent_of_allocated_rows": 13.122322799644387
+      },
+      {
+        "tile_rows": 16,
+        "allocated_rows": 1100912,
+        "padding_rows": 68972,
+        "padding_percent_of_allocated_rows": 6.264987573938698
+      }
+    ]
+  },
+  "correctness": {
+    "capture_process_exit_status": 0,
+    "prompt_hash_matches_manifest": true,
+    "output_token_sha256": "59e19706d51d39f66711c2653cd7eb1291c94d9b55eb14bda74ce4dc636d015a",
+    "candidate_elementwise_test_run": false,
+    "candidate_end_to_end_parity_run": false,
+    "reason": "The profile gate failed before candidate implementation."
+  },
+  "decision": {
+    "profile_gate_passed": false,
+    "decision": "stop P3 before an isolated MLX build",
+    "reason": "Measured and coverage-normalized gather_qmm GPU shares are both below the 15% Prefill stop threshold.",
+    "runtime_change": "none"
+  },
+  "limitations": [
+    "This is one diagnostic capture of one 4K workload.",
+    "Metal GPU Counters changes runtime overhead.",
+    "Request start is inferred from the last Python GPU interval and request_seconds.",
+    "The shader timeline reports sampled intervals and can fragment one logical call.",
+    "Coverage normalization assumes the missing GPU work has the sampled shader mix.",
+    "The rows-per-expert distribution comes from a separate R0 route trace of the same fixed prompt.",
+    "No candidate was built, so this artifact does not measure a tile speedup."
+  ],
+  "artifacts": {
+    "metrics": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-gpu-counters.json",
+      "bytes": 4166,
+      "sha256": "45608189ab4b9a50f6d79f45b38fc5ad1d16c579578f32540592f941f428df76"
+    },
+    "trace_toc": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-gpu-counters-toc.xml",
+      "bytes": 31640,
+      "sha256": "1aedf8c28ac78a874d5c784dce7372df89775c72bc5c7a0c8c78a99ddd26a28e"
+    },
+    "gpu_intervals": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-gpu-intervals.xml",
+      "bytes": 7358214,
+      "sha256": "2bcda50108e5694349056f85e8f33effc8acb91b74e5d772c8dbb1b1381e150b"
+    },
+    "shader_intervals": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-shader-intervals.xml",
+      "bytes": 8902766,
+      "sha256": "0091e9de690cabd5ab3ed3b1d782eee824c940bca741e66c9adeeeb31e834a5f"
+    },
+    "shader_catalog": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-shaders.xml",
+      "bytes": 1051229,
+      "sha256": "08c5f18974aed1e4f94d9d029a1af25552c0ee8ad2a222a8bb7687af9f8d25dc"
+    },
+    "profiler_windows": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-profiler-windows.xml",
+      "bytes": 7522483,
+      "sha256": "83a15477f70d2f682c75161eb46c3d04aa46686ae44d58b902ca5d6d01470f7a"
+    },
+    "profiler_samples": {
+      "path": "scratch/p3-gather-qmm-2026-08-11/tool-like-4096-profiler-samples.xml",
+      "bytes": 532,
+      "sha256": "94b5776a56416b35de74c85cffe45c3796a6cf4e3841cbedf7261fc0a0146b17"
+    }
+  }
+}

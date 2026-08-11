@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "exploratory TTFT paired ABBA",
+  "recorded_on": "2026-08-10",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "commit": "57e440e48b79fb0399beae7e9965481f74b35b25",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_test_start": "68d55f02df9a0a03df997cb3bffd19986f88dac6dcccd7f6e2a869f8ed36a2e6",
+    "runtime_python_tree_sha256": "97f45f23a16a8c12f5c2502abed9bbddef6a55c8ffc599d20c27af88dc2aac69",
+    "runtime_python_tree_hash_method": "sort runtime/deepseek_v4_ssd Python paths, hash each file with SHA-256, then hash the resulting lines"
+  },
+  "checkpoint": {
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
+  },
+  "hardware": {
+    "model": "MacBook Pro Mac17,8",
+    "chip": "Apple M5 Pro",
+    "cpu_cores": 18,
+    "gpu_cores": 20,
+    "unified_memory_gb": 64,
+    "model_storage": "internal APFS SSD over Apple Fabric",
+    "filevault": true,
+    "power_source": "AC",
+    "power_mode": 2
+  },
+  "software": {
+    "macos": "27.0 (26A5388g)",
+    "python": "3.14.6",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1",
+    "numpy": "2.3.5"
+  },
+  "experiment": {
+    "id": "R2c-prefetch1",
+    "objective": "Compare prefetch_read_workers=2 with prefetch_read_workers=1 for 4K TTFT",
+    "control_prefetch_read_workers": 2,
+    "candidate_prefetch_read_workers": 1,
+    "slots": 1152,
+    "read_workers": 4,
+    "case": "code-4096",
+    "run_pattern": [
+      "A:2",
+      "B:1",
+      "B:1",
+      "A:2"
+    ],
+    "completed_run_count": 4,
+    "stopped_early": false
+  },
+  "generation": {
+    "batch_size": 1,
+    "runtime_prompt_tokens": 4096,
+    "requested_output_tokens": 1,
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "persistent_prompt_cache": false,
+    "prompt_cache_entries": 1,
+    "dspark_enabled": false
+  },
+  "cache_state": {
+    "process": "fresh process for each run",
+    "expert_cache_at_start": "empty",
+    "prompt_cache_at_start": "empty",
+    "os_page_cache": "not purged"
+  },
+  "system_memory": {
+    "initial_free_percent": 92,
+    "final_free_percent": 92,
+    "initial_swap_used_mib": 337.12,
+    "final_swap_used_mib": 337.12,
+    "initial_compressor_pages": 82814,
+    "final_compressor_pages": 83258,
+    "page_size_bytes": 16384,
+    "scope": "system-wide; other processes are included"
+  },
+  "runs": [
+    {
+      "run": 1,
+      "position": "A1",
+      "prefetch_read_workers": 2,
+      "time_to_first_token_seconds": 22.083660832999158,
+      "prefill_tokens_per_second": 185.4764946344146,
+      "request_seconds": 22.083799375002855,
+      "expert_bytes_read": 149990670336,
+      "expert_read_seconds": 14.56322037204518,
+      "prefetched_layer_hits": 40,
+      "routing_sync_seconds": 0.07338421099848347,
+      "gather_qmm_calls": 84,
+      "mlx_peak_memory_bytes": 21407258672,
+      "external_wall_seconds": 28.33,
+      "maximum_resident_set_bytes": 17809424384,
+      "peak_memory_footprint_bytes": 21846778784,
+      "prompt_token_sha256": "690ba3962787ad702a2ab74dfe47b7f0444043a62047a131264a931bebf8609c",
+      "output_token_sha256": "2a7185fd600ecd7bd4b998bc7dbf460bd0dd2f1b9529ebdf0f662a48be746642"
+    },
+    {
+      "run": 2,
+      "position": "B1",
+      "prefetch_read_workers": 1,
+      "time_to_first_token_seconds": 23.778839874998084,
+      "prefill_tokens_per_second": 172.25398806384493,
+      "request_seconds": 23.778965375000553,
+      "expert_bytes_read": 149990670336,
+      "expert_read_seconds": 19.41057829897909,
+      "prefetched_layer_hits": 1,
+      "routing_sync_seconds": 0.07518241505022161,
+      "gather_qmm_calls": 84,
+      "mlx_peak_memory_bytes": 21407193132,
+      "external_wall_seconds": 29.73,
+      "maximum_resident_set_bytes": 17809588224,
+      "peak_memory_footprint_bytes": 21878219176,
+      "prompt_token_sha256": "690ba3962787ad702a2ab74dfe47b7f0444043a62047a131264a931bebf8609c",
+      "output_token_sha256": "2a7185fd600ecd7bd4b998bc7dbf460bd0dd2f1b9529ebdf0f662a48be746642"
+    },
+    {
+      "run": 3,
+      "position": "B2",
+      "prefetch_read_workers": 1,
+      "time_to_first_token_seconds": 23.700208709000435,
+      "prefill_tokens_per_second": 172.82548226862218,
+      "request_seconds": 23.700335959001677,
+      "expert_bytes_read": 149990670336,
+      "expert_read_seconds": 19.376926629032823,
+      "prefetched_layer_hits": 0,
+      "routing_sync_seconds": 0.07696987802046351,
+      "gather_qmm_calls": 84,
+      "mlx_peak_memory_bytes": 21407224380,
+      "external_wall_seconds": 29.68,
+      "maximum_resident_set_bytes": 17809522688,
+      "peak_memory_footprint_bytes": 21863162208,
+      "prompt_token_sha256": "690ba3962787ad702a2ab74dfe47b7f0444043a62047a131264a931bebf8609c",
+      "output_token_sha256": "2a7185fd600ecd7bd4b998bc7dbf460bd0dd2f1b9529ebdf0f662a48be746642"
+    },
+    {
+      "run": 4,
+      "position": "A2",
+      "prefetch_read_workers": 2,
+      "time_to_first_token_seconds": 21.989659375001793,
+      "prefill_tokens_per_second": 186.26937007748288,
+      "request_seconds": 21.98979212500126,
+      "expert_bytes_read": 149990670336,
+      "expert_read_seconds": 14.499518964970775,
+      "prefetched_layer_hits": 39,
+      "routing_sync_seconds": 0.07698596599220764,
+      "gather_qmm_calls": 84,
+      "mlx_peak_memory_bytes": 21407274548,
+      "external_wall_seconds": 27.91,
+      "maximum_resident_set_bytes": 17809489920,
+      "peak_memory_footprint_bytes": 21888558104,
+      "prompt_token_sha256": "690ba3962787ad702a2ab74dfe47b7f0444043a62047a131264a931bebf8609c",
+      "output_token_sha256": "2a7185fd600ecd7bd4b998bc7dbf460bd0dd2f1b9529ebdf0f662a48be746642"
+    }
+  ],
+  "paired_median": {
+    "prefetch_workers_2_ttft_seconds": 22.036660104000475,
+    "prefetch_workers_1_ttft_seconds": 23.73952429199926,
+    "ttft_improvement_percent": -7.727415043669206,
+    "prefill_tokens_per_second_delta_percent": -7.173286083517505,
+    "expert_read_seconds_delta_percent": 33.46128346067483,
+    "prefetched_layer_hits_2_workers": 39.5,
+    "prefetched_layer_hits_1_worker": 0.5,
+    "routing_sync_seconds_delta_percent": 1.1851526118136668,
+    "external_wall_seconds_delta_percent": 5.636557610241821,
+    "peak_memory_footprint_delta_mib": 2.8822402954101562,
+    "individual_ttft_improvements_percent": [
+      -7.676168615422019,
+      -7.77888054029261
+    ]
+  },
+  "decision": {
+    "prefetch_read_workers_1": "rejected",
+    "default_prefetch_read_workers": 2,
+    "reason": "TTFT regressed by 7.73%, expert read time increased by 33.46%, and prefetch hits fell from a median of 39.5 to 0.5.",
+    "next_experiment": "R2 is complete; retain slots=1152, read_workers=4, and prefetch_read_workers=2"
+  },
+  "limitations": [
+    "This is an exploratory one-workload, one-round ABBA result.",
+    "The result is sufficient to reject 1 prefetch worker but not to estimate cross-workload variance.",
+    "The OS page cache was not purged.",
+    "Expert read timers can overlap with GPU work and cannot be added to TTFT.",
+    "System memory counters include other processes.",
+    "The checkout was dirty; commit and source hashes are recorded."
+  ]
+}

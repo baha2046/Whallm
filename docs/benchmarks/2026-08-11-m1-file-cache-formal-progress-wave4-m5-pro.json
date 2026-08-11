@@ -1,0 +1,767 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "formal-study interim paired ABBA progress; study incomplete",
+  "recorded_on": "2026-08-11",
+  "timezone": "Asia/Taipei",
+  "experiment": {
+    "id": "M1-file-cache-formal-progress-wave-04",
+    "completed_wave_count": 4,
+    "planned_wave_count": 5,
+    "remaining_wave_count": 1,
+    "measured_run_count": 80,
+    "measured_pair_count": 40,
+    "formal_study_completed": false,
+    "formal_adoption_decision_available": false
+  },
+  "source": {
+    "commit": "57e440e48b79fb0399beae7e9965481f74b35b25",
+    "runtime_python_tree_sha256": "6c8cbd37722b961f394530fa2aede5eda05794bfd739d8b115ee500cbff5fef8",
+    "wave_tracked_diff_sha256": [
+      {
+        "wave": 1,
+        "sha256": "77679c2a065dbb72ac705d3c357d18a9ba44e2c93049ad631d2518410d02a302"
+      },
+      {
+        "wave": 2,
+        "sha256": "65ff87510542122839af3f47f415246a0f5862598678adfab7bf35cec0c0ab9e"
+      },
+      {
+        "wave": 3,
+        "sha256": "cc38d58ee8ac14d6956a71788b8b2693bc5f70d62df9509794fec77a2a65db11"
+      },
+      {
+        "wave": 4,
+        "sha256": "4aac6d012642eaed94a2555cf847c90e447b9d0bc971cd951eae1186ec7229ff"
+      }
+    ]
+  },
+  "wave_artifacts": [
+    "docs/benchmarks/2026-08-11-m1-file-cache-formal-wave1-m5-pro.json",
+    "docs/benchmarks/2026-08-11-m1-file-cache-formal-wave2-m5-pro.json",
+    "docs/benchmarks/2026-08-11-m1-file-cache-formal-wave3-m5-pro.json",
+    "docs/benchmarks/2026-08-11-m1-file-cache-formal-wave4-m5-pro.json"
+  ],
+  "prompt_orders": [
+    {
+      "wave": 1,
+      "order": [
+        "repeated",
+        "code",
+        "zh_technical",
+        "mixed_math",
+        "tool_like"
+      ]
+    },
+    {
+      "wave": 2,
+      "order": [
+        "code",
+        "zh_technical",
+        "mixed_math",
+        "tool_like",
+        "repeated"
+      ]
+    },
+    {
+      "wave": 3,
+      "order": [
+        "zh_technical",
+        "mixed_math",
+        "tool_like",
+        "repeated",
+        "code"
+      ]
+    },
+    {
+      "wave": 4,
+      "order": [
+        "mixed_math",
+        "tool_like",
+        "repeated",
+        "code",
+        "zh_technical"
+      ]
+    }
+  ],
+  "correctness": {
+    "all_waves_passed": true,
+    "all_output_hashes_equal_within_workload_across_waves": true,
+    "all_stop_conditions_clear": true
+  },
+  "workload_summary": [
+    {
+      "workload": "repeated",
+      "role": "regression control",
+      "pair_count": 8,
+      "pair_results": [
+        {
+          "wave": 1,
+          "pair": "A1/B1",
+          "request_improvement_percent": 2.9599968846050544,
+          "time_to_first_token_improvement_percent": 9.002581230161061,
+          "prefill_throughput_delta_percent": 9.893227029803361,
+          "decode_throughput_delta_percent": -4.005528312128404,
+          "expert_read_improvement_percent": 22.037504436374284,
+          "external_wall_improvement_percent": 2.576524994494593,
+          "maximum_resident_set_increase_bytes": 49152,
+          "peak_memory_footprint_increase_bytes": 262096,
+          "peak_memory_increase_bytes": 203824
+        },
+        {
+          "wave": 1,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.1049297514160306,
+          "time_to_first_token_improvement_percent": 7.468082884392496,
+          "prefill_throughput_delta_percent": 8.070818283233029,
+          "decode_throughput_delta_percent": -1.7961397105988464,
+          "expert_read_improvement_percent": 21.782177896254748,
+          "external_wall_improvement_percent": 2.7930503628766132,
+          "maximum_resident_set_increase_bytes": 1310720,
+          "peak_memory_footprint_increase_bytes": 1245160,
+          "peak_memory_increase_bytes": 8440
+        },
+        {
+          "wave": 2,
+          "pair": "A1/B1",
+          "request_improvement_percent": 6.87089951730962,
+          "time_to_first_token_improvement_percent": 9.494900981128865,
+          "prefill_throughput_delta_percent": 10.491012201587768,
+          "decode_throughput_delta_percent": 3.8325179258659325,
+          "expert_read_improvement_percent": 22.62639326559906,
+          "external_wall_improvement_percent": 6.0538116591928315,
+          "maximum_resident_set_increase_bytes": 1933312,
+          "peak_memory_footprint_increase_bytes": 3244032,
+          "peak_memory_increase_bytes": 71696
+        },
+        {
+          "wave": 2,
+          "pair": "A2/B2",
+          "request_improvement_percent": 8.385841801276028,
+          "time_to_first_token_improvement_percent": 12.620179793092206,
+          "prefill_throughput_delta_percent": 14.442899702939105,
+          "decode_throughput_delta_percent": 3.4495492775567356,
+          "expert_read_improvement_percent": 23.850594852740702,
+          "external_wall_improvement_percent": 7.299440298507467,
+          "maximum_resident_set_increase_bytes": 360448,
+          "peak_memory_footprint_increase_bytes": 114664,
+          "peak_memory_increase_bytes": 172560
+        },
+        {
+          "wave": 3,
+          "pair": "A1/B1",
+          "request_improvement_percent": 8.119781396974378,
+          "time_to_first_token_improvement_percent": 12.095642706219044,
+          "prefill_throughput_delta_percent": 13.760003575015938,
+          "decode_throughput_delta_percent": 3.3039376258206774,
+          "expert_read_improvement_percent": 24.1724876852718,
+          "external_wall_improvement_percent": 7.274701411509217,
+          "maximum_resident_set_increase_bytes": 157614080,
+          "peak_memory_footprint_increase_bytes": -23560264,
+          "peak_memory_increase_bytes": 57596
+        },
+        {
+          "wave": 3,
+          "pair": "A2/B2",
+          "request_improvement_percent": 7.739232059342247,
+          "time_to_first_token_improvement_percent": 11.625683041203203,
+          "prefill_throughput_delta_percent": 13.155047123728838,
+          "decode_throughput_delta_percent": 3.203559718343501,
+          "expert_read_improvement_percent": 23.35993141737146,
+          "external_wall_improvement_percent": 6.822880771881458,
+          "maximum_resident_set_increase_bytes": -606208,
+          "peak_memory_footprint_increase_bytes": -1032216,
+          "peak_memory_increase_bytes": -42248
+        },
+        {
+          "wave": 4,
+          "pair": "A1/B1",
+          "request_improvement_percent": 5.716687315494832,
+          "time_to_first_token_improvement_percent": 9.229231363477787,
+          "prefill_throughput_delta_percent": 10.167624998786614,
+          "decode_throughput_delta_percent": 1.5134310374469808,
+          "expert_read_improvement_percent": 22.435744474261703,
+          "external_wall_improvement_percent": 5.046567034871124,
+          "maximum_resident_set_increase_bytes": -950272,
+          "peak_memory_footprint_increase_bytes": -2113512,
+          "peak_memory_increase_bytes": 60700
+        },
+        {
+          "wave": 4,
+          "pair": "A2/B2",
+          "request_improvement_percent": 9.798473927318557,
+          "time_to_first_token_improvement_percent": 12.418807911285553,
+          "prefill_throughput_delta_percent": 14.179765786592688,
+          "decode_throughput_delta_percent": 7.198283299253414,
+          "expert_read_improvement_percent": 23.660558476510566,
+          "external_wall_improvement_percent": 6.657700067249493,
+          "maximum_resident_set_increase_bytes": -1622016,
+          "peak_memory_footprint_increase_bytes": -2408448,
+          "peak_memory_increase_bytes": 166416
+        }
+      ],
+      "paired_median_improvement_percent": {
+        "request": 7.305065788325933,
+        "time_to_first_token": 10.560292011166034,
+        "prefill_throughput": 11.823029662658303,
+        "decode_throughput": 3.2537486720820894,
+        "expert_read": 22.99316234148526,
+        "external_wall": 6.355755863221162
+      },
+      "request_pairs_improved": 8,
+      "maximum_resident_set_increase_bytes_median": 204800,
+      "peak_memory_footprint_increase_bytes_median": -458776,
+      "peak_memory_increase_bytes_median": 66198
+    },
+    {
+      "workload": "code",
+      "role": "primary",
+      "pair_count": 8,
+      "pair_results": [
+        {
+          "wave": 1,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.768341585767064,
+          "time_to_first_token_improvement_percent": 8.077879751849526,
+          "prefill_throughput_delta_percent": 8.787743069940841,
+          "decode_throughput_delta_percent": 0.7205090357894557,
+          "expert_read_improvement_percent": 12.087334114147172,
+          "external_wall_improvement_percent": 3.292250548708418,
+          "maximum_resident_set_increase_bytes": 4472832,
+          "peak_memory_footprint_increase_bytes": 5865448,
+          "peak_memory_increase_bytes": 100880
+        },
+        {
+          "wave": 1,
+          "pair": "A2/B2",
+          "request_improvement_percent": 5.306424287278647,
+          "time_to_first_token_improvement_percent": 9.013269116993165,
+          "prefill_throughput_delta_percent": 9.906135795320164,
+          "decode_throughput_delta_percent": 2.765541801854333,
+          "expert_read_improvement_percent": 12.582136594591072,
+          "external_wall_improvement_percent": 4.795884500497844,
+          "maximum_resident_set_increase_bytes": 1179648,
+          "peak_memory_footprint_increase_bytes": 2539520,
+          "peak_memory_increase_bytes": -10320
+        },
+        {
+          "wave": 2,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.5486724092889297,
+          "time_to_first_token_improvement_percent": 7.892104621881749,
+          "prefill_throughput_delta_percent": 8.568325863362032,
+          "decode_throughput_delta_percent": 0.46312842213220795,
+          "expert_read_improvement_percent": 11.225370740353865,
+          "external_wall_improvement_percent": 2.8508399796368566,
+          "maximum_resident_set_increase_bytes": -1146880,
+          "peak_memory_footprint_increase_bytes": -1261568,
+          "peak_memory_increase_bytes": 29960
+        },
+        {
+          "wave": 2,
+          "pair": "A2/B2",
+          "request_improvement_percent": 4.0181451294139725,
+          "time_to_first_token_improvement_percent": 7.766411657815694,
+          "prefill_throughput_delta_percent": 8.420372445016987,
+          "decode_throughput_delta_percent": 1.3972145184764702,
+          "expert_read_improvement_percent": 11.44819676573933,
+          "external_wall_improvement_percent": 3.714333952388985,
+          "maximum_resident_set_increase_bytes": -491520,
+          "peak_memory_footprint_increase_bytes": -245832,
+          "peak_memory_increase_bytes": 307404
+        },
+        {
+          "wave": 3,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.709137410121257,
+          "time_to_first_token_improvement_percent": 7.447692753798926,
+          "prefill_throughput_delta_percent": 8.047009280910839,
+          "decode_throughput_delta_percent": 1.0707697485666834,
+          "expert_read_improvement_percent": 11.421505095354007,
+          "external_wall_improvement_percent": 3.3837782690018736,
+          "maximum_resident_set_increase_bytes": -3358720,
+          "peak_memory_footprint_increase_bytes": -3424304,
+          "peak_memory_increase_bytes": -684
+        },
+        {
+          "wave": 3,
+          "pair": "A2/B2",
+          "request_improvement_percent": 4.43981455896052,
+          "time_to_first_token_improvement_percent": 7.960368659160717,
+          "prefill_throughput_delta_percent": 8.648848917790692,
+          "decode_throughput_delta_percent": 1.9902644046024967,
+          "expert_read_improvement_percent": 11.629457654281,
+          "external_wall_improvement_percent": 4.062025956514406,
+          "maximum_resident_set_increase_bytes": 2818048,
+          "peak_memory_footprint_increase_bytes": 3506152,
+          "peak_memory_increase_bytes": 214208
+        },
+        {
+          "wave": 4,
+          "pair": "A1/B1",
+          "request_improvement_percent": 4.165198947940369,
+          "time_to_first_token_improvement_percent": 4.894691436824106,
+          "prefill_throughput_delta_percent": 5.146601710011482,
+          "decode_throughput_delta_percent": 3.8086592987560244,
+          "expert_read_improvement_percent": 10.604203688381212,
+          "external_wall_improvement_percent": 3.207855973813422,
+          "maximum_resident_set_increase_bytes": -158023680,
+          "peak_memory_footprint_increase_bytes": 21544912,
+          "peak_memory_increase_bytes": 321744
+        },
+        {
+          "wave": 4,
+          "pair": "A2/B2",
+          "request_improvement_percent": 2.4359044831531333,
+          "time_to_first_token_improvement_percent": 6.718181622520963,
+          "prefill_throughput_delta_percent": 7.202026868017112,
+          "decode_throughput_delta_percent": -0.6297012294959821,
+          "expert_read_improvement_percent": 10.116218984012121,
+          "external_wall_improvement_percent": 2.1172912115610787,
+          "maximum_resident_set_increase_bytes": -5996544,
+          "peak_memory_footprint_increase_bytes": 557032,
+          "peak_memory_increase_bytes": -43772
+        }
+      ],
+      "paired_median_improvement_percent": {
+        "request": 3.893243357590518,
+        "time_to_first_token": 7.829258139848722,
+        "prefill_throughput": 8.49434915418951,
+        "decode_throughput": 1.2339921335215767,
+        "expert_read": 11.43485093054667,
+        "external_wall": 3.3380144088551456
+      },
+      "request_pairs_improved": 8,
+      "maximum_resident_set_increase_bytes_median": -819200,
+      "peak_memory_footprint_increase_bytes_median": 1548276,
+      "peak_memory_increase_bytes_median": 65420
+    },
+    {
+      "workload": "zh_technical",
+      "role": "primary",
+      "pair_count": 8,
+      "pair_results": [
+        {
+          "wave": 1,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.2582638447497327,
+          "time_to_first_token_improvement_percent": 7.9630879144721884,
+          "prefill_throughput_delta_percent": 8.652058977241959,
+          "decode_throughput_delta_percent": 0.014857440768942983,
+          "expert_read_improvement_percent": 10.33604625019598,
+          "external_wall_improvement_percent": 2.923203963666385,
+          "maximum_resident_set_increase_bytes": 2211840,
+          "peak_memory_footprint_increase_bytes": 1490920,
+          "peak_memory_increase_bytes": 26648
+        },
+        {
+          "wave": 1,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.547323598844502,
+          "time_to_first_token_improvement_percent": 8.279968088474556,
+          "prefill_throughput_delta_percent": 9.027436990494657,
+          "decode_throughput_delta_percent": 0.24406864190484567,
+          "expert_read_improvement_percent": 11.145223742859818,
+          "external_wall_improvement_percent": 3.247609627431584,
+          "maximum_resident_set_increase_bytes": -1032192,
+          "peak_memory_footprint_increase_bytes": -376832,
+          "peak_memory_increase_bytes": 70664
+        },
+        {
+          "wave": 2,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.5630657887363126,
+          "time_to_first_token_improvement_percent": 8.217931021307914,
+          "prefill_throughput_delta_percent": 8.953743484705896,
+          "decode_throughput_delta_percent": 0.33672709472228257,
+          "expert_read_improvement_percent": 10.437786722733419,
+          "external_wall_improvement_percent": 3.2311792138574247,
+          "maximum_resident_set_increase_bytes": -49152,
+          "peak_memory_footprint_increase_bytes": -1261640,
+          "peak_memory_increase_bytes": 72936
+        },
+        {
+          "wave": 2,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.756844188992222,
+          "time_to_first_token_improvement_percent": 8.309669736871715,
+          "prefill_throughput_delta_percent": 9.062754723453432,
+          "decode_throughput_delta_percent": 0.6074156704457387,
+          "expert_read_improvement_percent": 11.007171068192369,
+          "external_wall_improvement_percent": 3.4773969200198733,
+          "maximum_resident_set_increase_bytes": -327680,
+          "peak_memory_footprint_increase_bytes": -852016,
+          "peak_memory_increase_bytes": 4336
+        },
+        {
+          "wave": 3,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.8452857164951335,
+          "time_to_first_token_improvement_percent": 6.910034664215885,
+          "prefill_throughput_delta_percent": 7.4229640534194665,
+          "decode_throughput_delta_percent": 1.7707556549474,
+          "expert_read_improvement_percent": 11.550580853641211,
+          "external_wall_improvement_percent": 3.625426759876438,
+          "maximum_resident_set_increase_bytes": 278528,
+          "peak_memory_footprint_increase_bytes": 294888,
+          "peak_memory_increase_bytes": -2476
+        },
+        {
+          "wave": 3,
+          "pair": "A2/B2",
+          "request_improvement_percent": 4.724726578921259,
+          "time_to_first_token_improvement_percent": 10.418987210550734,
+          "prefill_throughput_delta_percent": 11.630798632562314,
+          "decode_throughput_delta_percent": 0.6722184875069104,
+          "expert_read_improvement_percent": 12.091473941750431,
+          "external_wall_improvement_percent": 4.472271914132379,
+          "maximum_resident_set_increase_bytes": 1245184,
+          "peak_memory_footprint_increase_bytes": 212944,
+          "peak_memory_increase_bytes": 49664
+        },
+        {
+          "wave": 4,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.291143099220419,
+          "time_to_first_token_improvement_percent": 7.695198874067698,
+          "prefill_throughput_delta_percent": 8.336726562650911,
+          "decode_throughput_delta_percent": 0.21978305180373253,
+          "expert_read_improvement_percent": 10.476982414561395,
+          "external_wall_improvement_percent": 2.8828528578570185,
+          "maximum_resident_set_increase_bytes": 147456,
+          "peak_memory_footprint_increase_bytes": 442320,
+          "peak_memory_increase_bytes": 149504
+        },
+        {
+          "wave": 4,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.8273927645826653,
+          "time_to_first_token_improvement_percent": 8.202095210870947,
+          "prefill_throughput_delta_percent": 8.934948166531854,
+          "decode_throughput_delta_percent": 0.738115140064893,
+          "expert_read_improvement_percent": 11.698622638815063,
+          "external_wall_improvement_percent": 3.7188728702490104,
+          "maximum_resident_set_increase_bytes": -5226496,
+          "peak_memory_footprint_increase_bytes": -5226568,
+          "peak_memory_increase_bytes": 77912
+        }
+      ],
+      "paired_median_improvement_percent": {
+        "request": 3.6599549888642673,
+        "time_to_first_token": 8.210013116089431,
+        "prefill_throughput": 8.944345825618875,
+        "decode_throughput": 0.47207138258401066,
+        "expert_read": 11.076197405526093,
+        "external_wall": 3.3625032737257285
+      },
+      "request_pairs_improved": 8,
+      "maximum_resident_set_increase_bytes_median": 49152,
+      "peak_memory_footprint_increase_bytes_median": -81944,
+      "peak_memory_increase_bytes_median": 60164
+    },
+    {
+      "workload": "mixed_math",
+      "role": "primary",
+      "pair_count": 8,
+      "pair_results": [
+        {
+          "wave": 1,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.9410749606962656,
+          "time_to_first_token_improvement_percent": 7.960528501147344,
+          "prefill_throughput_delta_percent": 8.649037604748287,
+          "decode_throughput_delta_percent": 1.2257824131221964,
+          "expert_read_improvement_percent": 11.126466687904319,
+          "external_wall_improvement_percent": 3.619390763183755,
+          "maximum_resident_set_increase_bytes": -49152,
+          "peak_memory_footprint_increase_bytes": -163840,
+          "peak_memory_increase_bytes": 16936
+        },
+        {
+          "wave": 1,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.431492108866775,
+          "time_to_first_token_improvement_percent": 8.519461388202226,
+          "prefill_throughput_delta_percent": 9.312867542631091,
+          "decode_throughput_delta_percent": -0.08833662259906899,
+          "expert_read_improvement_percent": 10.57711450667612,
+          "external_wall_improvement_percent": 3.2384690873405364,
+          "maximum_resident_set_increase_bytes": 1359872,
+          "peak_memory_footprint_increase_bytes": 573392,
+          "peak_memory_increase_bytes": 97064
+        },
+        {
+          "wave": 2,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.521749665881523,
+          "time_to_first_token_improvement_percent": 8.299407914932129,
+          "prefill_throughput_delta_percent": 9.05054997598381,
+          "decode_throughput_delta_percent": 0.24561731983234944,
+          "expert_read_improvement_percent": 10.841311132468588,
+          "external_wall_improvement_percent": 3.2300811661421167,
+          "maximum_resident_set_increase_bytes": -573440,
+          "peak_memory_footprint_increase_bytes": -524264,
+          "peak_memory_increase_bytes": -97700
+        },
+        {
+          "wave": 2,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.6244319156489597,
+          "time_to_first_token_improvement_percent": 8.724925253229078,
+          "prefill_throughput_delta_percent": 9.558935204857505,
+          "decode_throughput_delta_percent": 0.0933981759476559,
+          "expert_read_improvement_percent": 10.53051742771075,
+          "external_wall_improvement_percent": 3.2518983162759967,
+          "maximum_resident_set_increase_bytes": 851968,
+          "peak_memory_footprint_increase_bytes": 540648,
+          "peak_memory_increase_bytes": 14940
+        },
+        {
+          "wave": 3,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.4945616972187348,
+          "time_to_first_token_improvement_percent": 6.112004537911557,
+          "prefill_throughput_delta_percent": 6.50988926521448,
+          "decode_throughput_delta_percent": 1.7541155482494275,
+          "expert_read_improvement_percent": 11.207723537047558,
+          "external_wall_improvement_percent": 3.0507385998715457,
+          "maximum_resident_set_increase_bytes": 98304,
+          "peak_memory_footprint_increase_bytes": 802816,
+          "peak_memory_increase_bytes": 115472
+        },
+        {
+          "wave": 3,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.1758738705450336,
+          "time_to_first_token_improvement_percent": 7.840294424477412,
+          "prefill_throughput_delta_percent": 8.50729109377686,
+          "decode_throughput_delta_percent": -0.04350284785785573,
+          "expert_read_improvement_percent": 10.21272374448432,
+          "external_wall_improvement_percent": 2.904769763987465,
+          "maximum_resident_set_increase_bytes": -2588672,
+          "peak_memory_footprint_increase_bytes": -3899440,
+          "peak_memory_increase_bytes": 68020
+        },
+        {
+          "wave": 4,
+          "pair": "A1/B1",
+          "request_improvement_percent": 2.3411817875560406,
+          "time_to_first_token_improvement_percent": 8.388130291339213,
+          "prefill_throughput_delta_percent": 9.156161006226263,
+          "decode_throughput_delta_percent": -1.8025805764301666,
+          "expert_read_improvement_percent": 9.988518295736865,
+          "external_wall_improvement_percent": 2.089795918367349,
+          "maximum_resident_set_increase_bytes": 5226496,
+          "peak_memory_footprint_increase_bytes": 5930984,
+          "peak_memory_increase_bytes": 29464
+        },
+        {
+          "wave": 4,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.9859902318395735,
+          "time_to_first_token_improvement_percent": 7.126198970501992,
+          "prefill_throughput_delta_percent": 7.672991620358705,
+          "decode_throughput_delta_percent": 1.8503300967513003,
+          "expert_read_improvement_percent": 11.307787447733862,
+          "external_wall_improvement_percent": 3.467651308396206,
+          "maximum_resident_set_increase_bytes": -199344128,
+          "peak_memory_footprint_increase_bytes": 22724536,
+          "peak_memory_increase_bytes": 191016
+        }
+      ],
+      "paired_median_improvement_percent": {
+        "request": 3.5081556815501287,
+        "time_to_first_token": 8.129968208039736,
+        "prefill_throughput": 8.849793790366048,
+        "decode_throughput": 0.16950774789000267,
+        "expert_read": 10.709212819572354,
+        "external_wall": 3.2342751267413266
+      },
+      "request_pairs_improved": 8,
+      "maximum_resident_set_increase_bytes_median": 24576,
+      "peak_memory_footprint_increase_bytes_median": 557020,
+      "peak_memory_increase_bytes_median": 48742
+    },
+    {
+      "workload": "tool_like",
+      "role": "primary",
+      "pair_count": 8,
+      "pair_results": [
+        {
+          "wave": 1,
+          "pair": "A1/B1",
+          "request_improvement_percent": 2.717412701307262,
+          "time_to_first_token_improvement_percent": 7.878422749299766,
+          "prefill_throughput_delta_percent": 8.552201323973625,
+          "decode_throughput_delta_percent": -0.22125012308365763,
+          "expert_read_improvement_percent": 8.368110095466166,
+          "external_wall_improvement_percent": 2.6004382761139535,
+          "maximum_resident_set_increase_bytes": 720896,
+          "peak_memory_footprint_increase_bytes": -262216,
+          "peak_memory_increase_bytes": 282396
+        },
+        {
+          "wave": 1,
+          "pair": "A2/B2",
+          "request_improvement_percent": 2.6914436167123634,
+          "time_to_first_token_improvement_percent": 8.062074221760923,
+          "prefill_throughput_delta_percent": 8.769040799557773,
+          "decode_throughput_delta_percent": -0.4220353144835585,
+          "expert_read_improvement_percent": 8.116638561940208,
+          "external_wall_improvement_percent": 2.5202780996523884,
+          "maximum_resident_set_increase_bytes": 32768,
+          "peak_memory_footprint_increase_bytes": 376832,
+          "peak_memory_increase_bytes": 43788
+        },
+        {
+          "wave": 2,
+          "pair": "A1/B1",
+          "request_improvement_percent": 2.5049615546710684,
+          "time_to_first_token_improvement_percent": 7.715653077565604,
+          "prefill_throughput_delta_percent": 8.36073866790286,
+          "decode_throughput_delta_percent": -0.4633781272167345,
+          "expert_read_improvement_percent": 7.928804789669791,
+          "external_wall_improvement_percent": 2.327637006482025,
+          "maximum_resident_set_increase_bytes": -1523712,
+          "peak_memory_footprint_increase_bytes": -409600,
+          "peak_memory_increase_bytes": 262164
+        },
+        {
+          "wave": 2,
+          "pair": "A2/B2",
+          "request_improvement_percent": 2.7225159436770188,
+          "time_to_first_token_improvement_percent": 7.832676831210228,
+          "prefill_throughput_delta_percent": 8.498323008541677,
+          "decode_throughput_delta_percent": -0.24845031913735205,
+          "expert_read_improvement_percent": 8.15639340111393,
+          "external_wall_improvement_percent": 2.4963503649634946,
+          "maximum_resident_set_increase_bytes": 835584,
+          "peak_memory_footprint_increase_bytes": 1720272,
+          "peak_memory_increase_bytes": 147732
+        },
+        {
+          "wave": 3,
+          "pair": "A1/B1",
+          "request_improvement_percent": 1.3238143239651252,
+          "time_to_first_token_improvement_percent": 6.021811845754361,
+          "prefill_throughput_delta_percent": 6.4076696561449005,
+          "decode_throughput_delta_percent": -1.3408185877428254,
+          "expert_read_improvement_percent": 7.615206974087236,
+          "external_wall_improvement_percent": 1.2547417566384584,
+          "maximum_resident_set_increase_bytes": 638976,
+          "peak_memory_footprint_increase_bytes": -1146904,
+          "peak_memory_increase_bytes": 94212
+        },
+        {
+          "wave": 3,
+          "pair": "A2/B2",
+          "request_improvement_percent": 2.7937779200593993,
+          "time_to_first_token_improvement_percent": 10.797218800418284,
+          "prefill_throughput_delta_percent": 12.104127982580119,
+          "decode_throughput_delta_percent": -1.9342404406459837,
+          "expert_read_improvement_percent": 8.842706147544456,
+          "external_wall_improvement_percent": 2.720317370359878,
+          "maximum_resident_set_increase_bytes": 2473984,
+          "peak_memory_footprint_increase_bytes": 3227624,
+          "peak_memory_increase_bytes": 79892
+        },
+        {
+          "wave": 4,
+          "pair": "A1/B1",
+          "request_improvement_percent": 3.1950859403635223,
+          "time_to_first_token_improvement_percent": 7.235482088053389,
+          "prefill_throughput_delta_percent": 7.799837967056988,
+          "decode_throughput_delta_percent": 0.8699316517580942,
+          "expert_read_improvement_percent": 8.732155823401504,
+          "external_wall_improvement_percent": 2.9163688348820673,
+          "maximum_resident_set_increase_bytes": -917504,
+          "peak_memory_footprint_increase_bytes": -1441768,
+          "peak_memory_increase_bytes": 81404
+        },
+        {
+          "wave": 4,
+          "pair": "A2/B2",
+          "request_improvement_percent": 3.4419955649614113,
+          "time_to_first_token_improvement_percent": 8.544697895304356,
+          "prefill_throughput_delta_percent": 9.343031730978922,
+          "decode_throughput_delta_percent": 0.39993973751563666,
+          "expert_read_improvement_percent": 9.301854501215145,
+          "external_wall_improvement_percent": 3.1276656241114624,
+          "maximum_resident_set_increase_bytes": -180224,
+          "peak_memory_footprint_increase_bytes": 507880,
+          "peak_memory_increase_bytes": 76524
+        }
+      ],
+      "paired_median_improvement_percent": {
+        "request": 2.7199643224921406,
+        "time_to_first_token": 7.855549790254997,
+        "prefill_throughput": 8.52526216625765,
+        "decode_throughput": -0.3352428168104553,
+        "expert_read": 8.262251748290048,
+        "external_wall": 2.560358187883171
+      },
+      "request_pairs_improved": 8,
+      "maximum_resident_set_increase_bytes_median": 335872,
+      "peak_memory_footprint_increase_bytes_median": 57308,
+      "peak_memory_increase_bytes_median": 87808
+    }
+  ],
+  "primary_workload_summary": {
+    "workloads": [
+      "code",
+      "zh_technical",
+      "mixed_math",
+      "tool_like"
+    ],
+    "aggregation": "median of each workload paired median across completed waves",
+    "median_improvement_percent": {
+      "request": 3.584055335207198,
+      "time_to_first_token": 7.992758999147367,
+      "prefill_throughput": 8.687527978311849,
+      "decode_throughput": 0.32078956523700664,
+      "expert_read": 10.892705112549223,
+      "external_wall": 3.286144767798236
+    },
+    "request_pairs_improved": 32,
+    "request_pairs_total": 32,
+    "all_workload_request_pairs_improved": 40,
+    "all_workload_request_pairs_total": 40,
+    "median_maximum_resident_set_increase_bytes": 36864,
+    "median_peak_memory_footprint_increase_bytes": 307164,
+    "median_peak_memory_increase_bytes": 62792,
+    "bootstrap_confidence_interval_available": false,
+    "p95_regression_available": false
+  },
+  "system_memory_by_wave": [
+    {
+      "wave": 1,
+      "swap_used_delta_mib": -8.0,
+      "compressor_delta_bytes": -61128704,
+      "scope": "system-wide; diagnostic only"
+    },
+    {
+      "wave": 2,
+      "swap_used_delta_mib": -8.0,
+      "compressor_delta_bytes": 219856896,
+      "scope": "system-wide; diagnostic only"
+    },
+    {
+      "wave": 3,
+      "swap_used_delta_mib": 0.0,
+      "compressor_delta_bytes": 256655360,
+      "scope": "system-wide; diagnostic only"
+    },
+    {
+      "wave": 4,
+      "swap_used_delta_mib": 0.0,
+      "compressor_delta_bytes": 356941824,
+      "scope": "system-wide; diagnostic only"
+    }
+  ],
+  "decision": {
+    "performance_signal": "positive after the completed waves",
+    "formal_performance_adoption": "not decided; 1 planned waves remain",
+    "confidence_limit": "Formal p95 and 95% bootstrap confidence intervals wait for all five waves.",
+    "prefill_no_file_cache_default": false,
+    "prototype_status": "retain opt-in until the formal study completes"
+  }
+}

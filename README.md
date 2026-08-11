@@ -138,9 +138,8 @@ requests.
 - Very long input and output need more KV cache memory.
 - Performance depends on SSD speed, input length, and cache state.
 
-Read the [runtime research](docs/RUNTIME_RESEARCH_2026-08-07.md) and
-[implementation plan](docs/IMPLEMENTATION_PLAN.md) for the model contract,
-runtime design, and measured engineering decisions.
+Read the [current documentation](docs/README.md) for the model contract,
+runtime design, validation, performance, and research conclusions.
 
 DeepSeekV4SSD is not affiliated with DeepSeek. Review the model terms before
 you download and use the model.

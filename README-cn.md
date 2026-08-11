@@ -132,8 +132,7 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 - 很长的 input 和 output 需要更多 KV cache 内存。
 - 性能取决于 SSD 速度、input 长度和 cache 状态。
 
-[运行时研究](docs/RUNTIME_RESEARCH_2026-08-07.md)和
-[实现计划](docs/IMPLEMENTATION_PLAN.md)包含模型合约、runtime 设计和已测量的工程决策。
+[当前文档](docs/README.md)包含模型合约、runtime 设计、验证、性能和研究结论。
 
 DeepSeekV4SSD 与 DeepSeek 没有从属关系。下载和使用模型前，请先阅读模型条款。
 
