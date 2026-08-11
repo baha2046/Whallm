@@ -1,5 +1,10 @@
 # DeepSeek-V4-Flash-0731 runtime speed research
 
+> [!WARNING]
+> Historical snapshot from 2026-08-07. Its estimates are not current results.
+> Use [the current performance guide](../../docs/PERFORMANCE.md) and
+> [validation record](../../docs/VALIDATION.md).
+
 Checked: 2026-08-07
 
 ## Decision
@@ -50,8 +55,8 @@ expert cache cannot remove much more traffic from this case.
 The read-time ceiling is also clear. Removing all 11.48 seconds would reduce
 105.81 seconds by at most 10.85%. Any larger cold-prefill gain must also reduce
 GPU work, graph overhead, or the waits between CPU and GPU work. These values
-come from the [local validation record](VALIDATION.md#layer-major-prefill-measurements)
-and the current [routed expert cache](../runtime/deepseek_v4_ssd/expert_cache.py).
+come from the [local validation record](../../docs/VALIDATION.md)
+and the current [routed expert cache](../../runtime/deepseek_v4_ssd/expert_cache.py).
 
 ### New 2026-08-07 local measurement
 

@@ -1,5 +1,10 @@
 # Prefill 與 decode 效能研究
 
+> [!WARNING]
+> 本文件是 2026-08-08 的歷史研究。估計值不是目前效能結果。
+> 請以[目前效能指南](../../docs/PERFORMANCE.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 Checked: 2026-08-08
 
 ## 結論
@@ -620,11 +625,11 @@ Gate 0 未通過時，不接受新的效能結論。
 
 - [本地 runtime research](RUNTIME_RESEARCH_2026-08-07.md)
 - [本地 runtime speed research](RUNTIME_SPEED_RESEARCH_2026-08-07.md)
-- [本地 validation](VALIDATION.md#batched-layer-local-moe-measurements)
-- [本地 layer-major prefill](../runtime/deepseek_v4_ssd/model.py)
-- [本地 expert cache](../runtime/deepseek_v4_ssd/expert_cache.py)
-- [本地 MXFP8 pooling cache](../runtime/deepseek_v4_ssd/fp8_cache.py)
-- [本地 generation path](../runtime/deepseek_v4_ssd/generation.py)
+- [本地 validation](../../docs/VALIDATION.md)
+- [本地 layer-major prefill](../../runtime/deepseek_v4_ssd/model.py)
+- [本地 expert cache](../../runtime/deepseek_v4_ssd/expert_cache.py)
+- [本地 MXFP8 pooling cache](../../runtime/deepseek_v4_ssd/fp8_cache.py)
+- [本地 generation path](../../runtime/deepseek_v4_ssd/generation.py)
 - [MLX lazy evaluation](https://ml-explore.github.io/mlx/build/html/usage/lazy_evaluation.html)
 - [MLX compilation](https://ml-explore.github.io/mlx/build/html/usage/compile.html)
 - [MLX Metal Debugger](https://ml-explore.github.io/mlx/build/html/dev/metal_debugger.html)

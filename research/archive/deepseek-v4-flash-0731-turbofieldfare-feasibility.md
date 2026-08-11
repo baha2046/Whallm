@@ -1,5 +1,12 @@
 # DeepSeek-V4-Flash-0731 與 TurboFieldfare 可行性
 
+> [!WARNING]
+> 本文件是 2026-08-06 的歷史可行性研究。主模型、repacker 和 DSpark
+> 已經實作。記憶體與速度估算不是目前量測。請以
+> [目前架構](../../docs/ARCHITECTURE.md)、
+> [驗證紀錄](../../docs/VALIDATION.md)和
+> [研究結論](../../docs/RESEARCH.md)為準。
+
 查證日期：2026-08-06
 
 ## 結論

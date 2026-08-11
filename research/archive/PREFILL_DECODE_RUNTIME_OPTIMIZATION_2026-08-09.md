@@ -1,5 +1,10 @@
 # Prefill 與 decode runtime 最佳化研究
 
+> [!WARNING]
+> 本文件是 2026-08-09 的歷史實作紀錄。測試數量和部分預設值已變更。
+> 請以[目前研究結論](../../docs/RESEARCH.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 日期：2026-08-09
 
 ## 結論
@@ -77,11 +82,11 @@ layer expert file
   -> 下一層
 ```
 
-[layer_major_prefill](../runtime/deepseek_v4_ssd/model.py#L64) 會逐層執行 attention 和 MoE。
+[layer_major_prefill](../../runtime/deepseek_v4_ssd/model.py#L64) 會逐層執行 attention 和 MoE。
 
-[ExpertCache.prefetch_layer](../runtime/deepseek_v4_ssd/expert_cache.py#L307) 會先配置一個 full-layer `bytearray`。
+[ExpertCache.prefetch_layer](../../runtime/deepseek_v4_ssd/expert_cache.py#L307) 會先配置一個 full-layer `bytearray`。
 
-[ExpertCache.batched_layer](../runtime/deepseek_v4_ssd/expert_cache.py#L337) 再用 `mx.array(np.frombuffer(...))` 建立 MLX array。
+[ExpertCache.batched_layer](../../runtime/deepseek_v4_ssd/expert_cache.py#L337) 再用 `mx.array(np.frombuffer(...))` 建立 MLX array。
 
 本機 mutation test 顯示，這個 Python 路徑會複製資料。
 
@@ -101,17 +106,17 @@ gate
   -> token
 ```
 
-[_streaming_moe](../runtime/deepseek_v4_ssd/model.py#L334) 會在每一層執行 `mx.eval(indices)`。
+[_streaming_moe](../../runtime/deepseek_v4_ssd/model.py#L334) 會在每一層執行 `mx.eval(indices)`。
 
-[iter_ready](../runtime/deepseek_v4_ssd/expert_cache.py#L440) 已經可以讓 resident expert 和已完成讀取的 expert 先開始計算。
+[iter_ready](../../runtime/deepseek_v4_ssd/expert_cache.py#L440) 已經可以讓 resident expert 和已完成讀取的 expert 先開始計算。
 
-[ModelRuntime.stream](../runtime/deepseek_v4_ssd/generation.py#L477) 會在每個輸出後評估所有 `cache.state`。
+[ModelRuntime.stream](../../runtime/deepseek_v4_ssd/generation.py#L477) 會在每個輸出後評估所有 `cache.state`。
 
 ## 本機量測
 
 ### 1. 原始量化快取陣列
 
-目前 [MXFP8PoolingCache.state](../runtime/deepseek_v4_ssd/fp8_cache.py#L249) 會呼叫 `_fetch()`。
+目前 [MXFP8PoolingCache.state](../../runtime/deepseek_v4_ssd/fp8_cache.py#L249) 會呼叫 `_fetch()`。
 
 `_fetch()` 會解量化所有 FP8 chunk。
 
@@ -121,7 +126,7 @@ gate
 
 一般生成路徑不需要建立 persistence state。
 
-目前 DSpark 路徑已經有 [eval_prompt_cache](../runtime/deepseek_v4_ssd/model.py#L659)。
+目前 DSpark 路徑已經有 [eval_prompt_cache](../../runtime/deepseek_v4_ssd/model.py#L659)。
 
 這個函式會直接評估原始快取陣列。
 
@@ -149,9 +154,9 @@ gate
 
 目前顯示的 `decode_tokens_per_second` 不包含 `cache_state_eval_seconds`。
 
-[RuntimeMetrics.record_token](../runtime/deepseek_v4_ssd/generation.py#L210) 會把兩段時間分開記錄。
+[RuntimeMetrics.record_token](../../runtime/deepseek_v4_ssd/generation.py#L210) 會把兩段時間分開記錄。
 
-[RuntimeMetrics.snapshot](../runtime/deepseek_v4_ssd/generation.py#L277) 只用 `decode_seconds` 計算 decode Tok/s。
+[RuntimeMetrics.snapshot](../../runtime/deepseek_v4_ssd/generation.py#L277) 只用 `decode_seconds` 計算 decode Tok/s。
 
 因此，目前 Decode Tok/s 高於使用者實際取得 token 的速度。
 
@@ -220,7 +225,7 @@ runtime 可以在完成前兩項工作後再實作 greedy-only generator。
 
 ### 4. Expert slot 與 read worker
 
-目前 [RuntimeConfig](../runtime/deepseek_v4_ssd/model.py#L24) 的預設值是 1,152 slots 和 8 個 read worker。
+目前 [RuntimeConfig](../../runtime/deepseek_v4_ssd/model.py#L24) 的預設值是 1,152 slots 和 8 個 read worker。
 
 1,152 slots 需要 14.34 GiB 的 expert slot 容量。
 
@@ -228,7 +233,7 @@ runtime 可以在完成前兩項工作後再實作 greedy-only generator。
 
 兩個設定相差 7.97 GiB。
 
-既有 [SSD microbenchmark](VALIDATION.md#ssd-measurements) 結果如下。
+既有 [SSD microbenchmark](../../docs/VALIDATION.md) 結果如下。
 
 | read worker | 直接讀取速度 |
 |---:|---:|
@@ -254,13 +259,13 @@ runtime 不應把 1,152 slots 視為所有 prompt 的固定最佳值。
 
 目前 ready expert 路徑是有效的最佳化。
 
-既有 [5-prompt paired benchmark](VALIDATION.md#ready-expert-decode-measurements) 的改善中位數是 12.9%。
+既有 [5-prompt paired benchmark](../../docs/VALIDATION.md) 的改善中位數是 12.9%。
 
 每一組 greedy token 雜湊都相同。
 
 2,000-token repeated prompt 也從 10.67 Tok/s 提升到 11.92 Tok/s。
 
-runtime 應保留 [ready expert decode](../runtime/deepseek_v4_ssd/model.py#L218)。
+runtime 應保留 [ready expert decode](../../runtime/deepseek_v4_ssd/model.py#L218)。
 
 ### 6. Prefill-to-decode handoff
 
@@ -299,8 +304,8 @@ cache.persistence_state()
 
 runtime 應在下列位置使用 `eval_arrays()`。
 
-- [layer_major_prefill](../runtime/deepseek_v4_ssd/model.py#L64)
-- [ModelRuntime.stream](../runtime/deepseek_v4_ssd/generation.py#L477)
+- [layer_major_prefill](../../runtime/deepseek_v4_ssd/model.py#L64)
+- [ModelRuntime.stream](../../runtime/deepseek_v4_ssd/generation.py#L477)
 - DSpark verification
 
 runtime 不應直接改變 `state` property 的 persistence contract。
@@ -350,9 +355,9 @@ runtime 應分開調整 `read_workers` 和 `prefetch_read_workers`。
 
 #### P0.5 避免 TTFT 包含 persistence 轉換
 
-layer-major prefill 目前會在第一個輸出前呼叫 [_store_prompt_cache](../runtime/deepseek_v4_ssd/generation.py#L540)。
+layer-major prefill 目前會在第一個輸出前呼叫 [_store_prompt_cache](../../runtime/deepseek_v4_ssd/generation.py#L540)。
 
-[_persist_prompt_cache](../runtime/deepseek_v4_ssd/generation.py#L822) 會在送交 writer 前讀取所有 `item.state`。
+[_persist_prompt_cache](../../runtime/deepseek_v4_ssd/generation.py#L822) 會在送交 writer 前讀取所有 `item.state`。
 
 對 MXFP8 cache 而言，這會建立完整的解量化快取。
 
@@ -384,7 +389,7 @@ runtime 再把資料複製到 MLX array。
 
 decode 也有相同問題。
 
-[_SlotPool.store](../runtime/deepseek_v4_ssd/expert_cache.py#L132) 會把每個 12.75 MiB expert blob 複製到新的 MLX array。
+[_SlotPool.store](../../runtime/deepseek_v4_ssd/expert_cache.py#L132) 會把每個 12.75 MiB expert blob 複製到新的 MLX array。
 
 MLX 已經合併 C++ no-copy array constructor。[MLX no-copy array change](https://github.com/ml-explore/mlx/pull/2875)
 
@@ -452,7 +457,7 @@ runtime 不應先編譯包含動態 expert residency 的整個 Python loop。
 
 #### P2.1 建立連續 expert slot arena
 
-目前 [_SlotPool](../runtime/deepseek_v4_ssd/expert_cache.py#L100) 使用 `list[mx.array | None]`。
+目前 [_SlotPool](../../runtime/deepseek_v4_ssd/expert_cache.py#L100) 使用 `list[mx.array | None]`。
 
 每個 slot 是獨立 array。
 
@@ -504,7 +509,7 @@ runtime 不應只替換其中一半。
 
 目前工作樹也會一次驗證完整 draft block。
 
-[verification_forward_with_hidden](../runtime/deepseek_v4_ssd/model.py#L597) 不再為每個位置建立 cache checkpoint。
+[verification_forward_with_hidden](../../runtime/deepseek_v4_ssd/model.py#L597) 不再為每個位置建立 cache checkpoint。
 
 這是正確方向。
 
@@ -538,7 +543,7 @@ DSpark 應繼續預設停用。
 
 下一個 DSpark 工作應依序執行下列項目。
 
-1. [_verify](../runtime/deepseek_v4_ssd/dspark.py#L664) 應一次計算整個 block 的 greedy `argmax`。
+1. [_verify](../../runtime/deepseek_v4_ssd/dspark.py#L664) 應一次計算整個 block 的 greedy `argmax`。
 2. verification 應使用連續 expert slot arena。
 3. rejection replay 應只重算必要前綴。
 4. runtime 應用 5 種 prompt 和 256-token output 做 paired benchmark。

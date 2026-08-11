@@ -1,5 +1,10 @@
 # DeepSeek-V4-Flash-0731 implementation plan
 
+> [!WARNING]
+> Historical milestone plan. M1 through M4 are complete on the target M5 Pro.
+> Use [the current architecture](../../docs/ARCHITECTURE.md) and
+> [research conclusions](../../docs/RESEARCH.md).
+
 Current status: M1 through M4 are complete on the target M5 Pro. The 145 GiB
 main model is installed. All 49 installed files pass SHA-256 verification.
 The 4K BF16 and 8K BF16/MXFP8 end-to-end checks pass.

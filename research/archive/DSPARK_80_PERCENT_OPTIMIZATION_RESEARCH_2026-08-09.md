@@ -1,5 +1,11 @@
 # DSpark 80% 速度目標最佳化研究
 
+> [!WARNING]
+> 本文件是 2026-08-09 的歷史研究。文件描述的 per-position cache copy
+> 已由目前的 round-level cache fork 取代。請以
+> [目前研究結論](../../docs/RESEARCH.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 日期：2026-08-09
 
 ## 結論
@@ -117,7 +123,7 @@ DSpark 三次測試平均每回合提出 5 個 draft token。draft 時間約 0.1
 
 ### 3.1 Verification 每個 position 都同步 cache
 
-目前 [verification_forward_with_hidden](../runtime/deepseek_v4_ssd/model.py#L588-L654) 依 layer 和 position 執行：
+目前 [verification_forward_with_hidden](../../runtime/deepseek_v4_ssd/model.py#L588-L654) 依 layer 和 position 執行：
 
 ```text
 for each of 43 target layers:
@@ -131,7 +137,7 @@ for each of 43 target layers:
 
 ### 3.2 FP8 `state` 會重建完整 pooled cache
 
-在目前預設 `fp8_kv_cache=True` 時，[MXFP8PoolingCache.state](../runtime/deepseek_v4_ssd/fp8_cache.py#L228-L264) 會呼叫 `_fetch`。`_fetch` 會：
+在目前預設 `fp8_kv_cache=True` 時，[MXFP8PoolingCache.state](../../runtime/deepseek_v4_ssd/fp8_cache.py#L228-L264) 會呼叫 `_fetch`。`_fetch` 會：
 
 1. 對所有 `_chunks` 執行 FP8 dequantize。
 2. 把所有解量化 chunks concatenate。
@@ -145,7 +151,7 @@ Inference hot loop 不應讀取 persistence `state`。runtime 應新增只回傳
 
 ### 3.3 Per-position cache copy 成本高
 
-目前 [_copy_layer_cache](../runtime/deepseek_v4_ssd/model.py#L657-L680) 會對每一個 checkpoint：
+目前 [_copy_layer_cache](../../runtime/deepseek_v4_ssd/model.py#L657-L680) 會對每一個 checkpoint：
 
 - `copy.deepcopy(layer_cache)`；
 - 複製 keys、values、buffer、previous window arrays；
@@ -155,7 +161,7 @@ Inference hot loop 不應讀取 persistence `state`。runtime 應新增只回傳
 
 ### 3.4 Verification 的 MoE 沒有使用 batched `gather_qmm`
 
-目前 [_StreamingSwitchGLU](../runtime/deepseek_v4_ssd/model.py#L196-L310) 只有在 `ExpertCache.current_batched()` 有值時才使用 `mx.gather_qmm`。該 context 主要由 prefill 使用。Verification path 沒有建立 batched layer context，因此最新 metrics 的 `request_gather_qmm_calls` 是 0。
+目前 [_StreamingSwitchGLU](../../runtime/deepseek_v4_ssd/model.py#L196-L310) 只有在 `ExpertCache.current_batched()` 有值時才使用 `mx.gather_qmm`。該 context 主要由 prefill 使用。Verification path 沒有建立 batched layer context，因此最新 metrics 的 `request_gather_qmm_calls` 是 0。
 
 在 multi-token verification 中，目前程式會：
 
@@ -166,17 +172,17 @@ Inference hot loop 不應讀取 persistence `state`。runtime 應新增只回傳
 
 43 層的 unique expert 數量會使 Metal operation 數量快速增加。這個成本可能大於數學 FLOPs。
 
-目前 [_streaming_moe](../runtime/deepseek_v4_ssd/model.py#L325-L336) 也會先同步 `indices`。該 routing sync 必須獨立計時，不能和 MoE matmul 混在一起。
+目前 [_streaming_moe](../../runtime/deepseek_v4_ssd/model.py#L325-L336) 也會先同步 `indices`。該 routing sync 必須獨立計時，不能和 MoE matmul 混在一起。
 
 ### 3.5 Draft head 造成 host sync
 
-目前 [DSparkModel.draft](../runtime/deepseek_v4_ssd/dspark.py#L230-L289) 在每個 Markov position 呼叫 `mx.argmax(...).item()` 或 `mx.random.categorical(...).item()`。這是 Markov recurrence 的必要順序，但每次 `.item()` 都可能造成 CPU/GPU synchronization。
+目前 [DSparkModel.draft](../../runtime/deepseek_v4_ssd/dspark.py#L230-L289) 在每個 Markov position 呼叫 `mx.argmax(...).item()` 或 `mx.random.categorical(...).item()`。這是 Markov recurrence 的必要順序，但每次 `.item()` 都可能造成 CPU/GPU synchronization。
 
 目前每個 position 也先做完整 `logsumexp`。Greedy API 不需要完整 normalized log probability。若 API 不要求 logprobs，greedy draft 和 greedy verifier 可以只保留 argmax 路徑。該變更必須保留 logits dtype、tie rule 和 token ID equality。
 
 ### 3.6 DSpark attention 與官方 path 不同
 
-目前 [_DSparkAttention](../runtime/deepseek_v4_ssd/dspark.py#L46-L116) 會將 context KV 和 draft KV concatenate，然後呼叫 generic `scaled_dot_product_attention`。官方 DeepSeek-V4 DSpark code 使用 top-k sparse attention，並預先建立 index。vLLM 也使用 preallocated top-k buffer、fused KV insertion 和 paged cache。
+目前 [_DSparkAttention](../../runtime/deepseek_v4_ssd/dspark.py#L46-L116) 會將 context KV 和 draft KV concatenate，然後呼叫 generic `scaled_dot_product_attention`。官方 DeepSeek-V4 DSpark code 使用 top-k sparse attention，並預先建立 index。vLLM 也使用 preallocated top-k buffer、fused KV insertion 和 paged cache。
 
 這是 P3 工作。P0/P1 尚未證明前，不應直接改寫 attention。先用 profiler 確認 dense attention 是否佔據回合時間。
 
@@ -184,11 +190,11 @@ Inference hot loop 不應讀取 persistence `state`。runtime 應新增只回傳
 
 目前 DSpark 有獨立 ExpertCache。這可以避免 DSpark routed expert 直接驅逐 main model 的 slot，但每個 round 仍可能引入 SSD read、pack 和 eviction。
 
-目前 [DSpark attention](../runtime/deepseek_v4_ssd/dspark.py#L76-L101) 的 `prefill_context` 和 `__call__` 都會執行 `_kv` 和 context cache update。這可能是設計需要，也可能在某些回合重算同一段 main context。需要以 `wkv` invocation、context cache length 和 accepted position 記錄確認，不能先假設是 bug。官方 vLLM 將 context KV precompute 和 query block 分開，該設計可作為比較基準。
+目前 [DSpark attention](../../runtime/deepseek_v4_ssd/dspark.py#L76-L101) 的 `prefill_context` 和 `__call__` 都會執行 `_kv` 和 context cache update。這可能是設計需要，也可能在某些回合重算同一段 main context。需要以 `wkv` invocation、context cache length 和 accepted position 記錄確認，不能先假設是 bug。官方 vLLM 將 context KV precompute 和 query block 分開，該設計可作為比較基準。
 
 ### 3.8 目前無法直接重現 production scheduler
 
-[ModelRuntime](../runtime/deepseek_v4_ssd/generation.py#L353-L385) 以 `_generation_lock` serialize generation。[verification_forward_with_hidden](../runtime/deepseek_v4_ssd/model.py#L594-L600) 也只接受 batch size 1。
+[ModelRuntime](../../runtime/deepseek_v4_ssd/generation.py#L353-L385) 以 `_generation_lock` serialize generation。[verification_forward_with_hidden](../../runtime/deepseek_v4_ssd/model.py#L594-L600) 也只接受 batch size 1。
 
 因此目前不能重現論文的多 request Hardware-Aware Prefix Scheduler。batch size 1 的 confidence threshold 只能縮短 draft prefix。它不能增加 acceptance，也不能把單一請求變成 production scheduler。
 
@@ -429,11 +435,11 @@ Markov head 的 token dependency 不能完全移除。可以先做以下低風�
 
 ## 14. 本機來源
 
-- [verification implementation](../runtime/deepseek_v4_ssd/model.py#L588-L680)
-- [FP8 pooling cache](../runtime/deepseek_v4_ssd/fp8_cache.py#L228-L285)
-- [streaming MoE](../runtime/deepseek_v4_ssd/model.py#L196-L336)
-- [DSpark draft and attention](../runtime/deepseek_v4_ssd/dspark.py#L46-L289)
-- [DSpark verification loop and fallback](../runtime/deepseek_v4_ssd/dspark.py#L497-L613)
-- [runtime DSpark metrics](../runtime/deepseek_v4_ssd/generation.py#L97-L350)
-- [runtime batch-size and generation lock](../runtime/deepseek_v4_ssd/generation.py#L353-L385)
+- [verification implementation](../../runtime/deepseek_v4_ssd/model.py#L588-L680)
+- [FP8 pooling cache](../../runtime/deepseek_v4_ssd/fp8_cache.py#L228-L285)
+- [streaming MoE](../../runtime/deepseek_v4_ssd/model.py#L196-L336)
+- [DSpark draft and attention](../../runtime/deepseek_v4_ssd/dspark.py#L46-L289)
+- [DSpark verification loop and fallback](../../runtime/deepseek_v4_ssd/dspark.py#L497-L613)
+- [runtime DSpark metrics](../../runtime/deepseek_v4_ssd/generation.py#L97-L350)
+- [runtime batch-size and generation lock](../../runtime/deepseek_v4_ssd/generation.py#L353-L385)
 - [existing runtime optimization notes](DSPARK_RUNTIME_OPTIMIZATION_2026-08-08.md)

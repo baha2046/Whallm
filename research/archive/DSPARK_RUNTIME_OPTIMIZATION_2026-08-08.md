@@ -1,5 +1,10 @@
 # DSpark runtime 最佳化研究
 
+> [!WARNING]
+> 本文件是 2026-08-08 的歷史研究。部分問題已由目前程式碼修正。
+> 請以[目前研究結論](../../docs/RESEARCH.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 日期：2026-08-08
 
 ## 結論
@@ -64,7 +69,7 @@ DeepSpec 的參考實作一次把 `draft_token_count + 1` 個 token 送入 targe
 
 DeepSpec 在每回合結束後，把 target KV cache 裁切到已提交位置。DeepSpec 也在 draft forward 後裁掉 speculative suffix。[target cache crop](https://github.com/deepseek-ai/DeepSpec/blob/005e03b81cec38b7da6399833d609ee89a2587f2/deepspec/eval/base_evaluator.py#L385-L426) [draft cache crop](https://github.com/deepseek-ai/DeepSpec/blob/005e03b81cec38b7da6399833d609ee89a2587f2/deepspec/eval/dspark/draft_ops.py#L22-L45)
 
-目前 runtime 在每一層逐 token 執行 attention。每個位置都呼叫 `mx.eval()`。runtime 也為 rollback 位置複製各層 cache array。[目前 verification 實作](../runtime/deepseek_v4_ssd/model.py#L555-L647) 目前 scheduler 在拒絕後，以該位置的完整 checkpoint 取代 prompt cache。[目前 rollback 實作](../runtime/deepseek_v4_ssd/dspark.py#L493-L533)
+目前 runtime 在每一層逐 token 執行 attention。每個位置都呼叫 `mx.eval()`。runtime 也為 rollback 位置複製各層 cache array。[目前 verification 實作](../../runtime/deepseek_v4_ssd/model.py#L555-L647) 目前 scheduler 在拒絕後，以該位置的完整 checkpoint 取代 prompt cache。[目前 rollback 實作](../../runtime/deepseek_v4_ssd/dspark.py#L493-L533)
 
 MLX-LM 也要求 speculative decoding 使用可裁切的 cache。驗證後，MLX-LM 依 `num_draft - num_accept` 裁切 target cache。MLX-LM 另行裁切 draft cache。[MLX-LM speculative decode](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L509-L635)
 

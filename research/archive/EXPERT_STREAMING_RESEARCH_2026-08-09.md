@@ -1,5 +1,10 @@
 # Routed expert streaming 研究
 
+> [!WARNING]
+> 本文件是 2026-08-09 的歷史研究。外部論文結果只代表研究假設。
+> 請以[目前研究結論](../../docs/RESEARCH.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 Checked: 2026-08-09
 
 ## 結論
@@ -39,8 +44,8 @@ experts、每個 token 選 6 個 routed experts。模型也有 3 個 hash-routed
 這些值來自固定 revision 的官方 configuration 和本地 validation record。
 
 - [官方 DeepSeek-V4 configuration](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/config.json)
-- [本地 model contract](../Sources/DeepSeekRepack/Model.swift)
-- [本地 validation record](VALIDATION.md#checkpoint-contract)
+- [本地 model contract](../../Sources/DeepSeekRepack/Model.swift)
+- [本地 validation record](../../docs/VALIDATION.md)
 
 每個 installed routed expert blob 是 12.75 MiB。blob 目前依序放置：
 
@@ -49,7 +54,7 @@ w1.weight + w1.scale + w2.weight + w2.scale + w3.weight + w3.scale
 ```
 
 本地 cache 使用 512 個固定 slot。每個 slot 保存一個完整 expert blob。cache
-使用一個 global LFU heap，並保留每層 reserve。[expert cache](../runtime/deepseek_v4_ssd/expert_cache.py#L171-L211)
+使用一個 global LFU heap，並保留每層 reserve。[expert cache](../../runtime/deepseek_v4_ssd/expert_cache.py#L171-L211)
 
 目前 decode 的流程是：
 
@@ -63,14 +68,14 @@ native gate
 ```
 
 `get_many()` 會先提交所有 missing read，再對每個 future 呼叫
-`future.result()`。runtime 之後才把 blob 存入 slot。[get_many](../runtime/deepseek_v4_ssd/expert_cache.py#L330-L390)
+`future.result()`。runtime 之後才把 blob 存入 slot。[get_many](../../runtime/deepseek_v4_ssd/expert_cache.py#L330-L390)
 
 `_SlotPool.store()` 目前會建立 NumPy view，再建立 MLX array，最後同步
-`mx.eval()`。[slot store](../runtime/deepseek_v4_ssd/expert_cache.py#L131-L135)
+`mx.eval()`。[slot store](../../runtime/deepseek_v4_ssd/expert_cache.py#L131-L135)
 
 layer-major prefill 的 batched path 會讀取整層 256 個 expert，建立一個
 `BatchedExperts` view。context 結束時，runtime 只清除 `_batched_layer`。它不會
-把這個完整層中的 prompt hot experts promotion 到一般固定 slot。[batched layer](../runtime/deepseek_v4_ssd/expert_cache.py#L293-L318)
+把這個完整層中的 prompt hot experts promotion 到一般固定 slot。[batched layer](../../runtime/deepseek_v4_ssd/expert_cache.py#L293-L318)
 
 這是本研究最重要的專案特有缺口。
 
@@ -84,9 +89,9 @@ layer-major prefill 的 batched path 會讀取整層 256 個 expert，建立一�
 - 1,024 到 1,536 slots 的已測試變更沒有改善總時間。2,048 slots 因 memory
   pressure 變慢。
 
-來源：[optimized prefill](VALIDATION.md#optimized-prefill-measurements)、
-[batched layer-local measurements](VALIDATION.md#batched-layer-local-moe-measurements)、
-[SSD measurements](VALIDATION.md#ssd-measurements)、
+來源：[optimized prefill](../../docs/VALIDATION.md)、
+[batched layer-local measurements](../../docs/VALIDATION.md)、
+[SSD measurements](../../docs/VALIDATION.md)、
 [已測試的 slot sweep](RUNTIME_RESEARCH_2026-08-07.md#implementation-progress)。
 
 因此，本研究不再建議單純增加 slot 數，也不再建議 layer-order eviction。
@@ -305,7 +310,7 @@ high-confidence candidate
 
 本地測量顯示，4 個 workers 的 cached read 平均是 0.73 ms。direct read 平均是
 3.30 ms。因此，即使預取結果只進入作業系統 page cache，native route miss 的
-後續讀取仍可能縮短。[SSD measurements](VALIDATION.md#ssd-measurements)
+後續讀取仍可能縮短。[SSD measurements](../../docs/VALIDATION.md)
 
 這個設計把兩種資源分開管理：
 
@@ -468,7 +473,7 @@ microbenchmark，不能先改 Python cache。
 
 8K optimized run 的 SSD read 約 14.0 秒，總時間約 65.5 秒。即使完整移除
 這段等待，該測試的總時間上限也只是約 21.4%。這是上限，不是 MTLIO 的預測
-收益。[local 8K measurement](VALIDATION.md#optimized-prefill-measurements)
+收益。[local 8K measurement](../../docs/VALIDATION.md)
 
 ### 建議 gate
 
@@ -495,7 +500,7 @@ w3(up) + w1(gate)
   -> w2(down)
 ```
 
-本地 direct path 正是依序執行這三次 MXFP4 matmul。[decode expert path](../runtime/deepseek_v4_ssd/model.py#L249-L259)
+本地 direct path 正是依序執行這三次 MXFP4 matmul。[decode expert path](../../runtime/deepseek_v4_ssd/model.py#L249-L259)
 
 目前 blob 把 w2 放在 w1 和 w3 中間。可以把 installed expert layout 改成：
 
@@ -557,7 +562,7 @@ w2 arena:  map[(layer, expert)] -> w2 slot
 
 本專案的單層 direct six-expert compute 約 0.56 ms。每個 w2 region 約 4.25 MiB。
 本地 direct SSD 速度是 14.30 GiB/s。這表示單次 w2 read 的純頻寬時間約為
-0.29 ms；是否能被 w13 compute 隱藏，必須用 Metal capture 測量。[direct SSD and direct expert measurements](VALIDATION.md#ssd-measurements)
+0.29 ms；是否能被 w13 compute 隱藏，必須用 Metal capture 測量。[direct SSD and direct expert measurements](../../docs/VALIDATION.md)
 
 ### Trade-off
 

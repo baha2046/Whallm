@@ -1,5 +1,10 @@
 # DeepSeek-V4-Flash-0731 runtime research
 
+> [!WARNING]
+> Historical snapshot from 2026-08-07. This file does not describe the current
+> runtime. Use [the current research conclusions](../../docs/RESEARCH.md) and
+> [validation record](../../docs/VALIDATION.md).
+
 Checked: 2026-08-07
 
 ## Implementation progress
@@ -118,7 +123,7 @@ The checked MLX-LM revision is `254d153fdeb6f150edd4fc5a54f9828638481fa8`, dated
 - Revision `7872f01b1d1fe23eabc4c98b48bffcef5a386062` defines 43 main-model layers, a 1,048,576-token limit, 256 routed experts, six selected routed experts per token, three hash-routed layers, a 128-token sliding window, compression ratios 4 and 128, and an index top-k of 512 ([official config](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/config.json)).
 - The main model has 284B total parameters and 13B active parameters per token ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S4.SS2.SSS1)). The full Hugging Face checkpoint is larger because it also contains the attached module under `mtp.*` ([official tensor index](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/model.safetensors.index.json)).
 - The official inference configuration defines three DSpark layers, a draft block size of five, target hidden states from main-model layers 40 through 42, and a Markov rank of 256 ([official inference config](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/config.json)).
-- The checkpoint index contains 4,705 tensor names under `mtp.*`. Their calculated size is about 10.1168 GiB ([official tensor index](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/model.safetensors.index.json), [local size record](VALIDATION.md#dspark-decision)).
+- The checkpoint index contains 4,705 tensor names under `mtp.*`. Their calculated size is about 10.1168 GiB ([official tensor index](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/model.safetensors.index.json), [local size record](../../docs/VALIDATION.md)).
 - The official reference code defines `DSparkBlock` under the `mtp.*` namespace. It shares the main embedding and output head. It consumes main-model hidden states and adds Markov and confidence heads ([official reference model](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/model.py#L743-L936)).
 - The bundled simple generator calls only the main-model forward path. It does not call `forward_spec` ([official generator](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/generate.py)). The model card directs users to vLLM or SGLang for DSpark ([official model card](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/README.md#how-to-run-with-vllm)).
 - The official vLLM example enables `method: "dspark"` with seven speculative tokens. The official SGLang example also selects `DSPARK` and loads target and draft weights from the same checkpoint ([official model card](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/README.md#how-to-run-with-vllm)).
@@ -126,17 +131,17 @@ The checked MLX-LM revision is `254d153fdeb6f150edd4fc5a54f9828638481fa8`, dated
 
 ### This runtime
 
-- The repack plan removes every `mtp.*` tensor from common tensors. The installed model therefore contains the main model only ([repack planner](../Sources/DeepSeekRepack/RepackPlanner.swift#L25-L30)).
-- The runtime imports a pinned, non-upstream `deepseek_v4` implementation. It replaces routed expert execution with SSD streaming and uses `mx.gather_qmm` in MXFP4 mode ([requirements](../requirements.txt), [runtime model](../runtime/deepseek_v4_ssd/model.py#L7-L74)).
-- Local validation covers batch size 1 and greedy decoding. It covers 4,096 tokens with BF16 cache and 8,192 tokens with BF16 and MXFP8 cache. It does not cover the official 1M-token range, sampling parity, or DSpark ([validation record](VALIDATION.md#end-to-end-measurements)).
-- A local mHC Metal-kernel comparison supplied for this review passed against its fallback path with a maximum absolute difference of `1.49e-7`. The compared implementation comes from the pinned runtime dependency ([requirements](../requirements.txt)). This result supports the tested mHC operation. It does not extend the context or generation support claims above.
-- The official encoder supports `reasoning_effort` values `low`, `high`, and `max`, tool definitions, tool calls, tool results, and structured `response_format` instructions ([official encoding guide](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/README.md), [official encoding code](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/encoding_dsv4.py)). The runtime loads this pinned official encoder from the installed model. The API exposes `reasoning_effort` through Chat Completions and `reasoning.effort` through Responses API. The API does not yet expose `response_format` ([local Tool codec](../runtime/deepseek_v4_ssd/tool_codec.py)).
-- The 8K MXFP8 run took 264.1 seconds. Routed expert reads used about 34 seconds and read 1,340.2 GB. The recorded hit rate was 57.2 percent ([validation record](VALIDATION.md#end-to-end-measurements), [DSpark decision](VALIDATION.md#dspark-decision)).
-- Multi-token prefill slices and stacks expert regions, then uses compact stack indices for three routed MXFP4 matrix multiplications. Single-token decode now runs the six experts directly without stacked weight buffers ([expert pool](../runtime/deepseek_v4_ssd/expert_cache.py), [routed execution](../runtime/deepseek_v4_ssd/model.py)).
+- The repack plan removes every `mtp.*` tensor from common tensors. The installed model therefore contains the main model only ([repack planner](../../Sources/DeepSeekRepack/RepackPlanner.swift#L25-L30)).
+- The runtime imports a pinned, non-upstream `deepseek_v4` implementation. It replaces routed expert execution with SSD streaming and uses `mx.gather_qmm` in MXFP4 mode ([requirements](../../requirements.txt), [runtime model](../../runtime/deepseek_v4_ssd/model.py#L7-L74)).
+- Local validation covers batch size 1 and greedy decoding. It covers 4,096 tokens with BF16 cache and 8,192 tokens with BF16 and MXFP8 cache. It does not cover the official 1M-token range, sampling parity, or DSpark ([validation record](../../docs/VALIDATION.md)).
+- A local mHC Metal-kernel comparison supplied for this review passed against its fallback path with a maximum absolute difference of `1.49e-7`. The compared implementation comes from the pinned runtime dependency ([requirements](../../requirements.txt)). This result supports the tested mHC operation. It does not extend the context or generation support claims above.
+- The official encoder supports `reasoning_effort` values `low`, `high`, and `max`, tool definitions, tool calls, tool results, and structured `response_format` instructions ([official encoding guide](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/README.md), [official encoding code](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/encoding_dsv4.py)). The runtime loads this pinned official encoder from the installed model. The API exposes `reasoning_effort` through Chat Completions and `reasoning.effort` through Responses API. The API does not yet expose `response_format` ([local Tool codec](../../runtime/deepseek_v4_ssd/tool_codec.py)).
+- The 8K MXFP8 run took 264.1 seconds. Routed expert reads used about 34 seconds and read 1,340.2 GB. The recorded hit rate was 57.2 percent ([validation record](../../docs/VALIDATION.md), [DSpark decision](../../docs/VALIDATION.md)).
+- Multi-token prefill slices and stacks expert regions, then uses compact stack indices for three routed MXFP4 matrix multiplications. Single-token decode now runs the six experts directly without stacked weight buffers ([expert pool](../../runtime/deepseek_v4_ssd/expert_cache.py), [routed execution](../../runtime/deepseek_v4_ssd/model.py)).
 - The runtime keeps up to two in-memory prompt cache timelines within an 8 GiB
   default limit. It reuses the longest complete token prefix. A mismatch creates
-  a new cache timeline ([generation path](../runtime/deepseek_v4_ssd/generation.py)).
-- The custom MXFP8 pooling cache becomes non-trimmable after it stores compressed entries ([local cache](../runtime/deepseek_v4_ssd/fp8_cache.py#L217-L218)). Generic MLX-LM speculative decoding needs cache rollback after rejected draft tokens, so it cannot be connected to this cache without a new trim or checkpoint-and-restore operation.
+  a new cache timeline ([generation path](../../runtime/deepseek_v4_ssd/generation.py)).
+- The custom MXFP8 pooling cache becomes non-trimmable after it stores compressed entries ([local cache](../../runtime/deepseek_v4_ssd/fp8_cache.py#L217-L218)). Generic MLX-LM speculative decoding needs cache rollback after rejected draft tokens, so it cannot be connected to this cache without a new trim or checkpoint-and-restore operation.
 - An MLX-LM issue reports unbounded Metal-resource growth during long DeepSeek-V4 decode on the same experimental model branch. The reported workaround evaluates cache state every decode step ([MLX-LM issue 1332](https://github.com/ml-explore/mlx-lm/issues/1332)). This runtime now applies that workaround. It has not validated a 12K-token decode.
 
 ### MLX and MLX-LM capabilities
@@ -151,13 +156,13 @@ The checked MLX-LM revision is `254d153fdeb6f150edd4fc5a54f9828638481fa8`, dated
 
 ### Support status
 
-1. **The main model has targeted support, not full support.** The local 4K and 8K greedy results show that the implemented path works for those tests. They do not validate the official 1M limit, all generation modes, or the complete official message format. The use of a closed, non-upstream MLX-LM branch also makes updates harder ([local validation](VALIDATION.md#end-to-end-measurements), [official encoding guide](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/README.md), [upstream model directory](https://github.com/ml-explore/mlx-lm/tree/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/models)).
-2. **MTP is not a separate supported local feature.** For this checkpoint, `mtp.*` stores the attached DSpark layers. The repacker excludes that namespace, so the runtime cannot load those weights ([official reference model](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/model.py#L818-L936), [local repack planner](../Sources/DeepSeekRepack/RepackPlanner.swift#L25-L30)).
+1. **The main model has targeted support, not full support.** The local 4K and 8K greedy results show that the implemented path works for those tests. They do not validate the official 1M limit, all generation modes, or the complete official message format. The use of a closed, non-upstream MLX-LM branch also makes updates harder ([local validation](../../docs/VALIDATION.md), [official encoding guide](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/encoding/README.md), [upstream model directory](https://github.com/ml-explore/mlx-lm/tree/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/models)).
+2. **MTP is not a separate supported local feature.** For this checkpoint, `mtp.*` stores the attached DSpark layers. The repacker excludes that namespace, so the runtime cannot load those weights ([official reference model](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/model.py#L818-L936), [local repack planner](../../Sources/DeepSeekRepack/RepackPlanner.swift#L25-L30)).
 3. **DSpark is not supported.** Generic MLX-LM speculation cannot replace DSpark. DSpark needs main-model hidden states, a parallel draft backbone, a Markov head, a confidence head, and a prefix scheduler ([DSpark paper](https://arxiv.org/html/2607.05147#S3), [MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L464-L644)).
 
 ### Runtime bottleneck
 
-The latest 8K measurement assigns about 14.0 of 65.5 seconds to SSD reads. Routing synchronization records about 37.5 seconds, but that value can include queued model work. The next speed work must separate attention matrix multiplication, routed matrix multiplication, and synchronization ([local validation](VALIDATION.md#optimized-prefill-measurements)).
+The latest 8K measurement assigns about 14.0 of 65.5 seconds to SSD reads. Routing synchronization records about 37.5 seconds, but that value can include queued model work. The next speed work must separate attention matrix multiplication, routed matrix multiplication, and synchronization ([local validation](../../docs/VALIDATION.md)).
 
 ## Speed opportunities
 
@@ -178,7 +183,7 @@ The order below uses expected value and implementation risk. Expected gains are 
 
 ### 1. Remove expert stack creation from the main path
 
-The runtime reads individual expert views from stable slots. Decode runs the six selected experts directly. Prefill groups token routes by expert and restores the original route order before weighted reduction ([current pool](../runtime/deepseek_v4_ssd/expert_cache.py), [routed execution](../runtime/deepseek_v4_ssd/model.py)).
+The runtime reads individual expert views from stable slots. Decode runs the six selected experts directly. Prefill groups token routes by expert and restores the original route order before weighted reduction ([current pool](../../runtime/deepseek_v4_ssd/expert_cache.py), [routed execution](../../runtime/deepseek_v4_ssd/model.py)).
 
 This removes the stacked weight buffers without copying the complete slot pool.
 
@@ -193,7 +198,7 @@ Single-token decode keeps its smaller direct path. It does not pay the grouping 
 The local comparison now covers 128, 256, and 512 tokens. The runtime uses 128
 below 1K uncached tokens, 256 below 4K, and 512 from 4K onward. Layer-major
 prefill reduced the 8K test from 47.04 to 38.20 seconds at a 512-token step
-([validation record](VALIDATION.md#layer-major-prefill-measurements)).
+([validation record](../../docs/VALIDATION.md)).
 
 Select the chunk size from total prompt time, peak memory, expert bytes read, stack time, routing synchronization, and cache hit rate.
 
@@ -201,7 +206,7 @@ Select the chunk size from total prompt time, peak memory, expert bytes read, st
 
 The MXFP8 path now concatenates small packed chunks for index scoring. It also
 selects top-k packed rows and dequantizes only the selected result
-([local cache gather](../runtime/deepseek_v4_ssd/fp8_cache.py), [local sparse attention](../runtime/deepseek_v4_ssd/model.py)). A future DeepSeek-V4-specific Metal kernel could also apply masks, include attention sinks, and accumulate attention without materializing the selected BF16 values.
+([local cache gather](../../runtime/deepseek_v4_ssd/fp8_cache.py), [local sparse attention](../../runtime/deepseek_v4_ssd/model.py)). A future DeepSeek-V4-specific Metal kernel could also apply masks, include attention sinks, and accumulate attention without materializing the selected BF16 values.
 
 This matches the official model's cache-and-kernel co-design. DeepSeek states that cache layout, alignment, and sparse attention kernels must be designed together ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S3.SS5.SSS1)). This work has higher implementation risk than expert-pool changes.
 
@@ -209,7 +214,7 @@ This matches the official model's cache-and-kernel co-design. DeepSeek states th
 
 The runtime now keeps two in-memory prompt cache timelines. A token-prefix check
 selects the longest matching timeline. An optional warmup prompt prepares one
-fixed prefix before the server accepts requests ([local generation path](../runtime/deepseek_v4_ssd/generation.py)). MLX-LM supports an explicit prompt cache ([MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L298-L436)). DeepSeek's official design stores compressed entries and recomputes incomplete tails when it reuses a disk prefix ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S3.SS5.SSS2)).
+fixed prefix before the server accepts requests ([local generation path](../../runtime/deepseek_v4_ssd/generation.py)). MLX-LM supports an explicit prompt cache ([MLX-LM generation source](https://github.com/ml-explore/mlx-lm/blob/254d153fdeb6f150edd4fc5a54f9828638481fa8/mlx_lm/generate.py#L298-L436)). DeepSeek's official design stores compressed entries and recomputes incomplete tails when it reuses a disk prefix ([DeepSeek-V4 paper](https://arxiv.org/html/2606.19348#S3.SS5.SSS2)).
 
 This change improves time to first token for repeated prefixes. It does not improve steady one-token decode.
 

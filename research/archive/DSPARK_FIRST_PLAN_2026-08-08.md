@@ -1,5 +1,10 @@
 # DSpark-first 實作計畫
 
+> [!WARNING]
+> 本文件是 2026-08-08 的歷史計畫。DSpark 安裝與 runtime 已經實作。
+> 請以[目前研究結論](../../docs/RESEARCH.md)和
+> [驗證紀錄](../../docs/VALIDATION.md)為準。
+
 Checked: 2026-08-08
 
 ## 決定
@@ -368,6 +373,6 @@ S0 完成後，S1 才會修改 installed model 格式。
 - [官方 model card](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/README.md#how-to-run-with-vllm)
 - [DSpark paper](https://arxiv.org/html/2607.05147)
 - [本地 runtime research](RUNTIME_RESEARCH_2026-08-07.md)
-- [本地 validation](VALIDATION.md#dspark-decision)
-- [本地 repack planner](../Sources/DeepSeekRepack/RepackPlanner.swift)
-- [本地 MXFP8 cache](../runtime/deepseek_v4_ssd/fp8_cache.py)
+- [本地 validation](../../docs/VALIDATION.md)
+- [本地 repack planner](../../Sources/DeepSeekRepack/RepackPlanner.swift)
+- [本地 MXFP8 cache](../../runtime/deepseek_v4_ssd/fp8_cache.py)
