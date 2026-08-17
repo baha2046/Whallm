@@ -82,4 +82,48 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(configuration.arguments.contains("9000"))
     XCTAssertFalse(configuration.arguments.contains("secret"))
   }
+
+  func testConfigurationPersistenceRestoresEveryUserSettingWithoutPlaintextAPIKey() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.localDefault
+    configuration.modelPath = "/tmp/model.dsv4"
+    configuration.host = "0.0.0.0"
+    configuration.port = 9_000
+    configuration.apiKey = "secret"
+    configuration.publicModel = "saved-model"
+    configuration.slots = 900
+    configuration.readWorkers = 8
+    configuration.powerSavingLimitGBps = 0.5
+    configuration.prefillStepSize = 256
+    configuration.layerMajorPrefill = false
+    configuration.promptCacheEntries = 4
+    configuration.promptCacheMemoryGiB = 12
+    configuration.warmupPromptPath = "/tmp/prompt.txt"
+    configuration.bf16KVCache = true
+    configuration.dsparkEnabled = true
+    configuration.dsparkSlots = 512
+    configuration.dsparkConfidenceThreshold = 0.7
+    configuration.defaultMaxTokens = 4_096
+    configuration.defaultTemperature = 0.8
+    configuration.defaultTopP = 0.9
+
+    configuration.save(defaults: defaults)
+    let restored = ServerConfiguration.load(defaults: defaults, apiKey: "secret")
+
+    XCTAssertEqual(restored, configuration)
+    let storedData = try XCTUnwrap(defaults.data(forKey: "serverConfiguration"))
+    XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
+  }
+
+  func testAPIKeyRoundTripsThroughIsolatedKeychainItem() {
+    let service = "ServerConfigurationTests.\(UUID().uuidString)"
+    let account = "api-key"
+    defer { AppKeychain.saveAPIKey("", service: service, account: account) }
+
+    AppKeychain.saveAPIKey("secret", service: service, account: account)
+
+    XCTAssertEqual(AppKeychain.readAPIKey(service: service, account: account), "secret")
+  }
 }

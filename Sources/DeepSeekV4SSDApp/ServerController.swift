@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import Security
 
 struct ServerStatus: Decodable {
   struct Performance: Decodable {
@@ -178,7 +179,8 @@ private struct RuntimeEnvironment {
   }
 }
 
-struct ServerConfiguration {
+struct ServerConfiguration: Codable, Equatable {
+  private static let preferenceKey = "serverConfiguration"
   static let powerSavingLimitOptionsGBps: [Double?] = [0.5, 1, 2, 3, 5, 10, 25, nil]
 
   var runtimeDirectory: String
@@ -207,8 +209,12 @@ struct ServerConfiguration {
   var defaultTopP: Double
 
   static var localDefault: ServerConfiguration {
+    load(defaults: .standard, apiKey: AppKeychain.readAPIKey())
+  }
+
+  static func load(defaults: UserDefaults, apiKey: String) -> ServerConfiguration {
     let runtime = RuntimeEnvironment.current
-    return ServerConfiguration(
+    var configuration = ServerConfiguration(
       runtimeDirectory: runtime.runtimeDirectory.path,
       pythonExecutable: runtime.pythonExecutable.path,
       pythonHome: runtime.pythonHome?.path,
@@ -234,6 +240,36 @@ struct ServerConfiguration {
       defaultTemperature: 0.2,
       defaultTopP: 0.98
     )
+    if let data = defaults.data(forKey: preferenceKey),
+      var saved = try? JSONDecoder().decode(ServerConfiguration.self, from: data)
+    {
+      saved.runtimeDirectory = configuration.runtimeDirectory
+      saved.pythonExecutable = configuration.pythonExecutable
+      saved.pythonHome = configuration.pythonHome
+      saved.sitePackages = configuration.sitePackages
+      saved.apiKey = apiKey
+      if !powerSavingLimitOptionsGBps.contains(where: {
+        $0 == saved.powerSavingLimitGBps
+      }) {
+        saved.powerSavingLimitGBps = nil
+      }
+      configuration = saved
+    } else {
+      configuration.apiKey = apiKey
+    }
+    return configuration
+  }
+
+  func save(defaults: UserDefaults = .standard) {
+    var saved = self
+    saved.runtimeDirectory = ""
+    saved.pythonExecutable = ""
+    saved.pythonHome = nil
+    saved.sitePackages = nil
+    saved.apiKey = ""
+    guard let data = try? JSONEncoder().encode(saved) else { return }
+    defaults.set(data, forKey: Self.preferenceKey)
+    defaults.set(modelPath, forKey: "selectedModelPath")
   }
 
   var baseURL: URL? {
@@ -332,6 +368,53 @@ struct ServerConfiguration {
     else {
       throw ConfigurationError(L10n.string("Correct the default generation parameters."))
     }
+  }
+}
+
+enum AppKeychain {
+  private static let service = "com.deepseekv4ssd.app"
+  private static let account = "server-api-key"
+
+  static func readAPIKey(service: String = service, account: String = account) -> String {
+    var query = baseQuery(service: service, account: account)
+    query[kSecReturnData as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitOne
+    var result: CFTypeRef?
+    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
+      let data = result as? Data
+    else { return "" }
+    return String(data: data, encoding: .utf8) ?? ""
+  }
+
+  static func saveAPIKey(
+    _ value: String,
+    service: String = service,
+    account: String = account
+  ) {
+    let query = baseQuery(service: service, account: account)
+    if value.isEmpty {
+      SecItemDelete(query as CFDictionary)
+      return
+    }
+    guard readAPIKey(service: service, account: account) != value else { return }
+    let data = Data(value.utf8)
+    let status = SecItemUpdate(
+      query as CFDictionary,
+      [kSecValueData as String: data] as CFDictionary
+    )
+    if status == errSecItemNotFound {
+      var item = query
+      item[kSecValueData as String] = data
+      SecItemAdd(item as CFDictionary, nil)
+    }
+  }
+
+  private static func baseQuery(service: String, account: String) -> [String: Any] {
+    [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: service,
+      kSecAttrAccount as String: account,
+    ]
   }
 }
 
