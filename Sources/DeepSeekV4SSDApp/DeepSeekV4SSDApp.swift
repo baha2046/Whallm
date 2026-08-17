@@ -24,7 +24,7 @@ struct DeepSeekV4SSDApp: App {
       .font(.body)
       .dynamicTypeSize(.xLarge ... .accessibility5)
       .controlSize(.large)
-      .frame(minWidth: 1_180, minHeight: 760)
+      .frame(minWidth: 960, minHeight: 760)
       .environment(\.locale, selectedLanguage.locale)
       .onAppear { NSApplication.shared.activate() }
       .onDisappear { server.stop() }
