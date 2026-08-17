@@ -179,6 +179,8 @@ private struct RuntimeEnvironment {
 }
 
 struct ServerConfiguration {
+  static let powerSavingLimitOptionsGBps: [Double?] = [0.5, 1, 2, 3, 5, 10, 25, nil]
+
   var runtimeDirectory: String
   var pythonExecutable: String
   var pythonHome: String?
@@ -190,6 +192,7 @@ struct ServerConfiguration {
   var publicModel: String
   var slots: Int
   var readWorkers: Int
+  var powerSavingLimitGBps: Double?
   var prefillStepSize: Int
   var layerMajorPrefill: Bool
   var promptCacheEntries: Int
@@ -217,6 +220,7 @@ struct ServerConfiguration {
       publicModel: "deepseek-v4-flash-0731",
       slots: 1_152,
       readWorkers: 4,
+      powerSavingLimitGBps: nil,
       prefillStepSize: 0,
       layerMajorPrefill: true,
       promptCacheEntries: 2,
@@ -254,6 +258,9 @@ struct ServerConfiguration {
       "--default-temperature", String(defaultTemperature),
       "--default-top-p", String(defaultTopP),
     ]
+    if let powerSavingLimitGBps {
+      values += ["--power-saving-limit-gbps", String(powerSavingLimitGBps)]
+    }
     if !layerMajorPrefill { values.append("--no-layer-major-prefill") }
     if !warmupPromptPath.isEmpty {
       values += ["--warmup-prompt-file", warmupPromptPath]

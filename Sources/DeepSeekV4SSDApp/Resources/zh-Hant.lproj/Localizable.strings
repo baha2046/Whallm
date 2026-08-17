@@ -74,7 +74,7 @@
 "No Test Messages" = "尚無測試訊息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的線性對話數量。推薦值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 數量。建議值是 1152。";
-"Number of workers that read expert blobs at the same time. The recommended value is 8." = "同時讀取 expert blob 的工作數量。建議值是 8。";
+"Number of workers that read expert blobs at the same time. The recommended value is 4." = "同時讀取 expert blob 的工作數量。建議值是 8。";
 "Optional for local use" = "本機使用時可留空";
 "Optional UTF-8 prompt file path" = "可選的 UTF-8 prompt 檔案路徑";
 "Port" = "連接埠";
@@ -204,6 +204,14 @@
 "Default 11434. Restart the server after changing it." = "預設為 11434。變更後請重新啟動伺服器。";
 "Model name exposed by the OpenAI-compatible API." = "OpenAI 相容 API 對外提供的模型名稱。";
 "Loads routed experts by layer during prefill." = "預填時依 layer 載入 routed expert。";
+"%lld GB/s" = "%lld GB/s";
+"500 MB/s" = "500 MB/s";
+"A lower SSD read limit can reduce generation speed." = "較低的 SSD 讀取速度上限可能會降低生成速度。";
+"Performance" = "效能";
+"Power Saving Mode" = "省電模式";
+"Power saving" = "省電";
+"SSD read limit" = "SSD 讀取速度上限";
+"Unlimited" = "無限制";
 "Stores the KV cache in BF16 format." = "使用 BF16 格式儲存 KV cache。";
 "Uses DSpark speculative decoding when it is installed." = "安裝 DSpark 後使用推測解碼。";
 "Preferences" = "偏好設定";

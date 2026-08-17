@@ -74,7 +74,7 @@
 "No Test Messages" = "No Test Messages";
 "Number of linear conversations to keep. The recommended value is 2." = "Number of linear conversations to keep. The recommended value is 2.";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.";
-"Number of workers that read expert blobs at the same time. The recommended value is 8." = "Number of workers that read expert blobs at the same time. The recommended value is 8.";
+"Number of workers that read expert blobs at the same time. The recommended value is 4." = "Number of workers that read expert blobs at the same time. The recommended value is 4.";
 "Optional for local use" = "Optional for local use";
 "Optional UTF-8 prompt file path" = "Optional UTF-8 prompt file path";
 "Port" = "Port";
@@ -204,6 +204,14 @@
 "Default 11434. Restart the server after changing it." = "Default 11434. Restart the server after changing it.";
 "Model name exposed by the OpenAI-compatible API." = "Model name exposed by the OpenAI-compatible API.";
 "Loads routed experts by layer during prefill." = "Loads routed experts by layer during prefill.";
+"%lld GB/s" = "%lld GB/s";
+"500 MB/s" = "500 MB/s";
+"A lower SSD read limit can reduce generation speed." = "A lower SSD read limit can reduce generation speed.";
+"Performance" = "Performance";
+"Power Saving Mode" = "Power Saving Mode";
+"Power saving" = "Power saving";
+"SSD read limit" = "SSD read limit";
+"Unlimited" = "Unlimited";
 "Stores the KV cache in BF16 format." = "Stores the KV cache in BF16 format.";
 "Uses DSpark speculative decoding when it is installed." = "Uses DSpark speculative decoding when it is installed.";
 "Preferences" = "Preferences";

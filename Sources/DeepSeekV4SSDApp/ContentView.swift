@@ -739,6 +739,11 @@ private struct AdvancedView: View {
         .appCard()
         .disabled(serverActive)
 
+        SectionHeader(title: L10n.string("Power Saving Mode", language: language))
+          .padding(.top, 12)
+        powerSavingPanel
+          .disabled(serverActive)
+
         SectionHeader(title: L10n.string("Runtime", language: language))
           .padding(.top, 12)
         VStack(spacing: 0) {
@@ -752,7 +757,7 @@ private struct AdvancedView: View {
           integerField(
             "Read workers",
             hint:
-              "Number of workers that read expert blobs at the same time. The recommended value is 8.",
+              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
             value: $configuration.readWorkers
           )
           Divider()
@@ -833,6 +838,85 @@ private struct AdvancedView: View {
     .environment(\.locale, language.locale)
   }
 
+  private var powerSavingPanel: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(alignment: .firstTextBaseline) {
+        SettingLabel(
+          "SSD read limit",
+          hint: "A lower SSD read limit can reduce generation speed.",
+          language: language
+        )
+        Spacer()
+        Text(powerSavingLimitLabel(configuration.powerSavingLimitGBps))
+          .font(.body.weight(.semibold).monospacedDigit())
+      }
+
+      VStack(spacing: 6) {
+        HStack {
+          Text(L10n.string("Power saving", language: language))
+          Spacer()
+          Text(L10n.string("Performance", language: language))
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+
+        Slider(
+          value: powerSavingSelection,
+          in: 0...Double(ServerConfiguration.powerSavingLimitOptionsGBps.count - 1),
+          step: 1
+        )
+        .accessibilityLabel(L10n.string("SSD read limit", language: language))
+        .accessibilityValue(powerSavingLimitLabel(configuration.powerSavingLimitGBps))
+
+        HStack(spacing: 0) {
+          ForEach(
+            Array(ServerConfiguration.powerSavingLimitOptionsGBps.enumerated()),
+            id: \.offset
+          ) { index, limit in
+            Text(powerSavingLimitLabel(limit))
+              .font(.caption.monospacedDigit())
+              .foregroundStyle(.secondary)
+              .frame(
+                maxWidth: .infinity,
+                alignment: index == 0
+                  ? .leading
+                  : index == ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+                    ? .trailing : .center
+              )
+          }
+        }
+        .accessibilityHidden(true)
+      }
+    }
+    .appCard()
+  }
+
+  private var powerSavingSelection: Binding<Double> {
+    Binding(
+      get: {
+        Double(
+          ServerConfiguration.powerSavingLimitOptionsGBps.firstIndex {
+            $0 == configuration.powerSavingLimitGBps
+          } ?? ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+        )
+      },
+      set: { value in
+        let index = min(
+          max(Int(value.rounded()), 0),
+          ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+        )
+        configuration.powerSavingLimitGBps =
+          ServerConfiguration.powerSavingLimitOptionsGBps[index]
+      }
+    )
+  }
+
+  private func powerSavingLimitLabel(_ limit: Double?) -> String {
+    guard let limit else { return L10n.string("Unlimited", language: language) }
+    if limit == 0.5 { return L10n.string("500 MB/s", language: language) }
+    return L10n.string("%lld GB/s", language: language, Int64(limit))
+  }
+
   private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
     SettingRow(label, hint: hint, language: language) {
       TextField(
@@ -861,6 +945,7 @@ private struct AdvancedView: View {
     SettingRow(label, hint: hint, language: language) {
       Toggle(L10n.string(label, language: language), isOn: value)
         .labelsHidden()
+        .accessibilityLabel(L10n.string(label, language: language))
     }
   }
 }
