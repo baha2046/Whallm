@@ -39,7 +39,9 @@ struct ContentView: View {
             .font(.title2.bold())
           Spacer()
         }
-        .padding(.horizontal, 32)
+        .frame(maxWidth: AppLayout.contentWidth)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 40)
         .padding(.vertical, 16)
 
         Divider()
@@ -155,6 +157,11 @@ private enum AppPage: String, CaseIterable, Identifiable {
     case .settings: L10n.string("Settings", language: language)
     }
   }
+}
+
+private enum AppLayout {
+  // Change this value to set the visible page content width.
+  static let contentWidth: CGFloat = 880
 }
 
 private enum AppTheme {
@@ -273,7 +280,7 @@ private struct ServerView: View {
           .padding(.top, 10)
         serverPanel
       }
-      .frame(maxWidth: 980)
+      .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
       .padding(.horizontal, 40)
       .padding(.vertical, 24)
@@ -830,7 +837,7 @@ private struct AdvancedView: View {
         .appCard()
         .disabled(serverActive)
       }
-      .frame(maxWidth: 980)
+      .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
       .padding(.horizontal, 40)
       .padding(.vertical, 24)
@@ -990,7 +997,7 @@ private struct LogsView: View {
       .appCard()
       .accessibilityLabel(L10n.string("Server log", language: language))
     }
-    .frame(maxWidth: 980)
+    .frame(maxWidth: AppLayout.contentWidth)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .padding(.horizontal, 40)
     .padding(.vertical, 24)
@@ -1123,7 +1130,7 @@ private struct SettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .appCard()
       }
-      .frame(maxWidth: 980)
+      .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
       .padding(.horizontal, 40)
       .padding(.vertical, 24)
@@ -1222,7 +1229,7 @@ private struct MetricView: View {
           .padding(.top, 10)
         systemCard
       }
-      .frame(maxWidth: 980)
+      .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
       .padding(.horizontal, 40)
       .padding(.vertical, 24)
@@ -1713,7 +1720,7 @@ private struct ChatView: View {
       }
       .appCard(padding: 16)
     }
-    .frame(maxWidth: 980)
+    .frame(maxWidth: AppLayout.contentWidth)
     .frame(maxWidth: .infinity)
     .padding(.horizontal, 40)
     .padding(.vertical, 24)
