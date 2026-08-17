@@ -68,9 +68,9 @@ PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 | Suite | 通過 | 失敗 |
 | --- | ---: | ---: |
 | Swift `DeepSeekRepackTests` | 8 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 18 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 19 | 0 |
 | Python runtime 與 server | 68 | 0 |
-| 合計 | 94 | 0 |
+| 合計 | 95 | 0 |
 
 目前 checkout 比 clean checkout benchmark artifact 多七個 Python 測試。
 七個新測試都已通過。
@@ -82,6 +82,7 @@ clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Pytho
 - 無效 expert shape 和缺少 tensor 的拒絕行為。
 - 8 MiB bounded copy、續傳 receipt、SHA failure 和 repair。
 - APP installed model 掃描、server 設定、設定儲存、Keychain 和測試對話儲存。
+- Power Saving Mode Slider 的 legend 節點對齊。
 - MXFP4 個別與 batched expert output。
 - ready expert decode 的 router 順序。
 - MXFP8 cache chunk、gather、index 和 persistence round-trip。
