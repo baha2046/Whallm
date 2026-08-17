@@ -149,6 +149,7 @@ final class ModelLibrary: ObservableObject {
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
+  private static let installDSparkPreference = "installDSparkWithModel"
   nonisolated private static let recommendedMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
   nonisolated private static let requiredStorageBytes: UInt64 = 160 * 1_024 * 1_024 * 1_024
 
@@ -162,7 +163,9 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var message: String?
   @Published private(set) var verificationModelPath: String?
   @Published private(set) var verificationIssues: [InstalledFileIssue]?
-  @Published var installDSparkWithModel = true
+  @Published var installDSparkWithModel: Bool {
+    didSet { defaults.set(installDSparkWithModel, forKey: Self.installDSparkPreference) }
+  }
 
   private let defaults: UserDefaults
   private var operationTask: Task<Void, Never>?
@@ -170,6 +173,8 @@ final class ModelLibrary: ObservableObject {
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
+    installDSparkWithModel =
+      defaults.object(forKey: Self.installDSparkPreference) as? Bool ?? true
     if let savedPath = defaults.string(forKey: Self.rootPreference) {
       rootURL = URL(fileURLWithPath: savedPath, isDirectory: true)
     } else {

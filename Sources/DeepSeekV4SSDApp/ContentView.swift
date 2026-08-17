@@ -6,7 +6,7 @@ struct ContentView: View {
   let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
   @State private var configuration = ServerConfiguration.localDefault
-  @State private var selectedPage = AppPage.server
+  @AppStorage("selectedAppPage") private var selectedPage = AppPage.server
   @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
 
   var body: some View {
@@ -97,8 +97,9 @@ struct ContentView: View {
       modelLibrary.resumeDownloadIfNeeded()
     }
     .onChange(of: modelLibrary.models) { selectDetectedModel() }
-    .onChange(of: configuration.modelPath) {
-      UserDefaults.standard.set(configuration.modelPath, forKey: "selectedModelPath")
+    .onChange(of: configuration) {
+      configuration.save()
+      AppKeychain.saveAPIKey(configuration.apiKey)
     }
     .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
   }
@@ -1478,9 +1479,9 @@ private struct ChatView: View {
   let configuration: ServerConfiguration
   @ObservedObject var server: ServerController
   let language: AppLanguage
-  @State private var messages: [ChatMessage] = []
-  @State private var input = ""
-  @State private var thinkingMode = "chat"
+  @State private var messages = ChatHistory.load()
+  @AppStorage("chatDraft") private var input = ""
+  @AppStorage("chatThinkingMode") private var thinkingMode = "chat"
   @State private var isSending = false
   @State private var generationTask: Task<Void, Never>?
   @State private var errorMessage: String?
@@ -1665,6 +1666,7 @@ private struct ChatView: View {
     ) {
       Button(localized("Clear Chat"), role: .destructive) {
         messages.removeAll()
+        ChatHistory.save(messages)
         input = ""
         errorMessage = nil
       }
@@ -1706,8 +1708,10 @@ private struct ChatView: View {
     let requestMessages = messages
     let assistantID = UUID()
     messages.append(ChatMessage(id: assistantID, role: "assistant", content: ""))
+    ChatHistory.save(messages)
     generationTask = Task {
       defer {
+        ChatHistory.save(messages)
         isSending = false
         generationTask = nil
       }

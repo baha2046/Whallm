@@ -86,6 +86,48 @@ struct ChatMessage: Encodable, Identifiable, Sendable {
   }
 }
 
+enum ChatHistory {
+  private static let preferenceKey = "chatMessages"
+
+  private struct StoredMessage: Codable {
+    let id: UUID
+    let role: String
+    let content: String
+    let reasoningContent: String
+    let toolCalls: [ChatToolCall]
+
+    init(_ message: ChatMessage) {
+      id = message.id
+      role = message.role
+      content = message.content
+      reasoningContent = message.reasoningContent
+      toolCalls = message.toolCalls
+    }
+
+    var message: ChatMessage {
+      ChatMessage(
+        id: id,
+        role: role,
+        content: content,
+        reasoningContent: reasoningContent,
+        toolCalls: toolCalls
+      )
+    }
+  }
+
+  static func load(defaults: UserDefaults = .standard) -> [ChatMessage] {
+    guard let data = defaults.data(forKey: preferenceKey),
+      let stored = try? JSONDecoder().decode([StoredMessage].self, from: data)
+    else { return [] }
+    return stored.map(\.message)
+  }
+
+  static func save(_ messages: [ChatMessage], defaults: UserDefaults = .standard) {
+    guard let data = try? JSONEncoder().encode(messages.map(StoredMessage.init)) else { return }
+    defaults.set(data, forKey: preferenceKey)
+  }
+}
+
 struct ChatDelta: Decodable, Equatable, Sendable {
   let content: String
   let reasoningContent: String

@@ -87,4 +87,31 @@ final class ChatStreamDecoderTests: XCTestCase {
       #"{"time_zone":"Asia/Taipei"}Tai"#
     )
   }
+
+  func testChatHistoryPersistenceRestoresLocalFields() throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let message = ChatMessage(
+      role: "assistant",
+      content: "answer",
+      reasoningContent: "reason",
+      toolCalls: [
+        ChatToolCall(
+          id: "call_1",
+          type: "function",
+          function: .init(name: "get_current_time", arguments: "{}")
+        )
+      ]
+    )
+
+    ChatHistory.save([message], defaults: defaults)
+    let restored = try XCTUnwrap(ChatHistory.load(defaults: defaults).first)
+
+    XCTAssertEqual(restored.id, message.id)
+    XCTAssertEqual(restored.role, message.role)
+    XCTAssertEqual(restored.content, message.content)
+    XCTAssertEqual(restored.reasoningContent, message.reasoningContent)
+    XCTAssertEqual(restored.toolCalls, message.toolCalls)
+  }
 }

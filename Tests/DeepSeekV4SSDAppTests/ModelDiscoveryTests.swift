@@ -80,4 +80,16 @@ final class ModelDiscoveryTests: XCTestCase {
       FileManager.default.homeDirectoryForCurrentUser.appending(path: ".dsmodel").path
     )
   }
+
+  @MainActor
+  func testModelLibraryRestoresDSparkInstallPreference() {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let library = ModelLibrary(defaults: defaults)
+
+    library.installDSparkWithModel = false
+
+    XCTAssertFalse(ModelLibrary(defaults: defaults).installDSparkWithModel)
+  }
 }
