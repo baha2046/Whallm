@@ -56,6 +56,7 @@
 "Language" = "Language";
 "Input Tokens" = "Input Tokens";
 "Live" = "Live";
+"Accumulate" = "Accumulate";
 "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed." = "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed.";
 "Max tokens" = "Max tokens";
 "Memory" = "Memory";

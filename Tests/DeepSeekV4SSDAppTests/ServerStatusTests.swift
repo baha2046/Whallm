@@ -6,7 +6,7 @@ import XCTest
 final class ServerStatusTests: XCTestCase {
   func testStatusDecodesPerformanceMetrics() throws {
     let data = Data(
-      #"{"performance":{"generating":true,"runtime_prompt_tokens":120,"runtime_generation_tokens":12,"completed_request_count":2,"request_seconds":3.5,"time_to_first_token_seconds":0.5,"prefill_tokens_per_second":200,"decode_tokens_per_second":4,"request_ssd_read_bytes_per_second":4194304,"request_expert_cache_hit_rate":0.8,"ssd_bytes_read":1048576,"active_parameters_cache":{"hit_rate":0.75,"hits":3,"misses":1,"resident_slots":3,"capacity_slots":1024}}}"#
+      #"{"performance":{"generating":true,"runtime_prompt_tokens":120,"runtime_generation_tokens":12,"accumulated_generation_tokens":42,"completed_request_count":2,"request_seconds":3.5,"time_to_first_token_seconds":0.5,"prefill_tokens_per_second":200,"decode_tokens_per_second":4,"request_ssd_read_bytes_per_second":4194304,"request_expert_cache_hit_rate":0.8,"ssd_bytes_read":1048576,"active_parameters_cache":{"hit_rate":0.75,"hits":3,"misses":1,"resident_slots":3,"capacity_slots":1024}}}"#
         .utf8
     )
 
@@ -15,6 +15,7 @@ final class ServerStatusTests: XCTestCase {
     XCTAssertTrue(status.performance.generating)
     XCTAssertEqual(status.performance.runtimePromptTokens, 120)
     XCTAssertEqual(status.performance.runtimeGenerationTokens, 12)
+    XCTAssertEqual(status.performance.accumulatedGenerationTokens, 42)
     XCTAssertEqual(status.performance.completedRequestCount, 2)
     XCTAssertEqual(status.performance.prefillTokensPerSecond, 200)
     XCTAssertEqual(status.performance.decodeTokensPerSecond, 4)

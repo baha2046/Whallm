@@ -15,6 +15,7 @@ struct ServerStatus: Decodable {
     let generating: Bool
     let runtimePromptTokens: Int
     let runtimeGenerationTokens: Int
+    let accumulatedGenerationTokens: Int
     let completedRequestCount: Int
     let requestSeconds: Double
     let timeToFirstTokenSeconds: Double
@@ -138,6 +139,7 @@ struct LivePerformance: Equatable {
   var hasStatus = false
   var generating = false
   var completedRequestCount = 0
+  var accumulatedOutputTokens = 0
   var snapshot = PerformanceSnapshot()
   var dsparkEnabled = false
   var dsparkAcceptanceRate = 0.0
@@ -609,6 +611,7 @@ final class ServerController: ObservableObject {
         hasStatus: true,
         generating: status.performance.generating,
         completedRequestCount: status.performance.completedRequestCount,
+        accumulatedOutputTokens: status.performance.accumulatedGenerationTokens,
         snapshot: PerformanceSnapshot(
           prefillTokensPerSecond: status.performance.prefillTokensPerSecond,
           decodeTokensPerSecond: status.performance.decodeTokensPerSecond,

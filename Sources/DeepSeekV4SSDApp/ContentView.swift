@@ -1164,6 +1164,9 @@ private struct MetricView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
+        SectionHeader(title: localized("Active Now"))
+        activeCard
+
         HStack(alignment: .center) {
           SectionHeader(title: localized("Serving Stats"))
           Spacer()
@@ -1177,6 +1180,7 @@ private struct MetricView: View {
           .help(localized("Clear metric history"))
           .accessibilityLabel(localized("Clear metric history"))
         }
+        .padding(.top, 10)
 
         LazyVGrid(
           columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
@@ -1198,10 +1202,6 @@ private struct MetricView: View {
           metricCard(.decodeTokensPerSecond)
         }
 
-        SectionHeader(title: localized("Active Now"))
-          .padding(.top, 10)
-        activeCard
-
         SectionHeader(title: localized("System"))
           .padding(.top, 10)
         systemCard
@@ -1216,7 +1216,52 @@ private struct MetricView: View {
     .environment(\.locale, language.locale)
   }
 
+  @ViewBuilder
   private func metricCard(_ metric: PerformanceMetric) -> some View {
+    switch metric {
+    case .inputTokens:
+      singleValueMetricCard(
+        metric,
+        label: localized("Live"),
+        value: formattedValue(performance.snapshot[metric], for: metric, live: true)
+      )
+    case .outputTokens:
+      singleValueMetricCard(
+        metric,
+        label: localized("Accumulate"),
+        value: performance.hasStatus ? performance.accumulatedOutputTokens.formatted() : "-"
+      )
+    default:
+      historicalMetricCard(metric)
+    }
+  }
+
+  private func singleValueMetricCard(
+    _ metric: PerformanceMetric,
+    label: String,
+    value: String
+  ) -> some View {
+    VStack(spacing: 14) {
+      Text(localized(metricTitle(metric)))
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+      VStack(spacing: 2) {
+        Text(label)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(value)
+          .font(.title2.weight(.semibold).monospacedDigit())
+          .lineLimit(1)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 126)
+    .appCard(padding: 18)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(localized(metricTitle(metric)))。\(label)：\(value)")
+  }
+
+  private func historicalMetricCard(_ metric: PerformanceMetric) -> some View {
     let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
     let statistics = history[metric]
     let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"

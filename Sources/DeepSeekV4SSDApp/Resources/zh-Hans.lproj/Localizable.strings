@@ -56,6 +56,7 @@
 "Language" = "语言";
 "Input Tokens" = "输入 Tokens";
 "Live" = "实时";
+"Accumulate" = "累计";
 "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed." = "请确认外接磁盘是高速 SSD。慢速磁盘会降低生成速度。";
 "Max tokens" = "最大 token 数";
 "Memory" = "内存";
