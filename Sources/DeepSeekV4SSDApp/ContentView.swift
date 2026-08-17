@@ -208,7 +208,9 @@ private struct AppInputModifier: ViewModifier {
       .padding(.horizontal, 11)
       .frame(width: width)
       .frame(minHeight: 34)
-      .background(AppTheme.fieldBackground, in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius))
+      .background(
+        AppTheme.fieldBackground, in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+      )
       .overlay(
         RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
           .stroke(Color.primary.opacity(0.12))
@@ -590,30 +592,30 @@ private struct ServerView: View {
   private var operationPanel: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text(modelLibrary.operationPhase.label).font(.headline)
-        if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
-          ProgressView(value: fraction)
-            .accessibilityLabel(modelLibrary.operationPhase.label)
-            .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
-          HStack(spacing: 16) {
-            Text(
-              L10n.string(
-                "%@ / %@", formattedBytes(progress.completedBytes),
-                formattedBytes(progress.totalBytes)))
-            if let speed = progress.bytesPerSecond, speed > 0 {
-              Text(L10n.string("%@/s", formattedBytes(UInt64(speed))))
-            }
-            if let seconds = progress.estimatedSecondsRemaining, seconds.isFinite {
-              Text(L10n.string("About %@ remaining", formattedDuration(seconds)))
-            }
+      if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
+        ProgressView(value: fraction)
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+          .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
+        HStack(spacing: 16) {
+          Text(
+            L10n.string(
+              "%@ / %@", formattedBytes(progress.completedBytes),
+              formattedBytes(progress.totalBytes)))
+          if let speed = progress.bytesPerSecond, speed > 0 {
+            Text(L10n.string("%@/s", formattedBytes(UInt64(speed))))
           }
-          .font(.callout.monospacedDigit())
-          .foregroundStyle(.secondary)
-        } else {
-          ProgressView()
-            .accessibilityLabel(modelLibrary.operationPhase.label)
+          if let seconds = progress.estimatedSecondsRemaining, seconds.isFinite {
+            Text(L10n.string("About %@ remaining", formattedDuration(seconds)))
+          }
         }
-        Button(L10n.string("Stop Current Operation")) { modelLibrary.cancelOperation() }
-          .disabled(modelLibrary.operationPhase == .cancelling)
+        .font(.callout.monospacedDigit())
+        .foregroundStyle(.secondary)
+      } else {
+        ProgressView()
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+      }
+      Button(L10n.string("Stop Current Operation")) { modelLibrary.cancelOperation() }
+        .disabled(modelLibrary.operationPhase == .cancelling)
     }
     .appCard()
   }
@@ -621,40 +623,40 @@ private struct ServerView: View {
   private var damagedModelsPanel: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text(L10n.string("Models That Need Attention")).font(.headline)
-        ForEach(modelLibrary.damagedModels) { model in
-          HStack(alignment: .top, spacing: 12) {
-            Label(
-              L10n.string(
-                "%@: %lld files are missing or have the wrong size", model.name,
-                Int64(model.quickIssues.count)),
-              systemImage: "exclamationmark.triangle.fill"
-            )
-            .foregroundStyle(.red)
-            Spacer()
-            Button(L10n.string("Show in Finder")) { modelLibrary.reveal(model.url) }
-            Button(L10n.string("Verify and Repair")) {
-              repairTarget = model
-              confirmsRepair = true
-            }
-            .disabled(modelLibrary.isBusy || server.isActive)
+      ForEach(modelLibrary.damagedModels) { model in
+        HStack(alignment: .top, spacing: 12) {
+          Label(
+            L10n.string(
+              "%@: %lld files are missing or have the wrong size", model.name,
+              Int64(model.quickIssues.count)),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .foregroundStyle(.red)
+          Spacer()
+          Button(L10n.string("Show in Finder")) { modelLibrary.reveal(model.url) }
+          Button(L10n.string("Verify and Repair")) {
+            repairTarget = model
+            confirmsRepair = true
           }
+          .disabled(modelLibrary.isBusy || server.isActive)
         }
-        ForEach(modelLibrary.invalidModelURLs, id: \.path) { url in
-          HStack(alignment: .top, spacing: 12) {
-            Label(
-              L10n.string("%@: The manifest cannot be read", url.lastPathComponent),
-              systemImage: "xmark.octagon.fill"
-            )
-            .foregroundStyle(.red)
-            Spacer()
-            Button(L10n.string("Show in Finder")) { modelLibrary.reveal(url) }
-            Button(L10n.string("Download Again")) {
-              reinstallTarget = url
-              confirmsReinstall = true
-            }
-            .disabled(modelLibrary.isBusy || server.isActive || !modelLibrary.canDownload)
+      }
+      ForEach(modelLibrary.invalidModelURLs, id: \.path) { url in
+        HStack(alignment: .top, spacing: 12) {
+          Label(
+            L10n.string("%@: The manifest cannot be read", url.lastPathComponent),
+            systemImage: "xmark.octagon.fill"
+          )
+          .foregroundStyle(.red)
+          Spacer()
+          Button(L10n.string("Show in Finder")) { modelLibrary.reveal(url) }
+          Button(L10n.string("Download Again")) {
+            reinstallTarget = url
+            confirmsReinstall = true
           }
+          .disabled(modelLibrary.isBusy || server.isActive || !modelLibrary.canDownload)
         }
+      }
     }
     .appCard()
   }
@@ -1116,8 +1118,11 @@ private struct SettingsView: View {
           .padding(.top, 12)
 
         VStack(alignment: .leading, spacing: 6) {
-          Label(L10n.string("MIT License", language: language), systemImage: "point.3.connected.trianglepath.dotted")
-            .font(.headline)
+          Label(
+            L10n.string("MIT License", language: language),
+            systemImage: "point.3.connected.trianglepath.dotted"
+          )
+          .font(.headline)
           Text(
             L10n.string(
               "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text.",

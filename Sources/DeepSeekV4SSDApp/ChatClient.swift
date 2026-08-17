@@ -309,7 +309,8 @@ enum ChatClient {
       for try await byte in bytes { data.append(byte) }
       let detail = try? JSONDecoder().decode(ErrorResponse.self, from: data)
       throw ChatError(
-        detail?.error.message ?? L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
+        detail?.error.message
+          ?? L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
     }
 
     var promptTokens = 0

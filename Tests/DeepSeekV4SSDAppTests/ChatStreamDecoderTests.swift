@@ -33,7 +33,8 @@ final class ChatStreamDecoderTests: XCTestCase {
     )
     XCTAssertEqual(
       try ChatStreamDecoder.decode(
-        line: #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_current_time","arguments":"{\"time_zone\":\"Asia/Taipei\"}"}}]}}]}"#
+        line:
+          #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_current_time","arguments":"{\"time_zone\":\"Asia/Taipei\"}"}}]}}]}"#
       ),
       .delta(ChatDelta(content: "", reasoningContent: "", toolCalls: [toolDelta]))
     )
@@ -78,7 +79,8 @@ final class ChatStreamDecoderTests: XCTestCase {
     }
 
     if case .delta(let delta) = try ChatStreamDecoder.decode(
-      line: #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Tai"}}]}}]}"#
+      line:
+        #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"Tai"}}]}}]}"#
     ) {
       message.append(delta)
     }

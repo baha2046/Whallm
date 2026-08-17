@@ -61,7 +61,11 @@ public enum ExpertIOBenchmark {
     let accumulator = BenchmarkAccumulator()
     let descriptorCount = mode == .cached ? 1 : manifest.layerCount
     var descriptors: [Int32] = []
-    defer { descriptors.forEach { Darwin.close($0) } }
+    defer {
+      for descriptor in descriptors {
+        Darwin.close(descriptor)
+      }
+    }
     for layer in 0..<descriptorCount {
       let file = root.appendingPathComponent(
         String(format: "experts/layer_%02d.bin", layer))
