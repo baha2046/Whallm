@@ -69,11 +69,11 @@ PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 | --- | ---: | ---: |
 | Swift `DeepSeekRepackTests` | 8 | 0 |
 | Swift `DeepSeekV4SSDAppTests` | 18 | 0 |
-| Python runtime 與 server | 67 | 0 |
-| 合計 | 93 | 0 |
+| Python runtime 與 server | 68 | 0 |
+| 合計 | 94 | 0 |
 
-目前 checkout 比 clean checkout benchmark artifact 多六個 Python 測試。
-六個新測試都已通過。
+目前 checkout 比 clean checkout benchmark artifact 多七個 Python 測試。
+七個新測試都已通過。
 clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Python 測試。
 
 測試覆蓋下列關鍵行為。
@@ -87,6 +87,7 @@ clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Pytho
 - MXFP8 cache chunk、gather、index 和 persistence round-trip。
 - layer-major prefill 和一般 path 的 next-token logits。
 - 記憶體與 persistent prompt cache reuse。
+- Output token 的 process 累計值。
 - DSpark greedy、sampling、verification、replay 和 fallback 邏輯。
 - Chat Completions、Responses、Text Completions、tool 和 SSE。
 

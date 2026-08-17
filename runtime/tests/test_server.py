@@ -40,6 +40,7 @@ class FakeRuntime:
         snapshot=lambda: {
             "runtime_prompt_tokens": 5,
             "runtime_generation_tokens": 2,
+            "accumulated_generation_tokens": 2,
             "prompt_cache_reused_tokens": 3,
             "completed_request_count": 1,
             "request_seconds": 0.75,
@@ -691,6 +692,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(performance["time_to_first_token_seconds"], 0.5)
         self.assertEqual(performance["prefill_tokens_per_second"], 4.0)
         self.assertEqual(performance["decode_tokens_per_second"], 4.0)
+        self.assertEqual(performance["accumulated_generation_tokens"], 2)
         self.assertEqual(performance["completed_request_count"], 1)
         self.assertEqual(performance["request_ssd_read_bytes_per_second"], 5_120.0)
         self.assertEqual(performance["prompt_cache_reused_tokens"], 3)

@@ -195,6 +195,7 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(observed_phases, ["prefill", "decode"])
         self.assertEqual(metrics["runtime_prompt_tokens"], 4)
         self.assertEqual(metrics["runtime_generation_tokens"], 2)
+        self.assertEqual(metrics["accumulated_generation_tokens"], 2)
         self.assertEqual(metrics["completed_request_count"], 1)
         self.assertEqual(metrics["cache_state_eval_count"], 2)
         self.assertGreaterEqual(metrics["time_to_first_token_seconds"], 0)
@@ -459,6 +460,20 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(snapshot["decode_tokens_per_second"], 0.4)
         self.assertEqual(snapshot["decode_latency_p50_seconds"], 2.5)
         self.assertEqual(snapshot["decode_latency_p95_seconds"], 2.5)
+
+    def test_output_tokens_accumulate_across_requests(self):
+        metrics = RuntimeMetrics()
+        metrics.start(4, 0, 1, False, CacheMetrics())
+        metrics.record_token(2, 1.0, 0.0)
+        self.assertEqual(metrics.snapshot()["accumulated_generation_tokens"], 2)
+        metrics.finish(CacheMetrics())
+
+        metrics.start(4, 0, 1, False, CacheMetrics())
+        metrics.record_token(3, 1.0, 0.0)
+        self.assertEqual(metrics.snapshot()["accumulated_generation_tokens"], 5)
+        metrics.finish(CacheMetrics())
+
+        self.assertEqual(metrics.snapshot()["accumulated_generation_tokens"], 5)
 
 
 class PrefillTests(unittest.TestCase):

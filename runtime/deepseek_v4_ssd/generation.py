@@ -215,6 +215,7 @@ class RuntimeMetrics:
         self._decode_latency_seconds: list[float] = []
         self._prompt_tokens = 0
         self._generation_tokens = 0
+        self._accumulated_generation_tokens = 0
         self._prompt_cache_reused_tokens = 0
         self._prefill_step_size = 0
         self._layer_major_prefill = False
@@ -412,6 +413,7 @@ class RuntimeMetrics:
                     self._dspark_expert_before
                 )
             if self._generation_tokens > 0:
+                self._accumulated_generation_tokens += self._generation_tokens
                 self._completed_request_count += 1
 
     def snapshot(self) -> dict[str, Any]:
@@ -448,6 +450,10 @@ class RuntimeMetrics:
             return {
                 "runtime_prompt_tokens": self._prompt_tokens,
                 "runtime_generation_tokens": self._generation_tokens,
+                "accumulated_generation_tokens": (
+                    self._accumulated_generation_tokens
+                    + (self._generation_tokens if self._request_active else 0)
+                ),
                 "prompt_cache_reused_tokens": self._prompt_cache_reused_tokens,
                 "completed_request_count": self._completed_request_count,
                 "request_seconds": request_seconds,

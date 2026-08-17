@@ -70,6 +70,10 @@ decode token 數使用：
 decode_tokens = max(0, runtime_generation_tokens - 1)
 ```
 
+`accumulated_generation_tokens` 是目前 server process 產生的 output token 總數。
+這個欄位包含進行中的 request。
+server restart 會把這個欄位重設為 0。
+
 主要 decode 指標如下。
 
 | 欄位 | 意義 |

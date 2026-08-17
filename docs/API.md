@@ -332,6 +332,7 @@ server restart 會還原 command-line 預設值。
 | `performance` | generation、時間、記憶體、SSD 和 expert cache 指標。 |
 
 `performance` 同時包含累計值和最近一次 request 值。
+`accumulated_generation_tokens` 是目前 server process 產生的 output token 總數。
 欄位語意請見[效能與瓶頸](PERFORMANCE.md)。
 
 `runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
