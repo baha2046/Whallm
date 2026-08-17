@@ -299,6 +299,9 @@ server 讓一個 installed model 保持載入。
 APP 使用獨立 Python process 啟動 server。
 APP 每秒讀取 `/api/status`。
 APP 使用 process RSS 顯示記憶體。
+APP 使用 bundle domain `com.deepseekv4ssd.app` 的 `UserDefaults` 保留 Server、進階、Power Saving Mode、模型、語言、目前頁面與測試對話設定。
+APP 使用 macOS Keychain 的 `com.deepseekv4ssd.app` service 與 `server-api-key` account 保留 API key。
+APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 
 ## 目前限制
 
