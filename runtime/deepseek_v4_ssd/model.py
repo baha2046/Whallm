@@ -14,12 +14,13 @@ from mlx_lm.models.cache import CacheList
 from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
 from .dspark import VerificationMetrics, load_dspark_model
-from .expert_cache import BatchedExperts, ExpertCache
+from .expert_cache import BatchedExperts, ExpertCache, _ReadLimiter
 from .fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
 from .manifest import InstalledModel, Tensor
 
 _ORIGINAL_SPARSE_POOLED_ATTENTION = deepseek_v4._sparse_pooled_attention
 _CACHE_CLEAR_THRESHOLD_BYTES = 512 * 1024**2
+_POWER_SAVING_LIMITS_GBPS = (0.5, 1, 2, 3, 5, 10, 25)
 
 
 def _clear_memory_cache() -> None:
@@ -49,6 +50,7 @@ class RuntimeConfig:
     dspark_slots: int = 768
     expert_route_trace: str | None = None
     ready_expert_decode: bool = True
+    power_saving_limit_gbps: float | None = None
 
 
 def _select_prefill_step_size(configured: int, prompt_tokens: int) -> int:
@@ -525,6 +527,13 @@ def load_model(
     installed_model: InstalledModel,
     config: RuntimeConfig = RuntimeConfig(),
 ):
+    if (
+        config.power_saving_limit_gbps is not None
+        and config.power_saving_limit_gbps not in _POWER_SAVING_LIMITS_GBPS
+    ):
+        raise ValueError(
+            "power saving limit must be 0.5, 1, 2, 3, 5, 10, or 25 GB/s"
+        )
     mx.set_memory_limit(config.memory_limit_gib * 1024**3)
     mx.set_wired_limit(config.memory_limit_gib * 1024**3)
     mx.set_cache_limit(1024**3)
@@ -542,6 +551,11 @@ def load_model(
     deepseek_v4.Indexer.__call__ = _correct_indexer
     deepseek_v4._sparse_pooled_attention = _sparse_pooled_attention
     model = deepseek_v4.Model(args)
+    read_limiter = (
+        _ReadLimiter(int(config.power_saving_limit_gbps * 1_000_000_000))
+        if config.power_saving_limit_gbps is not None
+        else None
+    )
     cache = ExpertCache(
         installed_model,
         config.slots,
@@ -549,6 +563,7 @@ def load_model(
         config.prefetch_read_workers,
         route_trace_path=config.expert_route_trace,
         ready_expert_decode=config.ready_expert_decode,
+        read_limiter=read_limiter,
     )
     try:
         for layer_index, layer in enumerate(model.layers):
@@ -580,7 +595,9 @@ def load_model(
         model.load_weights(list(weights.items()), strict=False)
         model.dspark = None
         if config.dspark_enabled and installed_model.has_dspark:
-            model.dspark = _load_dspark(installed_model, model, args, config)
+            model.dspark = _load_dspark(
+                installed_model, model, args, config, read_limiter
+            )
         mx.eval(model.parameters())
         return model, cache
     except Exception:
@@ -762,7 +779,13 @@ def _clone_layer_cache(layer_cache):
     return checkpoint, arrays
 
 
-def _load_dspark(installed_model: InstalledModel, main_model, args, config):
+def _load_dspark(
+    installed_model: InstalledModel,
+    main_model,
+    args,
+    config: RuntimeConfig,
+    read_limiter: _ReadLimiter | None,
+):
     minimum_slots = (
         installed_model.selected_expert_count * installed_model.dspark_block_size
     )
@@ -779,6 +802,7 @@ def _load_dspark(installed_model: InstalledModel, main_model, args, config):
         config.prefetch_read_workers,
         layer_count=installed_model.dspark_layer_count,
         expert_directory=installed_model.root / "dspark/experts",
+        read_limiter=read_limiter,
     )
     try:
         dspark = load_dspark_model(

@@ -12,6 +12,7 @@ import mlx.core as mx
 from .generation import GenerationOptions, ModelRuntime
 from .model import (
     RuntimeConfig,
+    _POWER_SAVING_LIMITS_GBPS,
     _select_moe_step_size,
 )
 
@@ -39,6 +40,11 @@ def main() -> None:
     parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
+    parser.add_argument(
+        "--power-saving-limit-gbps",
+        type=float,
+        choices=_POWER_SAVING_LIMITS_GBPS,
+    )
     parser.add_argument("--prefill-step-size", type=int, default=0)
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
     parser.add_argument("--no-layer-major-prefill", action="store_true")
@@ -106,6 +112,7 @@ def main() -> None:
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         expert_route_trace=arguments.expert_route_trace,
         ready_expert_decode=not arguments.no_ready_expert_decode,
+        power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
     runtime = ModelRuntime.open(arguments.model, config)
     prompt_token_sha256 = _token_sha256(runtime._encode_prompt(prompt_text))
@@ -187,6 +194,7 @@ def main() -> None:
             "batched_expert_prefill": config.batched_expert_prefill,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
+            "power_saving_limit_gbps": config.power_saving_limit_gbps,
             "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
             "dspark_slots": config.dspark_slots,
             **runtime_metrics,

@@ -9,7 +9,7 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START
-from deepseek_v4_ssd.server import APIError, OpenAIServer, ServerDefaults, _options
+from deepseek_v4_ssd.server import APIError, OpenAIServer, ServerDefaults, _options, _parser
 from deepseek_v4_ssd.tool_codec import AssistantTurn, ToolCall
 
 
@@ -114,6 +114,23 @@ class FakeRuntime:
             if index == self.pause_after_chunks:
                 self.chunk_paused.set()
                 self.chunk_gate.wait(timeout=2)
+
+
+class ServerArgumentTests(unittest.TestCase):
+    def test_power_saving_limit_uses_fixed_values(self):
+        self.assertIsNone(
+            _parser().parse_args(["--model", "/tmp/model"]).power_saving_limit_gbps
+        )
+        self.assertEqual(
+            _parser().parse_args(
+                ["--model", "/tmp/model", "--power-saving-limit-gbps", "0.5"]
+            ).power_saving_limit_gbps,
+            0.5,
+        )
+        with self.assertRaises(SystemExit):
+            _parser().parse_args(
+                ["--model", "/tmp/model", "--power-saving-limit-gbps", "0.75"]
+            )
 
 
 class ServerTests(unittest.TestCase):
@@ -660,8 +677,10 @@ class ServerTests(unittest.TestCase):
             },
         )
         status, _, body = self.request("/api/status")
-        performance = json.loads(body)["performance"]
+        payload = json.loads(body)
+        performance = payload["performance"]
         self.assertEqual(status, 200)
+        self.assertIsNone(payload["runtime"]["power_saving_limit_gbps"])
         self.assertFalse(performance["generating"])
         self.assertEqual(performance["generation_tokens"], 2)
         self.assertGreaterEqual(performance["tokens_per_second"], 0)

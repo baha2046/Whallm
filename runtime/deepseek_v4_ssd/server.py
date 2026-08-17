@@ -15,7 +15,7 @@ from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from .generation import GenerationOptions, GeneratedPiece, ModelRuntime, THINK_END
-from .model import RuntimeConfig
+from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
 MAX_REQUEST_BYTES = 1_048_576
@@ -999,6 +999,9 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "prefetch_read_workers": getattr(
                     config, "prefetch_read_workers", 1
                 ),
+                "power_saving_limit_gbps": getattr(
+                    config, "power_saving_limit_gbps", None
+                ),
                 "prefill_step_size": config.prefill_step_size,
                 "moe_prefill_step_size": getattr(
                     config, "moe_prefill_step_size", 0
@@ -1779,6 +1782,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
     parser.add_argument(
+        "--power-saving-limit-gbps",
+        type=float,
+        choices=_POWER_SAVING_LIMITS_GBPS,
+    )
+    parser.add_argument(
         "--prefill-step-size",
         type=int,
         default=0,
@@ -1865,6 +1873,7 @@ def main() -> None:
         dspark_enabled=arguments.dspark,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
+        power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
     print(f"Loading {arguments.model}...", flush=True)
     runtime = ModelRuntime.open(arguments.model, config)

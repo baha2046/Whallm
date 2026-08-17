@@ -102,6 +102,30 @@ class _LayerRead:
     futures: tuple[Future[float], ...]
 
 
+class _ReadLimiter:
+    """Limit aggregate preadv throughput across all read workers."""
+
+    def __init__(self, bytes_per_second: int) -> None:
+        if bytes_per_second <= 0:
+            raise ValueError("read limit must be greater than zero")
+        self._bytes_per_second = bytes_per_second
+        self._lock = threading.Lock()
+
+    def preadv(
+        self,
+        descriptor: int,
+        views: list[memoryview],
+        offset: int,
+    ) -> int:
+        with self._lock:
+            started = time.perf_counter()
+            count = os.preadv(descriptor, views, offset)
+            delay = count / self._bytes_per_second - (time.perf_counter() - started)
+            if delay > 0:
+                time.sleep(delay)
+            return count
+
+
 def _fused_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
     source = {region.name: region for region in model.expert_regions}
     required = {
@@ -305,6 +329,7 @@ class ExpertCache:
         expert_directory: Path | None = None,
         route_trace_path: str | Path | None = None,
         ready_expert_decode: bool = False,
+        read_limiter: _ReadLimiter | None = None,
     ) -> None:
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
@@ -319,6 +344,7 @@ class ExpertCache:
         self.layer_count = layer_count or installed_model.layer_count
         self.expert_directory = expert_directory or installed_model.root / "experts"
         self.ready_expert_decode = ready_expert_decode
+        self._read_limiter = read_limiter
         if self.layer_count < 1:
             raise ValueError("expert cache layer count must be greater than zero")
         self.metrics = CacheMetrics()
@@ -783,11 +809,12 @@ class ExpertCache:
         pending = list(views)
         position = offset
         while pending:
-            count = os.preadv(
-                self._descriptors[layer],
-                pending,
-                position,
-            )
+            if self._read_limiter is None:
+                count = os.preadv(self._descriptors[layer], pending, position)
+            else:
+                count = self._read_limiter.preadv(
+                    self._descriptors[layer], pending, position
+                )
             if count <= 0:
                 raise EOFError(
                     f"expert file ended early at layer {layer}, offset {position}"

@@ -156,6 +156,7 @@ Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
 | `slots` | 1,152 | main model expert cache 容量。 |
 | `read_workers` | 4 | 個別 expert blob 讀取工作數。 |
 | `prefetch_read_workers` | 2 | full-layer prefetch 工作數。 |
+| `power_saving_limit_gbps` | `null` | routed expert SSD 聚合讀取速度上限。`null` 代表無限制。 |
 | `prefill_step_size` | 0 | 由 prompt 長度自動選擇。 |
 | `moe_prefill_step_size` | 0 | 4K 以上自動使用 4,096-token tile。 |
 | `layer_major_prefill` | `true` | 只在至少 4,096 個未快取 token 時啟用。 |
@@ -169,6 +170,14 @@ Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
 | `memory_limit_gib` | 48 | MLX memory 和 wired memory limit。 |
 | `dspark_enabled` | `false` | DSpark 預設停用。 |
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |
+
+APP 的省電模式 Slider 支援 500 MB/s、1、2、3、5、10、25 GB/s 和無限制。
+選擇速度上限時，APP 會傳送 `--power-saving-limit-gbps`。
+server 只接受 0.5、1、2、3、5、10 或 25 GB/s。
+選擇無限制時，APP 不會傳送這個參數。
+限速器會序列化 routed expert 的 `preadv` 呼叫，並在每次讀取後等待。
+此限速不包含啟動時讀取的 common tensor。
+專案尚未量測各速度上限的耗電量與 generation 效能。
 
 自動 prefill step 如下。
 

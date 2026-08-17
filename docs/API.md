@@ -328,11 +328,14 @@ server restart 會還原 command-line 預設值。
 | 區域 | 內容 |
 | --- | --- |
 | root | model ID、checkpoint model ID、installed model path 和 key 狀態。 |
-| `runtime` | slot、worker、prefill、cache 和 DSpark 設定。 |
+| `runtime` | slot、worker、省電模式、prefill、cache 和 DSpark 設定。 |
 | `performance` | generation、時間、記憶體、SSD 和 expert cache 指標。 |
 
 `performance` 同時包含累計值和最近一次 request 值。
 欄位語意請見[效能與瓶頸](PERFORMANCE.md)。
+
+`runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
+`null` 代表 routed expert SSD 讀取速度沒有限制。
 
 ## Error
 

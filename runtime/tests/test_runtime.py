@@ -20,6 +20,7 @@ from deepseek_v4_ssd.expert_cache import (
     ExpertCache,
     ExpertWeights,
     ResidentExperts,
+    _ReadLimiter,
 )
 from deepseek_v4_ssd.dspark import (
     DraftResult,
@@ -824,6 +825,22 @@ class CacheMetricsTests(unittest.TestCase):
 
 
 class ExpertCacheTests(unittest.TestCase):
+    def test_read_limiter_caps_aggregate_preadv_rate(self):
+        limiter = _ReadLimiter(1_000_000_000)
+        with (
+            patch("deepseek_v4_ssd.expert_cache.os.preadv", return_value=500_000_000),
+            patch(
+                "deepseek_v4_ssd.expert_cache.time.perf_counter",
+                side_effect=[10.0, 10.25],
+            ),
+            patch("deepseek_v4_ssd.expert_cache.time.sleep") as sleep,
+        ):
+            count = limiter.preadv(1, [memoryview(bytearray(1))], 0)
+
+        self.assertEqual(count, 500_000_000)
+        sleep.assert_called_once()
+        self.assertAlmostEqual(sleep.call_args.args[0], 0.25)
+
     def test_cache_reads_an_independent_expert_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
