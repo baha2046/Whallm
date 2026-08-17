@@ -3,7 +3,7 @@ set -euo pipefail
 
 project_root=${0:A:h:h}
 python_executable=${PYTHON_EXECUTABLE:-$project_root/.venv/bin/python}
-output_root=$project_root/dist
+output_root=${OUTPUT_ROOT:-$project_root/dist}
 app_path=$output_root/DeepSeekV4SSD.app
 zip_path=$output_root/DeepSeekV4SSD-macOS-arm64.zip
 app_version=${APP_VERSION:-1.0.0}
@@ -25,7 +25,7 @@ $python_executable -c 'import mlx, numpy, sentencepiece, tiktoken, transformers'
 python_version=$($python_executable -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 python_framework=$($python_executable -c 'import pathlib, sys; print(pathlib.Path(sys.base_prefix).parents[1])')
 site_packages=$($python_executable -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
-python_binary=$($python_executable -c 'import os, sys; print(os.path.realpath(sys._base_executable))')
+python_binary=$($python_executable -c 'import os, sys; print(os.path.realpath(sys.executable))')
 
 if [[ ! -d $python_framework || ! -d $site_packages ]]; then
   print -u2 "The selected Python environment cannot be bundled."
@@ -59,6 +59,9 @@ for localization in "$project_root/Sources/DeepSeekV4SSDApp/Resources"/*.lproj; 
 done
 ditto "$site_packages" "$app_path/Contents/Resources/python/site-packages"
 ditto "$python_framework" "$app_path/Contents/Frameworks/Python.framework"
+if [[ -d ${python_framework:h}/Libraries ]]; then
+  ditto "${python_framework:h}/Libraries" "$app_path/Contents/Frameworks/Libraries"
+fi
 ditto "$python_binary" "$app_path/Contents/MacOS/python3"
 rm -f "$app_path/Contents/Frameworks/Python.framework/Versions/$python_version/lib/python$python_version/site-packages"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $app_version" "$app_path/Contents/Info.plist"
@@ -69,6 +72,9 @@ rewrite_python_library() {
   local target=$1
   local replacement=$2
   local dependency
+  if otool -L "$target" | /usr/bin/grep -Fq "$replacement"; then
+    return
+  fi
   dependency=$(otool -L "$target" | tail -n +2 | sed -n \
     '/Python\.framework\/Versions\//{s/^[[:space:]]*//;s/ (.*$//;p;q;}')
   if [[ -z $dependency ]]; then
@@ -130,18 +136,20 @@ rm -rf "$app_path/Contents/Frameworks/Python.framework/Versions/$python_version/
 
 code_sign_identity=${CODE_SIGN_IDENTITY:--}
 code_sign_arguments=(--force --sign "$code_sign_identity")
+code_sign_metadata=identifier,entitlements
 if [[ $code_sign_identity != - ]]; then
   code_sign_arguments+=(--options runtime --timestamp)
+  code_sign_metadata+=,flags
 fi
 while IFS= read -r -d '' target; do
   if /usr/bin/file -b "$target" | /usr/bin/grep -q 'Mach-O'; then
     codesign "${code_sign_arguments[@]}" \
-      --preserve-metadata=identifier,entitlements,flags "$target"
+      --preserve-metadata="$code_sign_metadata" "$target"
   fi
 done < <(/usr/bin/find "$app_path/Contents" -type f -print0)
 while IFS= read -r -d '' target; do
   codesign "${code_sign_arguments[@]}" \
-    --preserve-metadata=identifier,entitlements,flags "$target"
+    --preserve-metadata="$code_sign_metadata" "$target"
 done < <(
   /usr/bin/find "$app_path/Contents" -depth -type d \
     \( -name '*.app' -o -name '*.framework' -o -name '*.bundle' -o -name '*.xpc' \) \
