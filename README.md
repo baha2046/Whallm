@@ -36,6 +36,14 @@ See the [validation record](docs/VALIDATION.md) for the full test details.
 **Download the app → Open the app → Download the 167 GB full model → Start the
 server → Chat in the app or connect Codex**
 
+> [!IMPORTANT]
+> Version 1.0.3 cannot install version 1.0.4 through automatic update because
+> the previous Sparkle signing key is no longer available. Quit the app,
+> download `DeepSeekV4SSD-macOS-arm64.zip` from the
+> [1.0.4 release](https://github.com/yanun0323/deepseek_ssd/releases/tag/v1.0.4),
+> and replace the existing app manually. Automatic updates work again after
+> you install version 1.0.4.
+
 1. Download the latest `DeepSeekV4SSD-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
 2. Extract the ZIP and open `DeepSeekV4SSD.app`.
