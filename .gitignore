@@ -24,3 +24,4 @@ Makefile.env
 plan.json
 scratch/
 reference*.png
+.tmp
