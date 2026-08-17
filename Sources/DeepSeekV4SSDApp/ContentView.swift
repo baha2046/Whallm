@@ -395,7 +395,7 @@ private struct ServerView: View {
             .tag("0.0.0.0")
         }
         .labelsHidden()
-        .frame(width: 290)
+        .frame(width: 290, alignment: .trailing)
       }
       .disabled(server.isActive)
 
@@ -526,7 +526,7 @@ private struct ServerView: View {
           }
         }
         .labelsHidden()
-        .frame(width: 420)
+        .frame(width: 420, alignment: .trailing)
       }
 
       Divider()
@@ -869,23 +869,32 @@ private struct AdvancedView: View {
         .accessibilityLabel(L10n.string("SSD read limit", language: language))
         .accessibilityValue(powerSavingLimitLabel(configuration.powerSavingLimitGBps))
 
-        HStack(spacing: 0) {
-          ForEach(
-            Array(ServerConfiguration.powerSavingLimitOptionsGBps.enumerated()),
-            id: \.offset
-          ) { index, limit in
-            Text(powerSavingLimitLabel(limit))
-              .font(.caption.monospacedDigit())
-              .foregroundStyle(.secondary)
-              .frame(
-                maxWidth: .infinity,
-                alignment: index == 0
-                  ? .leading
-                  : index == ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
-                    ? .trailing : .center
+        GeometryReader { geometry in
+          ZStack(alignment: .topLeading) {
+            ForEach(
+              Array(ServerConfiguration.powerSavingLimitOptionsGBps.enumerated()),
+              id: \.offset
+            ) { index, limit in
+              let frame = powerSavingLegendFrame(
+                index: index,
+                count: ServerConfiguration.powerSavingLimitOptionsGBps.count,
+                totalWidth: geometry.size.width
               )
+              Text(powerSavingLimitLabel(limit))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(
+                  width: frame.width,
+                  alignment: index == 0
+                    ? .leading
+                    : index == ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+                      ? .trailing : .center
+                )
+                .offset(x: frame.minX)
+            }
           }
         }
+        .frame(height: 16)
         .accessibilityHidden(true)
       }
     }
@@ -949,6 +958,13 @@ private struct AdvancedView: View {
         .accessibilityLabel(L10n.string(label, language: language))
     }
   }
+}
+
+func powerSavingLegendFrame(index: Int, count: Int, totalWidth: CGFloat) -> CGRect {
+  let width = totalWidth / CGFloat(count - 1)
+  let nodeX = CGFloat(index) * width
+  let minX = min(max(nodeX - width / 2, 0), totalWidth - width)
+  return CGRect(x: minX, y: 0, width: width, height: 0)
 }
 
 private struct LogsView: View {
@@ -1035,7 +1051,7 @@ private struct SettingsView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .frame(minWidth: 180)
+            .frame(minWidth: 180, alignment: .trailing)
           }
 
           Divider()

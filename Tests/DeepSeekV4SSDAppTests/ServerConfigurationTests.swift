@@ -3,6 +3,32 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  func testPowerSavingLegendAnchorsAlignWithSliderNodes() {
+    let count = ServerConfiguration.powerSavingLimitOptionsGBps.count
+    let totalWidth = CGFloat(700)
+    let nodeSpacing = totalWidth / CGFloat(count - 1)
+
+    for index in 1..<(count - 1) {
+      let frame = powerSavingLegendFrame(
+        index: index,
+        count: count,
+        totalWidth: totalWidth
+      )
+      XCTAssertEqual(frame.midX, CGFloat(index) * nodeSpacing, accuracy: 0.001)
+    }
+
+    XCTAssertEqual(
+      powerSavingLegendFrame(index: 0, count: count, totalWidth: totalWidth).minX,
+      0,
+      accuracy: 0.001
+    )
+    XCTAssertEqual(
+      powerSavingLegendFrame(index: count - 1, count: count, totalWidth: totalWidth).maxX,
+      totalWidth,
+      accuracy: 0.001
+    )
+  }
+
   func testLocalDefaultsUseRequestedGenerationValues() {
     let configuration = ServerConfiguration.localDefault
 
