@@ -45,6 +45,12 @@ def main() -> None:
         type=float,
         choices=_POWER_SAVING_LIMITS_GBPS,
     )
+    parser.add_argument(
+        "--memory-limit-gib",
+        type=int,
+        default=0,
+        help="MLX memory limit in GiB; 0 uses Metal's recommended maximum",
+    )
     parser.add_argument("--prefill-step-size", type=int, default=0)
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
     parser.add_argument("--no-layer-major-prefill", action="store_true")
@@ -78,6 +84,8 @@ def main() -> None:
         parser.error("--read-workers must be greater than zero")
     if arguments.prefetch_read_workers < 1:
         parser.error("--prefetch-read-workers must be greater than zero")
+    if arguments.memory_limit_gib < 0:
+        parser.error("--memory-limit-gib must be zero or greater")
     if arguments.prefill_step_size < 0:
         parser.error("--prefill-step-size must be zero or greater")
     if arguments.moe_prefill_step_size < 0:
@@ -97,6 +105,7 @@ def main() -> None:
         slots=arguments.slots,
         read_workers=arguments.read_workers,
         prefetch_read_workers=arguments.prefetch_read_workers,
+        memory_limit_gib=arguments.memory_limit_gib,
         prefill_step_size=arguments.prefill_step_size,
         moe_prefill_step_size=arguments.moe_prefill_step_size,
         fp8_kv_cache=not arguments.bf16_kv_cache,

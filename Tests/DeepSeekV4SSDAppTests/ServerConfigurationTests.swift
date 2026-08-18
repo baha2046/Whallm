@@ -41,6 +41,7 @@ final class ServerConfigurationTests: XCTestCase {
       ServerConfiguration.powerSavingLimitOptionsGBps,
       [0.5, 1, 2, 3, 5, 10, 25, nil]
     )
+    XCTAssertEqual(configuration.memoryLimitGiB, 0)
     XCTAssertEqual(configuration.defaultMaxTokens, 272_000)
     XCTAssertEqual(configuration.defaultTemperature, 0.2)
     XCTAssertEqual(configuration.defaultTopP, 0.98)
@@ -50,6 +51,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(configuration.arguments.contains("0.98"))
     XCTAssertTrue(configuration.arguments.contains("11434"))
     XCTAssertTrue(configuration.arguments.contains("--dspark-slots"))
+    XCTAssertTrue(configuration.arguments.contains("--memory-limit-gib"))
   }
 
   func testLocalizationSupportsAllSelectableLanguages() {
@@ -122,6 +124,7 @@ final class ServerConfigurationTests: XCTestCase {
     configuration.slots = 900
     configuration.readWorkers = 8
     configuration.powerSavingLimitGBps = 0.5
+    configuration.memoryLimitGiB = 16
     configuration.prefillStepSize = 256
     configuration.layerMajorPrefill = false
     configuration.promptCacheEntries = 4
@@ -141,6 +144,32 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restored, configuration)
     let storedData = try XCTUnwrap(defaults.data(forKey: "serverConfiguration"))
     XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
+  }
+
+  func testConfigurationPersistenceMigratesMissingMemoryLimit() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.localDefault
+    configuration.modelPath = "/tmp/model.dsv4"
+    configuration.slots = 900
+    configuration.save(defaults: defaults)
+
+    let storedData = try XCTUnwrap(defaults.data(forKey: "serverConfiguration"))
+    var payload = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: storedData) as? [String: Any]
+    )
+    payload.removeValue(forKey: "memoryLimitGiB")
+    defaults.set(
+      try JSONSerialization.data(withJSONObject: payload),
+      forKey: "serverConfiguration"
+    )
+
+    let restored = ServerConfiguration.load(defaults: defaults, apiKey: "")
+
+    XCTAssertEqual(restored.modelPath, configuration.modelPath)
+    XCTAssertEqual(restored.slots, configuration.slots)
+    XCTAssertEqual(restored.memoryLimitGiB, 0)
   }
 
   func testAPIKeyRoundTripsThroughIsolatedKeychainItem() {

@@ -46,6 +46,7 @@ from deepseek_v4_ssd.model import (
     RuntimeConfig,
     _ORIGINAL_SPARSE_POOLED_ATTENTION,
     _StreamingSwitchGLU,
+    _configure_memory_limits,
     _correct_compressor,
     _select_moe_step_size,
     _select_prefill_step_size,
@@ -476,10 +477,46 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(metrics.snapshot()["accumulated_generation_tokens"], 5)
 
 
+class MemoryLimitTests(unittest.TestCase):
+    def test_automatic_memory_limit_uses_metals_recommended_maximum(self):
+        maximum = 40_200_896_512
+        with (
+            patch(
+                "deepseek_v4_ssd.model.mx.device_info",
+                return_value={"max_recommended_working_set_size": maximum},
+            ),
+            patch("deepseek_v4_ssd.model.mx.set_memory_limit") as set_memory_limit,
+            patch("deepseek_v4_ssd.model.mx.set_wired_limit") as set_wired_limit,
+        ):
+            selected = _configure_memory_limits(RuntimeConfig())
+
+        self.assertEqual(selected, maximum)
+        set_memory_limit.assert_called_once_with(maximum)
+        set_wired_limit.assert_called_once_with(maximum)
+
+    def test_explicit_memory_limit_caps_wired_memory_at_metals_maximum(self):
+        maximum = 40_200_896_512
+        requested = 48 * 1024**3
+        with (
+            patch(
+                "deepseek_v4_ssd.model.mx.device_info",
+                return_value={"max_recommended_working_set_size": maximum},
+            ),
+            patch("deepseek_v4_ssd.model.mx.set_memory_limit") as set_memory_limit,
+            patch("deepseek_v4_ssd.model.mx.set_wired_limit") as set_wired_limit,
+        ):
+            selected = _configure_memory_limits(RuntimeConfig(memory_limit_gib=48))
+
+        self.assertEqual(selected, requested)
+        set_memory_limit.assert_called_once_with(requested)
+        set_wired_limit.assert_called_once_with(maximum)
+
+
 class PrefillTests(unittest.TestCase):
     def test_runtime_uses_1152_expert_slots_by_default(self):
         self.assertEqual(RuntimeConfig().slots, 1_152)
         self.assertEqual(RuntimeConfig().read_workers, 4)
+        self.assertEqual(RuntimeConfig().memory_limit_gib, 0)
         self.assertEqual(RuntimeConfig().dspark_slots, 768)
         self.assertTrue(RuntimeConfig().ready_expert_decode)
 

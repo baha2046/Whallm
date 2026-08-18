@@ -772,6 +772,12 @@ private struct AdvancedView: View {
           )
           Divider()
           integerField(
+            "Memory limit GiB",
+            hint: "0 automatically uses Metal's recommended maximum.",
+            value: $configuration.memoryLimitGiB
+          )
+          Divider()
+          integerField(
             "Prefill step size",
             hint: "0 selects 128, 256, or 1024 based on the prompt length.",
             value: $configuration.prefillStepSize
