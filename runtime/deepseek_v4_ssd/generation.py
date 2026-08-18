@@ -42,7 +42,6 @@ THINK_END = "</think>"
 
 @contextmanager
 def _use_mlx_lm_generation_stream(stream):
-    # ponytail: serialize this process-global override until mlx-lm accepts a stream.
     with _MLX_LM_GENERATION_LOCK:
         previous = _mlx_lm_generate.generation_stream
         _mlx_lm_generate.generation_stream = stream
