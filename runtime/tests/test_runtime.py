@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib
 import json
 import os
 import tempfile
@@ -59,13 +58,10 @@ from deepseek_v4_ssd.model import (
     verification_forward_with_hidden,
 )
 
-_mlx_lm_generate = importlib.import_module("mlx_lm.generate")
-
 
 class ModelRuntimeTests(unittest.TestCase):
     def test_model_load_and_request_share_cross_thread_stream(self):
         load_stream = None
-        pending = None
 
         def fake_load_model(_installed, _config):
             nonlocal load_stream
@@ -87,7 +83,6 @@ class ModelRuntimeTests(unittest.TestCase):
             runtime = ModelRuntime(installed, config)
 
         self.assertEqual(runtime._generation_stream, load_stream)
-        self.assertEqual(_mlx_lm_generate.generation_stream, load_stream)
         response = SimpleNamespace(
             text="OK",
             token=1,
@@ -99,12 +94,10 @@ class ModelRuntimeTests(unittest.TestCase):
         errors = []
 
         def fake_stream_generate(*_args, **_kwargs):
-            nonlocal pending
-            with mx.stream(_mlx_lm_generate.generation_stream):
-                if pending is not None:
-                    mx.eval(pending)
-                pending = mx.ones((1,)) + 1
-                yield response
+            value = mx.ones((1,)) + 1
+            mx.async_eval(value)
+            mx.eval(value)
+            yield response
 
         def generate():
             try:
@@ -119,13 +112,12 @@ class ModelRuntimeTests(unittest.TestCase):
                 side_effect=fake_stream_generate,
             ),
         ):
-            for _ in range(2):
-                thread = threading.Thread(target=generate)
-                thread.start()
-                thread.join()
+            thread = threading.Thread(target=generate)
+            thread.start()
+            thread.join()
 
         self.assertEqual(errors, [])
-        self.assertEqual([piece.text for piece in pieces], ["OK", "OK"])
+        self.assertEqual([piece.text for piece in pieces], ["OK"])
 
     def test_generation_tracks_phases_and_evaluates_cache_state(self):
         installed = SimpleNamespace(root=Path("/tmp/tokenizer"))

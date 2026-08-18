@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import hashlib
-import importlib
 import json
 import os
 import threading
@@ -32,8 +31,6 @@ from .model import (
     load_model,
 )
 from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
-
-_mlx_lm_generate = importlib.import_module("mlx_lm.generate")
 
 THINK_START = "<think>"
 THINK_END = "</think>"
@@ -626,8 +623,6 @@ class ModelRuntime:
         self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
-        # mlx-lm's thread-local stream cannot retain graphs across HTTP workers.
-        _mlx_lm_generate.generation_stream = self._generation_stream
         with mx.stream(self._generation_stream):
             self.model, self.expert_cache = load_model(installed, config)
             try:
