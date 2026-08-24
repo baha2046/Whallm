@@ -1,3 +1,5 @@
+
+
 # DeepSeekV4SSD
 
 <p align="center">
@@ -143,6 +145,7 @@ requests.
 - The runtime supports only the pinned `DeepSeek-V4-Flash-0731` checkpoint.
 - The runtime processes one generation request at a time.
 - Images, audio, logprobs, `response_format`, and `stop` are not supported.
+- Request bodies are limited to 1 MiB.
 - Very long input and output need more KV cache memory.
 - Performance depends on SSD speed, input length, and cache state.
 
