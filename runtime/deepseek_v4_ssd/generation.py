@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import importlib
 import json
 import os
 import threading
 import time
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
@@ -32,8 +33,22 @@ from .model import (
 )
 from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
 
+_mlx_lm_generate = importlib.import_module("mlx_lm.generate")
+_MLX_LM_GENERATION_LOCK = threading.Lock()
+
 THINK_START = "<think>"
 THINK_END = "</think>"
+
+
+@contextmanager
+def _use_mlx_lm_generation_stream(stream):
+    with _MLX_LM_GENERATION_LOCK:
+        previous = _mlx_lm_generate.generation_stream
+        _mlx_lm_generate.generation_stream = stream
+        try:
+            yield
+        finally:
+            _mlx_lm_generate.generation_stream = previous
 
 
 def _route_phase(expert_cache, phase: str):
@@ -754,43 +769,44 @@ class ModelRuntime:
                             persist=False,
                         )
                         generation_prompt = generation_prompt[-1:]
-                    responses = iter(
-                        stream_generate(
-                            self.model,
-                            self.tokenizer,
-                            generation_prompt,
-                            max_tokens=options.max_tokens,
-                            sampler=sampler,
-                            prompt_cache=prompt_cache,
-                            prefill_step_size=step_size,
+                    with _use_mlx_lm_generation_stream(self._generation_stream):
+                        responses = iter(
+                            stream_generate(
+                                self.model,
+                                self.tokenizer,
+                                generation_prompt,
+                                max_tokens=options.max_tokens,
+                                sampler=sampler,
+                                prompt_cache=prompt_cache,
+                                prefill_step_size=step_size,
+                            )
                         )
-                    )
-                    first_response = True
-                    while True:
-                        started = time.perf_counter()
-                        try:
-                            phase = "prefill" if first_response else "decode"
-                            with _route_phase(self.expert_cache, phase):
-                                response = next(responses)
-                        except StopIteration:
-                            break
-                        first_response = False
-                        step_seconds = time.perf_counter() - started
-                        cache_started = time.perf_counter()
-                        eval_prompt_cache(prompt_cache)
-                        cache_seconds = time.perf_counter() - cache_started
-                        self.metrics.record(response, step_seconds, cache_seconds)
-                        if response.finish_reason != "stop":
-                            cache_tokens.append(int(response.token))
-                        if response.finish_reason is not None:
-                            completed = True
-                        yield GeneratedPiece(
-                            text=response.text,
-                            token=response.token,
-                            prompt_tokens=len(prompt_tokens),
-                            generation_tokens=response.generation_tokens,
-                            finish_reason=response.finish_reason,
-                        )
+                        first_response = True
+                        while True:
+                            started = time.perf_counter()
+                            try:
+                                phase = "prefill" if first_response else "decode"
+                                with _route_phase(self.expert_cache, phase):
+                                    response = next(responses)
+                            except StopIteration:
+                                break
+                            first_response = False
+                            step_seconds = time.perf_counter() - started
+                            cache_started = time.perf_counter()
+                            eval_prompt_cache(prompt_cache)
+                            cache_seconds = time.perf_counter() - cache_started
+                            self.metrics.record(response, step_seconds, cache_seconds)
+                            if response.finish_reason != "stop":
+                                cache_tokens.append(int(response.token))
+                            if response.finish_reason is not None:
+                                completed = True
+                            yield GeneratedPiece(
+                                text=response.text,
+                                token=response.token,
+                                prompt_tokens=len(prompt_tokens),
+                                generation_tokens=response.generation_tokens,
+                                finish_reason=response.finish_reason,
+                            )
                 finally:
                     self.metrics.finish(self._expert_metrics())
                     if completed and dspark is None:
