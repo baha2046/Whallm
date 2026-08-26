@@ -176,5 +176,8 @@ if [[ -n ${NOTARY_PROFILE:-} ]]; then
   ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 fi
 
+REQUIRE_NOTARIZATION=$([[ -n ${NOTARY_PROFILE:-} ]] && print 1 || print 0) \
+  "$project_root/Scripts/verify-packaged-app.sh" "$app_path" "$zip_path"
+
 print "App: $app_path"
 print "Archive: $zip_path"

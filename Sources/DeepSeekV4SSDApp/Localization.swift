@@ -63,14 +63,20 @@ enum L10n {
 
   private static func bundle(for language: AppLanguage) -> Bundle {
     let resolvedLanguage = language.resolved
-    for base in [Bundle.main, Bundle.module] {
-      for resourceName in [resolvedLanguage.rawValue, resolvedLanguage.rawValue.lowercased()] {
-        guard let path = base.path(forResource: resourceName, ofType: "lproj"),
-          let bundle = Bundle(path: path)
-        else { continue }
-        return bundle
-      }
+    if let bundle = bundle(in: .main, for: resolvedLanguage) {
+      return bundle
+    }
+    if let bundle = bundle(in: .module, for: resolvedLanguage) {
+      return bundle
     }
     return .main
+  }
+
+  private static func bundle(in base: Bundle, for language: AppLanguage) -> Bundle? {
+    for resourceName in [language.rawValue, language.rawValue.lowercased()] {
+      guard let path = base.path(forResource: resourceName, ofType: "lproj") else { continue }
+      if let bundle = Bundle(path: path) { return bundle }
+    }
+    return nil
   }
 }

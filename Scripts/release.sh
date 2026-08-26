@@ -9,7 +9,8 @@ archive_name=DeepSeekV4SSD-macOS-arm64.zip
 archive_path=$project_root/dist/$archive_name
 sparkle_tools=$project_root/.build/artifacts/sparkle/Sparkle/bin
 release_root=$(mktemp -d)
-trap 'rm -rf "$release_root"' EXIT
+download_root=$(mktemp -d)
+trap 'rm -rf "$release_root" "$download_root"' EXIT
 
 if ! command -v gh >/dev/null || ! gh auth status >/dev/null 2>&1; then
   print -u2 "GitHub CLI is not signed in."
@@ -28,6 +29,9 @@ fi
 
 APP_VERSION=$version BUILD_VERSION=${BUILD_VERSION:-$version} \
   "$project_root/Scripts/package-app.sh"
+
+REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
+  "$project_root/dist/DeepSeekV4SSD.app" "$archive_path"
 
 ditto "$archive_path" "$release_root/$archive_name"
 print "DeepSeekV4SSD $version" > "$release_root/${archive_name:r}.md"
@@ -49,4 +53,19 @@ gh release create "$tag" \
   --title "DeepSeekV4SSD $version" \
   --notes "DeepSeekV4SSD $version"
 
-print "Release: https://github.com/$repository/releases/tag/$tag"
+gh release download "$tag" \
+  --repo "$repository" \
+  --pattern "$archive_name" \
+  --pattern appcast.xml \
+  --dir "$download_root"
+
+[[ -f $download_root/$archive_name && -f $download_root/appcast.xml ]] || {
+  print -u2 "GitHub Release does not contain the ZIP and appcast.xml."
+  exit 1
+}
+REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
+  "$project_root/dist/DeepSeekV4SSD.app" "$download_root/$archive_name"
+
+release_url=$(gh release view "$tag" --repo "$repository" --json url --jq .url)
+print "Release: $release_url"
+shasum -a 256 "$download_root/$archive_name" "$download_root/appcast.xml"
