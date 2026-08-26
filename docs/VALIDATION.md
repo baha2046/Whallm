@@ -1,7 +1,9 @@
 # 驗證紀錄
 
 本文件分開記錄目前驗證和歷史量測。
-目前驗證使用 commit `57e440e48b79fb0399beae7e9965481f74b35b25`。
+目前自動測試使用 commit `eaff25ba1393a246579698b8a99eed1794880aa5`。
+完整 installed model 驗證和正式量測使用 commit
+`57e440e48b79fb0399beae7e9965481f74b35b25`。
 每個探索性 artifact 另行記錄 working tree source hash。
 歷史量測只用來說明演進和決策。
 
@@ -33,7 +35,7 @@
 | 單元測試 | 驗證局部邏輯。單元測試不代表 full-model 速度或品質。 |
 | 未驗證 | 程式可能允許該設定，但本專案沒有完整證據。 |
 
-## 目前環境
+## 正式量測環境
 
 | 項目 | 值 |
 | --- | --- |
@@ -58,23 +60,33 @@
 
 ## 自動測試
 
-目前驗證執行：
+2026-08-26 使用 commit `eaff25ba1393a246579698b8a99eed1794880aa5`
+執行：
 
 ```sh
 make test
 PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 ```
 
-| Suite | 通過 | 失敗 |
-| --- | ---: | ---: |
-| Swift `DeepSeekRepackTests` | 8 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 19 | 0 |
-| Python runtime 與 server | 68 | 0 |
-| 合計 | 95 | 0 |
+| Suite | 通過 | 失敗 | 略過 |
+| --- | ---: | ---: | ---: |
+| Swift `DeepSeekRepackTests` | 8 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 17 | 0 | 3 |
+| Python runtime 與 server | 70 | 0 | 0 |
+| 合計 | 95 | 0 | 3 |
 
-目前 checkout 比 clean checkout benchmark artifact 多七個 Python 測試。
-七個新測試都已通過。
+三個 App 測試因本機沒有完整 installed model 而略過。
+目前 checkout 比 clean checkout benchmark artifact 多九個 Python 測試。
+九個新測試都已通過。
 clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Python 測試。
+
+同一個 commit 也執行 `make package`。
+本機 App 和解壓後的 ZIP 都通過完整簽章檢查。
+兩個 App 都包含英文、簡體中文和繁體中文 localization。
+隔離啟動檢查禁止 App 讀取專案 `.build` 目錄。
+隔離啟動檢查也移除測試副本中的 Swift resource bundle。
+三種 localization 都直接從 `Contents/Resources` 載入。
+App 在每種語言下都持續執行，且沒有在 `L10n` 初始化時停止。
 
 測試覆蓋下列關鍵行為。
 
