@@ -30,32 +30,33 @@ verify_localizations() {
   done
 }
 
-launch_without_module_bundle() {
+launch_without_module_bundle_access() {
   local target=$1
-  local launch_app=$verification_root/launch-${target:t}
-  local module_bundle=$launch_app/Contents/Resources/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle
+  local module_bundle=$target/Contents/Resources/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle
   local build_path=$project_root/.build
   local sandbox_profile
   local language
 
-  ditto "$target" "$launch_app"
   [[ -d $module_bundle ]] || {
     print -u2 "Swift resource bundle is missing: $module_bundle"
     exit 1
   }
-  rm -rf "$module_bundle"
-  sandbox_profile="(version 1)(allow default)(deny file-read* (subpath \"$build_path\"))"
+  sandbox_profile="(version 1)(allow default)"
+  sandbox_profile+="(deny file-read* (subpath \"$build_path\"))"
+  sandbox_profile+="(deny file-read* (subpath \"$module_bundle\"))"
 
   for language in en zh-Hans zh-Hant; do
     local log_path=$verification_root/launch-$language.log
     sandbox-exec -p "$sandbox_profile" \
-      "$launch_app/Contents/MacOS/dsv4-app" \
+      "$target/Contents/MacOS/dsv4-app" \
       -appLanguage "$language" >"$log_path" 2>&1 &
     local app_pid=$!
     sleep 3
     if ! kill -0 "$app_pid" 2>/dev/null; then
-      wait "$app_pid" || true
-      print -u2 "Packaged App stopped during $language localization startup."
+      local exit_status=0
+      wait "$app_pid" || exit_status=$?
+      print -u2 \
+        "Packaged App stopped during $language localization startup (status $exit_status)."
       sed -n '1,160p' "$log_path" >&2
       exit 1
     fi
@@ -80,7 +81,7 @@ extracted_app=$verification_root/extracted/DeepSeekV4SSD.app
 }
 verify_signature "$extracted_app"
 verify_localizations "$extracted_app"
-launch_without_module_bundle "$extracted_app"
+launch_without_module_bundle_access "$extracted_app"
 
 print "Packaged App verification passed: $app_path"
 print "Extracted ZIP verification passed: $zip_path"
