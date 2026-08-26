@@ -129,6 +129,7 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 - runtime 只支持固定 checkpoint revision 的 `DeepSeek-V4-Flash-0731`。
 - runtime 一次只处理一个生成 request。
 - API 不支持图片、音频、logprobs、`response_format` 和 `stop`。
+- server 将 request body 限制为 1 MiB。
 - 很长的 input 和 output 需要更多 KV cache 内存。
 - 性能取决于 SSD 速度、input 长度和 cache 状态。
 

@@ -128,6 +128,7 @@ API client가 데이터를 다른 위치로 전송할 수는 있습니다.
 - runtime은 고정된 `DeepSeek-V4-Flash-0731` checkpoint만 지원합니다.
 - runtime은 한 번에 하나의 생성 request만 처리합니다.
 - 이미지, 오디오, logprobs, `response_format`, `stop`은 지원하지 않습니다.
+- request body의 최대 크기는 1 MiB입니다.
 - 매우 긴 input과 output에는 더 많은 KV cache 메모리가 필요합니다.
 - 성능은 SSD 속도, input 길이, cache 상태에 따라 달라집니다.
 

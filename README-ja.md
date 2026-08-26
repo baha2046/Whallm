@@ -128,6 +128,7 @@ API client がデータを外部に送信する場合はあります。
 - runtime は固定された `DeepSeek-V4-Flash-0731` checkpoint のみをサポートします。
 - runtime は同時に 1 つの生成 request だけを処理します。
 - 画像、音声、logprobs、`response_format`、`stop` はサポートしません。
+- request body の上限は 1 MiB です。
 - 長い input と output にはより多くの KV cache メモリーが必要です。
 - 性能は SSD の速度、input 長、cache の状態で変わります。
 
