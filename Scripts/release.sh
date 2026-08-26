@@ -8,6 +8,7 @@ repository=${GITHUB_REPOSITORY:-yanun0323/deepseek_ssd}
 archive_name=DeepSeekV4SSD-macOS-arm64.zip
 archive_path=$project_root/dist/$archive_name
 sparkle_tools=$project_root/.build/artifacts/sparkle/Sparkle/bin
+notes_path=${RELEASE_NOTES_FILE:-$project_root/Packaging/ReleaseNotes/$version.md}
 release_root=$(mktemp -d)
 download_root=$(mktemp -d)
 trap 'rm -rf "$release_root" "$download_root"' EXIT
@@ -19,6 +20,11 @@ fi
 
 if [[ -z ${CODE_SIGN_IDENTITY:-} || -z ${NOTARY_PROFILE:-} ]]; then
   print -u2 "CODE_SIGN_IDENTITY and NOTARY_PROFILE are required for a release."
+  exit 1
+fi
+
+if [[ ! -f $notes_path ]]; then
+  print -u2 "Release notes not found: $notes_path"
   exit 1
 fi
 
@@ -34,7 +40,7 @@ REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
   "$project_root/dist/DeepSeekV4SSD.app" "$archive_path"
 
 ditto "$archive_path" "$release_root/$archive_name"
-print "DeepSeekV4SSD $version" > "$release_root/${archive_name:r}.md"
+ditto "$notes_path" "$release_root/${archive_name:r}.md"
 
 "$sparkle_tools/generate_appcast" \
   --account deepseek_ssd \
@@ -51,7 +57,7 @@ gh release create "$tag" \
   "$release_root/appcast.xml" \
   --repo "$repository" \
   --title "DeepSeekV4SSD $version" \
-  --notes "DeepSeekV4SSD $version"
+  --notes-file "$notes_path"
 
 gh release download "$tag" \
   --repo "$repository" \
