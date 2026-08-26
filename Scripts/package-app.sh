@@ -20,7 +20,8 @@ if [[ ! -x $python_executable ]]; then
   exit 1
 fi
 
-$python_executable -c 'import mlx, numpy, sentencepiece, tiktoken, transformers'
+TRANSFORMERS_VERBOSITY=error \
+  $python_executable -c 'import mlx, numpy, sentencepiece, tiktoken, transformers'
 
 python_version=$($python_executable -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 python_framework=$($python_executable -c 'import pathlib, sys; print(pathlib.Path(sys.base_prefix).parents[1])')
