@@ -1,7 +1,7 @@
 # 驗證紀錄
 
 本文件分開記錄目前驗證和歷史量測。
-目前自動測試使用 commit `eaff25ba1393a246579698b8a99eed1794880aa5`。
+目前自動測試使用 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`。
 完整 installed model 驗證和正式量測使用 commit
 `57e440e48b79fb0399beae7e9965481f74b35b25`。
 每個探索性 artifact 另行記錄 working tree source hash。
@@ -60,7 +60,7 @@
 
 ## 自動測試
 
-2026-08-26 使用 commit `eaff25ba1393a246579698b8a99eed1794880aa5`
+2026-08-26 使用 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`
 執行：
 
 ```sh
@@ -84,7 +84,7 @@ clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Pytho
 本機 App 和解壓後的 ZIP 都通過完整簽章檢查。
 兩個 App 都包含英文、簡體中文和繁體中文 localization。
 隔離啟動檢查禁止 App 讀取專案 `.build` 目錄。
-隔離啟動檢查也移除測試副本中的 Swift resource bundle。
+隔離啟動檢查也禁止 App 讀取 Swift resource bundle。
 三種 localization 都直接從 `Contents/Resources` 載入。
 App 在每種語言下都持續執行，且沒有在 `L10n` 初始化時停止。
 

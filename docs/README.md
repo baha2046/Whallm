@@ -3,7 +3,7 @@
 本目錄只放目前有效的文件。
 
 最後核對日期是 2026-08-26。
-核對版本是 commit `eaff25ba1393a246579698b8a99eed1794880aa5`。
+核對版本是 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`。
 checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
 
