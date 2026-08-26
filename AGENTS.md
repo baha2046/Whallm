@@ -2,6 +2,58 @@
 
 Use the ubiquitous language in `CONTEXT.md`.
 
+## App packaging behaviors
+
+Treat `build local` and `release new version` as workflow requests.
+
+### `build local`
+
+When the user requests `build local`:
+
+1. Run the applicable tests.
+2. Run `make package` to create `dist/DeepSeekV4SSD.app` and
+   `dist/DeepSeekV4SSD-macOS-arm64.zip`.
+3. Verify the App with `codesign --verify --deep --strict`.
+4. Extract the ZIP to a temporary directory. Verify the extracted App again.
+5. Start the packaged App in an isolated check that denies access to the project
+   `.build` directory. Confirm that the App stays open and does not trap during
+   `L10n` initialization.
+6. Confirm that the packaged App loads the English, Simplified Chinese, and
+   Traditional Chinese localization files from `Contents/Resources` before it
+   accesses `Bundle.module`.
+
+The packaged App must not require an absolute path from the build machine.
+Keep local packaging on the local machine. Do not create a tag, notarize an
+artifact, or upload an artifact.
+
+`build local` is complete only when the App and the extracted ZIP pass all
+checks.
+
+### `release new version`
+
+When the user requests `release new version`:
+
+1. Complete `build local` first.
+2. If the user does not give a version, read the latest stable `vX.Y.Z` Git tag
+   and increment `Z` by one.
+3. Confirm that the release changes, tests, and applicable files in `docs/` are
+   current.
+4. Require `CODE_SIGN_IDENTITY`, `NOTARY_PROFILE`, authenticated `gh`, and the
+   Sparkle signing tools.
+5. Before `gh release create`, require the release script to verify the final
+   signed and notarized App, its ZIP, its localization files, and App startup
+   without access to the project `.build` directory. Stop the release if a check
+   fails.
+6. Run `make release VERSION=X.Y.Z`.
+7. After publication, download the GitHub Release ZIP to a temporary directory.
+   Verify its signature, notarization ticket, localization files, and isolated
+   startup again.
+8. Confirm that the GitHub Release contains the ZIP and `appcast.xml`. Report the
+   tag, release URL, and SHA-256 of both files.
+
+`release new version` is complete only when the downloaded release artifacts
+pass all checks.
+
 ## `docs/`
 
 `docs/` is the source of truth for the current project.
