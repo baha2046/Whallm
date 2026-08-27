@@ -10,6 +10,7 @@ from pathlib import Path
 import mlx.core as mx
 
 from .generation import GenerationOptions, ModelRuntime
+from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .model import (
     RuntimeConfig,
     _POWER_SAVING_LIMITS_GBPS,
@@ -62,10 +63,60 @@ def main() -> None:
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--dspark", action="store_true")
+    parser.add_argument(
+        "--dspark-prompt-cache",
+        action="store_true",
+        help="experimentally reuse an atomic target and DSpark prompt snapshot",
+    )
+    parser.add_argument(
+        "--dspark-hash-prefetch",
+        action="store_true",
+        help="experimentally prefetch exact target hash-layer experts",
+    )
+    parser.add_argument(
+        "--dspark-adaptive-block",
+        action="store_true",
+        help="experimentally select a storage-aware DSpark draft prefix",
+    )
+    parser.add_argument(
+        "--no-dspark-fallback",
+        action="store_true",
+        help="research only: continue DSpark after its wall-time stop gate",
+    )
+    parser.add_argument(
+        "--dspark-sequential-verification",
+        action="store_true",
+        help="research oracle: verify each DSpark target position sequentially",
+    )
+    parser.add_argument(
+        "--dspark-hybrid-verification",
+        action="store_true",
+        help=(
+            "experimental verifier: token-shaped target math with one expert "
+            "union acquisition per layer"
+        ),
+    )
     parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--metrics-json")
     parser.add_argument("--expert-route-trace")
+    parser.add_argument(
+        "--expert-page-cache-probe",
+        action="store_true",
+        help=(
+            "research-only pre-read mincore classification for expert-file "
+            "page residency; not a physical SSD byte counter"
+        ),
+    )
+    parser.add_argument(
+        "--expert-file-cache-policy",
+        choices=EXPERT_FILE_CACHE_POLICIES,
+        default="cached",
+        help=(
+            "research-only expert descriptor policy; bypass uses Darwin "
+            "F_NOCACHE with read-ahead disabled"
+        ),
+    )
     parser.add_argument("--no-ready-expert-decode", action="store_true")
     arguments = parser.parse_args()
     try:
@@ -98,6 +149,30 @@ def main() -> None:
         parser.error("--dspark-confidence-threshold must be between zero and one")
     if arguments.dspark_slots < 30:
         parser.error("--dspark-slots must be at least 30")
+    if arguments.dspark_prompt_cache and not arguments.dspark:
+        parser.error("--dspark-prompt-cache requires --dspark")
+    if arguments.dspark_hash_prefetch and not arguments.dspark:
+        parser.error("--dspark-hash-prefetch requires --dspark")
+    if arguments.dspark_adaptive_block and not arguments.dspark:
+        parser.error("--dspark-adaptive-block requires --dspark")
+    if arguments.no_dspark_fallback and not arguments.dspark:
+        parser.error("--no-dspark-fallback requires --dspark")
+    if arguments.dspark_sequential_verification and not arguments.dspark:
+        parser.error("--dspark-sequential-verification requires --dspark")
+    if arguments.dspark_sequential_verification and arguments.dspark_hash_prefetch:
+        parser.error(
+            "--dspark-sequential-verification cannot use --dspark-hash-prefetch"
+        )
+    if arguments.dspark_hybrid_verification and not arguments.dspark:
+        parser.error("--dspark-hybrid-verification requires --dspark")
+    if (
+        arguments.dspark_hybrid_verification
+        and arguments.dspark_sequential_verification
+    ):
+        parser.error(
+            "--dspark-hybrid-verification and "
+            "--dspark-sequential-verification are mutually exclusive"
+        )
     if arguments.dspark and arguments.expert_route_trace:
         parser.error("--expert-route-trace currently requires DSpark to be disabled")
 
@@ -117,9 +192,19 @@ def main() -> None:
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
         dspark_enabled=arguments.dspark,
+        dspark_prompt_cache=arguments.dspark_prompt_cache,
+        dspark_hash_prefetch=arguments.dspark_hash_prefetch,
+        dspark_adaptive_block=arguments.dspark_adaptive_block,
+        dspark_fallback_enabled=not arguments.no_dspark_fallback,
+        dspark_sequential_verification=(
+            arguments.dspark_sequential_verification
+        ),
+        dspark_hybrid_verification=arguments.dspark_hybrid_verification,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         expert_route_trace=arguments.expert_route_trace,
+        expert_page_cache_probe=arguments.expert_page_cache_probe,
+        expert_file_cache_policy=arguments.expert_file_cache_policy,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
@@ -172,6 +257,7 @@ def main() -> None:
         ]
         result = {
             "generated_tokens": generated,
+            "generated_token_ids": generated_token_ids,
             "prompt_token_sha256": prompt_token_sha256,
             "token_sha256": _token_sha256(generated_token_ids),
             "prompt_tokens": prompt_tokens,
@@ -182,6 +268,34 @@ def main() -> None:
             "expert_cache_misses": metrics.misses,
             "expert_resident_slots": runtime.expert_cache.resident_count,
             "expert_bytes_read": metrics.bytes_read,
+            "expert_page_cache_probe_calls": metrics.page_cache_probe_calls,
+            "expert_page_cache_probe_failures": (
+                metrics.page_cache_probe_failures
+            ),
+            "expert_page_cache_classified_bytes": (
+                metrics.page_cache_classified_bytes
+            ),
+            "expert_page_cache_resident_bytes_before_read": (
+                metrics.page_cache_resident_bytes_before_read
+            ),
+            "expert_page_cache_nonresident_bytes_before_read": (
+                metrics.page_cache_nonresident_bytes_before_read
+            ),
+            "expert_page_cache_unclassified_bytes": (
+                metrics.page_cache_unclassified_bytes
+            ),
+            "expert_page_cache_resident_fraction_before_read": (
+                metrics.page_cache_resident_bytes_before_read
+                / metrics.page_cache_classified_bytes
+                if metrics.page_cache_classified_bytes
+                else None
+            ),
+            "expert_page_cache_nonresident_fraction_before_read": (
+                metrics.page_cache_nonresident_bytes_before_read
+                / metrics.page_cache_classified_bytes
+                if metrics.page_cache_classified_bytes
+                else None
+            ),
             "expert_bytes_per_token": (
                 metrics.bytes_read / (prompt_tokens + generated)
                 if prompt_tokens + generated
@@ -203,8 +317,24 @@ def main() -> None:
             "batched_expert_prefill": config.batched_expert_prefill,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
+            "expert_page_cache_probe": config.expert_page_cache_probe,
+            "expert_file_cache_policy": config.expert_file_cache_policy,
+            "expert_file_direct_io_alignment_bytes": (
+                runtime.expert_cache.direct_io_alignment
+            ),
             "power_saving_limit_gbps": config.power_saving_limit_gbps,
             "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
+            "dspark_prompt_cache": config.dspark_prompt_cache,
+            "dspark_hash_prefetch": config.dspark_hash_prefetch,
+            "dspark_adaptive_block": config.dspark_adaptive_block,
+            "dspark_fallback_enabled": config.dspark_fallback_enabled,
+            "dspark_sequential_verification": (
+                config.dspark_sequential_verification
+            ),
+            "dspark_hybrid_verification": config.dspark_hybrid_verification,
+            "dspark_hash_prefetch_scratch_slots": (
+                runtime.expert_cache.speculative_slots
+            ),
             "dspark_slots": config.dspark_slots,
             **runtime_metrics,
         }

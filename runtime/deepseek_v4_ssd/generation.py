@@ -22,6 +22,7 @@ from transformers import AutoTokenizer
 from .dspark import DraftResult, VerificationMetrics, generate_tokens
 from .expert_cache import CacheMetrics
 from .fp8_cache import MXFP8PoolingCache
+from .io_metrics import ProcessDiskIO, process_disk_io_snapshot
 from .manifest import InstalledModel
 from .model import (
     RuntimeConfig,
@@ -102,10 +103,156 @@ class _PersistentPromptCacheEntry:
     tokens: list[int]
     path: Path
     format: int
+    cache_key: str = ""
+    metadata_path: Path | None = None
+    access_path: Path | None = None
+    reuse_count: int = 0
+    last_access_ns: int = 0
 
 
-_PROMPT_CACHE_FORMAT = 2
-_SUPPORTED_PROMPT_CACHE_FORMATS = frozenset((1, _PROMPT_CACHE_FORMAT))
+@dataclass(frozen=True)
+class _PromptCacheSnapshot:
+    state: Any
+    tokens: list[int]
+
+
+@dataclass
+class _DSparkPromptCacheEntry:
+    cache: Any
+    context_state: tuple[Any, ...]
+    tokens: list[int]
+    revision: str
+    target_layers: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class _PersistentDSparkPromptCacheEntry:
+    tokens: list[int]
+    path: Path
+    format: int
+    revision: str
+    target_layers: tuple[int, ...]
+
+
+_PROMPT_CACHE_FORMAT = 4
+_SUPPORTED_PROMPT_CACHE_FORMATS = frozenset((_PROMPT_CACHE_FORMAT,))
+_PROMPT_CACHE_BLOCK_SIZE = 128
+_PROMPT_CACHE_CONTRACT_FORMAT = 1
+_DSPARK_PROMPT_CACHE_FORMAT = 3
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def _sha256_json(value: Any) -> str:
+    return hashlib.sha256(_canonical_json(value).encode()).hexdigest()
+
+
+def _prompt_cache_contract(installed: InstalledModel, config: RuntimeConfig) -> dict:
+    """Return every model/runtime input that can change target KV semantics."""
+    raw_config: dict[str, Any] = {}
+    config_path = Path(getattr(installed, "root", "")) / "config.json"
+    try:
+        loaded = json.loads(config_path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            raw_config = loaded
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        pass
+
+    rope_keys = (
+        "rope_theta",
+        "rope_scaling",
+        "qk_rope_head_dim",
+        "compress_rope_theta",
+        "max_position_embeddings",
+    )
+    attention_keys = (
+        "attention_bias",
+        "attention_dropout",
+        "num_attention_heads",
+        "sliding_window",
+        "compress_ratios",
+        "use_cache",
+    )
+    fp8 = bool(getattr(config, "fp8_kv_cache", True))
+    fp4_index = bool(getattr(config, "fp4_index_cache", True))
+    return {
+        "format": _PROMPT_CACHE_CONTRACT_FORMAT,
+        "revision": str(getattr(installed, "revision", "")),
+        "modelID": str(getattr(installed, "model_id", "")),
+        "modelConfigSHA256": _sha256_json(raw_config),
+        "rope": {key: raw_config.get(key) for key in rope_keys},
+        "kvFormat": {
+            "compressedAttention": "mxfp8" if fp8 else "bfloat16",
+            "index": "mxfp4" if fp8 and fp4_index else "same-as-kv",
+            "stateSchema": "target-only-v2",
+        },
+        "attentionMode": {
+            "implementation": "sparse-pooled-correct-overlap-v1",
+            **{key: raw_config.get(key) for key in attention_keys},
+        },
+        "tokenBlockSize": _PROMPT_CACHE_BLOCK_SIZE,
+    }
+
+
+def _prompt_cache_block_identity(
+    contract: dict[str, Any],
+    tokens: list[int],
+) -> tuple[str, list[dict[str, Any]], str]:
+    """Build a content-addressed chain over fixed-size token blocks."""
+    contract_sha256 = _sha256_json(contract)
+    parent = contract_sha256
+    blocks: list[dict[str, Any]] = []
+    for index, start in enumerate(range(0, len(tokens), _PROMPT_CACHE_BLOCK_SIZE)):
+        token_block = [int(token) for token in tokens[start : start + _PROMPT_CACHE_BLOCK_SIZE]]
+        token_sha256 = _sha256_json(token_block)
+        block_key = _sha256_json(
+            {
+                "contractSHA256": contract_sha256,
+                "index": index,
+                "parent": parent,
+                "tokens": token_block,
+            }
+        )
+        blocks.append(
+            {
+                "index": index,
+                "start": start,
+                "length": len(token_block),
+                "tokenSHA256": token_sha256,
+                "parent": parent,
+                "key": block_key,
+            }
+        )
+        parent = block_key
+    return contract_sha256, blocks, parent
+
+
+def _clone_cache_state(value: Any) -> Any:
+    if isinstance(value, mx.array):
+        return value + mx.zeros((), value.dtype)
+    if isinstance(value, tuple):
+        return tuple(_clone_cache_state(item) for item in value)
+    if isinstance(value, list):
+        return [_clone_cache_state(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _clone_cache_state(item) for key, item in value.items()}
+    return copy.deepcopy(value)
+
+
+def _cache_state_arrays(value: Any) -> list[mx.array]:
+    if isinstance(value, mx.array):
+        return [value]
+    if isinstance(value, (tuple, list)):
+        return [array for item in value for array in _cache_state_arrays(item)]
+    if isinstance(value, dict):
+        return [array for item in value.values() for array in _cache_state_arrays(item)]
+    return []
+
+
+def _cache_state_nbytes(value: Any) -> int:
+    return sum(int(array.nbytes) for array in _cache_state_arrays(value))
 
 
 def _encode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
@@ -232,6 +379,7 @@ class RuntimeMetrics:
         self._generation_tokens = 0
         self._accumulated_generation_tokens = 0
         self._prompt_cache_reused_tokens = 0
+        self._dspark_prompt_cache_source = "disabled"
         self._prefill_step_size = 0
         self._layer_major_prefill = False
         self._request_started = 0.0
@@ -240,11 +388,14 @@ class RuntimeMetrics:
         self._completed_request_count = 0
         self._expert_before = CacheMetrics()
         self._expert_request = CacheMetrics()
+        self._process_disk_io_before: ProcessDiskIO | None = None
+        self._request_process_disk_io: ProcessDiskIO | None = None
         self._dspark_enabled = False
         self._dspark_rounds = 0
         self._dspark_proposed_tokens = 0
         self._dspark_accepted_tokens = 0
         self._dspark_committed_tokens = 0
+        self._dspark_output_budget_trimmed_tokens = 0
         self._dspark_draft_seconds = 0.0
         self._dspark_verification_seconds = 0.0
         self._dspark_cache_fork_seconds = 0.0
@@ -255,6 +406,16 @@ class RuntimeMetrics:
         self._dspark_per_position_cache_copies = 0
         self._dspark_state_fetch_count = 0
         self._dspark_block_attention_layers = 0
+        self._dspark_block_verification_rounds = 0
+        self._dspark_sequential_verification_rounds = 0
+        self._dspark_hybrid_verification_rounds = 0
+        self._dspark_hybrid_attention_layers = 0
+        self._dspark_hybrid_attention_token_calls = 0
+        self._dspark_hybrid_ffn_token_calls = 0
+        self._dspark_hybrid_moe_token_calls = 0
+        self._dspark_last_verification_mode = ""
+        self._dspark_last_sequential_position_seconds: tuple[float, ...] = ()
+        self._dspark_last_hybrid_verification_positions = 0
         self._dspark_last_layer_seconds: tuple[float, ...] = ()
         self._dspark_confidence_sum = 0.0
         self._dspark_confidence_count = 0
@@ -262,6 +423,71 @@ class RuntimeMetrics:
         self._dspark_last_accepted_tokens = 0
         self._dspark_last_draft_seconds = 0.0
         self._dspark_last_verification_seconds = 0.0
+        self._dspark_fallback_cost_ratios: list[float] = []
+        self._dspark_fallback_would_trigger_rounds = 0
+        self._dspark_fallback_triggered_rounds = 0
+        self._dspark_last_fallback_target_step_seconds = 0.0
+        self._dspark_last_fallback_speculative_seconds = 0.0
+        self._dspark_last_fallback_break_even_seconds = 0.0
+        self._dspark_last_fallback_cost_ratio = 0.0
+        self._dspark_round_trace: list[dict[str, object]] = []
+        self._dspark_verification_expert_union_calls = 0
+        self._dspark_verification_routed_expert_assignments = 0
+        self._dspark_verification_expert_union_experts = 0
+        self._dspark_verification_expert_union_misses = 0
+        self._dspark_target_expert_bytes_read = 0
+        self._dspark_verification_expert_bytes_read = 0
+        self._dspark_replay_expert_bytes_read = 0
+        self._dspark_verification_expert_read_seconds = 0.0
+        self._dspark_hash_prefetch_requested_experts = 0
+        self._dspark_hash_prefetch_cache_resident_experts = 0
+        self._dspark_hash_prefetch_experts_read = 0
+        self._dspark_hash_prefetch_bytes_read = 0
+        self._dspark_hash_prefetch_useful_bytes = 0
+        self._dspark_hash_prefetch_wasted_bytes = 0
+        self._dspark_hash_prefetch_page_cache_classified_bytes = 0
+        self._dspark_hash_prefetch_page_cache_resident_bytes_before_read = 0
+        self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read = 0
+        self._dspark_hash_prefetch_page_cache_unclassified_bytes = 0
+        self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read = 0
+        self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read = 0
+        self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes = 0
+        self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read = 0
+        self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read = 0
+        self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes = 0
+        self._dspark_hash_prefetch_read_seconds = 0.0
+        self._dspark_hash_prefetch_wait_seconds = 0.0
+        self._dspark_hash_prefetch_plan_seconds = 0.0
+        self._dspark_last_hash_prefetch_layer_ids: tuple[int, ...] = ()
+        self._dspark_last_hash_prefetch_layer_union_counts: tuple[int, ...] = ()
+        self._dspark_adaptive_block_decisions = 0
+        self._dspark_adaptive_block_original_tokens = 0
+        self._dspark_adaptive_block_selected_tokens = 0
+        self._dspark_adaptive_block_expected_committed = 0.0
+        self._dspark_adaptive_block_requested_hash_experts = 0
+        self._dspark_adaptive_block_resident_hash_experts = 0
+        self._dspark_adaptive_block_missing_hash_experts = 0
+        self._dspark_adaptive_block_predicted_hash_bytes = 0
+        self._dspark_adaptive_block_high_confidence_full_decisions = 0
+        self._dspark_adaptive_block_storage_score_decisions = 0
+        self._dspark_adaptive_block_full_block_decisions = 0
+        self._dspark_adaptive_block_selected_length_counts: dict[int, int] = {}
+        self._dspark_last_adaptive_block_selected_score = 0.0
+        self._dspark_last_adaptive_block_selection_reason = ""
+        self._dspark_last_adaptive_block_full_commit_fraction = 0.0
+        self._dspark_adaptive_block_plan_seconds = 0.0
+        self._dspark_last_adaptive_block_candidate_tokens: tuple[int, ...] = ()
+        self._dspark_last_adaptive_block_expected_committed: tuple[float, ...] = ()
+        self._dspark_last_adaptive_block_requested_hash_experts: tuple[int, ...] = ()
+        self._dspark_last_adaptive_block_resident_hash_experts: tuple[int, ...] = ()
+        self._dspark_last_adaptive_block_missing_hash_experts: tuple[int, ...] = ()
+        self._dspark_last_adaptive_block_predicted_hash_bytes: tuple[int, ...] = ()
+        self._dspark_last_adaptive_block_scores: tuple[float, ...] = ()
+        self._dspark_last_expert_union_layer_ids: tuple[int, ...] = ()
+        self._dspark_last_layer_routed_expert_assignments: tuple[int, ...] = ()
+        self._dspark_last_layer_expert_union_counts: tuple[int, ...] = ()
+        self._dspark_last_layer_expert_union_misses: tuple[int, ...] = ()
+        self._dspark_last_verification_expert_bytes_read = 0
         self._dspark_fallback = False
         self._dspark_cache = None
         self._dspark_expert_before = CacheMetrics()
@@ -276,6 +502,7 @@ class RuntimeMetrics:
         expert_before: CacheMetrics,
         dspark_enabled: bool = False,
         dspark_cache=None,
+        dspark_prompt_cache_source: str = "disabled",
     ) -> None:
         with self._lock:
             self._time_to_first_token_seconds = 0.0
@@ -292,8 +519,11 @@ class RuntimeMetrics:
             self._prompt_tokens = prompt_tokens
             self._generation_tokens = 0
             self._prompt_cache_reused_tokens = reused_tokens
+            self._dspark_prompt_cache_source = dspark_prompt_cache_source
             self._prefill_step_size = prefill_step_size
             self._layer_major_prefill = layer_major_prefill_enabled
+            self._process_disk_io_before = process_disk_io_snapshot()
+            self._request_process_disk_io = None
             self._request_started = time.perf_counter()
             self._request_seconds = 0.0
             self._request_active = True
@@ -304,6 +534,7 @@ class RuntimeMetrics:
             self._dspark_proposed_tokens = 0
             self._dspark_accepted_tokens = 0
             self._dspark_committed_tokens = 0
+            self._dspark_output_budget_trimmed_tokens = 0
             self._dspark_draft_seconds = 0.0
             self._dspark_verification_seconds = 0.0
             self._dspark_cache_fork_seconds = 0.0
@@ -314,6 +545,16 @@ class RuntimeMetrics:
             self._dspark_per_position_cache_copies = 0
             self._dspark_state_fetch_count = 0
             self._dspark_block_attention_layers = 0
+            self._dspark_block_verification_rounds = 0
+            self._dspark_sequential_verification_rounds = 0
+            self._dspark_hybrid_verification_rounds = 0
+            self._dspark_hybrid_attention_layers = 0
+            self._dspark_hybrid_attention_token_calls = 0
+            self._dspark_hybrid_ffn_token_calls = 0
+            self._dspark_hybrid_moe_token_calls = 0
+            self._dspark_last_verification_mode = ""
+            self._dspark_last_sequential_position_seconds = ()
+            self._dspark_last_hybrid_verification_positions = 0
             self._dspark_last_layer_seconds = ()
             self._dspark_confidence_sum = 0.0
             self._dspark_confidence_count = 0
@@ -321,6 +562,71 @@ class RuntimeMetrics:
             self._dspark_last_accepted_tokens = 0
             self._dspark_last_draft_seconds = 0.0
             self._dspark_last_verification_seconds = 0.0
+            self._dspark_fallback_cost_ratios = []
+            self._dspark_fallback_would_trigger_rounds = 0
+            self._dspark_fallback_triggered_rounds = 0
+            self._dspark_last_fallback_target_step_seconds = 0.0
+            self._dspark_last_fallback_speculative_seconds = 0.0
+            self._dspark_last_fallback_break_even_seconds = 0.0
+            self._dspark_last_fallback_cost_ratio = 0.0
+            self._dspark_round_trace = []
+            self._dspark_verification_expert_union_calls = 0
+            self._dspark_verification_routed_expert_assignments = 0
+            self._dspark_verification_expert_union_experts = 0
+            self._dspark_verification_expert_union_misses = 0
+            self._dspark_target_expert_bytes_read = 0
+            self._dspark_verification_expert_bytes_read = 0
+            self._dspark_replay_expert_bytes_read = 0
+            self._dspark_verification_expert_read_seconds = 0.0
+            self._dspark_hash_prefetch_requested_experts = 0
+            self._dspark_hash_prefetch_cache_resident_experts = 0
+            self._dspark_hash_prefetch_experts_read = 0
+            self._dspark_hash_prefetch_bytes_read = 0
+            self._dspark_hash_prefetch_useful_bytes = 0
+            self._dspark_hash_prefetch_wasted_bytes = 0
+            self._dspark_hash_prefetch_page_cache_classified_bytes = 0
+            self._dspark_hash_prefetch_page_cache_resident_bytes_before_read = 0
+            self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read = 0
+            self._dspark_hash_prefetch_page_cache_unclassified_bytes = 0
+            self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read = 0
+            self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read = 0
+            self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes = 0
+            self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read = 0
+            self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read = 0
+            self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes = 0
+            self._dspark_hash_prefetch_read_seconds = 0.0
+            self._dspark_hash_prefetch_wait_seconds = 0.0
+            self._dspark_hash_prefetch_plan_seconds = 0.0
+            self._dspark_last_hash_prefetch_layer_ids = ()
+            self._dspark_last_hash_prefetch_layer_union_counts = ()
+            self._dspark_adaptive_block_decisions = 0
+            self._dspark_adaptive_block_original_tokens = 0
+            self._dspark_adaptive_block_selected_tokens = 0
+            self._dspark_adaptive_block_expected_committed = 0.0
+            self._dspark_adaptive_block_requested_hash_experts = 0
+            self._dspark_adaptive_block_resident_hash_experts = 0
+            self._dspark_adaptive_block_missing_hash_experts = 0
+            self._dspark_adaptive_block_predicted_hash_bytes = 0
+            self._dspark_adaptive_block_high_confidence_full_decisions = 0
+            self._dspark_adaptive_block_storage_score_decisions = 0
+            self._dspark_adaptive_block_full_block_decisions = 0
+            self._dspark_adaptive_block_selected_length_counts = {}
+            self._dspark_last_adaptive_block_selected_score = 0.0
+            self._dspark_last_adaptive_block_selection_reason = ""
+            self._dspark_last_adaptive_block_full_commit_fraction = 0.0
+            self._dspark_adaptive_block_plan_seconds = 0.0
+            self._dspark_last_adaptive_block_candidate_tokens = ()
+            self._dspark_last_adaptive_block_expected_committed = ()
+            self._dspark_last_adaptive_block_requested_hash_experts = ()
+            self._dspark_last_adaptive_block_resident_hash_experts = ()
+            self._dspark_last_adaptive_block_missing_hash_experts = ()
+            self._dspark_last_adaptive_block_predicted_hash_bytes = ()
+            self._dspark_last_adaptive_block_scores = ()
+            self._dspark_last_expert_union_layer_ids = ()
+            self._dspark_last_layer_routed_expert_assignments = ()
+            self._dspark_last_layer_expert_union_counts = ()
+            self._dspark_last_layer_expert_union_misses = ()
+            self._dspark_last_verification_expert_bytes_read = 0
             self._dspark_fallback = False
             self._dspark_cache = dspark_cache
             self._dspark_expert_before = (
@@ -391,7 +697,14 @@ class RuntimeMetrics:
             self._dspark_rounds += 1
             self._dspark_proposed_tokens += len(draft.tokens)
             self._dspark_accepted_tokens += accepted
-            self._dspark_committed_tokens += accepted + 1
+            self._dspark_committed_tokens += (
+                accepted + 1
+                if verification.committed_tokens is None
+                else verification.committed_tokens
+            )
+            self._dspark_output_budget_trimmed_tokens += (
+                verification.output_budget_trimmed_tokens
+            )
             self._dspark_draft_seconds += draft.seconds
             self._dspark_verification_seconds += verification_seconds
             self._dspark_cache_fork_seconds += verification.cache_fork_seconds
@@ -406,6 +719,31 @@ class RuntimeMetrics:
             self._dspark_block_attention_layers += (
                 verification.block_attention_layers
             )
+            self._dspark_hybrid_attention_layers += (
+                verification.hybrid_attention_layers
+            )
+            self._dspark_hybrid_attention_token_calls += (
+                verification.hybrid_attention_token_calls
+            )
+            self._dspark_hybrid_ffn_token_calls += (
+                verification.hybrid_ffn_token_calls
+            )
+            self._dspark_hybrid_moe_token_calls += (
+                verification.hybrid_moe_token_calls
+            )
+            if verification.verification_mode == "block":
+                self._dspark_block_verification_rounds += 1
+            elif verification.verification_mode == "sequential":
+                self._dspark_sequential_verification_rounds += 1
+            elif verification.verification_mode == "hybrid":
+                self._dspark_hybrid_verification_rounds += 1
+            self._dspark_last_verification_mode = verification.verification_mode
+            self._dspark_last_sequential_position_seconds = (
+                verification.sequential_position_seconds
+            )
+            self._dspark_last_hybrid_verification_positions = (
+                verification.hybrid_verification_positions
+            )
             self._dspark_last_layer_seconds = verification.layer_seconds
             self._dspark_confidence_sum += sum(draft.confidence)
             self._dspark_confidence_count += len(draft.confidence)
@@ -413,6 +751,240 @@ class RuntimeMetrics:
             self._dspark_last_accepted_tokens = accepted
             self._dspark_last_draft_seconds = draft.seconds
             self._dspark_last_verification_seconds = verification_seconds
+            self._dspark_fallback_cost_ratios.append(
+                verification.fallback_cost_ratio
+            )
+            if verification.fallback_would_trigger:
+                self._dspark_fallback_would_trigger_rounds += 1
+            if verification.fallback_triggered:
+                self._dspark_fallback_triggered_rounds += 1
+            self._dspark_last_fallback_target_step_seconds = (
+                verification.fallback_target_step_seconds
+            )
+            self._dspark_last_fallback_speculative_seconds = (
+                verification.fallback_speculative_seconds
+            )
+            self._dspark_last_fallback_break_even_seconds = (
+                verification.fallback_break_even_seconds
+            )
+            self._dspark_last_fallback_cost_ratio = (
+                verification.fallback_cost_ratio
+            )
+            self._dspark_round_trace.append(
+                {
+                    "proposed_tokens": len(draft.tokens),
+                    "accepted_tokens": accepted,
+                    "committed_tokens": (
+                        accepted + 1
+                        if verification.committed_tokens is None
+                        else verification.committed_tokens
+                    ),
+                    "verification_mode": verification.verification_mode,
+                    "sequential_verification_positions": (
+                        verification.sequential_verification_positions
+                    ),
+                    "hybrid_verification_positions": (
+                        verification.hybrid_verification_positions
+                    ),
+                    "adaptive_original_tokens": (
+                        verification.adaptive_block_original_tokens
+                    ),
+                    "adaptive_selected_tokens": (
+                        verification.adaptive_block_selected_tokens
+                    ),
+                    "adaptive_selection_reason": (
+                        verification.adaptive_block_selection_reason
+                    ),
+                    "adaptive_full_commit_fraction": (
+                        verification.adaptive_block_full_commit_fraction
+                    ),
+                    "fallback_cost_ratio": verification.fallback_cost_ratio,
+                    "fallback_would_trigger": (
+                        verification.fallback_would_trigger
+                    ),
+                    "fallback_triggered": verification.fallback_triggered,
+                }
+            )
+            self._dspark_verification_routed_expert_assignments += (
+                verification.routed_expert_assignments
+            )
+            self._dspark_verification_expert_union_calls += len(
+                verification.layer_expert_union_layer_ids
+            )
+            self._dspark_verification_expert_union_experts += (
+                verification.expert_union_experts
+            )
+            self._dspark_verification_expert_union_misses += (
+                verification.expert_union_misses
+            )
+            self._dspark_target_expert_bytes_read += (
+                verification.expert_bytes_read
+            )
+            self._dspark_verification_expert_bytes_read += (
+                verification.verification_expert_bytes_read
+            )
+            self._dspark_replay_expert_bytes_read += (
+                verification.replay_expert_bytes_read
+            )
+            self._dspark_verification_expert_read_seconds += (
+                verification.expert_read_seconds
+            )
+            self._dspark_hash_prefetch_requested_experts += (
+                verification.hash_prefetch_requested_experts
+            )
+            self._dspark_hash_prefetch_cache_resident_experts += (
+                verification.hash_prefetch_cache_resident_experts
+            )
+            self._dspark_hash_prefetch_experts_read += (
+                verification.hash_prefetch_experts_read
+            )
+            self._dspark_hash_prefetch_bytes_read += (
+                verification.hash_prefetch_bytes_read
+            )
+            self._dspark_hash_prefetch_useful_bytes += (
+                verification.hash_prefetch_useful_bytes
+            )
+            self._dspark_hash_prefetch_wasted_bytes += (
+                verification.hash_prefetch_wasted_bytes
+            )
+            self._dspark_hash_prefetch_page_cache_classified_bytes += (
+                verification.hash_prefetch_page_cache_classified_bytes
+            )
+            self._dspark_hash_prefetch_page_cache_resident_bytes_before_read += (
+                verification.hash_prefetch_page_cache_resident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read += (
+                verification.hash_prefetch_page_cache_nonresident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_page_cache_unclassified_bytes += (
+                verification.hash_prefetch_page_cache_unclassified_bytes
+            )
+            self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read += (
+                verification.hash_prefetch_useful_page_cache_resident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read += (
+                verification.hash_prefetch_useful_page_cache_nonresident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes += (
+                verification.hash_prefetch_useful_page_cache_unclassified_bytes
+            )
+            self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read += (
+                verification.hash_prefetch_wasted_page_cache_resident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read += (
+                verification.hash_prefetch_wasted_page_cache_nonresident_bytes_before_read
+            )
+            self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes += (
+                verification.hash_prefetch_wasted_page_cache_unclassified_bytes
+            )
+            self._dspark_hash_prefetch_read_seconds += (
+                verification.hash_prefetch_read_seconds
+            )
+            self._dspark_hash_prefetch_wait_seconds += (
+                verification.hash_prefetch_wait_seconds
+            )
+            self._dspark_hash_prefetch_plan_seconds += (
+                verification.hash_prefetch_plan_seconds
+            )
+            self._dspark_last_hash_prefetch_layer_ids = (
+                verification.hash_prefetch_layer_ids
+            )
+            self._dspark_last_hash_prefetch_layer_union_counts = (
+                verification.hash_prefetch_layer_union_counts
+            )
+            if verification.adaptive_block_candidate_tokens:
+                self._dspark_adaptive_block_decisions += 1
+                if (
+                    verification.adaptive_block_selection_reason
+                    == "high_confidence_full"
+                ):
+                    self._dspark_adaptive_block_high_confidence_full_decisions += 1
+                elif verification.adaptive_block_selection_reason == "storage_score":
+                    self._dspark_adaptive_block_storage_score_decisions += 1
+                if (
+                    verification.adaptive_block_selected_tokens
+                    == verification.adaptive_block_original_tokens
+                ):
+                    self._dspark_adaptive_block_full_block_decisions += 1
+                selected_tokens = verification.adaptive_block_selected_tokens
+                self._dspark_adaptive_block_selected_length_counts[
+                    selected_tokens
+                ] = (
+                    self._dspark_adaptive_block_selected_length_counts.get(
+                        selected_tokens,
+                        0,
+                    )
+                    + 1
+                )
+                self._dspark_last_adaptive_block_selected_score = (
+                    verification.adaptive_block_selected_score
+                )
+                self._dspark_last_adaptive_block_selection_reason = (
+                    verification.adaptive_block_selection_reason
+                )
+                self._dspark_last_adaptive_block_full_commit_fraction = (
+                    verification.adaptive_block_full_commit_fraction
+                )
+                self._dspark_last_adaptive_block_candidate_tokens = (
+                    verification.adaptive_block_candidate_tokens
+                )
+                self._dspark_last_adaptive_block_expected_committed = (
+                    verification.adaptive_block_candidate_expected_committed
+                )
+                self._dspark_last_adaptive_block_requested_hash_experts = (
+                    verification.adaptive_block_candidate_requested_hash_experts
+                )
+                self._dspark_last_adaptive_block_resident_hash_experts = (
+                    verification.adaptive_block_candidate_resident_hash_experts
+                )
+                self._dspark_last_adaptive_block_missing_hash_experts = (
+                    verification.adaptive_block_candidate_missing_hash_experts
+                )
+                self._dspark_last_adaptive_block_predicted_hash_bytes = (
+                    verification.adaptive_block_candidate_predicted_hash_bytes
+                )
+                self._dspark_last_adaptive_block_scores = (
+                    verification.adaptive_block_candidate_scores
+                )
+            self._dspark_adaptive_block_original_tokens += (
+                verification.adaptive_block_original_tokens
+            )
+            self._dspark_adaptive_block_selected_tokens += (
+                verification.adaptive_block_selected_tokens
+            )
+            self._dspark_adaptive_block_expected_committed += (
+                verification.adaptive_block_selected_expected_committed
+            )
+            self._dspark_adaptive_block_requested_hash_experts += (
+                verification.adaptive_block_selected_requested_hash_experts
+            )
+            self._dspark_adaptive_block_resident_hash_experts += (
+                verification.adaptive_block_selected_resident_hash_experts
+            )
+            self._dspark_adaptive_block_missing_hash_experts += (
+                verification.adaptive_block_selected_missing_hash_experts
+            )
+            self._dspark_adaptive_block_predicted_hash_bytes += (
+                verification.adaptive_block_selected_predicted_hash_bytes
+            )
+            self._dspark_adaptive_block_plan_seconds += (
+                verification.adaptive_block_plan_seconds
+            )
+            self._dspark_last_expert_union_layer_ids = (
+                verification.layer_expert_union_layer_ids
+            )
+            self._dspark_last_layer_routed_expert_assignments = (
+                verification.layer_routed_expert_assignments
+            )
+            self._dspark_last_layer_expert_union_counts = (
+                verification.layer_expert_union_counts
+            )
+            self._dspark_last_layer_expert_union_misses = (
+                verification.layer_expert_union_misses
+            )
+            self._dspark_last_verification_expert_bytes_read = (
+                verification.expert_bytes_read
+            )
 
     def record_dspark_fallback(self) -> None:
         with self._lock:
@@ -423,6 +995,13 @@ class RuntimeMetrics:
             self._request_seconds = time.perf_counter() - self._request_started
             self._request_active = False
             self._expert_request = expert_after.delta(self._expert_before)
+            process_disk_io_after = process_disk_io_snapshot()
+            self._request_process_disk_io = (
+                process_disk_io_after.delta(self._process_disk_io_before)
+                if process_disk_io_after is not None
+                and self._process_disk_io_before is not None
+                else None
+            )
             if self._dspark_cache is not None:
                 self._dspark_expert_request = self._dspark_cache.metrics_snapshot().delta(
                     self._dspark_expert_before
@@ -441,6 +1020,14 @@ class RuntimeMetrics:
             if self._request_active and self._dspark_cache is not None:
                 dspark_expert = self._dspark_cache.metrics_snapshot().delta(
                     self._dspark_expert_before
+                )
+            process_disk_io = self._request_process_disk_io
+            if self._request_active and self._process_disk_io_before is not None:
+                current_process_disk_io = process_disk_io_snapshot()
+                process_disk_io = (
+                    current_process_disk_io.delta(self._process_disk_io_before)
+                    if current_process_disk_io is not None
+                    else None
                 )
             prefill_tokens = max(
                 0, self._prompt_tokens - self._prompt_cache_reused_tokens
@@ -470,6 +1057,7 @@ class RuntimeMetrics:
                     + (self._generation_tokens if self._request_active else 0)
                 ),
                 "prompt_cache_reused_tokens": self._prompt_cache_reused_tokens,
+                "dspark_prompt_cache_source": self._dspark_prompt_cache_source,
                 "completed_request_count": self._completed_request_count,
                 "request_seconds": request_seconds,
                 "time_to_first_token_seconds": self._time_to_first_token_seconds,
@@ -520,6 +1108,52 @@ class RuntimeMetrics:
                 "request_expert_cache_misses": self._expert_request.misses,
                 "request_expert_evictions": self._expert_request.evictions,
                 "request_expert_bytes_read": self._expert_request.bytes_read,
+                "request_expert_page_cache_probe_calls": (
+                    self._expert_request.page_cache_probe_calls
+                ),
+                "request_expert_page_cache_probe_failures": (
+                    self._expert_request.page_cache_probe_failures
+                ),
+                "request_expert_page_cache_classified_bytes": (
+                    self._expert_request.page_cache_classified_bytes
+                ),
+                "request_expert_page_cache_resident_bytes_before_read": (
+                    self._expert_request.page_cache_resident_bytes_before_read
+                ),
+                "request_expert_page_cache_nonresident_bytes_before_read": (
+                    self._expert_request.page_cache_nonresident_bytes_before_read
+                ),
+                "request_expert_page_cache_unclassified_bytes": (
+                    self._expert_request.page_cache_unclassified_bytes
+                ),
+                "request_expert_page_cache_resident_fraction_before_read": (
+                    self._expert_request.page_cache_resident_bytes_before_read
+                    / self._expert_request.page_cache_classified_bytes
+                    if self._expert_request.page_cache_classified_bytes
+                    else None
+                ),
+                "request_expert_page_cache_nonresident_fraction_before_read": (
+                    self._expert_request.page_cache_nonresident_bytes_before_read
+                    / self._expert_request.page_cache_classified_bytes
+                    if self._expert_request.page_cache_classified_bytes
+                    else None
+                ),
+                "request_expert_page_cache_nonresident_bytes_per_generated_token": (
+                    self._expert_request.page_cache_nonresident_bytes_before_read
+                    / self._generation_tokens
+                    if self._generation_tokens
+                    else 0.0
+                ),
+                "request_process_disk_bytes_read": (
+                    process_disk_io.bytes_read
+                    if process_disk_io is not None
+                    else None
+                ),
+                "request_process_disk_bytes_written": (
+                    process_disk_io.bytes_written
+                    if process_disk_io is not None
+                    else None
+                ),
                 "request_expert_read_seconds": self._expert_request.read_seconds,
                 "request_expert_upload_seconds": self._expert_request.upload_seconds,
                 "request_expert_pack_seconds": self._expert_request.pack_seconds,
@@ -537,12 +1171,130 @@ class RuntimeMetrics:
                 "request_prefetched_layer_hits": (
                     self._expert_request.prefetched_layer_hits
                 ),
+                "request_expert_union_calls": (
+                    self._expert_request.expert_union_calls
+                ),
+                "request_routed_expert_assignments": (
+                    self._expert_request.routed_expert_assignments
+                ),
+                "request_expert_union_experts": (
+                    self._expert_request.expert_union_experts
+                ),
+                "request_expert_union_reused_assignments": max(
+                    0,
+                    self._expert_request.routed_expert_assignments
+                    - self._expert_request.expert_union_experts,
+                ),
+                "request_expert_union_reuse_rate": (
+                    1
+                    - self._expert_request.expert_union_experts
+                    / self._expert_request.routed_expert_assignments
+                    if self._expert_request.routed_expert_assignments
+                    else 0.0
+                ),
+                "request_expert_union_misses": (
+                    self._expert_request.expert_union_misses
+                ),
+                "request_speculative_prefetch_rounds": (
+                    self._expert_request.speculative_prefetch_rounds
+                ),
+                "request_speculative_prefetch_requested_experts": (
+                    self._expert_request.speculative_prefetch_requested_experts
+                ),
+                "request_speculative_prefetch_cache_resident_experts": (
+                    self._expert_request.speculative_prefetch_cache_resident_experts
+                ),
+                "request_speculative_prefetch_experts_read": (
+                    self._expert_request.speculative_prefetch_experts_read
+                ),
+                "request_speculative_prefetch_bytes_read": (
+                    self._expert_request.speculative_prefetch_bytes_read
+                ),
+                "request_speculative_prefetch_read_seconds": (
+                    self._expert_request.speculative_prefetch_read_seconds
+                ),
+                "request_speculative_prefetch_wait_seconds": (
+                    self._expert_request.speculative_prefetch_wait_seconds
+                ),
+                "request_speculative_scratch_hits": (
+                    self._expert_request.speculative_scratch_hits
+                ),
+                "request_staged_expert_reads": (
+                    self._expert_request.staged_expert_reads
+                ),
+                "request_staged_w13_bytes_read": (
+                    self._expert_request.staged_w13_bytes_read
+                ),
+                "request_staged_w2_bytes_read": (
+                    self._expert_request.staged_w2_bytes_read
+                ),
+                "request_staged_read_seconds": (
+                    self._expert_request.staged_read_seconds
+                ),
+                "request_staged_w2_wait_seconds": (
+                    self._expert_request.staged_w2_wait_seconds
+                ),
+                "request_staged_first_stage_submit_seconds": (
+                    self._expert_request.staged_first_stage_submit_seconds
+                ),
+                "request_adaptive_prefill_planned_layers": (
+                    self._expert_request.adaptive_prefill_planned_layers
+                ),
+                "request_adaptive_prefill_full_layers": (
+                    self._expert_request.adaptive_prefill_full_layers
+                ),
+                "request_adaptive_prefill_selective_layers": (
+                    self._expert_request.adaptive_prefill_selective_layers
+                ),
+                "request_adaptive_prefill_union_experts": (
+                    self._expert_request.adaptive_prefill_union_experts
+                ),
+                "request_adaptive_prefill_read_experts": (
+                    self._expert_request.adaptive_prefill_read_experts
+                ),
+                "request_adaptive_prefill_bytes_read": (
+                    self._expert_request.adaptive_prefill_bytes_read
+                ),
+                "request_adaptive_prefill_avoided_bytes": (
+                    self._expert_request.adaptive_prefill_avoided_bytes
+                ),
+                "request_adaptive_prefill_plan_seconds": (
+                    self._expert_request.adaptive_prefill_plan_seconds
+                ),
                 "dspark_enabled": self._dspark_enabled,
                 "dspark_fallback": self._dspark_fallback,
+                "dspark_fallback_would_trigger_rounds": (
+                    self._dspark_fallback_would_trigger_rounds
+                ),
+                "dspark_fallback_triggered_rounds": (
+                    self._dspark_fallback_triggered_rounds
+                ),
+                "dspark_fallback_cost_ratios": tuple(
+                    self._dspark_fallback_cost_ratios
+                ),
+                "dspark_last_fallback_target_step_seconds": (
+                    self._dspark_last_fallback_target_step_seconds
+                ),
+                "dspark_last_fallback_speculative_seconds": (
+                    self._dspark_last_fallback_speculative_seconds
+                ),
+                "dspark_last_fallback_break_even_seconds": (
+                    self._dspark_last_fallback_break_even_seconds
+                ),
+                "dspark_last_fallback_cost_ratio": (
+                    self._dspark_last_fallback_cost_ratio
+                ),
+                "dspark_round_trace": tuple(
+                    dict(round_metrics)
+                    for round_metrics in self._dspark_round_trace
+                ),
                 "dspark_rounds": self._dspark_rounds,
                 "dspark_proposed_tokens": self._dspark_proposed_tokens,
                 "dspark_accepted_tokens": self._dspark_accepted_tokens,
                 "dspark_committed_tokens": self._dspark_committed_tokens,
+                "dspark_output_budget_trimmed_tokens": (
+                    self._dspark_output_budget_trimmed_tokens
+                ),
                 "dspark_rejected_tokens": (
                     self._dspark_proposed_tokens - self._dspark_accepted_tokens
                 ),
@@ -586,6 +1338,36 @@ class RuntimeMetrics:
                 "dspark_block_attention_layers": (
                     self._dspark_block_attention_layers
                 ),
+                "dspark_block_verification_rounds": (
+                    self._dspark_block_verification_rounds
+                ),
+                "dspark_sequential_verification_rounds": (
+                    self._dspark_sequential_verification_rounds
+                ),
+                "dspark_hybrid_verification_rounds": (
+                    self._dspark_hybrid_verification_rounds
+                ),
+                "dspark_hybrid_attention_layers": (
+                    self._dspark_hybrid_attention_layers
+                ),
+                "dspark_hybrid_attention_token_calls": (
+                    self._dspark_hybrid_attention_token_calls
+                ),
+                "dspark_hybrid_ffn_token_calls": (
+                    self._dspark_hybrid_ffn_token_calls
+                ),
+                "dspark_hybrid_moe_token_calls": (
+                    self._dspark_hybrid_moe_token_calls
+                ),
+                "dspark_last_verification_mode": (
+                    self._dspark_last_verification_mode
+                ),
+                "dspark_last_sequential_position_seconds": (
+                    self._dspark_last_sequential_position_seconds
+                ),
+                "dspark_last_hybrid_verification_positions": (
+                    self._dspark_last_hybrid_verification_positions
+                ),
                 "dspark_last_verification_layer_seconds": (
                     self._dspark_last_layer_seconds
                 ),
@@ -594,6 +1376,268 @@ class RuntimeMetrics:
                 "dspark_last_draft_seconds": self._dspark_last_draft_seconds,
                 "dspark_last_verification_seconds": (
                     self._dspark_last_verification_seconds
+                ),
+                "dspark_verification_routed_expert_assignments": (
+                    self._dspark_verification_routed_expert_assignments
+                ),
+                "dspark_verification_expert_union_calls": (
+                    self._dspark_verification_expert_union_calls
+                ),
+                "dspark_verification_expert_union_experts": (
+                    self._dspark_verification_expert_union_experts
+                ),
+                "dspark_verification_expert_union_reused_assignments": max(
+                    0,
+                    self._dspark_verification_routed_expert_assignments
+                    - self._dspark_verification_expert_union_experts,
+                ),
+                "dspark_verification_expert_union_reuse_rate": (
+                    1
+                    - self._dspark_verification_expert_union_experts
+                    / self._dspark_verification_routed_expert_assignments
+                    if self._dspark_verification_routed_expert_assignments
+                    else 0.0
+                ),
+                "dspark_verification_expert_union_misses": (
+                    self._dspark_verification_expert_union_misses
+                ),
+                "dspark_target_expert_bytes_read": (
+                    self._dspark_target_expert_bytes_read
+                ),
+                "dspark_verification_expert_bytes_read": (
+                    self._dspark_verification_expert_bytes_read
+                ),
+                "dspark_replay_expert_bytes_read": (
+                    self._dspark_replay_expert_bytes_read
+                ),
+                "dspark_target_expert_read_seconds": (
+                    self._dspark_verification_expert_read_seconds
+                ),
+                "dspark_hash_prefetch_requested_experts": (
+                    self._dspark_hash_prefetch_requested_experts
+                ),
+                "dspark_hash_prefetch_cache_resident_experts": (
+                    self._dspark_hash_prefetch_cache_resident_experts
+                ),
+                "dspark_hash_prefetch_experts_read": (
+                    self._dspark_hash_prefetch_experts_read
+                ),
+                "dspark_hash_prefetch_bytes_read": (
+                    self._dspark_hash_prefetch_bytes_read
+                ),
+                "dspark_hash_prefetch_useful_bytes": (
+                    self._dspark_hash_prefetch_useful_bytes
+                ),
+                "dspark_hash_prefetch_wasted_bytes": (
+                    self._dspark_hash_prefetch_wasted_bytes
+                ),
+                "dspark_hash_prefetch_page_cache_classified_bytes": (
+                    self._dspark_hash_prefetch_page_cache_classified_bytes
+                ),
+                "dspark_hash_prefetch_page_cache_resident_bytes_before_read": (
+                    self._dspark_hash_prefetch_page_cache_resident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_page_cache_nonresident_bytes_before_read": (
+                    self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_page_cache_unclassified_bytes": (
+                    self._dspark_hash_prefetch_page_cache_unclassified_bytes
+                ),
+                "dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read": (
+                    self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read": (
+                    self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_useful_page_cache_unclassified_bytes": (
+                    self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes
+                ),
+                "dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read": (
+                    self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read": (
+                    self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read
+                ),
+                "dspark_hash_prefetch_wasted_page_cache_unclassified_bytes": (
+                    self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes
+                ),
+                "dspark_hash_prefetch_on_demand_expert_bytes_read": max(
+                    0,
+                    self._dspark_target_expert_bytes_read
+                    - self._dspark_hash_prefetch_bytes_read,
+                ),
+                "dspark_hash_prefetch_read_seconds": (
+                    self._dspark_hash_prefetch_read_seconds
+                ),
+                "dspark_hash_prefetch_wait_seconds": (
+                    self._dspark_hash_prefetch_wait_seconds
+                ),
+                "dspark_hash_prefetch_plan_seconds": (
+                    self._dspark_hash_prefetch_plan_seconds
+                ),
+                "dspark_hash_prefetch_useful_rate": (
+                    self._dspark_hash_prefetch_useful_bytes
+                    / self._dspark_hash_prefetch_bytes_read
+                    if self._dspark_hash_prefetch_bytes_read
+                    else 0.0
+                ),
+                "dspark_hash_prefetch_bytes_per_committed_token": (
+                    self._dspark_hash_prefetch_bytes_read
+                    / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_last_hash_prefetch_layer_ids": (
+                    self._dspark_last_hash_prefetch_layer_ids
+                ),
+                "dspark_last_hash_prefetch_union_by_layer": (
+                    self._dspark_last_hash_prefetch_layer_union_counts
+                ),
+                "dspark_adaptive_block_decisions": (
+                    self._dspark_adaptive_block_decisions
+                ),
+                "dspark_adaptive_block_original_tokens": (
+                    self._dspark_adaptive_block_original_tokens
+                ),
+                "dspark_adaptive_block_selected_tokens": (
+                    self._dspark_adaptive_block_selected_tokens
+                ),
+                "dspark_adaptive_block_expected_committed": (
+                    self._dspark_adaptive_block_expected_committed
+                ),
+                "dspark_adaptive_block_requested_hash_experts": (
+                    self._dspark_adaptive_block_requested_hash_experts
+                ),
+                "dspark_adaptive_block_resident_hash_experts": (
+                    self._dspark_adaptive_block_resident_hash_experts
+                ),
+                "dspark_adaptive_block_missing_hash_experts": (
+                    self._dspark_adaptive_block_missing_hash_experts
+                ),
+                "dspark_adaptive_block_predicted_hash_bytes": (
+                    self._dspark_adaptive_block_predicted_hash_bytes
+                ),
+                "dspark_adaptive_block_high_confidence_full_decisions": (
+                    self._dspark_adaptive_block_high_confidence_full_decisions
+                ),
+                "dspark_adaptive_block_storage_score_decisions": (
+                    self._dspark_adaptive_block_storage_score_decisions
+                ),
+                "dspark_adaptive_block_full_block_decisions": (
+                    self._dspark_adaptive_block_full_block_decisions
+                ),
+                "dspark_adaptive_block_selected_length_counts": tuple(
+                    sorted(
+                        self._dspark_adaptive_block_selected_length_counts.items()
+                    )
+                ),
+                "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": (
+                    self._dspark_adaptive_block_predicted_hash_bytes
+                    / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_last_adaptive_block_selected_score": (
+                    self._dspark_last_adaptive_block_selected_score
+                ),
+                "dspark_last_adaptive_block_selection_reason": (
+                    self._dspark_last_adaptive_block_selection_reason
+                ),
+                "dspark_last_adaptive_block_full_commit_fraction": (
+                    self._dspark_last_adaptive_block_full_commit_fraction
+                ),
+                "dspark_adaptive_block_trimmed_tokens": max(
+                    0,
+                    self._dspark_adaptive_block_original_tokens
+                    - self._dspark_adaptive_block_selected_tokens,
+                ),
+                "dspark_adaptive_block_plan_seconds": (
+                    self._dspark_adaptive_block_plan_seconds
+                ),
+                "dspark_last_adaptive_block_candidate_tokens": (
+                    self._dspark_last_adaptive_block_candidate_tokens
+                ),
+                "dspark_last_adaptive_block_expected_committed": (
+                    self._dspark_last_adaptive_block_expected_committed
+                ),
+                "dspark_last_adaptive_block_requested_hash_experts": (
+                    self._dspark_last_adaptive_block_requested_hash_experts
+                ),
+                "dspark_last_adaptive_block_resident_hash_experts": (
+                    self._dspark_last_adaptive_block_resident_hash_experts
+                ),
+                "dspark_last_adaptive_block_missing_hash_experts": (
+                    self._dspark_last_adaptive_block_missing_hash_experts
+                ),
+                "dspark_last_adaptive_block_predicted_hash_bytes": (
+                    self._dspark_last_adaptive_block_predicted_hash_bytes
+                ),
+                "dspark_last_adaptive_block_scores": (
+                    self._dspark_last_adaptive_block_scores
+                ),
+                "dspark_draft_expert_bytes_read": dspark_expert.bytes_read,
+                "dspark_draft_page_cache_probe_calls": (
+                    dspark_expert.page_cache_probe_calls
+                ),
+                "dspark_draft_page_cache_probe_failures": (
+                    dspark_expert.page_cache_probe_failures
+                ),
+                "dspark_draft_page_cache_classified_bytes": (
+                    dspark_expert.page_cache_classified_bytes
+                ),
+                "dspark_draft_page_cache_resident_bytes_before_read": (
+                    dspark_expert.page_cache_resident_bytes_before_read
+                ),
+                "dspark_draft_page_cache_nonresident_bytes_before_read": (
+                    dspark_expert.page_cache_nonresident_bytes_before_read
+                ),
+                "dspark_draft_page_cache_unclassified_bytes": (
+                    dspark_expert.page_cache_unclassified_bytes
+                ),
+                "dspark_draft_page_cache_nonresident_bytes_per_committed_token": (
+                    dspark_expert.page_cache_nonresident_bytes_before_read
+                    / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_speculative_expert_bytes_read": (
+                    dspark_expert.bytes_read
+                    + self._dspark_target_expert_bytes_read
+                ),
+                "dspark_draft_expert_bytes_per_committed_token": (
+                    dspark_expert.bytes_read / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_target_expert_bytes_per_committed_token": (
+                    self._dspark_target_expert_bytes_read
+                    / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_speculative_expert_bytes_per_committed_token": (
+                    (
+                        dspark_expert.bytes_read
+                        + self._dspark_target_expert_bytes_read
+                    )
+                    / self._dspark_committed_tokens
+                    if self._dspark_committed_tokens
+                    else 0.0
+                ),
+                "dspark_last_verification_expert_union_layer_ids": (
+                    self._dspark_last_expert_union_layer_ids
+                ),
+                "dspark_last_verification_expert_assignments_by_layer": (
+                    self._dspark_last_layer_routed_expert_assignments
+                ),
+                "dspark_last_verification_expert_union_by_layer": (
+                    self._dspark_last_layer_expert_union_counts
+                ),
+                "dspark_last_verification_expert_misses_by_layer": (
+                    self._dspark_last_layer_expert_union_misses
+                ),
+                "dspark_last_verification_expert_bytes_read": (
+                    self._dspark_last_verification_expert_bytes_read
                 ),
                 "dspark_seconds_per_output_token": (
                     (self._dspark_draft_seconds + self._dspark_verification_seconds)
@@ -635,6 +1679,10 @@ class ModelRuntime:
         self._codec: ToolCodec | None = None
         self._prompt_caches: list[_PromptCacheEntry] = []
         self._persistent_prompt_caches: list[_PersistentPromptCacheEntry] = []
+        self._dspark_prompt_caches: list[_DSparkPromptCacheEntry] = []
+        self._persistent_dspark_prompt_caches: list[
+            _PersistentDSparkPromptCacheEntry
+        ] = []
         self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
@@ -653,7 +1701,17 @@ class ModelRuntime:
                 raise
         self._prompt_cache_directory = self._open_prompt_cache_directory()
         if self._prompt_cache_directory is not None:
-            self._persistent_prompt_caches = self._scan_persistent_prompt_caches()
+            dspark = getattr(self.model, "dspark", None)
+            if dspark is not None and getattr(
+                self.config, "dspark_prompt_cache", False
+            ):
+                self._persistent_dspark_prompt_caches = (
+                    self._scan_persistent_dspark_prompt_caches(dspark)
+                )
+            elif dspark is None:
+                self._persistent_prompt_caches = (
+                    self._scan_persistent_prompt_caches()
+                )
         # ponytail: the lock serializes graph evaluation as required by the
         # cross-thread MLX stream and remains correct for batch size 1.
 
@@ -705,16 +1763,32 @@ class ModelRuntime:
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
                 dspark = getattr(self.model, "dspark", None)
-                entry = (
-                    _PromptCacheEntry(_make_prompt_cache(self.model), [])
-                    if dspark is not None
-                    else self._acquire_prompt_cache(prompt_tokens)
+                dspark_prompt_cache_enabled = bool(
+                    dspark is not None
+                    and getattr(self.config, "dspark_prompt_cache", False)
                 )
+                dspark_prompt_cache_source = "disabled"
+                if dspark_prompt_cache_enabled:
+                    dspark_entry, dspark_prompt_cache_source = (
+                        self._acquire_dspark_prompt_cache(prompt_tokens, dspark)
+                    )
+                    entry = _PromptCacheEntry(
+                        dspark_entry.cache,
+                        list(dspark_entry.tokens),
+                    )
+                    dspark.restore_cache_state(dspark_entry.context_state)
+                else:
+                    entry = (
+                        _PromptCacheEntry(_make_prompt_cache(self.model), [])
+                        if dspark is not None
+                        else self._acquire_prompt_cache(prompt_tokens)
+                    )
                 prompt_cache = entry.cache
                 cache_tokens = entry.tokens
                 reused_tokens = len(cache_tokens)
                 generation_prompt = prompt_tokens[reused_tokens:]
-                cache_tokens.extend(generation_prompt)
+                if dspark is None:
+                    cache_tokens.extend(generation_prompt)
                 step_size = _select_prefill_step_size(
                     getattr(self.config, "prefill_step_size", 128),
                     len(generation_prompt),
@@ -731,9 +1805,40 @@ class ModelRuntime:
                     self._expert_metrics(),
                     dspark_enabled=dspark is not None,
                     dspark_cache=(dspark.expert_cache if dspark is not None else None),
+                    dspark_prompt_cache_source=dspark_prompt_cache_source,
                 )
                 completed = False
                 prefill_persist_entry = None
+                prefill_persist_snapshots: dict[int, _PromptCacheSnapshot] = {}
+
+                def record_prefill_checkpoint(processed: int, total: int) -> None:
+                    if (
+                        self._prompt_cache_directory is None
+                        or use_layer_major
+                        or processed <= 0
+                        or processed >= total
+                    ):
+                        return
+                    is_first = not prefill_persist_snapshots
+                    is_last = processed == total - 1
+                    if not (is_first or is_last):
+                        return
+                    token_count = reused_tokens + processed
+                    if token_count <= reused_tokens:
+                        return
+                    snapshot_started = time.perf_counter()
+                    state = _persistence_cache_state(prompt_cache)
+                    arrays = _cache_state_arrays(state)
+                    if arrays:
+                        mx.eval(*arrays)
+                    prefill_persist_snapshots[token_count] = _PromptCacheSnapshot(
+                        state,
+                        list(prompt_tokens[:token_count]),
+                    )
+                    self.metrics.record_prompt_cache_snapshot(
+                        time.perf_counter() - snapshot_started
+                    )
+
                 try:
                     if dspark is not None:
                         yield from self._stream_dspark(
@@ -742,6 +1847,8 @@ class ModelRuntime:
                             dspark,
                             options,
                             step_size,
+                            reused_tokens,
+                            dspark_prompt_cache_enabled,
                         )
                         completed = True
                         return
@@ -755,6 +1862,11 @@ class ModelRuntime:
                                 self.expert_cache,
                                 getattr(self.config, "moe_prefill_step_size", 0),
                                 getattr(self.config, "batched_expert_prefill", True),
+                                getattr(
+                                    self.config,
+                                    "adaptive_expert_prefill_threshold",
+                                    None,
+                                ),
                             )
                         snapshot_started = time.perf_counter()
                         prefill_persist_entry = _PromptCacheEntry(
@@ -779,6 +1891,7 @@ class ModelRuntime:
                                 sampler=sampler,
                                 prompt_cache=prompt_cache,
                                 prefill_step_size=step_size,
+                                prompt_progress_callback=record_prefill_checkpoint,
                             )
                         )
                         first_response = True
@@ -812,6 +1925,8 @@ class ModelRuntime:
                     if completed and dspark is None:
                         if prefill_persist_entry is not None:
                             self._persist_prompt_cache(prefill_persist_entry)
+                        for snapshot in prefill_persist_snapshots.values():
+                            self._persist_prompt_cache_snapshot(snapshot)
                         self._store_prompt_cache(entry, persist=True)
 
     def _stream_dspark(
@@ -821,6 +1936,8 @@ class ModelRuntime:
         dspark,
         options: GenerationOptions,
         step_size: int,
+        prefilled_tokens: int,
+        prompt_cache_enabled: bool,
     ) -> Iterator[GeneratedPiece]:
         tokenizer = TokenizerWrapper(self.tokenizer)
         detokenizer = tokenizer.detokenizer
@@ -841,6 +1958,46 @@ class ModelRuntime:
                 ),
                 record_round=self.metrics.record_dspark_round,
                 record_fallback=self.metrics.record_dspark_fallback,
+                target_expert_cache=self.expert_cache,
+                hash_prefetch=getattr(
+                    self.config,
+                    "dspark_hash_prefetch",
+                    False,
+                ),
+                adaptive_block=getattr(
+                    self.config,
+                    "dspark_adaptive_block",
+                    False,
+                ),
+                fallback_enabled=getattr(
+                    self.config,
+                    "dspark_fallback_enabled",
+                    True,
+                ),
+                sequential_verification=getattr(
+                    self.config,
+                    "dspark_sequential_verification",
+                    False,
+                ),
+                hybrid_verification=getattr(
+                    self.config,
+                    "dspark_hybrid_verification",
+                    False,
+                ),
+                prefilled_tokens=prefilled_tokens,
+                record_prefill_snapshot=(
+                    lambda processed, target_cache, context_state: (
+                        self._snapshot_dspark_prompt_cache(
+                            prompt_tokens,
+                            processed,
+                            target_cache,
+                            context_state,
+                            dspark,
+                        )
+                    )
+                    if prompt_cache_enabled
+                    else None
+                ),
             )
         )
         generation_tokens = 0
@@ -907,6 +2064,11 @@ class ModelRuntime:
                     self.expert_cache,
                     getattr(self.config, "moe_prefill_step_size", 0),
                     getattr(self.config, "batched_expert_prefill", True),
+                    getattr(
+                        self.config,
+                        "adaptive_expert_prefill_threshold",
+                        None,
+                    ),
                 )
                 self._store_prompt_cache(
                     _PromptCacheEntry(cache, tokens[:-1]),
@@ -934,8 +2096,150 @@ class ModelRuntime:
             entry = max(persistent, key=lambda item: len(item.tokens))
             loaded = self._load_persistent_prompt_cache(entry)
             if loaded is not None:
+                self._record_persistent_prompt_cache_hit(entry)
                 return loaded
         return _PromptCacheEntry(_make_prompt_cache(self.model), [])
+
+    def _dspark_prompt_cache_contract_matches(
+        self,
+        entry: _DSparkPromptCacheEntry,
+        dspark,
+    ) -> bool:
+        context_count = len(getattr(dspark, "layers", ()))
+        return bool(
+            entry.tokens
+            and entry.revision == str(getattr(self.installed, "revision", ""))
+            and entry.target_layers == tuple(dspark.target_layers)
+            and len(entry.context_state) == context_count
+            and all(state is not None for state in entry.context_state)
+        )
+
+    def _clone_dspark_prompt_cache_entry(
+        self,
+        entry: _DSparkPromptCacheEntry,
+    ) -> _DSparkPromptCacheEntry:
+        target_cache = copy.deepcopy(entry.cache)
+        context_state = _clone_cache_state(entry.context_state)
+        eval_prompt_cache(target_cache)
+        context_arrays = _cache_state_arrays(context_state)
+        if context_arrays:
+            mx.eval(*context_arrays)
+        return _DSparkPromptCacheEntry(
+            target_cache,
+            context_state,
+            list(entry.tokens),
+            entry.revision,
+            entry.target_layers,
+        )
+
+    def _acquire_dspark_prompt_cache(
+        self,
+        prompt_tokens: list[int],
+        dspark,
+    ) -> tuple[_DSparkPromptCacheEntry, str]:
+        matches = [
+            entry
+            for entry in self._dspark_prompt_caches
+            if self._dspark_prompt_cache_contract_matches(entry, dspark)
+            and len(entry.tokens) < len(prompt_tokens)
+            and prompt_tokens[: len(entry.tokens)] == entry.tokens
+        ]
+        if matches:
+            entry = max(matches, key=lambda item: len(item.tokens))
+            return self._clone_dspark_prompt_cache_entry(entry), "memory"
+        persistent = [
+            entry
+            for entry in self._persistent_dspark_prompt_caches
+            if entry.revision == str(getattr(self.installed, "revision", ""))
+            and entry.target_layers == tuple(dspark.target_layers)
+            and len(entry.tokens) < len(prompt_tokens)
+            and prompt_tokens[: len(entry.tokens)] == entry.tokens
+        ]
+        if persistent:
+            descriptor = max(persistent, key=lambda item: len(item.tokens))
+            loaded = self._load_persistent_dspark_prompt_cache(descriptor, dspark)
+            if loaded is not None:
+                self._store_dspark_prompt_cache(loaded, persist=False)
+                return self._clone_dspark_prompt_cache_entry(loaded), "persistent"
+        return (
+            _DSparkPromptCacheEntry(
+                _make_prompt_cache(self.model),
+                tuple(None for _ in getattr(dspark, "layers", ())),
+                [],
+                str(getattr(self.installed, "revision", "")),
+                tuple(dspark.target_layers),
+            ),
+            "none",
+        )
+
+    def _snapshot_dspark_prompt_cache(
+        self,
+        prompt_tokens: list[int],
+        processed: int,
+        target_cache,
+        context_state,
+        dspark,
+    ) -> None:
+        if not 0 < processed < len(prompt_tokens):
+            return
+        snapshot_started = time.perf_counter()
+        entry = _DSparkPromptCacheEntry(
+            copy.deepcopy(target_cache),
+            _clone_cache_state(context_state),
+            list(prompt_tokens[:processed]),
+            str(getattr(self.installed, "revision", "")),
+            tuple(dspark.target_layers),
+        )
+        if not self._dspark_prompt_cache_contract_matches(entry, dspark):
+            return
+        eval_prompt_cache(entry.cache)
+        context_arrays = _cache_state_arrays(entry.context_state)
+        if context_arrays:
+            mx.eval(*context_arrays)
+        self._store_dspark_prompt_cache(entry, persist=False)
+        self.metrics.record_prompt_cache_snapshot(
+            time.perf_counter() - snapshot_started
+        )
+        self._persist_dspark_prompt_cache(entry)
+
+    def _store_dspark_prompt_cache(
+        self,
+        entry: _DSparkPromptCacheEntry,
+        *,
+        persist: bool = False,
+    ) -> None:
+        dspark = getattr(self.model, "dspark", None)
+        if dspark is None or not self._dspark_prompt_cache_contract_matches(
+            entry, dspark
+        ):
+            return
+        self._dspark_prompt_caches = [
+            cached
+            for cached in self._dspark_prompt_caches
+            if cached.tokens != entry.tokens
+        ]
+        self._dspark_prompt_caches.insert(0, entry)
+        maximum = max(1, int(getattr(self.config, "prompt_cache_entries", 2)))
+        memory_limit = max(
+            1,
+            int(getattr(self.config, "prompt_cache_memory_gib", 8)),
+        ) * 1024**3
+        while len(self._dspark_prompt_caches) > maximum:
+            self._dspark_prompt_caches.pop()
+        while (
+            len(self._dspark_prompt_caches) > 1
+            and self._dspark_prompt_cache_bytes() > memory_limit
+        ):
+            self._dspark_prompt_caches.pop()
+        if persist:
+            self._persist_dspark_prompt_cache(entry)
+
+    def _dspark_prompt_cache_bytes(self) -> int:
+        return sum(
+            _cache_state_nbytes(_persistence_cache_state(entry.cache))
+            + _cache_state_nbytes(entry.context_state)
+            for entry in self._dspark_prompt_caches
+        )
 
     def _store_prompt_cache(
         self,
@@ -996,11 +2300,64 @@ class ModelRuntime:
             return None
         return directory
 
+    def _normal_prompt_cache_contract(self) -> dict[str, Any]:
+        cached = getattr(self, "_prompt_cache_contract_value", None)
+        if cached is None:
+            cached = _prompt_cache_contract(self.installed, self.config)
+            self._prompt_cache_contract_value = cached
+        return cached
+
+    @staticmethod
+    def _read_prompt_cache_access(
+        access_path: Path,
+        fallback_ns: int,
+    ) -> tuple[int, int]:
+        try:
+            access = json.loads(access_path.read_text(encoding="utf-8"))
+            reuse_count = max(0, int(access.get("reuseCount", 0)))
+            last_access_ns = max(0, int(access.get("lastAccessUnixNs", 0)))
+            return reuse_count, last_access_ns
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return 0, fallback_ns
+
+    def _record_persistent_prompt_cache_hit(
+        self,
+        entry: _PersistentPromptCacheEntry,
+    ) -> None:
+        access_path = entry.access_path
+        if access_path is None:
+            return
+        reuse_count, _ = self._read_prompt_cache_access(
+            access_path,
+            entry.last_access_ns,
+        )
+        temporary = access_path.with_name(
+            f"{access_path.name}.tmp-{os.getpid()}-{threading.get_ident()}"
+        )
+        try:
+            temporary.write_text(
+                _canonical_json(
+                    {
+                        "reuseCount": reuse_count + 1,
+                        "lastAccessUnixNs": time.time_ns(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            os.replace(temporary, access_path)
+        except OSError:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+
     def _scan_persistent_prompt_caches(self) -> list[_PersistentPromptCacheEntry]:
         directory = self._prompt_cache_directory
         if directory is None:
             return []
-        entries = []
+        contract = self._normal_prompt_cache_contract()
+        contract_sha256 = _sha256_json(contract)
+        entries: list[_PersistentPromptCacheEntry] = []
         for metadata_path in sorted(
             directory.glob("*.json"),
             key=lambda path: path.stat().st_mtime,
@@ -1010,16 +2367,101 @@ class ModelRuntime:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 data_path = directory / metadata["data"]
                 cache_format = int(metadata.get("format", 0))
+                tokens = [int(token) for token in metadata["tokens"]]
+                expected_contract_sha256, blocks, cache_key = (
+                    _prompt_cache_block_identity(contract, tokens)
+                )
+                access_path = directory / f"{cache_key}.normal.v4.access"
+                modified_ns = metadata_path.stat().st_mtime_ns
+                reuse_count, last_access_ns = self._read_prompt_cache_access(
+                    access_path,
+                    modified_ns,
+                )
                 if (
                     cache_format in _SUPPORTED_PROMPT_CACHE_FORMATS
+                    and metadata.get("mode", "normal") == "normal"
                     and metadata.get("revision") == self.installed.revision
+                    and metadata.get("contract") == contract
+                    and metadata.get("contractSHA256") == contract_sha256
+                    and expected_contract_sha256 == contract_sha256
+                    and metadata.get("blocks") == blocks
+                    and metadata.get("cacheKey") == cache_key
+                    and bool(tokens)
+                    and data_path.parent == directory
+                    and data_path.name
+                    == f"{cache_key}.normal.v{_PROMPT_CACHE_FORMAT}.safetensors"
+                    and metadata_path.name
+                    == f"{cache_key}.normal.v{_PROMPT_CACHE_FORMAT}.json"
                     and data_path.is_file()
                 ):
                     entries.append(
                         _PersistentPromptCacheEntry(
-                            [int(token) for token in metadata["tokens"]],
+                            tokens,
                             data_path,
                             cache_format,
+                            cache_key,
+                            metadata_path,
+                            access_path,
+                            reuse_count,
+                            last_access_ns,
+                        )
+                    )
+            except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+        entries.sort(
+            key=lambda entry: (
+                entry.reuse_count,
+                entry.last_access_ns,
+                len(entry.tokens),
+            ),
+            reverse=True,
+        )
+        maximum = max(
+            1,
+            int(getattr(self.config, "persistent_prompt_cache_entries", 8)),
+        )
+        return entries[:maximum]
+
+    def _scan_persistent_dspark_prompt_caches(
+        self,
+        dspark,
+    ) -> list[_PersistentDSparkPromptCacheEntry]:
+        directory = self._prompt_cache_directory
+        if directory is None:
+            return []
+        entries = []
+        expected_revision = str(getattr(self.installed, "revision", ""))
+        expected_layers = tuple(dspark.target_layers)
+        for metadata_path in sorted(
+            directory.glob("*.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        ):
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                data_path = directory / metadata["data"]
+                revision = str(metadata.get("revision", ""))
+                target_layers = tuple(
+                    int(layer) for layer in metadata["targetLayers"]
+                )
+                tokens = [int(token) for token in metadata["tokens"]]
+                if (
+                    int(metadata.get("format", 0))
+                    == _DSPARK_PROMPT_CACHE_FORMAT
+                    and metadata.get("mode") == "dspark"
+                    and revision == expected_revision
+                    and target_layers == expected_layers
+                    and bool(tokens)
+                    and data_path.parent == directory
+                    and data_path.is_file()
+                ):
+                    entries.append(
+                        _PersistentDSparkPromptCacheEntry(
+                            tokens,
+                            data_path,
+                            _DSPARK_PROMPT_CACHE_FORMAT,
+                            revision,
+                            target_layers,
                         )
                     )
             except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
@@ -1051,21 +2493,72 @@ class ModelRuntime:
         except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
             return None
 
+    def _load_persistent_dspark_prompt_cache(
+        self,
+        entry: _PersistentDSparkPromptCacheEntry,
+        dspark,
+    ) -> _DSparkPromptCacheEntry | None:
+        try:
+            arrays, metadata = mx.load(entry.path, return_metadata=True)
+            schema = json.loads(metadata["state"])
+            state = _decode_cache_state(schema, arrays)
+            if not isinstance(state, dict) or set(state) != {"target", "context"}:
+                return None
+            context_state = state["context"]
+            if not isinstance(context_state, tuple):
+                return None
+            cache = _make_prompt_cache(self.model)
+            _restore_persistence_cache(cache, state["target"])
+            loaded = _DSparkPromptCacheEntry(
+                cache,
+                context_state,
+                list(entry.tokens),
+                entry.revision,
+                entry.target_layers,
+            )
+            if not self._dspark_prompt_cache_contract_matches(loaded, dspark):
+                return None
+            eval_prompt_cache(cache)
+            context_arrays = _cache_state_arrays(context_state)
+            if context_arrays:
+                mx.eval(*context_arrays)
+            return loaded
+        except Exception:
+            return None
+
     def _persist_prompt_cache(self, entry: _PromptCacheEntry) -> None:
+        self._persist_prompt_cache_state(
+            entry.tokens,
+            _persistence_cache_state(entry.cache),
+        )
+
+    def _persist_prompt_cache_snapshot(
+        self,
+        snapshot: _PromptCacheSnapshot,
+    ) -> None:
+        self._persist_prompt_cache_state(snapshot.tokens, snapshot.state)
+
+    def _persist_prompt_cache_state(
+        self,
+        tokens: list[int],
+        state: Any,
+    ) -> None:
         directory = self._prompt_cache_directory
-        if directory is None or not entry.tokens:
+        if directory is None or not tokens:
             return
-        digest = hashlib.sha256(
-            json.dumps(entry.tokens, separators=(",", ":")).encode()
-        ).hexdigest()
-        stem = f"{digest}.v{_PROMPT_CACHE_FORMAT}"
+        contract = self._normal_prompt_cache_contract()
+        contract_sha256, blocks, cache_key = _prompt_cache_block_identity(
+            contract,
+            tokens,
+        )
+        stem = f"{cache_key}.normal.v{_PROMPT_CACHE_FORMAT}"
         data_path = directory / f"{stem}.safetensors"
         metadata_path = directory / f"{stem}.json"
+        access_path = directory / f"{stem}.access"
         if data_path.exists() and metadata_path.exists():
             return
         serialize_started = time.perf_counter()
         arrays: dict[str, mx.array] = {}
-        state = _persistence_cache_state(entry.cache)
         schema = _encode_cache_state(state, arrays)
         mx.eval(*arrays.values())
         self.metrics.record_prompt_cache_serialize(
@@ -1073,16 +2566,27 @@ class ModelRuntime:
         )
         metadata = {
             "format": _PROMPT_CACHE_FORMAT,
+            "mode": "normal",
             "revision": self.installed.revision,
-            "tokens": entry.tokens,
+            "contract": contract,
+            "contractSHA256": contract_sha256,
+            "cacheKey": cache_key,
+            "blocks": blocks,
+            "tokens": tokens,
             "data": data_path.name,
         }
 
         def save() -> None:
             write_started = time.perf_counter()
-            temporary_data = data_path.with_name(data_path.stem + ".tmp.safetensors")
+            temporary_suffix = f".tmp-{os.getpid()}-{threading.get_ident()}"
+            temporary_data = data_path.with_name(
+                f"{data_path.stem}{temporary_suffix}.safetensors"
+            )
             temporary_metadata = metadata_path.with_name(
-                metadata_path.stem + ".tmp.json"
+                f"{metadata_path.name}{temporary_suffix}"
+            )
+            temporary_access = access_path.with_name(
+                f"{access_path.name}{temporary_suffix}"
             )
             try:
                 mx.save_safetensors(
@@ -1091,40 +2595,35 @@ class ModelRuntime:
                     metadata={"state": json.dumps(schema, separators=(",", ":"))},
                 )
                 temporary_metadata.write_text(
-                    json.dumps(metadata, separators=(",", ":")),
+                    _canonical_json(metadata),
+                    encoding="utf-8",
+                )
+                temporary_access.write_text(
+                    _canonical_json(
+                        {
+                            "reuseCount": 0,
+                            "lastAccessUnixNs": time.time_ns(),
+                        }
+                    ),
                     encoding="utf-8",
                 )
                 os.replace(temporary_data, data_path)
                 os.replace(temporary_metadata, metadata_path)
-                maximum = max(
-                    1,
-                    int(
-                        getattr(
-                            self.config,
-                            "persistent_prompt_cache_entries",
-                            8,
-                        )
-                    ),
+                if not access_path.exists():
+                    os.replace(temporary_access, access_path)
+                else:
+                    temporary_access.unlink(missing_ok=True)
+                self._prune_persistent_cache_files("normal")
+                self._persistent_prompt_caches = (
+                    self._scan_persistent_prompt_caches()
                 )
-                saved = sorted(
-                    directory.glob("*.json"),
-                    key=lambda path: path.stat().st_mtime,
-                    reverse=True,
-                )
-                for stale_metadata in saved[maximum:]:
-                    try:
-                        stale = json.loads(
-                            stale_metadata.read_text(encoding="utf-8")
-                        )
-                        stale_data = directory / stale["data"]
-                        if stale_data.parent == directory:
-                            stale_data.unlink(missing_ok=True)
-                        stale_metadata.unlink(missing_ok=True)
-                    except (KeyError, OSError, json.JSONDecodeError):
-                        continue
             except Exception as error:
                 self.metrics.record_prompt_cache_write_error(error)
-                for path in (temporary_data, temporary_metadata):
+                for path in (
+                    temporary_data,
+                    temporary_metadata,
+                    temporary_access,
+                ):
                     try:
                         path.unlink()
                     except OSError:
@@ -1136,10 +2635,131 @@ class ModelRuntime:
 
         save()
 
+    def _persist_dspark_prompt_cache(
+        self,
+        entry: _DSparkPromptCacheEntry,
+    ) -> None:
+        directory = self._prompt_cache_directory
+        dspark = getattr(self.model, "dspark", None)
+        if (
+            directory is None
+            or dspark is None
+            or not self._dspark_prompt_cache_contract_matches(entry, dspark)
+        ):
+            return
+        digest = hashlib.sha256(
+            json.dumps(entry.tokens, separators=(",", ":")).encode()
+        ).hexdigest()
+        stem = f"{digest}.dspark.v{_DSPARK_PROMPT_CACHE_FORMAT}"
+        data_path = directory / f"{stem}.safetensors"
+        metadata_path = directory / f"{stem}.json"
+        if data_path.exists() and metadata_path.exists():
+            return
+        serialize_started = time.perf_counter()
+        arrays: dict[str, mx.array] = {}
+        state = {
+            "target": _persistence_cache_state(entry.cache),
+            "context": entry.context_state,
+        }
+        schema = _encode_cache_state(state, arrays)
+        mx.eval(*arrays.values())
+        self.metrics.record_prompt_cache_serialize(
+            time.perf_counter() - serialize_started
+        )
+        metadata = {
+            "format": _DSPARK_PROMPT_CACHE_FORMAT,
+            "mode": "dspark",
+            "revision": entry.revision,
+            "targetLayers": list(entry.target_layers),
+            "tokens": entry.tokens,
+            "data": data_path.name,
+        }
+        write_started = time.perf_counter()
+        temporary_data = data_path.with_name(data_path.stem + ".tmp.safetensors")
+        temporary_metadata = metadata_path.with_name(
+            metadata_path.stem + ".tmp.json"
+        )
+        try:
+            mx.save_safetensors(
+                temporary_data,
+                arrays,
+                metadata={"state": json.dumps(schema, separators=(",", ":"))},
+            )
+            temporary_metadata.write_text(
+                json.dumps(metadata, separators=(",", ":")),
+                encoding="utf-8",
+            )
+            os.replace(temporary_data, data_path)
+            os.replace(temporary_metadata, metadata_path)
+            self._prune_persistent_cache_files("dspark")
+        except Exception as error:
+            self.metrics.record_prompt_cache_write_error(error)
+            for path in (temporary_data, temporary_metadata):
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        finally:
+            self.metrics.record_prompt_cache_write(
+                time.perf_counter() - write_started
+            )
+
+    def _prune_persistent_cache_files(self, mode: str) -> None:
+        directory = self._prompt_cache_directory
+        if directory is None:
+            return
+        saved: list[tuple[tuple[int, int, int], Path, dict[str, Any]]] = []
+        for metadata_path in directory.glob("*.json"):
+            try:
+                metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                if metadata.get("mode", "normal") != mode:
+                    continue
+                modified_ns = metadata_path.stat().st_mtime_ns
+                reuse_count = 0
+                last_access_ns = modified_ns
+                if mode == "normal" and int(metadata.get("format", 0)) == 4:
+                    cache_key = str(metadata["cacheKey"])
+                    access_path = directory / f"{cache_key}.normal.v4.access"
+                    reuse_count, last_access_ns = self._read_prompt_cache_access(
+                        access_path,
+                        modified_ns,
+                    )
+                saved.append(
+                    (
+                        (reuse_count, last_access_ns, modified_ns),
+                        metadata_path,
+                        metadata,
+                    )
+                )
+            except (OSError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+        saved.sort(key=lambda item: item[0], reverse=True)
+        maximum = max(
+            1,
+            int(getattr(self.config, "persistent_prompt_cache_entries", 8)),
+        )
+        for _, stale_metadata, stale in saved[maximum:]:
+            try:
+                stale_data = directory / stale["data"]
+                if stale_data.parent == directory:
+                    stale_data.unlink(missing_ok=True)
+                cache_key = stale.get("cacheKey")
+                if mode == "normal" and isinstance(cache_key, str):
+                    stale_access = directory / f"{cache_key}.normal.v4.access"
+                    if stale_access.parent == directory:
+                        stale_access.unlink(missing_ok=True)
+                stale_metadata.unlink(missing_ok=True)
+            except (KeyError, OSError, TypeError):
+                continue
+
     def close(self) -> None:
         self._prompt_caches.clear()
+        self._persistent_prompt_caches.clear()
+        self._dspark_prompt_caches.clear()
+        self._persistent_dspark_prompt_caches.clear()
         dspark = getattr(self.model, "dspark", None)
         if dspark is not None:
+            dspark.reset_cache()
             dspark.expert_cache.close()
         self.expert_cache.close()
 

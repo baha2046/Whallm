@@ -291,15 +291,19 @@ class MXFP8PoolingCache(CorrectPoolingCache):
 
     def persistence_state(self) -> dict:
         """Return the quantized arrays without rebuilding a BF16 cache."""
+        buf_kv = self.buf_kv[:, : self.remainder] if self.remainder > 0 else None
+        buf_gate = (
+            self.buf_gate[:, : self.remainder] if self.remainder > 0 else None
+        )
         return {
             "ratio": self.ratio,
             "remainder": self.remainder,
-            "buf_kv": self.buf_kv,
-            "buf_gate": self.buf_gate,
+            "buf_kv": buf_kv,
+            "buf_gate": buf_gate,
             "previous_window_kv": self.previous_window_kv,
             "previous_window_gate": self.previous_window_gate,
-            "chunks": self._chunks,
-            "index_chunks": self._index_chunks,
+            "chunks": list(self._chunks),
+            "index_chunks": list(self._index_chunks),
             "pending": self._pending,
             "length": self._length,
             "last_shape": self._last_shape,
@@ -308,9 +312,15 @@ class MXFP8PoolingCache(CorrectPoolingCache):
     def restore_persistence_state(self, value: dict) -> None:
         """Restore quantized arrays saved by :meth:`persistence_state`."""
         self.ratio = int(value["ratio"])
-        self.remainder = int(value["remainder"])
-        self.buf_kv = value["buf_kv"]
-        self.buf_gate = value["buf_gate"]
+        expected_remainder = int(value["remainder"])
+        self.remainder = 0
+        self.buf_kv = self.buf_gate = None
+        buf_kv = value["buf_kv"]
+        buf_gate = value["buf_gate"]
+        if buf_kv is not None:
+            self.accumulate_windows(buf_kv, buf_gate, 0)
+        if self.remainder != expected_remainder:
+            raise ValueError("MXFP8 pooling cache remainder does not match")
         self.previous_window_kv = value["previous_window_kv"]
         self.previous_window_gate = value["previous_window_gate"]
         self._chunks = [tuple(chunk) for chunk in value["chunks"]]

@@ -15,6 +15,7 @@ from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from .generation import GenerationOptions, GeneratedPiece, ModelRuntime, THINK_END
+from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
@@ -1018,9 +1019,39 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     config, "persistent_prompt_cache", False
                 ),
                 "fp4_index_cache": getattr(config, "fp4_index_cache", False),
+                "expert_page_cache_probe": getattr(
+                    config, "expert_page_cache_probe", False
+                ),
+                "expert_file_cache_policy": getattr(
+                    config, "expert_file_cache_policy", "cached"
+                ),
+                "expert_file_direct_io_alignment_bytes": getattr(
+                    cache, "direct_io_alignment", 0
+                ),
                 "dspark_available": getattr(installed, "has_dspark", False),
                 "dspark_enabled": bool(
                     getattr(getattr(self.app.runtime, "model", None), "dspark", None)
+                ),
+                "dspark_prompt_cache": getattr(
+                    config, "dspark_prompt_cache", False
+                ),
+                "dspark_hash_prefetch": getattr(
+                    config, "dspark_hash_prefetch", False
+                ),
+                "dspark_adaptive_block": getattr(
+                    config, "dspark_adaptive_block", False
+                ),
+                "dspark_fallback_enabled": getattr(
+                    config, "dspark_fallback_enabled", True
+                ),
+                "dspark_sequential_verification": getattr(
+                    config, "dspark_sequential_verification", False
+                ),
+                "dspark_hybrid_verification": getattr(
+                    config, "dspark_hybrid_verification", False
+                ),
+                "dspark_hash_prefetch_scratch_slots": getattr(
+                    cache, "speculative_slots", 0
                 ),
                 "dspark_confidence_threshold": getattr(
                     config, "dspark_confidence_threshold", 0.6
@@ -1809,7 +1840,57 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--no-ready-expert-decode", action="store_true")
+    parser.add_argument(
+        "--expert-page-cache-probe",
+        action="store_true",
+        help=(
+            "research-only pre-read mincore classification for expert-file "
+            "page residency; not a physical SSD byte counter"
+        ),
+    )
+    parser.add_argument(
+        "--expert-file-cache-policy",
+        choices=EXPERT_FILE_CACHE_POLICIES,
+        default="cached",
+        help=(
+            "research-only expert descriptor policy; bypass uses Darwin "
+            "F_NOCACHE with read-ahead disabled"
+        ),
+    )
     parser.add_argument("--dspark", action="store_true")
+    parser.add_argument(
+        "--dspark-prompt-cache",
+        action="store_true",
+        help="experimentally reuse an atomic target and DSpark prompt snapshot",
+    )
+    parser.add_argument(
+        "--dspark-hash-prefetch",
+        action="store_true",
+        help="experimentally prefetch exact target hash-layer experts",
+    )
+    parser.add_argument(
+        "--dspark-adaptive-block",
+        action="store_true",
+        help="experimentally select a storage-aware DSpark draft prefix",
+    )
+    parser.add_argument(
+        "--no-dspark-fallback",
+        action="store_true",
+        help="research only: continue DSpark after its wall-time stop gate",
+    )
+    parser.add_argument(
+        "--dspark-sequential-verification",
+        action="store_true",
+        help="research oracle: verify each DSpark target position sequentially",
+    )
+    parser.add_argument(
+        "--dspark-hybrid-verification",
+        action="store_true",
+        help=(
+            "experimental verifier: token-shaped target math with one expert "
+            "union acquisition per layer"
+        ),
+    )
     parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--default-max-tokens", type=int, default=272_000)
@@ -1845,6 +1926,30 @@ def main() -> None:
         parser.error("--dspark-confidence-threshold must be between zero and one")
     if arguments.dspark_slots < 30:
         parser.error("--dspark-slots must be at least 30")
+    if arguments.dspark_prompt_cache and not arguments.dspark:
+        parser.error("--dspark-prompt-cache requires --dspark")
+    if arguments.dspark_hash_prefetch and not arguments.dspark:
+        parser.error("--dspark-hash-prefetch requires --dspark")
+    if arguments.dspark_adaptive_block and not arguments.dspark:
+        parser.error("--dspark-adaptive-block requires --dspark")
+    if arguments.no_dspark_fallback and not arguments.dspark:
+        parser.error("--no-dspark-fallback requires --dspark")
+    if arguments.dspark_sequential_verification and not arguments.dspark:
+        parser.error("--dspark-sequential-verification requires --dspark")
+    if arguments.dspark_sequential_verification and arguments.dspark_hash_prefetch:
+        parser.error(
+            "--dspark-sequential-verification cannot use --dspark-hash-prefetch"
+        )
+    if arguments.dspark_hybrid_verification and not arguments.dspark:
+        parser.error("--dspark-hybrid-verification requires --dspark")
+    if (
+        arguments.dspark_hybrid_verification
+        and arguments.dspark_sequential_verification
+    ):
+        parser.error(
+            "--dspark-hybrid-verification and "
+            "--dspark-sequential-verification are mutually exclusive"
+        )
     if not arguments.public_model:
         parser.error("--public-model must not be empty")
     try:
@@ -1878,8 +1983,18 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        expert_page_cache_probe=arguments.expert_page_cache_probe,
+        expert_file_cache_policy=arguments.expert_file_cache_policy,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         dspark_enabled=arguments.dspark,
+        dspark_prompt_cache=arguments.dspark_prompt_cache,
+        dspark_hash_prefetch=arguments.dspark_hash_prefetch,
+        dspark_adaptive_block=arguments.dspark_adaptive_block,
+        dspark_fallback_enabled=not arguments.no_dspark_fallback,
+        dspark_sequential_verification=(
+            arguments.dspark_sequential_verification
+        ),
+        dspark_hybrid_verification=arguments.dspark_hybrid_verification,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,

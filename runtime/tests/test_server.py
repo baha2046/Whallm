@@ -20,6 +20,8 @@ class FakeRuntime:
         read_workers=4,
         prefill_step_size=32,
         fp8_kv_cache=True,
+        expert_page_cache_probe=False,
+        expert_file_cache_policy="cached",
     )
     installed = SimpleNamespace(root=Path("/tmp/model"))
     expert_cache = SimpleNamespace(
@@ -35,6 +37,7 @@ class FakeRuntime:
             evictions=0,
         ),
         resident_count=3,
+        direct_io_alignment=0,
     )
     metrics = SimpleNamespace(
         snapshot=lambda: {
@@ -118,6 +121,38 @@ class FakeRuntime:
 
 
 class ServerArgumentTests(unittest.TestCase):
+    def test_dspark_prompt_cache_is_research_opt_in(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertFalse(arguments.dspark_prompt_cache)
+
+        arguments = _parser().parse_args(
+            ["--model", "/tmp/model", "--dspark", "--dspark-prompt-cache"]
+        )
+        self.assertTrue(arguments.dspark_prompt_cache)
+
+    def test_expert_page_cache_probe_is_research_opt_in(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertFalse(arguments.expert_page_cache_probe)
+
+        arguments = _parser().parse_args(
+            ["--model", "/tmp/model", "--expert-page-cache-probe"]
+        )
+        self.assertTrue(arguments.expert_page_cache_probe)
+
+    def test_expert_file_cache_policy_defaults_to_cached(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertEqual(arguments.expert_file_cache_policy, "cached")
+
+        arguments = _parser().parse_args(
+            [
+                "--model",
+                "/tmp/model",
+                "--expert-file-cache-policy",
+                "bypass",
+            ]
+        )
+        self.assertEqual(arguments.expert_file_cache_policy, "bypass")
+
     def test_power_saving_limit_uses_fixed_values(self):
         self.assertIsNone(
             _parser().parse_args(["--model", "/tmp/model"]).power_saving_limit_gbps
@@ -682,6 +717,13 @@ class ServerTests(unittest.TestCase):
         performance = payload["performance"]
         self.assertEqual(status, 200)
         self.assertIsNone(payload["runtime"]["power_saving_limit_gbps"])
+        self.assertFalse(payload["runtime"]["expert_page_cache_probe"])
+        self.assertFalse(payload["runtime"]["dspark_prompt_cache"])
+        self.assertEqual(payload["runtime"]["expert_file_cache_policy"], "cached")
+        self.assertEqual(
+            payload["runtime"]["expert_file_direct_io_alignment_bytes"],
+            0,
+        )
         self.assertFalse(performance["generating"])
         self.assertEqual(performance["generation_tokens"], 2)
         self.assertGreaterEqual(performance["tokens_per_second"], 0)
