@@ -4,8 +4,8 @@ set -euo pipefail
 project_root=${0:A:h:h}
 python_executable=${PYTHON_EXECUTABLE:-$project_root/.venv/bin/python}
 output_root=${OUTPUT_ROOT:-$project_root/dist}
-app_path=$output_root/DeepSeekV4SSD.app
-zip_path=$output_root/DeepSeekV4SSD-macOS-arm64.zip
+app_path=$output_root/Whallm.app
+zip_path=$output_root/Whallm-macOS-arm64.zip
 app_version=${APP_VERSION:-1.0.0}
 build_version=${BUILD_VERSION:-$app_version}
 

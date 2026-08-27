@@ -1,7 +1,7 @@
-# DeepSeekV4SSD
+# Whallm
 
 <p align="center">
-  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD APP Icon" width="160">
+  <img src="Packaging/AppIcon.png" alt="Whallm APP Icon" width="160">
 </p>
 
 <p align="center">
@@ -12,9 +12,24 @@
   <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
 </p>
 
-DeepSeekV4SSD 让 M 系列 Mac 使用约 30 GB 内存运行
-`DeepSeek-V4-Flash-0731` 的全部 284B 参数，并从 SSD 流式读取 routed expert
-（灵感来自 [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare)）。
+> [!NOTE]
+> Whallm 的旧名称是 DeepSeekV4SSD。更名前发布的 release 仍使用旧 APP 和 ZIP 名称。
+
+Whallm 让 M 系列 Mac 运行 `DeepSeek-V4-Flash-0731` 的全部 284B 参数。
+Whallm 从 SSD 流式读取 routed expert。
+Whallm 也支持 `Qwen3.8-Flash-Next-FP8` text checkpoint。
+本项目的设计灵感来自 [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare)。
+
+## 峰值内存参考
+
+| 模型 | 一般对话 | Codex Agent |
+| --- | ---: | ---: |
+| `DeepSeek-V4-Flash-0731` | 约 20 GB | 约 30 GB |
+| `Qwen3.8-Flash-Next-FP8` | 约 15 GB | 约 25 GB |
+
+这些数字用于容量规划，不是性能保证。prompt 长度、tool、cache 状态和
+runtime 设置会改变峰值内存。[完整验证记录](docs/VALIDATION.md)包含特定
+workload 的测量结果。
 
 ## Benchmark
 
@@ -36,16 +51,16 @@ GPU 和 64 GiB 统一内存。测试已禁用 DSpark。
 在 APP 中对话或连接 Codex**
 
 1. 从 [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest)
-   下载最新的 `DeepSeekV4SSD-macOS-arm64.zip`。
-2. 解压 ZIP。打开 `DeepSeekV4SSD.app`。
-3. 选择“下载模型”。默认安装包含 DSpark。installed model 约使用 167 GB。
+   下载最新的 `Whallm-macOS-arm64.zip`。
+2. 解压 ZIP。打开 `Whallm.app`。
+3. 选择“下载模型”。DeepSeek 安装始终包含 DSpark。installed model 约使用 167 GB。
    你可以停止下载，以后再继续下载。
 4. 模型 ready 后，选择“启动 server”。
 5. 使用 APP 的对话功能，或使用下方配置连接 Codex。
 
 默认本机 server 地址是 `http://127.0.0.1:11434`。
 
-![DeepSeekV4SSD APP 截图](docs/assets/deepseekv4ssd-app.png)
+![Whallm APP 截图](docs/assets/deepseekv4ssd-app.png)
 
 ## 使用要求
 
@@ -59,12 +74,12 @@ GPU 和 64 GiB 统一内存。测试已禁用 DSpark。
 | 网络 | 下载模型和 APP 更新时需要网络 |
 
 > [!IMPORTANT]
-> DeepSeekV4SSD 是实验性软件。APP 不包含模型权重。除非其他设备必须连接，
+> Whallm 是实验性软件。APP 不包含模型权重。除非其他设备必须连接，
 > 否则请保留默认本机 server 地址。
 
 ## Codex `config.toml` 配置
 
-先在 DeepSeekV4SSD 中启动 server。然后将以下配置添加到
+先在 Whallm 中启动 server。然后将以下配置添加到
 `~/.codex/config.toml`：
 
 ```toml
@@ -73,7 +88,7 @@ model_provider = "deepseek-v4-ssd"
 model_reasoning_effort = "high"
 
 [model_providers.deepseek-v4-ssd]
-name = "DeepSeekV4SSD"
+name = "Whallm"
 base_url = "http://127.0.0.1:11434/v1"
 wire_api = "responses"
 requires_openai_auth = false
@@ -97,7 +112,7 @@ requires_openai_auth = false
 ### 模型存储空间与 DSpark
 
 - main model 约使用 145 GiB。
-- DSpark 会增加约 10.12 GiB。默认下载会安装 DSpark。
+- DSpark 会增加约 10.12 GiB。每次新的 DeepSeek 下载都会安装 DSpark。
 - 安装 DSpark 不会启用 DSpark。你可以在 runtime 设置中启用“使用 DSpark”来
   测试 speculative decoding。
 - 你可以移除 DSpark。移除 DSpark 不需要重新安装 main model。
@@ -135,9 +150,9 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 
 [当前文档](docs/README.md)包含模型合约、runtime 设计、验证、性能和研究结论。
 
-DeepSeekV4SSD 与 DeepSeek 没有从属关系。下载和使用模型前，请先阅读模型条款。
+Whallm 与 DeepSeek 没有从属关系。下载和使用模型前，请先阅读模型条款。
 
 ## 许可证
 
-DeepSeekV4SSD 源代码使用 [MIT 许可证](LICENSE)开放。项目不包含模型权重。
+Whallm 源代码使用 [MIT 许可证](LICENSE)开放。项目不包含模型权重。
 模型权重适用其自身条款。

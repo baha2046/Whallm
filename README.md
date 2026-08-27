@@ -1,7 +1,7 @@
-# DeepSeekV4SSD
+# Whallm
 
 <p align="center">
-  <img src="Packaging/AppIcon.png" alt="DeepSeekV4SSD App Icon" width="160">
+  <img src="Packaging/AppIcon.png" alt="Whallm App Icon" width="160">
 </p>
 
 <p align="center">
@@ -12,9 +12,25 @@
   <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
 </p>
 
+> [!NOTE]
+> Whallm was previously named DeepSeekV4SSD. Releases published before the
+> rename, including version 1.0.4, use the old app and archive names.
+
 Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
-DeepSeekV4SSD streams routed experts from SSD on an M-series Mac. It supports
-the pinned `DeepSeek-V4-Flash-0731` and `Qwen3.8-Flash-Next-FP8` text checkpoints.
+Whallm lets an M-series Mac run all 284B parameters of the pinned
+`DeepSeek-V4-Flash-0731` checkpoint by streaming routed experts from SSD. It
+also supports the pinned `Qwen3.8-Flash-Next-FP8` text checkpoint.
+
+## Memory guidance
+
+| Model | Chat | Codex agent |
+| --- | ---: | ---: |
+| `DeepSeek-V4-Flash-0731` | About 20 GB | About 30 GB |
+| `Qwen3.8-Flash-Next-FP8` | About 15 GB | About 25 GB |
+
+These figures are peak memory planning values, not performance guarantees.
+Prompt length, tools, cache state, and runtime settings can change peak memory.
+See the [validation record](docs/VALIDATION.md) for measured workloads.
 
 ## Benchmark
 
@@ -44,9 +60,9 @@ server → Chat in the app or connect Codex**
 > and replace the existing app manually. Automatic updates work again after
 > you install version 1.0.4.
 
-1. Download the latest `DeepSeekV4SSD-macOS-arm64.zip` from
+1. Download the latest `Whallm-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
-2. Extract the ZIP and open `DeepSeekV4SSD.app`.
+2. Extract the ZIP and open `Whallm.app`.
 3. Select DeepSeek or Qwen. Then select **Download Model**. The app checks the
    required storage. Qwen downloads the published MXFP4 installed model. You
    can stop the download and resume it later.
@@ -55,7 +71,7 @@ server → Chat in the app or connect Codex**
 
 The local server starts at `http://127.0.0.1:11434` by default.
 
-![DeepSeekV4SSD app](docs/assets/deepseekv4ssd-app.png)
+![Whallm app](docs/assets/deepseekv4ssd-app.png)
 
 ## Requirements
 
@@ -69,12 +85,12 @@ The local server starts at `http://127.0.0.1:11434` by default.
 | Internet | Required to download the model and app updates |
 
 > [!IMPORTANT]
-> DeepSeekV4SSD is experimental. Model weights are not included with the app.
+> Whallm is experimental. Model weights are not included with the app.
 > Keep the default local server address unless another device must connect.
 
 ## Codex `config.toml`
 
-Start the server in DeepSeekV4SSD. Then add this configuration to
+Start the server in Whallm. Then add this configuration to
 `~/.codex/config.toml`:
 
 ```toml
@@ -83,7 +99,7 @@ model_provider = "deepseek-v4-ssd"
 model_reasoning_effort = "high"
 
 [model_providers.deepseek-v4-ssd]
-name = "DeepSeekV4SSD"
+name = "Whallm"
 base_url = "http://127.0.0.1:11434/v1"
 wire_api = "responses"
 requires_openai_auth = false
@@ -110,7 +126,7 @@ for more options.
 ### Model storage and DSpark
 
 - The main model uses about 145 GiB.
-- DSpark adds about 10.12 GiB and is included in the default download.
+- DSpark adds about 10.12 GiB. Every new DeepSeek download includes it.
 - Installing DSpark does not enable it. Enable **Use DSpark** in the runtime
   settings when you want to test speculative decoding.
 - You can remove DSpark without reinstalling the main model.
@@ -160,10 +176,10 @@ requests.
 Read the [current documentation](docs/README.md) for the model contract,
 runtime design, validation, performance, and research conclusions.
 
-DeepSeekV4SSD is not affiliated with DeepSeek. Review the model terms before
+Whallm is not affiliated with DeepSeek. Review the model terms before
 you download and use the model.
 
 ## License
 
-The DeepSeekV4SSD source code is available under the [MIT License](LICENSE).
+The Whallm source code is available under the [MIT License](LICENSE).
 Model weights are not included and remain subject to their own terms.

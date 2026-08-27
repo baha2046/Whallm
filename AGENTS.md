@@ -11,8 +11,8 @@ Treat `build local` and `release new version` as workflow requests.
 When the user requests `build local`:
 
 1. Run the applicable tests.
-2. Run `make package` to create `dist/DeepSeekV4SSD.app` and
-   `dist/DeepSeekV4SSD-macOS-arm64.zip`.
+2. Run `make package` to create `dist/Whallm.app` and
+   `dist/Whallm-macOS-arm64.zip`.
 3. Verify the App with `codesign --verify --deep --strict`.
 4. Extract the ZIP to a temporary directory. Verify the extracted App again.
 5. Start the packaged App in an isolated check that denies access to the project

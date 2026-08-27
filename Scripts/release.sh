@@ -5,7 +5,7 @@ project_root=${0:A:h:h}
 version=${VERSION:?Set VERSION, for example: make release VERSION=1.1.0}
 tag=${TAG:-v$version}
 repository=${GITHUB_REPOSITORY:-yanun0323/deepseek_ssd}
-archive_name=DeepSeekV4SSD-macOS-arm64.zip
+archive_name=Whallm-macOS-arm64.zip
 archive_path=$project_root/dist/$archive_name
 sparkle_tools=$project_root/.build/artifacts/sparkle/Sparkle/bin
 notes_path=${RELEASE_NOTES_FILE:-$project_root/Packaging/ReleaseNotes/$version.md}
@@ -37,7 +37,7 @@ APP_VERSION=$version BUILD_VERSION=${BUILD_VERSION:-$version} \
   "$project_root/Scripts/package-app.sh"
 
 REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
-  "$project_root/dist/DeepSeekV4SSD.app" "$archive_path"
+  "$project_root/dist/Whallm.app" "$archive_path"
 
 ditto "$archive_path" "$release_root/$archive_name"
 ditto "$notes_path" "$release_root/${archive_name:r}.md"
@@ -56,7 +56,7 @@ gh release create "$tag" \
   "$release_root/$archive_name" \
   "$release_root/appcast.xml" \
   --repo "$repository" \
-  --title "DeepSeekV4SSD $version" \
+  --title "Whallm $version" \
   --notes-file "$notes_path"
 
 gh release download "$tag" \
@@ -70,7 +70,7 @@ gh release download "$tag" \
   exit 1
 }
 REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
-  "$project_root/dist/DeepSeekV4SSD.app" "$download_root/$archive_name"
+  "$project_root/dist/Whallm.app" "$download_root/$archive_name"
 
 release_url=$(gh release view "$tag" --repo "$repository" --json url --jq .url)
 print "Release: $release_url"

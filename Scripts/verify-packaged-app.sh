@@ -74,9 +74,9 @@ verify_signature "$app_path"
 verify_localizations "$app_path"
 
 ditto -x -k "$zip_path" "$verification_root/extracted"
-extracted_app=$verification_root/extracted/DeepSeekV4SSD.app
+extracted_app=$verification_root/extracted/Whallm.app
 [[ -d $extracted_app ]] || {
-  print -u2 "The ZIP does not contain DeepSeekV4SSD.app."
+  print -u2 "The ZIP does not contain Whallm.app."
   exit 1
 }
 verify_signature "$extracted_app"

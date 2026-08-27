@@ -11,7 +11,7 @@
 		<string>zh-Hant</string>
 	</array>
   <key>CFBundleDisplayName</key>
-  <string>DeepSeekV4SSD</string>
+  <string>Whallm</string>
   <key>CFBundleExecutable</key>
   <string>dsv4-app</string>
   <key>CFBundleIconFile</key>
@@ -21,7 +21,7 @@
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>DeepSeekV4SSD</string>
+  <string>Whallm</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
