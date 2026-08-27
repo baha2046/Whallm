@@ -60,7 +60,7 @@ struct ContentView: View {
             configuration: $configuration,
             serverActive: server.isActive,
             dsparkAvailable: selectedModel?.hasDSpark == true,
-            supportsDSpark: selectedModel?.modelKind != .qwen3_8FlashNext,
+            supportsDSpark: modelLibrary.selectedModelKind != .qwen3_8FlashNext,
             language: selectedLanguage
           )
           .pageVisibility(selectedPage == .advanced)
@@ -68,7 +68,7 @@ struct ContentView: View {
           ChatView(
             configuration: configuration,
             server: server,
-            assistantName: selectedModel?.assistantName ?? configuration.publicModel,
+            assistantName: modelLibrary.selectedModelKind.assistantName,
             language: selectedLanguage
           )
             .pageVisibility(selectedPage == .chat)
@@ -106,6 +106,7 @@ struct ContentView: View {
       modelLibrary.resumeDownloadIfNeeded()
     }
     .onChange(of: modelLibrary.models) { selectDetectedModel() }
+    .onChange(of: modelLibrary.selectedModelKind) { selectDetectedModel() }
     .onChange(of: configuration.modelPath) { synchronizeSelectedModelDefaults() }
     .onChange(of: configuration) {
       configuration.save()
@@ -123,18 +124,15 @@ struct ContentView: View {
   }
 
   private func selectDetectedModel() {
-    guard
-      !modelLibrary.usableModels.contains(where: { $0.url.path == configuration.modelPath })
-    else {
-      return
-    }
-    configuration.modelPath = modelLibrary.usableModels.first?.url.path ?? ""
+    configuration.modelPath =
+      modelLibrary.usableModel(for: modelLibrary.selectedModelKind)?.url.path ?? ""
+    synchronizeSelectedModelDefaults()
   }
 
   private func synchronizeSelectedModelDefaults() {
-    guard let selectedModel else { return }
-    configuration.publicModel = selectedModel.modelID
-    switch selectedModel.modelKind {
+    let modelKind = selectedModel?.modelKind ?? modelLibrary.selectedModelKind
+    configuration.publicModel = selectedModel?.modelID ?? modelKind.defaultPublicModel
+    switch modelKind {
     case .deepSeekV4:
       configuration.defaultMaxTokens = 272_000
       configuration.defaultTemperature = 0.2
@@ -280,10 +278,10 @@ private struct ServerView: View {
         SectionHeader(title: L10n.string("Model", language: language))
           .padding(.top, 10)
 
-        if modelLibrary.usableModels.isEmpty {
+        modelPanel
+
+        if modelLibrary.needsSelectedModelDownload {
           onboardingPanel
-        } else {
-          modelPanel
         }
 
         if modelLibrary.isBusy {
@@ -369,7 +367,7 @@ private struct ServerView: View {
 
       VStack(alignment: .leading, spacing: 5) {
         HStack(spacing: 10) {
-          Text(selectedModel?.name ?? configuration.publicModel)
+          Text(selectedModel?.name ?? modelLibrary.selectedModelKind.displayName)
             .font(.title3.bold())
             .lineLimit(1)
           Label(server.state.label, systemImage: "circle.fill")
@@ -484,19 +482,12 @@ private struct ServerView: View {
         .font(.title2.bold())
         Text(
           L10n.string(
-            "Download a model or select an existing model folder. You can then start the local server."
+            "%@ is not installed. Download it or select its existing model folder.",
+            modelLibrary.selectedModelKind.displayName
           )
         )
         .foregroundStyle(.secondary)
       }
-
-      Picker(L10n.string("Model to install"), selection: $modelLibrary.selectedModelKind) {
-        Text("DeepSeek-V4-Flash-0731").tag(ModelKind.deepSeekV4)
-        Text("Qwen3.8-Flash-Next").tag(ModelKind.qwen3_8FlashNext)
-      }
-      .pickerStyle(.segmented)
-      .disabled(modelLibrary.isBusy || modelLibrary.hasPartialDownload)
-      .accessibilityHint(L10n.string("Select the model that the app will download and install."))
 
       if modelLibrary.selectedModelKind == .deepSeekV4 {
         Toggle(
@@ -505,7 +496,7 @@ private struct ServerView: View {
         )
         .disabled(modelLibrary.isBusy)
       } else {
-        Text(L10n.string("Qwen routed experts are converted from official FP8 to MXFP4 during installation."))
+        Text(L10n.string("The App downloads a verified MXFP4 installed model for Qwen."))
           .font(.callout)
           .foregroundStyle(.secondary)
       }
@@ -560,56 +551,72 @@ private struct ServerView: View {
         if modelLibrary.isScanning {
           ProgressView().controlSize(.small)
         } else {
-          Image(systemName: selectedModel == nil ? "externaldrive" : "checkmark.circle.fill")
-            .foregroundStyle(selectedModel == nil ? Color.secondary : Color.green)
+          Image(systemName: selectedModel == nil ? "arrow.down.circle" : "checkmark.circle.fill")
+            .foregroundStyle(selectedModel == nil ? Color.orange : Color.green)
             .accessibilityHidden(true)
         }
 
-        Text(L10n.string("Installed model"))
+        Text(
+          L10n.string(
+            selectedModel == nil ? "Not installed" : "Installed", language: language)
+        )
           .font(.body.weight(.medium))
         Spacer()
-        Picker(L10n.string("Installed model"), selection: $configuration.modelPath) {
-          ForEach(modelLibrary.usableModels) { model in
-            Text(
-              L10n.string(
-                "%@ · %@ · %@", model.name, model.modelKindLabel, formattedBytes(model.size)))
-              .tag(model.url.path)
+        Picker(L10n.string("Model"), selection: $modelLibrary.selectedModelKind) {
+          ForEach(ModelLibrary.supportedModelKinds, id: \.rawValue) { modelKind in
+            if let model = modelLibrary.usableModel(for: modelKind) {
+              Text(
+                L10n.string(
+                  "%@ · %@ · %@", language: language, modelKind.displayName,
+                  L10n.string("Installed", language: language),
+                  formattedBytes(model.size)))
+                .tag(modelKind)
+            } else {
+              Text(
+                L10n.string(
+                  "%@ · %@", language: language, modelKind.displayName,
+                  L10n.string("Not installed", language: language)))
+                .tag(modelKind)
+            }
           }
         }
         .labelsHidden()
+        .disabled(server.isActive || modelLibrary.isBusy || modelLibrary.hasPartialDownload)
+        .accessibilityHint(
+          L10n.string(
+            "Select a model. You can select it before it is installed.", language: language))
         .frame(minWidth: 420, idealWidth: 520, maxWidth: 560, alignment: .trailing)
       }
 
-      Divider()
+      if let selectedModel {
+        Divider()
 
-      HStack(spacing: 10) {
-        Button(L10n.string("Show in Finder")) {
-          if let selectedModel { modelLibrary.reveal(selectedModel.url) }
-        }
-        Button(L10n.string("Verify Complete Model")) {
-          if let selectedModel { modelLibrary.startVerification(selectedModel) }
-        }
-        .disabled(server.isActive || modelLibrary.isBusy)
-        if let selectedModel,
-          selectedModel.modelKind == .deepSeekV4,
-          !selectedModel.hasDSpark
-        {
-          Button(L10n.string("Install DSpark (10.12 GiB)")) {
-            modelLibrary.startDSparkInstallation(selectedModel)
+        HStack(spacing: 10) {
+          Button(L10n.string("Show in Finder")) {
+            modelLibrary.reveal(selectedModel.url)
+          }
+          Button(L10n.string("Verify Complete Model")) {
+            modelLibrary.startVerification(selectedModel)
           }
           .disabled(server.isActive || modelLibrary.isBusy)
+          if selectedModel.modelKind == .deepSeekV4, !selectedModel.hasDSpark {
+            Button(L10n.string("Install DSpark (10.12 GiB)")) {
+              modelLibrary.startDSparkInstallation(selectedModel)
+            }
+            .disabled(server.isActive || modelLibrary.isBusy)
+          }
+          Spacer()
+          Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
+            .disabled(server.isActive || modelLibrary.isBusy)
         }
-        Spacer()
-        Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
-          .disabled(server.isActive || modelLibrary.isBusy)
-      }
 
-      Text(modelLibrary.rootURL.path)
-        .font(.callout.monospaced())
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .textSelection(.enabled)
+        Text(modelLibrary.rootURL.path)
+          .font(.callout.monospaced())
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+      }
 
       if modelLibrary.verificationModelPath == configuration.modelPath,
         let issues = modelLibrary.verificationIssues
@@ -729,7 +736,13 @@ private struct ServerView: View {
     if panel.runModal() == .OK, let url = panel.url {
       Task {
         await modelLibrary.setRoot(url)
-        configuration.modelPath = modelLibrary.usableModels.first?.url.path ?? ""
+        if modelLibrary.usableModel(for: modelLibrary.selectedModelKind) == nil,
+          let firstModel = modelLibrary.usableModels.first
+        {
+          modelLibrary.selectedModelKind = firstModel.modelKind
+        }
+        configuration.modelPath =
+          modelLibrary.usableModel(for: modelLibrary.selectedModelKind)?.url.path ?? ""
       }
     }
   }

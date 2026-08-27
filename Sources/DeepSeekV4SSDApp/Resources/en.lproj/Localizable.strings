@@ -52,6 +52,7 @@
 "Host" = "Host";
 "Host cannot be empty." = "Host cannot be empty.";
 "Install Model" = "Install Model";
+"Installed" = "Installed";
 "Installed model" = "Installed model";
 "Invalid Base URL" = "Invalid Base URL";
 "Language" = "Language";
@@ -74,6 +75,7 @@
 "Model status: %@" = "Model status: %@";
 "Models That Need Attention" = "Models That Need Attention";
 "No model is installed. Download a model or select another folder." = "No model is installed. Download a model or select another folder.";
+"Not installed" = "Not installed";
 "No Test Messages" = "No Test Messages";
 "Number of linear conversations to keep. The recommended value is 2." = "Number of linear conversations to keep. The recommended value is 2.";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.";
@@ -235,12 +237,14 @@
 "Local DeepSeek inference from SSD." = "Local DeepSeek inference from SSD.";
 "Version %@ · build %@" = "Version %@ · build %@";
 "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text." = "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text.";
-"Downloading and converting routed experts to MXFP4" = "Downloading and converting routed experts to MXFP4";
-"The installation plan could not be loaded. Check the network and try again.\n%@" = "The installation plan could not be loaded. Check the network and try again.\n%@";
-"Loading the selected model installation plan." = "Loading the selected model installation plan.";
+"Downloading the Qwen MXFP4 installed model" = "Downloading the Qwen MXFP4 installed model";
+"The model installation information could not be loaded. Check the network and try again.\n%@" = "The model installation information could not be loaded. Check the network and try again.\n%@";
+"Loading model installation information." = "Loading model installation information.";
 "Model to install" = "Model to install";
 "Select the model that the app will download and install." = "Select the model that the app will download and install.";
-"Qwen routed experts are converted from official FP8 to MXFP4 during installation." = "Qwen routed experts are converted from official FP8 to MXFP4 during installation.";
+"Select a model. You can select it before it is installed." = "Select a model. You can select it before it is installed.";
+"%@ is not installed. Download it or select its existing model folder." = "%@ is not installed. Download it or select its existing model folder.";
+"The App downloads a verified MXFP4 installed model for Qwen." = "The App downloads a verified MXFP4 installed model for Qwen.";
 "%@ · %@ · %@" = "%@ · %@ · %@";
 "Top K" = "Top K";
 "0 disables Top K. Qwen uses 20 by default." = "0 disables Top K. Qwen uses 20 by default.";

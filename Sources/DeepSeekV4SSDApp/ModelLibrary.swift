@@ -3,6 +3,36 @@ import Combine
 import DeepSeekRepack
 import Foundation
 
+extension ModelKind {
+  var displayName: String {
+    switch self {
+    case .deepSeekV4: "DeepSeek-V4-Flash-0731"
+    case .qwen3_8FlashNext: "Qwen3.8-Flash-Next"
+    }
+  }
+
+  var modelKindLabel: String {
+    switch self {
+    case .deepSeekV4: "DeepSeek V4"
+    case .qwen3_8FlashNext: "Qwen3.8 Flash Next"
+    }
+  }
+
+  var assistantName: String {
+    switch self {
+    case .deepSeekV4: "DeepSeek"
+    case .qwen3_8FlashNext: "Qwen"
+    }
+  }
+
+  var defaultPublicModel: String {
+    switch self {
+    case .deepSeekV4: "deepseek-v4-flash-0731"
+    case .qwen3_8FlashNext: "Qwen/Qwen3.8-Flash-Next-FP8"
+    }
+  }
+}
+
 struct InstalledModelInfo: Identifiable, Equatable, Sendable {
   let url: URL
   let size: UInt64
@@ -14,18 +44,8 @@ struct InstalledModelInfo: Identifiable, Equatable, Sendable {
   var id: String { url.path }
   var name: String { url.deletingPathExtension().lastPathComponent }
   var isUsable: Bool { quickIssues.isEmpty }
-  var modelKindLabel: String {
-    switch modelKind {
-    case .deepSeekV4: "DeepSeek V4"
-    case .qwen3_8FlashNext: "Qwen3.8 Flash Next"
-    }
-  }
-  var assistantName: String {
-    switch modelKind {
-    case .deepSeekV4: "DeepSeek"
-    case .qwen3_8FlashNext: "Qwen"
-    }
-  }
+  var modelKindLabel: String { modelKind.modelKindLabel }
+  var assistantName: String { modelKind.assistantName }
 }
 
 struct ModelDiscoveryResult: Sendable {
@@ -144,7 +164,7 @@ enum ModelOperationPhase: Equatable {
     case .preparingRepair: L10n.string("Preparing repair")
     case .repairing: L10n.string("Downloading damaged data again")
     case .installingDSpark: L10n.string("Installing DSpark")
-    case .installingQwen: L10n.string("Downloading and converting routed experts to MXFP4")
+    case .installingQwen: L10n.string("Downloading the Qwen MXFP4 installed model")
     }
   }
 }
@@ -163,6 +183,7 @@ struct ModelOperationProgress: Equatable {
 
 @MainActor
 final class ModelLibrary: ObservableObject {
+  static let supportedModelKinds: [ModelKind] = [.deepSeekV4, .qwen3_8FlashNext]
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
@@ -222,6 +243,7 @@ final class ModelLibrary: ObservableObject {
 
   var usableModels: [InstalledModelInfo] { models.filter(\.isUsable) }
   var damagedModels: [InstalledModelInfo] { models.filter { !$0.isUsable } }
+  var needsSelectedModelDownload: Bool { usableModel(for: selectedModelKind) == nil }
   var isBusy: Bool { operationPhase != .idle }
   var canDownload: Bool {
     plannedInstalledBytes != nil && !isPlanningInstallation
@@ -239,6 +261,10 @@ final class ModelLibrary: ObservableObject {
 
   func model(at path: String) -> InstalledModelInfo? {
     models.first { $0.url.path == path }
+  }
+
+  func usableModel(for kind: ModelKind) -> InstalledModelInfo? {
+    usableModels.first { $0.modelKind == kind }
   }
 
   func canUseModel(at path: String) -> Bool {
@@ -296,7 +322,7 @@ final class ModelLibrary: ObservableObject {
         bytes = try await DeepSeekV4Checkpoint()
           .makeRepackPlan(includeDSpark: requestedDSpark).installedBytes
       case .qwen3_8FlashNext:
-        bytes = try await QwenFlashNextCheckpoint().makeRepackPlan().installedBytes
+        bytes = try await QwenInstalledModelArtifact().installedBytes()
       }
       if selectedModelKind == requestedKind,
         requestedKind != .deepSeekV4 || installDSparkWithModel == requestedDSpark
@@ -305,7 +331,7 @@ final class ModelLibrary: ObservableObject {
       }
     } catch {
       plannedInstalledBytes = nil
-      message = L10n.string("The installation plan could not be loaded. Check the network and try again.\n%@", String(describing: error))
+      message = L10n.string("The model installation information could not be loaded. Check the network and try again.\n%@", String(describing: error))
     }
     isPlanningInstallation = false
     refreshPreflight()
@@ -447,6 +473,7 @@ final class ModelLibrary: ObservableObject {
 
   private func performDownload(to destination: URL) async {
     do {
+      let needsAudit: Bool
       switch selectedModelKind {
       case .deepSeekV4:
         _ = try await DeepSeekV4Checkpoint().repack(
@@ -455,21 +482,23 @@ final class ModelLibrary: ObservableObject {
         ) { [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
         }
+        needsAudit = true
       case .qwen3_8FlashNext:
-        _ = try await QwenFlashNextCheckpoint().repack(to: destination) { [weak self] progress in
+        _ = try await QwenInstalledModelArtifact().install(to: destination) { [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
         }
+        needsAudit = false
       }
       try Task.checkCancellation()
-      let verification = try await audit(destination)
+      let issues = needsAudit ? try await audit(destination).issues : []
       verificationModelPath = destination.path
-      verificationIssues = verification.issues
+      verificationIssues = issues
       let resultMessage =
-        verification.isValid
+        issues.isEmpty
         ? L10n.string("The model is installed and passed complete verification.")
         : L10n.string(
           "The model is installed, but %lld files failed verification.",
-          Int64(verification.issues.count))
+          Int64(issues.count))
       defaults.set(false, forKey: Self.activeDownloadPreference)
       await scan()
       message = resultMessage
@@ -517,25 +546,28 @@ final class ModelLibrary: ObservableObject {
       downloadStart = nil
       let invalidFiles = Set(verification.issues.map(\.path))
       let modelKind = verification.manifest.modelKind ?? .deepSeekV4
+      let needsAudit: Bool
       switch modelKind {
       case .deepSeekV4:
         _ = try await DeepSeekV4Checkpoint().repair(at: url, invalidFiles: invalidFiles) {
           [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
         }
+        needsAudit = true
       case .qwen3_8FlashNext:
-        _ = try await QwenFlashNextCheckpoint().repair(at: url, invalidFiles: invalidFiles) {
+        _ = try await QwenInstalledModelArtifact().repair(at: url, invalidFiles: invalidFiles) {
           [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
         }
+        needsAudit = false
       }
       try Task.checkCancellation()
-      let repaired = try await audit(url)
-      verificationIssues = repaired.issues
+      let issues = needsAudit ? try await audit(url).issues : []
+      verificationIssues = issues
       let resultMessage =
-        repaired.isValid
+        issues.isEmpty
         ? L10n.string("The model was repaired and passed complete verification.")
-        : L10n.string("%lld files still need repair.", Int64(repaired.issues.count))
+        : L10n.string("%lld files still need repair.", Int64(issues.count))
       defaults.set(false, forKey: Self.activeDownloadPreference)
       await scan()
       message = resultMessage
@@ -693,7 +725,7 @@ final class ModelLibrary: ObservableObject {
       id: "storage",
       title: L10n.string("Storage"),
       detail: required == nil
-        ? L10n.string("Loading the selected model installation plan.")
+        ? L10n.string("Loading model installation information.")
         : hasStorage == true
           ? L10n.string("There is enough free space to complete installation.")
           : L10n.string(

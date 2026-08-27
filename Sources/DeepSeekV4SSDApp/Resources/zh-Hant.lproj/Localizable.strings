@@ -52,6 +52,7 @@
 "Host" = "主機";
 "Host cannot be empty." = "Host 不可空白。";
 "Install Model" = "安裝模型";
+"Installed" = "已安裝";
 "Installed model" = "已安裝模型";
 "Invalid Base URL" = "Base URL 無效";
 "Language" = "語言";
@@ -74,6 +75,7 @@
 "Model status: %@" = "模型狀態：%@";
 "Models That Need Attention" = "需要處理的模型";
 "No model is installed. Download a model or select another folder." = "尚未安裝模型。請下載模型或選擇其他資料夾。";
+"Not installed" = "未安裝";
 "No Test Messages" = "尚無測試訊息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的線性對話數量。推薦值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 數量。建議值是 1152。";
@@ -235,12 +237,14 @@
 "Local DeepSeek inference from SSD." = "從 SSD 執行本地 DeepSeek 推論。";
 "Version %@ · build %@" = "版本 %@ · build %@";
 "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text." = "Copyright © 2026 Yanun。完整內容請查看 Repository 中的 LICENSE 檔案。";
-"Downloading and converting routed experts to MXFP4" = "正在下載並將 routed expert 轉換為 MXFP4";
-"The installation plan could not be loaded. Check the network and try again.\n%@" = "無法載入安裝計畫。請檢查網路後再試。\n%@";
-"Loading the selected model installation plan." = "正在載入所選模型的安裝計畫。";
+"Downloading the Qwen MXFP4 installed model" = "正在下載 Qwen MXFP4 installed model";
+"The model installation information could not be loaded. Check the network and try again.\n%@" = "無法載入模型安裝資訊。請檢查網路後再試。\n%@";
+"Loading model installation information." = "正在載入模型安裝資訊。";
 "Model to install" = "要安裝的模型";
 "Select the model that the app will download and install." = "選擇 App 要下載和安裝的模型。";
-"Qwen routed experts are converted from official FP8 to MXFP4 during installation." = "安裝期間，App 會將 Qwen routed expert 從官方 FP8 轉換為 MXFP4。";
+"Select a model. You can select it before it is installed." = "選擇模型。即使模型尚未安裝，也可以選擇。";
+"%@ is not installed. Download it or select its existing model folder." = "%@ 尚未安裝。請下載模型，或選擇現有的模型資料夾。";
+"The App downloads a verified MXFP4 installed model for Qwen." = "App 會為 Qwen 下載已驗證的 MXFP4 installed model。";
 "%@ · %@ · %@" = "%@ · %@ · %@";
 "Top K" = "Top K";
 "0 disables Top K. Qwen uses 20 by default." = "0 表示停用 Top K。Qwen 預設使用 20。";

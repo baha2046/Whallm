@@ -118,6 +118,23 @@ final class ModelDiscoveryTests: XCTestCase {
 
     XCTAssertEqual(ModelLibrary(defaults: defaults).selectedModelKind, .qwen3_8FlashNext)
   }
+
+  @MainActor
+  func testModelLibraryOffersSupportedKindsWithoutInstalledModels() {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let library = ModelLibrary(defaults: defaults)
+
+    XCTAssertEqual(ModelLibrary.supportedModelKinds, [.deepSeekV4, .qwen3_8FlashNext])
+    XCTAssertNil(library.usableModel(for: .deepSeekV4))
+    XCTAssertNil(library.usableModel(for: .qwen3_8FlashNext))
+    XCTAssertTrue(library.needsSelectedModelDownload)
+
+    library.selectedModelKind = .qwen3_8FlashNext
+
+    XCTAssertTrue(library.needsSelectedModelDownload)
+  }
 }
 
 private func qwenManifestFixture() -> [String: Any] {
