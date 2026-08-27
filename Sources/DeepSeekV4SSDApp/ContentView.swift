@@ -7,6 +7,8 @@ struct ContentView: View {
   let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
   @State private var configuration = ServerConfiguration.localDefault
+  @State private var configurationModelKind: ModelKind?
+  @State private var modelNavigationPath: [String] = []
   @AppStorage("selectedAppPage") private var selectedPage = AppPage.server
   @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
 
@@ -34,67 +36,73 @@ struct ContentView: View {
       .background(AppTheme.sidebarBackground)
       .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 250)
     } detail: {
-      VStack(spacing: 0) {
-        HStack {
-          Text(selectedPage.title(language: selectedLanguage))
-            .font(.title2.bold())
-          Spacer()
-        }
-        .frame(maxWidth: AppLayout.contentWidth)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 40)
-        .padding(.vertical, 16)
+      NavigationStack(path: $modelNavigationPath) {
+        VStack(spacing: 0) {
+          HStack {
+            Text(selectedPage.title(language: selectedLanguage))
+              .font(.title2.bold())
+            Spacer()
+          }
+          .frame(maxWidth: AppLayout.contentWidth)
+          .frame(maxWidth: .infinity)
+          .padding(.horizontal, 40)
+          .padding(.vertical, 16)
 
-        Divider()
+          Divider()
 
-        ZStack {
-          ServerView(
-            configuration: $configuration,
-            server: server,
-            modelLibrary: modelLibrary,
-            language: selectedLanguage
-          )
-          .pageVisibility(selectedPage == .server)
+          ZStack {
+            ServerView(
+              configuration: $configuration,
+              server: server,
+              modelLibrary: modelLibrary,
+              language: selectedLanguage,
+              showAdvancedSettings: showModelAdvancedSettings
+            )
+            .pageVisibility(selectedPage == .server)
 
-          AdvancedView(
-            configuration: $configuration,
-            serverActive: server.isActive,
-            dsparkAvailable: selectedModel?.hasDSpark == true,
-            supportsDSpark: modelLibrary.selectedModelKind != .qwen3_8FlashNext,
-            language: selectedLanguage
-          )
-          .pageVisibility(selectedPage == .advanced)
+            AdvancedView(
+              configuration: $configuration,
+              serverActive: server.isActive,
+              language: selectedLanguage
+            )
+            .pageVisibility(selectedPage == .advanced)
 
-          ChatView(
-            configuration: configuration,
-            server: server,
-            assistantName: modelLibrary.selectedModelKind.assistantName,
-            language: selectedLanguage
-          )
+            ChatView(
+              configuration: configuration,
+              server: server,
+              assistantName: modelLibrary.selectedModelKind.assistantName,
+              language: selectedLanguage
+            )
             .pageVisibility(selectedPage == .chat)
 
-          MetricView(
-            model: configuration.publicModel,
-            state: server.state,
-            performance: server.performance,
-            history: server.performanceHistory,
-            language: selectedLanguage,
-            clearHistory: server.clearPerformanceHistory
-          )
-          .pageVisibility(selectedPage == .metric)
+            MetricView(
+              model: configuration.publicModel,
+              state: server.state,
+              performance: server.performance,
+              history: server.performanceHistory,
+              language: selectedLanguage,
+              clearHistory: server.clearPerformanceHistory
+            )
+            .pageVisibility(selectedPage == .metric)
 
-          LogsView(server: server, language: selectedLanguage)
-            .pageVisibility(selectedPage == .logs)
+            LogsView(server: server, language: selectedLanguage)
+              .pageVisibility(selectedPage == .logs)
 
-          SettingsView(
-            languageCode: $languageCode,
-            language: selectedLanguage,
-            checkForUpdates: checkForUpdates
-          )
-          .pageVisibility(selectedPage == .settings)
+            SettingsView(
+              languageCode: $languageCode,
+              language: selectedLanguage,
+              checkForUpdates: checkForUpdates
+            )
+            .pageVisibility(selectedPage == .settings)
+          }
+        }
+        .background(AppTheme.pageBackground)
+        .navigationDestination(for: String.self) { rawValue in
+          if let modelKind = ModelKind(rawValue: rawValue) {
+            modelAdvancedPage(for: modelKind)
+          }
         }
       }
-      .background(AppTheme.pageBackground)
     }
     .navigationSplitViewStyle(.balanced)
     .background(AppTheme.pageBackground)
@@ -102,15 +110,23 @@ struct ContentView: View {
     .environment(\.locale, selectedLanguage.locale)
     .task {
       await modelLibrary.scan()
-      selectDetectedModel()
+      activateSelectedModel()
       modelLibrary.resumeDownloadIfNeeded()
     }
-    .onChange(of: modelLibrary.models) { selectDetectedModel() }
-    .onChange(of: modelLibrary.selectedModelKind) { selectDetectedModel() }
-    .onChange(of: configuration.modelPath) { synchronizeSelectedModelDefaults() }
+    .onChange(of: modelLibrary.models) { activateSelectedModel() }
+    .onChange(of: modelLibrary.selectedModelKind) { activateSelectedModel() }
+    .onChange(of: configuration.modelPath) { synchronizeSelectedModelIdentity() }
     .onChange(of: configuration) {
       configuration.save()
+      if let configurationModelKind {
+        configuration.saveAdvancedSettings(for: configurationModelKind)
+      }
       AppKeychain.saveAPIKey(configuration.apiKey)
+    }
+    .onChange(of: selectedPage) {
+      if selectedPage != .server {
+        modelNavigationPath.removeAll()
+      }
     }
     .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
   }
@@ -119,32 +135,76 @@ struct ContentView: View {
     (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
   }
 
-  private var selectedModel: InstalledModelInfo? {
-    modelLibrary.usableModels.first { $0.url.path == configuration.modelPath }
-  }
-
-  private func selectDetectedModel() {
-    configuration.modelPath =
-      modelLibrary.usableModel(for: modelLibrary.selectedModelKind)?.url.path ?? ""
-    synchronizeSelectedModelDefaults()
-  }
-
-  private func synchronizeSelectedModelDefaults() {
-    let modelKind = selectedModel?.modelKind ?? modelLibrary.selectedModelKind
-    configuration.publicModel = selectedModel?.modelID ?? modelKind.defaultPublicModel
-    switch modelKind {
-    case .deepSeekV4:
-      configuration.defaultMaxTokens = 272_000
-      configuration.defaultTemperature = 0.2
-      configuration.defaultTopP = 0.98
-      configuration.defaultTopK = 0
-    case .qwen3_8FlashNext:
-      configuration.dsparkEnabled = false
-      configuration.defaultMaxTokens = 262_144
-      configuration.defaultTemperature = 1.0
-      configuration.defaultTopP = 0.95
-      configuration.defaultTopK = 20
+  private func activateSelectedModel() {
+    let modelKind = modelLibrary.selectedModelKind
+    if configurationModelKind != modelKind {
+      if let configurationModelKind {
+        configuration.saveAdvancedSettings(for: configurationModelKind)
+      }
+      let migratesCurrentSettings =
+        configurationModelKind == nil
+        && !ServerConfiguration.hasSavedAdvancedSettings(for: modelKind)
+        && ServerConfiguration.hasSavedConfiguration()
+      configuration.loadAdvancedSettings(
+        for: modelKind,
+        migrateCurrent: migratesCurrentSettings
+      )
+      configurationModelKind = modelKind
     }
+    synchronizeSelectedModelIdentity()
+  }
+
+  private func synchronizeSelectedModelIdentity() {
+    let modelKind = modelLibrary.selectedModelKind
+    let model = modelLibrary.usableModel(for: modelKind)
+    configuration.modelPath = model?.url.path ?? ""
+    configuration.publicModel = model?.modelID ?? modelKind.defaultPublicModel
+  }
+
+  private func showModelAdvancedSettings(_ modelKind: ModelKind) {
+    if modelLibrary.selectedModelKind != modelKind {
+      modelLibrary.selectedModelKind = modelKind
+    }
+    activateSelectedModel()
+    modelNavigationPath = [modelKind.rawValue]
+  }
+
+  private func modelAdvancedPage(for modelKind: ModelKind) -> some View {
+    let backLabel = L10n.string("Back to Model", language: selectedLanguage)
+
+    return VStack(spacing: 0) {
+      HStack(spacing: 12) {
+        Button {
+          modelNavigationPath.removeAll()
+        } label: {
+          Label(backLabel, systemImage: "chevron.backward")
+        }
+        .buttonStyle(TertiaryIconButtonStyle())
+        .accessibilityLabel(backLabel)
+        .help(backLabel)
+
+        Text(modelKind.displayName)
+          .font(.title2.bold())
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 8)
+
+      Divider()
+
+      ModelAdvancedView(
+        configuration: $configuration,
+        serverActive: server.isActive,
+        dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
+        modelKind: modelKind,
+        language: selectedLanguage
+      )
+    }
+    .background(AppTheme.pageBackground)
+    .navigationBarBackButtonHidden()
   }
 }
 
@@ -195,6 +255,62 @@ private enum AppTheme {
   static let fieldBackground = Color(red: 0.075, green: 0.075, blue: 0.08)
   static let cardRadius: CGFloat = 16
   static let fieldRadius: CGFloat = 8
+}
+
+private struct TertiaryIconButtonStyle: ButtonStyle {
+  var color = Color.secondary
+
+  func makeBody(configuration: Configuration) -> some View {
+    TertiaryIconButtonBody(
+      label: configuration.label,
+      isPressed: configuration.isPressed,
+      color: color
+    )
+  }
+}
+
+private struct TertiaryIconButtonBody<Label: View>: View {
+  let label: Label
+  let isPressed: Bool
+  let color: Color
+  @Environment(\.isEnabled) private var isEnabled
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var isHovered = false
+
+  var body: some View {
+    label
+      .labelStyle(.iconOnly)
+      .font(.system(size: 14, weight: .semibold))
+      .foregroundStyle(color)
+      .opacity(iconOpacity)
+      .frame(width: 32, height: 32)
+      .background {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(color.opacity(backgroundOpacity))
+      }
+      .frame(width: 40, height: 40)
+      .contentShape(Rectangle())
+      .scaleEffect(reduceMotion ? 1 : scale)
+      .onHover { isHovered = $0 }
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isPressed)
+  }
+
+  private var iconOpacity: Double {
+    if !isEnabled { return 0.35 }
+    if isPressed { return 0.55 }
+    return isHovered ? 1 : 0.78
+  }
+
+  private var backgroundOpacity: Double {
+    if !isEnabled { return 0 }
+    if isPressed { return 0.18 }
+    return isHovered ? 0.12 : 0
+  }
+
+  private var scale: CGFloat {
+    isEnabled && isPressed ? 0.96 : 1
+  }
 }
 
 private struct SectionHeader: View {
@@ -264,7 +380,9 @@ private struct ServerView: View {
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
   let language: AppLanguage
+  let showAdvancedSettings: (ModelKind) -> Void
   @State private var confirmsDownload = false
+  @State private var downloadTarget: ModelKind?
   @State private var confirmsRepair = false
   @State private var repairTarget: InstalledModelInfo?
   @State private var confirmsReinstall = false
@@ -275,16 +393,32 @@ private struct ServerView: View {
       VStack(alignment: .leading, spacing: 18) {
         serverSummaryCard
 
-        SectionHeader(title: L10n.string("Model", language: language))
+        SectionHeader(title: L10n.string("System Check", language: language))
           .padding(.top, 10)
+        systemCheckPanel
+
+        HStack(spacing: 16) {
+          SectionHeader(title: L10n.string("Model", language: language))
+          Spacer()
+          Button {
+            chooseModelDirectory()
+          } label: {
+            Label(
+              L10n.string("Select Model Folder", language: language),
+              systemImage: "folder"
+            )
+          }
+          .buttonStyle(.bordered)
+          .frame(minHeight: 40)
+          .contentShape(Rectangle())
+          .help(L10n.string("Select Model Folder", language: language))
+          .disabled(server.isActive || modelLibrary.isBusy)
+        }
+        .padding(.top, 10)
 
         modelPanel
 
-        if modelLibrary.needsSelectedModelDownload {
-          onboardingPanel
-        }
-
-        if modelLibrary.isBusy {
+        if modelLibrary.isBusy && modelLibrary.downloadModelKind == nil {
           operationPanel
         }
 
@@ -318,12 +452,15 @@ private struct ServerView: View {
       isPresented: $confirmsDownload,
       titleVisibility: .visible
     ) {
-      Button(L10n.string("Download Model")) { modelLibrary.startDownload() }
+      Button(L10n.string("Download Model", language: language)) {
+        if let downloadTarget { modelLibrary.startDownload(for: downloadTarget) }
+      }
       Button(L10n.string("Cancel"), role: .cancel) {}
     } message: {
       Text(
         L10n.string(
           "The app will install the model in %@. You can resume an interrupted download.",
+          language: language,
           modelLibrary.rootURL.path))
     }
     .confirmationDialog(
@@ -370,15 +507,15 @@ private struct ServerView: View {
           Text(selectedModel?.name ?? modelLibrary.selectedModelKind.displayName)
             .font(.title3.bold())
             .lineLimit(1)
-          Label(server.state.label, systemImage: "circle.fill")
+          Label(summaryStatusLabel, systemImage: summaryStatusSymbol)
             .font(.callout.weight(.semibold))
-            .foregroundStyle(statusColor)
+            .foregroundStyle(summaryStatusColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(statusColor.opacity(0.12), in: Capsule())
+            .background(summaryStatusColor.opacity(0.12), in: Capsule())
         }
-        Text(configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL"))
-          .font(.callout.monospaced())
+        Text(summaryDetail)
+          .font(selectedModelIsUsable ? .callout.monospaced() : .callout)
           .foregroundStyle(.secondary)
           .textSelection(.enabled)
       }
@@ -386,23 +523,24 @@ private struct ServerView: View {
 
       Spacer(minLength: 20)
 
-      Button {
-        if server.isActive {
-          server.stop()
-        } else {
-          server.start(configuration)
+      if server.isActive || selectedModelIsUsable {
+        Button {
+          if server.isActive {
+            server.stop()
+          } else {
+            server.start(configuration)
+          }
+        } label: {
+          Label(
+            L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
+            systemImage: server.isActive ? "stop.fill" : "play.fill"
+          )
         }
-      } label: {
-        Label(
-          L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
-          systemImage: server.isActive ? "stop.fill" : "play.fill"
-        )
+        .buttonStyle(.borderedProminent)
+        .tint(.blue)
+        .controlSize(.large)
+        .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
       }
-      .buttonStyle(.borderedProminent)
-      .tint(.blue)
-      .controlSize(.large)
-      .disabled(!server.isActive && !modelLibrary.canUseModel(at: configuration.modelPath))
-      .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
     }
     .appCard(padding: 22)
   }
@@ -472,121 +610,61 @@ private struct ServerView: View {
     .appCard()
   }
 
-  private var onboardingPanel: some View {
-    VStack(alignment: .leading, spacing: 24) {
-      VStack(alignment: .leading, spacing: 6) {
-        Text(
-          L10n.string(
-            modelLibrary.hasPartialDownload ? "Continue Model Installation" : "Install Model")
-        )
-        .font(.title2.bold())
-        Text(
-          L10n.string(
-            "%@ is not installed. Download it or select its existing model folder.",
-            modelLibrary.selectedModelKind.displayName
-          )
-        )
-        .foregroundStyle(.secondary)
-      }
+  private var systemCheckPanel: some View {
+    HStack(spacing: 0) {
+      ForEach(modelLibrary.preflightChecks) { check in
+        HStack(spacing: 10) {
+          Image(systemName: preflightCheckSymbol(check.id))
+            .font(.system(size: 20, weight: .regular))
+            .foregroundStyle(.secondary)
+            .frame(width: 24)
+            .accessibilityHidden(true)
 
-      if modelLibrary.selectedModelKind == .deepSeekV4 {
-        Toggle(
-          L10n.string("Install DSpark with the model (adds 10.12 GiB)"),
-          isOn: $modelLibrary.installDSparkWithModel
-        )
-        .disabled(modelLibrary.isBusy)
-      } else {
-        Text(L10n.string("The App downloads a verified MXFP4 installed model for Qwen."))
-          .font(.callout)
-          .foregroundStyle(.secondary)
-      }
+          Text(check.title)
+            .font(.callout.weight(.medium))
+            .lineLimit(1)
 
-      preflightPanel
+          Spacer(minLength: 8)
 
-      HStack(spacing: 12) {
-        Button(L10n.string("Select Model Folder")) { chooseModelDirectory() }
-          .disabled(modelLibrary.isBusy)
-        Button(L10n.string(modelLibrary.hasPartialDownload ? "Resume Download" : "Download Model"))
-        {
-          if modelLibrary.hasPartialDownload {
-            modelLibrary.startDownload()
-          } else {
-            confirmsDownload = true
-          }
+          Image(systemName: preflightSymbol(check.status))
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(preflightColor(check.status))
+            .accessibilityHidden(true)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(.blue)
-        .disabled(modelLibrary.isBusy || !modelLibrary.canStartDownload)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(check.detail)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(preflightAccessibilityLabel(check))
+
+        if check.id != modelLibrary.preflightChecks.last?.id {
+          Divider()
+            .frame(height: 28)
+            .padding(.horizontal, 16)
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .appCard()
   }
 
-  private var preflightPanel: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      Text(L10n.string("Checks Before Download"))
-        .font(.headline)
-      ForEach(modelLibrary.preflightChecks) { check in
-        HStack(alignment: .top, spacing: 10) {
-          Image(systemName: preflightSymbol(check.status))
-            .foregroundStyle(preflightColor(check.status))
-            .accessibilityHidden(true)
-          VStack(alignment: .leading, spacing: 2) {
-            Text(check.title).fontWeight(.medium)
-            Text(check.detail)
-              .font(.callout)
-              .foregroundStyle(.secondary)
-              .textSelection(.enabled)
-          }
-        }
-        .accessibilityElement(children: .combine)
-      }
-    }
-  }
-
   private var modelPanel: some View {
     VStack(alignment: .leading, spacing: 14) {
-      HStack(spacing: 12) {
-        if modelLibrary.isScanning {
-          ProgressView().controlSize(.small)
-        } else {
-          Image(systemName: selectedModel == nil ? "arrow.down.circle" : "checkmark.circle.fill")
-            .foregroundStyle(selectedModel == nil ? Color.orange : Color.green)
-            .accessibilityHidden(true)
+      List(selection: selectedModelKind) {
+        ForEach(ModelLibrary.supportedModelKinds, id: \.rawValue) { modelKind in
+          modelRow(modelKind)
+          .contentShape(Rectangle())
+          .tag(modelKind.rawValue)
+          .selectionDisabled(modelSelectionLocked)
+          .task { await modelLibrary.refreshInstallationPlan(for: modelKind) }
         }
-
-        Text(
-          L10n.string(
-            selectedModel == nil ? "Not installed" : "Installed", language: language)
-        )
-          .font(.body.weight(.medium))
-        Spacer()
-        Picker(L10n.string("Model"), selection: $modelLibrary.selectedModelKind) {
-          ForEach(ModelLibrary.supportedModelKinds, id: \.rawValue) { modelKind in
-            if let model = modelLibrary.usableModel(for: modelKind) {
-              Text(
-                L10n.string(
-                  "%@ · %@ · %@", language: language, modelKind.displayName,
-                  L10n.string("Installed", language: language),
-                  formattedBytes(model.size)))
-                .tag(modelKind)
-            } else {
-              Text(
-                L10n.string(
-                  "%@ · %@", language: language, modelKind.displayName,
-                  L10n.string("Not installed", language: language)))
-                .tag(modelKind)
-            }
-          }
-        }
-        .labelsHidden()
-        .disabled(server.isActive || modelLibrary.isBusy || modelLibrary.hasPartialDownload)
-        .accessibilityHint(
-          L10n.string(
-            "Select a model. You can select it before it is installed.", language: language))
-        .frame(minWidth: 420, idealWidth: 520, maxWidth: 560, alignment: .trailing)
       }
+      .listStyle(.inset)
+      .scrollContentBackground(.hidden)
+      .frame(height: modelListHeight)
+      .accessibilityLabel(L10n.string("Model", language: language))
+      .accessibilityHint(
+        L10n.string(
+          "Select a model. You can select it before it is installed.", language: language))
 
       if let selectedModel {
         Divider()
@@ -606,17 +684,11 @@ private struct ServerView: View {
             .disabled(server.isActive || modelLibrary.isBusy)
           }
           Spacer()
-          Button(L10n.string("Select Another Folder")) { chooseModelDirectory() }
-            .disabled(server.isActive || modelLibrary.isBusy)
         }
-
-        Text(modelLibrary.rootURL.path)
-          .font(.callout.monospaced())
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
-          .textSelection(.enabled)
       }
+
+      Divider()
+      modelFolderSummary
 
       if modelLibrary.verificationModelPath == configuration.modelPath,
         let issues = modelLibrary.verificationIssues
@@ -641,27 +713,259 @@ private struct ServerView: View {
     .appCard()
   }
 
+  private func modelRow(_ modelKind: ModelKind) -> some View {
+    let model = modelLibrary.usableModel(for: modelKind)
+    let downloadBlock = modelLibrary.downloadBlock(for: modelKind)
+    let isDownloading = modelLibrary.downloadModelKind == modelKind
+    let downloadReason = visibleDownloadReason(modelKind, block: downloadBlock)
+
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 12) {
+        if modelLibrary.isScanning
+          || (model == nil && modelLibrary.isPlanningInstallation(for: modelKind))
+        {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityHidden(true)
+        } else {
+          Image(systemName: model == nil ? "arrow.down.circle" : "checkmark.circle.fill")
+            .foregroundStyle(model == nil ? Color.orange : Color.green)
+            .accessibilityHidden(true)
+        }
+
+        VStack(alignment: .leading, spacing: 3) {
+          Text(modelKind.displayName)
+            .font(.body.weight(.medium))
+          modelStatus(modelKind, model: model)
+        }
+
+        Spacer(minLength: 16)
+
+        if isDownloading {
+          Button(L10n.string("Stop Download", language: language)) {
+            modelLibrary.cancelOperation()
+          }
+          .buttonStyle(.bordered)
+          .disabled(modelLibrary.operationPhase == .cancelling)
+        } else if model == nil {
+          modelDownloadButton(modelKind, block: downloadBlock)
+        }
+
+        Button {
+          showAdvancedSettings(modelKind)
+        } label: {
+          Label(
+            L10n.string("Advanced Settings", language: language),
+            systemImage: "slider.horizontal.3"
+          )
+        }
+        .buttonStyle(TertiaryIconButtonStyle())
+        .accessibilityLabel(
+          L10n.string(
+            "Advanced Settings for %@",
+            language: language,
+            modelKind.displayName
+          )
+        )
+        .help(
+          L10n.string(
+            "Advanced Settings for %@",
+            language: language,
+            modelKind.displayName
+          )
+        )
+        .disabled(modelSelectionLocked && modelKind != modelLibrary.selectedModelKind)
+      }
+      .frame(minHeight: 48)
+
+      if shouldShowModelDownloadReason(
+        modelIsInstalled: model != nil,
+        modelIsDownloading: isDownloading,
+        hasReason: downloadReason != nil
+      ), let downloadReason
+      {
+        Label(downloadReason, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .padding(.leading, 32)
+      }
+
+      if isDownloading {
+        modelDownloadProgress
+          .padding(.leading, 32)
+          .padding(.bottom, 8)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func modelStatus(_ modelKind: ModelKind, model: InstalledModelInfo?) -> some View {
+    if let model {
+      Text(
+        L10n.string(
+          "%@ · %@",
+          language: language,
+          L10n.string("Installed", language: language),
+          formattedBytes(model.size)
+        )
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+    } else if modelLibrary.isPlanningInstallation(for: modelKind) {
+      Text(L10n.string("Not installed · Checking download size…", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    } else if let bytes = modelLibrary.plannedInstalledBytes(for: modelKind) {
+      Text(
+        L10n.string(
+          "Not installed · Download size: %@",
+          language: language,
+          formattedBytes(bytes)
+        )
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+    } else if case .some(.installationPlanUnavailable) = modelLibrary.downloadBlock(
+      for: modelKind)
+    {
+      Text(L10n.string("Not installed · Download size unavailable", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    } else {
+      Text(L10n.string("Not installed", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  @ViewBuilder
+  private func modelDownloadButton(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> some View {
+    let isDisabled = modelDownloadIsDisabled(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      canStartDownload: modelLibrary.canStartDownload(modelKind),
+      hasPartialDownload: modelLibrary.hasPartialDownload,
+      targetHasPartialDownload: modelLibrary.hasPartialDownload(for: modelKind)
+    )
+    let label =
+      modelLibrary.hasPartialDownload(for: modelKind) ? "Resume" : "Download"
+    let help = downloadHelp(modelKind, block: block)
+
+    let button = Button {
+      requestDownload(modelKind)
+    } label: {
+      Label(L10n.string(label, language: language), systemImage: "arrow.down.circle")
+    }
+    .frame(minHeight: 40)
+    .contentShape(Rectangle())
+    .disabled(isDisabled)
+    .overlay {
+      if isDisabled {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(help)
+          .accessibilityHidden(true)
+      }
+    }
+    .help(help)
+    .accessibilityHint(help)
+
+    if modelLibrary.selectedModelKind == modelKind {
+      button
+        .buttonStyle(.borderedProminent)
+        .tint(isDisabled ? .gray : .blue)
+    } else {
+      button
+        .buttonStyle(.bordered)
+        .tint(isDisabled ? .gray : .secondary)
+    }
+  }
+
+  private var modelDownloadProgress: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
+        let fractionText = formattedProgress(fraction)
+        HStack(spacing: 12) {
+          Text(modelLibrary.operationPhase.label)
+            .font(.callout.weight(.medium))
+          Spacer()
+          Text(fractionText)
+            .font(.callout.weight(.semibold).monospacedDigit())
+        }
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+          .fill(Color.primary.opacity(0.12))
+          .overlay {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+              .fill(Color.accentColor)
+              .scaleEffect(x: max(0, min(1, fraction)), anchor: .leading)
+          }
+          .frame(height: 6)
+          .accessibilityElement()
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+          .accessibilityValue(fractionText)
+        modelDownloadMetadata(progress)
+      } else {
+        HStack(spacing: 10) {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityHidden(true)
+          Text(modelLibrary.operationPhase.label)
+            .font(.callout.weight(.medium))
+        }
+        .accessibilityElement(children: .combine)
+      }
+    }
+  }
+
+  private var modelListHeight: CGFloat {
+    var height = CGFloat(ModelLibrary.supportedModelKinds.count) * 62
+    if modelLibrary.downloadModelKind != nil {
+      height += modelDownloadProgressExtraHeight(
+        hasProgressFraction: modelLibrary.operationProgress?.fraction != nil)
+    }
+    let visibleDownloadReasonCount = ModelLibrary.supportedModelKinds.filter {
+      shouldShowModelDownloadReason(
+        modelIsInstalled: modelLibrary.usableModel(for: $0) != nil,
+        modelIsDownloading: modelLibrary.downloadModelKind == $0,
+        hasReason: visibleDownloadReason($0, block: modelLibrary.downloadBlock(for: $0)) != nil
+      )
+    }.count
+    height += CGFloat(visibleDownloadReasonCount) * 32
+    return min(height, 320)
+  }
+
+  private var selectedModelKind: Binding<String> {
+    Binding(
+      get: { modelLibrary.selectedModelKind.rawValue },
+      set: { value in
+        guard !modelSelectionLocked, let modelKind = ModelKind(rawValue: value),
+          modelKind != modelLibrary.selectedModelKind
+        else { return }
+        modelLibrary.selectedModelKind = modelKind
+      }
+    )
+  }
+
+  private var modelSelectionLocked: Bool {
+    modelSelectionIsLocked(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      downloadIsActive: modelLibrary.downloadModelKind != nil,
+      hasPartialDownload: modelLibrary.hasPartialDownload
+    )
+  }
+
   private var operationPanel: some View {
     VStack(alignment: .leading, spacing: 10) {
       Text(modelLibrary.operationPhase.label).font(.headline)
       if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
         ProgressView(value: fraction)
           .accessibilityLabel(modelLibrary.operationPhase.label)
-          .accessibilityValue(fraction.formatted(.percent.precision(.fractionLength(0))))
-        HStack(spacing: 16) {
-          Text(
-            L10n.string(
-              "%@ / %@", formattedBytes(progress.completedBytes),
-              formattedBytes(progress.totalBytes)))
-          if let speed = progress.bytesPerSecond, speed > 0 {
-            Text(L10n.string("%@/s", formattedBytes(UInt64(speed))))
-          }
-          if let seconds = progress.estimatedSecondsRemaining, seconds.isFinite {
-            Text(L10n.string("About %@ remaining", formattedDuration(seconds)))
-          }
-        }
-        .font(.callout.monospacedDigit())
-        .foregroundStyle(.secondary)
+          .accessibilityValue(formattedProgress(fraction))
+        modelDownloadMetadata(progress)
       } else {
         ProgressView()
           .accessibilityLabel(modelLibrary.operationPhase.label)
@@ -717,6 +1021,153 @@ private struct ServerView: View {
     modelLibrary.usableModels.first { $0.url.path == configuration.modelPath }
   }
 
+  private var selectedModelIsUsable: Bool {
+    modelLibrary.canUseModel(at: configuration.modelPath)
+  }
+
+  private var selectedModelDownloadIsActive: Bool {
+    modelLibrary.downloadModelKind == modelLibrary.selectedModelKind
+  }
+
+  private var selectedModelNeedsAttention: Bool {
+    (selectedModel != nil && !selectedModelIsUsable)
+      || modelLibrary.damagedModels.contains {
+        $0.modelKind == modelLibrary.selectedModelKind
+      }
+  }
+
+  private var summaryStatusLabel: String {
+    if selectedModelDownloadIsActive {
+      return L10n.string("Setup in progress", language: language)
+    }
+    if selectedModelNeedsAttention {
+      return L10n.string("Model needs attention", language: language)
+    }
+    if selectedModel == nil {
+      return L10n.string("Setup required", language: language)
+    }
+    return server.state.label
+  }
+
+  private var summaryStatusSymbol: String {
+    if selectedModelDownloadIsActive { return "arrow.down.circle.fill" }
+    if !selectedModelIsUsable { return "exclamationmark.circle.fill" }
+    return "circle.fill"
+  }
+
+  private var summaryStatusColor: Color {
+    if selectedModelDownloadIsActive { return .blue }
+    if selectedModelNeedsAttention { return .red }
+    if selectedModel == nil { return .orange }
+    return statusColor
+  }
+
+  private var summaryDetail: String {
+    if selectedModelDownloadIsActive {
+      return L10n.string(
+        "Download progress is shown in the model row below.", language: language)
+    }
+    if selectedModelNeedsAttention {
+      return L10n.string(
+        "Verify or repair the model before starting the server.", language: language)
+    }
+    if selectedModel == nil {
+      return L10n.string(
+        "Download this model or select a model folder that contains it.",
+        language: language
+      )
+    }
+    return configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL")
+  }
+
+  private var modelFolderSummary: some View {
+    HStack(alignment: .center, spacing: 12) {
+      Image(systemName: "folder")
+        .foregroundStyle(.secondary)
+        .frame(width: 18)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(L10n.string("Model folder", language: language))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(modelLibrary.rootURL.path)
+          .font(.callout.monospaced())
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+          .help(modelLibrary.rootURL.path)
+      }
+      Spacer(minLength: 16)
+      VStack(alignment: .trailing, spacing: 3) {
+        Text(L10n.string("Available space", language: language))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        if let availableBytes = modelLibrary.modelFolderAvailableBytes {
+          Text(formattedBytes(availableBytes))
+            .font(.callout.weight(.medium).monospacedDigit())
+        } else if modelLibrary.isScanning {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel(L10n.string("Available space", language: language))
+        } else {
+          Text(L10n.string("Unavailable", language: language))
+            .font(.callout.weight(.medium))
+        }
+      }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func visibleDownloadReason(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> String? {
+    if case .some(.loadingInstallationPlan) = block { return nil }
+    if let block { return block.message }
+    let isDisabled = modelDownloadIsDisabled(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      canStartDownload: modelLibrary.canStartDownload(modelKind),
+      hasPartialDownload: modelLibrary.hasPartialDownload,
+      targetHasPartialDownload: modelLibrary.hasPartialDownload(for: modelKind)
+    )
+    guard isDisabled else { return nil }
+    return downloadHelp(modelKind, block: nil)
+  }
+
+  private func modelDownloadMetadata(_ progress: ModelOperationProgress) -> some View {
+    let completed = L10n.string(
+      "%@ of %@",
+      language: language,
+      formattedBytes(progress.completedBytes),
+      formattedBytes(progress.totalBytes)
+    )
+    let speed = progress.bytesPerSecond.flatMap { bytesPerSecond in
+      bytesPerSecond > 0
+        ? L10n.string("%@/s", language: language, formattedBytes(UInt64(bytesPerSecond)))
+        : nil
+    }
+    let remaining = progress.estimatedSecondsRemaining.flatMap { seconds in
+      seconds.isFinite
+        ? L10n.string(
+          "About %@ remaining", language: language, formattedDuration(seconds))
+        : nil
+    }
+
+    return HStack(spacing: 14) {
+      Text(completed)
+      Spacer(minLength: 12)
+      if let speed {
+        Label(speed, systemImage: "speedometer")
+      }
+      if let remaining {
+        Label(remaining, systemImage: "clock")
+      }
+    }
+    .font(.callout.monospacedDigit())
+    .foregroundStyle(.secondary)
+  }
+
   private var statusColor: Color {
     switch server.state {
     case .running: .green
@@ -724,6 +1175,45 @@ private struct ServerView: View {
     case .starting, .stopping: .orange
     case .stopped: .secondary
     }
+  }
+
+  private func requestDownload(_ modelKind: ModelKind) {
+    guard !modelLibrary.isBusy, modelLibrary.canStartDownload(modelKind),
+      !modelLibrary.hasPartialDownload || modelLibrary.hasPartialDownload(for: modelKind)
+    else { return }
+    if modelLibrary.hasPartialDownload(for: modelKind) {
+      modelLibrary.startDownload(for: modelKind)
+    } else {
+      downloadTarget = modelKind
+      confirmsDownload = true
+    }
+  }
+
+  private func downloadHelp(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> String {
+    if let block { return block.message }
+    if modelLibrary.isBusy {
+      return L10n.string(
+        "Wait for the current model operation to finish.", language: language)
+    }
+    if modelLibrary.hasPartialDownload && !modelLibrary.hasPartialDownload(for: modelKind) {
+      return L10n.string(
+        "Finish the current model download before downloading another model.",
+        language: language
+      )
+    }
+    if !modelLibrary.canStartDownload(modelKind) {
+      return L10n.string(
+        "A model already exists in this location. Verify and repair the existing model first.",
+        language: language
+      )
+    }
+    return L10n.string(
+      modelLibrary.hasPartialDownload(for: modelKind) ? "Resume Download" : "Download Model",
+      language: language
+    )
   }
 
   private func chooseModelDirectory() {
@@ -748,7 +1238,9 @@ private struct ServerView: View {
   }
 
   private func formattedBytes(_ bytes: UInt64) -> String {
-    ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+    if bytes == 0 { return "0 KB" }
+    return ByteCountFormatter.string(
+      fromByteCount: Int64(clamping: bytes), countStyle: .file)
   }
 
   private func formattedDuration(_ seconds: Double) -> String {
@@ -758,12 +1250,41 @@ private struct ServerView: View {
       "%lld hr %lld min", Int64(totalMinutes / 60), Int64(totalMinutes % 60))
   }
 
+  private func formattedProgress(_ fraction: Double) -> String {
+    if fraction > 0, fraction < 0.001 {
+      return fraction.formatted(.percent.precision(.fractionLength(2)))
+    }
+    if fraction < 0.01 {
+      return fraction.formatted(.percent.precision(.fractionLength(1)))
+    }
+    return fraction.formatted(.percent.precision(.fractionLength(0)))
+  }
+
   private func preflightSymbol(_ status: PreflightStatus) -> String {
     switch status {
     case .passed: "checkmark.circle.fill"
-    case .warning: "exclamationmark.circle.fill"
+    case .warning: "exclamationmark.triangle.fill"
     case .failed: "xmark.circle.fill"
     }
+  }
+
+  private func preflightCheckSymbol(_ id: String) -> String {
+    switch id {
+    case "architecture": "apple.logo"
+    case "memory": "memorychip"
+    case "ssd": "externaldrive.fill"
+    default: "checklist"
+    }
+  }
+
+  private func preflightAccessibilityLabel(_ check: PreflightCheck) -> String {
+    let status: String
+    switch check.status {
+    case .passed: status = L10n.string("Passed", language: language)
+    case .warning: status = L10n.string("Review", language: language)
+    case .failed: status = L10n.string("Action required", language: language)
+    }
+    return "\(check.title). \(status). \(check.detail)"
   }
 
   private func preflightColor(_ status: PreflightStatus) -> Color {
@@ -775,142 +1296,49 @@ private struct ServerView: View {
   }
 }
 
+func shouldShowModelDownloadReason(
+  modelIsInstalled: Bool,
+  modelIsDownloading: Bool,
+  hasReason: Bool
+) -> Bool {
+  !modelIsInstalled && !modelIsDownloading && hasReason
+}
+
+func modelDownloadProgressExtraHeight(hasProgressFraction: Bool) -> CGFloat {
+  hasProgressFraction ? 72 : 40
+}
+
+func modelDownloadIsDisabled(
+  serverIsActive _: Bool,
+  operationIsBusy: Bool,
+  canStartDownload: Bool,
+  hasPartialDownload: Bool,
+  targetHasPartialDownload: Bool
+) -> Bool {
+  operationIsBusy || !canStartDownload
+    || (hasPartialDownload && !targetHasPartialDownload)
+}
+
+func modelSelectionIsLocked(
+  serverIsActive: Bool,
+  operationIsBusy: Bool,
+  downloadIsActive: Bool,
+  hasPartialDownload _: Bool
+) -> Bool {
+  serverIsActive || (operationIsBusy && !downloadIsActive)
+}
+
 private struct AdvancedView: View {
   @Binding var configuration: ServerConfiguration
   let serverActive: Bool
-  let dsparkAvailable: Bool
-  let supportsDSpark: Bool
   let language: AppLanguage
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
-        SectionHeader(title: L10n.string("Generate", language: language))
-        VStack(spacing: 0) {
-          integerField(
-            "Max tokens",
-            hint: "Default token limit for each request.",
-            value: $configuration.defaultMaxTokens
-          )
-          Divider()
-          doubleField(
-            "Temperature",
-            hint: "A higher value increases output variation.",
-            value: $configuration.defaultTemperature
-          )
-          Divider()
-          doubleField(
-            "Top P",
-            hint: "A lower value reduces the candidate token range.",
-            value: $configuration.defaultTopP
-          )
-          Divider()
-          integerField(
-            "Top K",
-            hint: "0 disables Top K. Qwen uses 20 by default.",
-            value: $configuration.defaultTopK
-          )
-        }
-        .appCard()
-        .disabled(serverActive)
-
         SectionHeader(title: L10n.string("Power Saving Mode", language: language))
-          .padding(.top, 12)
         powerSavingPanel
           .disabled(serverActive)
-
-        SectionHeader(title: L10n.string("Runtime", language: language))
-          .padding(.top, 12)
-        VStack(spacing: 0) {
-          integerField(
-            "Slots",
-            hint:
-              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
-            value: $configuration.slots
-          )
-          Divider()
-          integerField(
-            "Read workers",
-            hint:
-              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
-            value: $configuration.readWorkers
-          )
-          Divider()
-          integerField(
-            "Memory limit GiB",
-            hint: "0 selects the model-safe automatic limit.",
-            value: $configuration.memoryLimitGiB
-          )
-          Divider()
-          integerField(
-            "Prefill step size",
-            hint: "0 selects 128, 256, or 1024 based on the prompt length.",
-            value: $configuration.prefillStepSize
-          )
-          Divider()
-          toggleField(
-            "Use layer-major prefill",
-            hint: "Loads routed experts by layer during prefill.",
-            value: $configuration.layerMajorPrefill
-          )
-          Divider()
-          integerField(
-            "Prompt cache entries",
-            hint: "Number of linear conversations to keep. The recommended value is 2.",
-            value: $configuration.promptCacheEntries
-          )
-          Divider()
-          integerField(
-            "Prompt cache GiB",
-            hint: "Memory limit for all prompt caches. The recommended value is 8.",
-            value: $configuration.promptCacheMemoryGiB
-          )
-          Divider()
-          SettingRow(
-            "Warmup prompt",
-            hint: "Optional UTF-8 prompt file path",
-            language: language
-          ) {
-            TextField(
-              L10n.string("Optional UTF-8 prompt file path", language: language),
-              text: $configuration.warmupPromptPath
-            )
-            .appInput(width: 340)
-          }
-          Divider()
-          toggleField(
-            "Use BF16 KV cache",
-            hint: "Stores the KV cache in BF16 format.",
-            value: $configuration.bf16KVCache
-          )
-          if supportsDSpark {
-            Divider()
-            toggleField(
-              "Use DSpark",
-              hint: "Uses DSpark speculative decoding when it is installed.",
-              value: $configuration.dsparkEnabled
-            )
-            .disabled(!dsparkAvailable)
-            Divider()
-            integerField(
-              "DSpark slots",
-              hint:
-                "Number of DSpark routed experts kept in memory. The recommended value is 768.",
-              value: $configuration.dsparkSlots
-            )
-            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
-            Divider()
-            doubleField(
-              "DSpark confidence threshold",
-              hint:
-                "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
-              value: $configuration.dsparkConfidenceThreshold
-            )
-            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
-          }
-        }
-        .appCard()
-        .disabled(serverActive)
       }
       .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
@@ -1008,6 +1436,148 @@ private struct AdvancedView: View {
     if limit == 0.5 { return L10n.string("500 MB/s", language: language) }
     return L10n.string("%lld GB/s", language: language, Int64(limit))
   }
+}
+
+private struct ModelAdvancedView: View {
+  @Binding var configuration: ServerConfiguration
+  let serverActive: Bool
+  let dsparkAvailable: Bool
+  let modelKind: ModelKind
+  let language: AppLanguage
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: L10n.string("Generate", language: language))
+        VStack(spacing: 0) {
+          integerField(
+            "Max tokens",
+            hint: "Default token limit for each request.",
+            value: $configuration.defaultMaxTokens
+          )
+          Divider()
+          doubleField(
+            "Temperature",
+            hint: "A higher value increases output variation.",
+            value: $configuration.defaultTemperature
+          )
+          Divider()
+          doubleField(
+            "Top P",
+            hint: "A lower value reduces the candidate token range.",
+            value: $configuration.defaultTopP
+          )
+          Divider()
+          integerField(
+            "Top K",
+            hint: "0 disables Top K. Qwen uses 20 by default.",
+            value: $configuration.defaultTopK
+          )
+        }
+        .appCard()
+        .disabled(serverActive)
+
+        SectionHeader(title: L10n.string("Runtime", language: language))
+          .padding(.top, 12)
+        VStack(spacing: 0) {
+          integerField(
+            "Slots",
+            hint:
+              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
+            value: $configuration.slots
+          )
+          Divider()
+          integerField(
+            "Read workers",
+            hint:
+              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
+            value: $configuration.readWorkers
+          )
+          Divider()
+          integerField(
+            "Memory limit GiB",
+            hint: "0 selects the model-safe automatic limit.",
+            value: $configuration.memoryLimitGiB
+          )
+          Divider()
+          integerField(
+            "Prefill step size",
+            hint: "0 selects 128, 256, or 1024 based on the prompt length.",
+            value: $configuration.prefillStepSize
+          )
+          Divider()
+          toggleField(
+            "Use layer-major prefill",
+            hint: "Loads routed experts by layer during prefill.",
+            value: $configuration.layerMajorPrefill
+          )
+          Divider()
+          integerField(
+            "Prompt cache entries",
+            hint: "Number of linear conversations to keep. The recommended value is 2.",
+            value: $configuration.promptCacheEntries
+          )
+          Divider()
+          integerField(
+            "Prompt cache GiB",
+            hint: "Memory limit for all prompt caches. The recommended value is 8.",
+            value: $configuration.promptCacheMemoryGiB
+          )
+          Divider()
+          SettingRow(
+            "Warmup prompt",
+            hint: "Optional UTF-8 prompt file path",
+            language: language
+          ) {
+            TextField(
+              L10n.string("Optional UTF-8 prompt file path", language: language),
+              text: $configuration.warmupPromptPath
+            )
+            .appInput(width: 340)
+          }
+          if modelKind == .deepSeekV4 {
+            Divider()
+            toggleField(
+              "Use BF16 KV cache",
+              hint: "Stores the KV cache in BF16 format.",
+              value: $configuration.bf16KVCache
+            )
+            Divider()
+            toggleField(
+              "Use DSpark",
+              hint: "Uses DSpark speculative decoding when it is installed.",
+              value: $configuration.dsparkEnabled
+            )
+            .disabled(!dsparkAvailable)
+            Divider()
+            integerField(
+              "DSpark slots",
+              hint:
+                "Number of DSpark routed experts kept in memory. The recommended value is 768.",
+              value: $configuration.dsparkSlots
+            )
+            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+            Divider()
+            doubleField(
+              "DSpark confidence threshold",
+              hint:
+                "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
+              value: $configuration.dsparkConfidenceThreshold
+            )
+            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+          }
+        }
+        .appCard()
+        .disabled(serverActive)
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
 
   private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
     SettingRow(label, hint: hint, language: language) {
@@ -1096,7 +1666,7 @@ private struct SettingsView: View {
             .frame(width: 76, height: 76)
             .accessibilityHidden(true)
           VStack(alignment: .leading, spacing: 5) {
-            Text("DeepSeekV4SSD")
+            Text("Whallm")
               .font(.title.bold())
             Text(L10n.string("Local DeepSeek inference from SSD.", language: language))
               .font(.title3)
@@ -1273,10 +1843,8 @@ private struct MetricView: View {
           Spacer()
           Button(action: clearHistory) {
             Label(localized("Clear metric history"), systemImage: "trash")
-              .labelStyle(.iconOnly)
           }
-          .buttonStyle(.borderless)
-          .frame(width: 36, height: 36)
+          .buttonStyle(TertiaryIconButtonStyle(color: .red))
           .disabled(history.isEmpty)
           .help(localized("Clear metric history"))
           .accessibilityLabel(localized("Clear metric history"))
@@ -1466,7 +2034,10 @@ private struct MetricView: View {
   }
 
   private func metricRow(_ metric: PerformanceMetric) -> some View {
-    let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
+    let value =
+      metric == .firstTokenWaitTime
+      ? performance.liveFirstTokenWaitTime : performance.snapshot[metric]
+    let live = formattedValue(value, for: metric, live: true)
     let statistics = history[metric]
     let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
     let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"

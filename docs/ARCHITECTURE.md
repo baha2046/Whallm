@@ -1,6 +1,6 @@
 # 架構與目前實作
 
-DeepSeekV4SSD 在 Apple Silicon 上執行固定的
+Whallm 在 Apple Silicon 上執行固定的
 `DeepSeek-V4-Flash-0731` 或 `Qwen3.8-Flash-Next-FP8` checkpoint。
 runtime 將 common tensor 保留在統一記憶體。
 runtime 只在 router 選到 routed expert 時讀取 expert blob。
@@ -71,8 +71,8 @@ repacker 會拒絕不相容的 checkpoint。
 
 ## Installed model
 
-預設安裝包含 DSpark。
-使用者可以不安裝 DSpark，也可以稍後移除 DSpark。
+App 的 DeepSeek 安裝固定包含 DSpark。
+使用者可以在安裝後移除 DSpark。
 
 ```text
 deepseek-v4-flash-0731.dsv4/
@@ -112,6 +112,16 @@ deepseek-v4-flash-0731.dsv4/
 `manifest.json` 不包含在 `manifest.files` 計數中。
 沒有 DSpark 的 manifest 需要 49 個 main model files。
 `inference/config.json` 可以作為第 50 個可選 main model file 保留。
+
+App 使用下列固定值執行下載前空間檢查。
+
+| model kind | Bytes | 值的來源 |
+| --- | ---: | --- |
+| DeepSeek | 166,878,580,480 | 固定 checkpoint revision 的 repack plan `installedBytes` |
+| Qwen | 125,291,490,955 | 固定 installed model revision 的 manifest files 合計 |
+
+App 啟動時不會為了取得這些值建立 repack plan 或下載遠端 manifest。
+checkpoint revision 或 installed model revision 變更時，App 必須同步更新固定值。
 
 ### Expert blob
 
@@ -290,7 +300,7 @@ runtime 會忽略無法載入的 cache entry。
 ## DSpark
 
 DSpark 是可選功能。
-installed model 預設包含 DSpark weights。
+App 下載的 DeepSeek installed model 固定包含 DSpark weights。
 runtime 預設不啟用 DSpark。
 
 目前 DSpark 合約如下。
@@ -328,7 +338,14 @@ server 讓一個 installed model 保持載入。
 APP 使用獨立 Python process 啟動 server。
 APP 每秒讀取 `/api/status`。
 APP 使用 process RSS 顯示記憶體。
-APP 使用 bundle domain `com.deepseekv4ssd.app` 的 `UserDefaults` 保留 Server、進階、Power Saving Mode、模型、語言、目前頁面與測試對話設定。
+Server 的 Model list 使用 `NavigationStack` 顯示每個 model kind 的獨立進階設定頁。
+獨立進階設定頁不會新增 sidebar 項目。
+使用者選擇進階設定圖示時，APP 從右側推入頁面。
+頁面標頭顯示 model 名稱和返回指示。
+APP 將 Generate 和 Runtime 設定依 model kind 分開儲存。
+使用者選擇模型時，APP 將該模型的設定載入 `ServerConfiguration`。
+Power Saving Mode 是所有模型共用的設定。
+APP 使用 bundle domain `com.deepseekv4ssd.app` 的 `UserDefaults` 保留 Server、各模型的進階設定、Power Saving Mode、模型、語言、目前頁面與測試對話設定。
 APP 使用 macOS Keychain 的 `com.deepseekv4ssd.app` service 與 `server-api-key` account 保留 API key。
 APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 

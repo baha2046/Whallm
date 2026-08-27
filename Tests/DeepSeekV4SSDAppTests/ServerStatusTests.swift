@@ -73,6 +73,65 @@ final class ServerStatusTests: XCTestCase {
     XCTAssertEqual(statistics.p95, 19)
   }
 
+  func testLiveFirstTokenWaitTimeUsesRequestElapsedUntilFirstToken() {
+    let waiting = LivePerformance(
+      generating: true,
+      snapshot: PerformanceSnapshot(
+        outputTokens: 0,
+        firstTokenWaitTime: 0,
+        completionTime: 12.4
+      )
+    )
+    let generating = LivePerformance(
+      generating: true,
+      snapshot: PerformanceSnapshot(
+        outputTokens: 1,
+        firstTokenWaitTime: 12.8,
+        completionTime: 13.2
+      )
+    )
+
+    XCTAssertEqual(waiting.liveFirstTokenWaitTime, 12.4)
+    XCTAssertEqual(generating.liveFirstTokenWaitTime, 12.8)
+  }
+
+  @MainActor
+  func testPerformanceHistoryRecordsFinalFirstTokenWaitTimeOnly() {
+    let controller = ServerController()
+
+    controller.recordPerformanceSample(
+      LivePerformance(
+        generating: true,
+        snapshot: PerformanceSnapshot(
+          outputTokens: 0,
+          firstTokenWaitTime: 0,
+          completionTime: 1
+        )
+      ))
+    controller.recordPerformanceSample(
+      LivePerformance(
+        generating: true,
+        snapshot: PerformanceSnapshot(
+          outputTokens: 1,
+          firstTokenWaitTime: 2,
+          completionTime: 3
+        )
+      ))
+
+    XCTAssertNil(controller.performanceHistory[.firstTokenWaitTime])
+
+    controller.recordPerformanceSample(
+      LivePerformance(
+        completedRequestCount: 1,
+        snapshot: PerformanceSnapshot(firstTokenWaitTime: 2, completionTime: 4)
+      ))
+
+    let firstTokenWait = controller.performanceHistory[.firstTokenWaitTime]
+    XCTAssertEqual(firstTokenWait?.count, 1)
+    XCTAssertEqual(firstTokenWait?.minimum, 2)
+    XCTAssertEqual(firstTokenWait?.maximum, 2)
+  }
+
   @MainActor
   func testPerformanceHistoryRecordsEachGeneratingSecondAcrossRequests() {
     let controller = ServerController()

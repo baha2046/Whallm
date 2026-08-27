@@ -1,4 +1,5 @@
 import Darwin
+import DeepSeekRepack
 import Foundation
 import Security
 
@@ -124,8 +125,11 @@ struct PerformanceHistory: Equatable {
 
   subscript(metric: PerformanceMetric) -> MetricStatistics? { values[metric] }
 
-  mutating func record(_ snapshot: PerformanceSnapshot) {
-    for metric in PerformanceMetric.allCases {
+  mutating func record(
+    _ snapshot: PerformanceSnapshot,
+    excluding excludedMetric: PerformanceMetric? = nil
+  ) {
+    for metric in PerformanceMetric.allCases where metric != excludedMetric {
       values[metric, default: MetricStatistics()].record(snapshot[metric])
     }
   }
@@ -144,6 +148,13 @@ struct LivePerformance: Equatable {
   var dsparkEnabled = false
   var dsparkAcceptanceRate = 0.0
   var dsparkAverageAcceptedLength = 0.0
+
+  var liveFirstTokenWaitTime: Double {
+    if generating && snapshot.outputTokens == 0 {
+      return snapshot.completionTime
+    }
+    return snapshot.firstTokenWaitTime
+  }
 }
 
 private struct RuntimeEnvironment {
@@ -178,6 +189,102 @@ private struct RuntimeEnvironment {
       pythonHome: nil,
       sitePackages: nil
     )
+  }
+}
+
+struct ModelAdvancedSettings: Codable, Equatable {
+  var slots = 1_152
+  var readWorkers = 4
+  var memoryLimitGiB = 0
+  var prefillStepSize = 0
+  var layerMajorPrefill = true
+  var promptCacheEntries = 2
+  var promptCacheMemoryGiB = 8
+  var warmupPromptPath = ""
+  var bf16KVCache = false
+  var dsparkEnabled = false
+  var dsparkSlots = 768
+  var dsparkConfidenceThreshold = 0.6
+  var defaultMaxTokens = 272_000
+  var defaultTemperature = 0.2
+  var defaultTopP = 0.98
+  var defaultTopK = 0
+
+  static func defaults(for modelKind: ModelKind) -> ModelAdvancedSettings {
+    var settings = ModelAdvancedSettings()
+    if modelKind == .qwen3_8FlashNext {
+      settings.defaultMaxTokens = 262_144
+      settings.defaultTemperature = 1.0
+      settings.defaultTopP = 0.95
+      settings.defaultTopK = 20
+    }
+    return settings
+  }
+
+  private init() {}
+
+  fileprivate init(configuration: ServerConfiguration) {
+    slots = configuration.slots
+    readWorkers = configuration.readWorkers
+    memoryLimitGiB = configuration.memoryLimitGiB
+    prefillStepSize = configuration.prefillStepSize
+    layerMajorPrefill = configuration.layerMajorPrefill
+    promptCacheEntries = configuration.promptCacheEntries
+    promptCacheMemoryGiB = configuration.promptCacheMemoryGiB
+    warmupPromptPath = configuration.warmupPromptPath
+    bf16KVCache = configuration.bf16KVCache
+    dsparkEnabled = configuration.dsparkEnabled
+    dsparkSlots = configuration.dsparkSlots
+    dsparkConfidenceThreshold = configuration.dsparkConfidenceThreshold
+    defaultMaxTokens = configuration.defaultMaxTokens
+    defaultTemperature = configuration.defaultTemperature
+    defaultTopP = configuration.defaultTopP
+    defaultTopK = configuration.defaultTopK
+  }
+
+  fileprivate func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
+    var settings = self
+    if modelKind == .qwen3_8FlashNext {
+      settings.bf16KVCache = false
+      settings.dsparkEnabled = false
+    }
+    return settings
+  }
+
+  fileprivate func apply(to configuration: inout ServerConfiguration) {
+    configuration.slots = slots
+    configuration.readWorkers = readWorkers
+    configuration.memoryLimitGiB = memoryLimitGiB
+    configuration.prefillStepSize = prefillStepSize
+    configuration.layerMajorPrefill = layerMajorPrefill
+    configuration.promptCacheEntries = promptCacheEntries
+    configuration.promptCacheMemoryGiB = promptCacheMemoryGiB
+    configuration.warmupPromptPath = warmupPromptPath
+    configuration.bf16KVCache = bf16KVCache
+    configuration.dsparkEnabled = dsparkEnabled
+    configuration.dsparkSlots = dsparkSlots
+    configuration.dsparkConfidenceThreshold = dsparkConfidenceThreshold
+    configuration.defaultMaxTokens = defaultMaxTokens
+    configuration.defaultTemperature = defaultTemperature
+    configuration.defaultTopP = defaultTopP
+    configuration.defaultTopK = defaultTopK
+  }
+
+  fileprivate static func load(
+    for modelKind: ModelKind,
+    defaults: UserDefaults
+  ) -> ModelAdvancedSettings? {
+    guard let data = defaults.data(forKey: preferenceKey(for: modelKind)) else { return nil }
+    return try? JSONDecoder().decode(ModelAdvancedSettings.self, from: data)
+  }
+
+  fileprivate func save(for modelKind: ModelKind, defaults: UserDefaults) {
+    guard let data = try? JSONEncoder().encode(normalized(for: modelKind)) else { return }
+    defaults.set(data, forKey: Self.preferenceKey(for: modelKind))
+  }
+
+  private static func preferenceKey(for modelKind: ModelKind) -> String {
+    "modelAdvancedSettings.\(modelKind.rawValue)"
   }
 }
 
@@ -218,6 +325,7 @@ struct ServerConfiguration: Codable, Equatable {
 
   static func load(defaults: UserDefaults, apiKey: String) -> ServerConfiguration {
     let runtime = RuntimeEnvironment.current
+    let advanced = ModelAdvancedSettings.defaults(for: .deepSeekV4)
     var configuration = ServerConfiguration(
       runtimeDirectory: runtime.runtimeDirectory.path,
       pythonExecutable: runtime.pythonExecutable.path,
@@ -228,23 +336,23 @@ struct ServerConfiguration: Codable, Equatable {
       port: 11_434,
       apiKey: "",
       publicModel: "deepseek-v4-flash-0731",
-      slots: 1_152,
-      readWorkers: 4,
+      slots: advanced.slots,
+      readWorkers: advanced.readWorkers,
       powerSavingLimitGBps: nil,
-      memoryLimitGiB: 0,
-      prefillStepSize: 0,
-      layerMajorPrefill: true,
-      promptCacheEntries: 2,
-      promptCacheMemoryGiB: 8,
-      warmupPromptPath: "",
-      bf16KVCache: false,
-      dsparkEnabled: false,
-      dsparkSlots: 768,
-      dsparkConfidenceThreshold: 0.6,
-      defaultMaxTokens: 272_000,
-      defaultTemperature: 0.2,
-      defaultTopP: 0.98,
-      defaultTopK: 0
+      memoryLimitGiB: advanced.memoryLimitGiB,
+      prefillStepSize: advanced.prefillStepSize,
+      layerMajorPrefill: advanced.layerMajorPrefill,
+      promptCacheEntries: advanced.promptCacheEntries,
+      promptCacheMemoryGiB: advanced.promptCacheMemoryGiB,
+      warmupPromptPath: advanced.warmupPromptPath,
+      bf16KVCache: advanced.bf16KVCache,
+      dsparkEnabled: advanced.dsparkEnabled,
+      dsparkSlots: advanced.dsparkSlots,
+      dsparkConfidenceThreshold: advanced.dsparkConfidenceThreshold,
+      defaultMaxTokens: advanced.defaultMaxTokens,
+      defaultTemperature: advanced.defaultTemperature,
+      defaultTopP: advanced.defaultTopP,
+      defaultTopK: advanced.defaultTopK
     )
     if let data = defaults.data(forKey: preferenceKey),
       var saved = decodeSavedConfiguration(data)
@@ -264,6 +372,54 @@ struct ServerConfiguration: Codable, Equatable {
       configuration.apiKey = apiKey
     }
     return configuration
+  }
+
+  static func hasSavedConfiguration(defaults: UserDefaults = .standard) -> Bool {
+    defaults.data(forKey: preferenceKey) != nil
+  }
+
+  static func hasSavedAdvancedSettings(
+    for modelKind: ModelKind,
+    defaults: UserDefaults = .standard
+  ) -> Bool {
+    ModelAdvancedSettings.load(for: modelKind, defaults: defaults) != nil
+  }
+
+  mutating func loadAdvancedSettings(
+    for modelKind: ModelKind,
+    defaults: UserDefaults = .standard,
+    migrateCurrent: Bool = false
+  ) {
+    let settings =
+      ModelAdvancedSettings.load(for: modelKind, defaults: defaults)
+      ?? (migrateCurrent && canMigrateAdvancedSettings(to: modelKind)
+        ? ModelAdvancedSettings(configuration: self)
+        : ModelAdvancedSettings.defaults(for: modelKind))
+    let normalized = settings.normalized(for: modelKind)
+    normalized.apply(to: &self)
+    normalized.save(for: modelKind, defaults: defaults)
+  }
+
+  func saveAdvancedSettings(
+    for modelKind: ModelKind,
+    defaults: UserDefaults = .standard
+  ) {
+    ModelAdvancedSettings(configuration: self).save(for: modelKind, defaults: defaults)
+  }
+
+  private func canMigrateAdvancedSettings(to modelKind: ModelKind) -> Bool {
+    if !modelPath.isEmpty,
+      let installedModel = InstalledModelDiscovery.inspect(URL(fileURLWithPath: modelPath))
+    {
+      return installedModel.modelKind == modelKind
+    }
+    if publicModel == ModelKind.deepSeekV4.defaultPublicModel {
+      return modelKind == .deepSeekV4
+    }
+    if publicModel == ModelKind.qwen3_8FlashNext.defaultPublicModel {
+      return modelKind == .qwen3_8FlashNext
+    }
+    return true
   }
 
   private static func decodeSavedConfiguration(_ data: Data) -> ServerConfiguration? {
@@ -662,7 +818,10 @@ final class ServerController: ObservableObject {
 
     let requestCompleted = live.completedRequestCount > lastRecordedCompletedRequestCount
     if live.generating || requestCompleted {
-      performanceHistory.record(live.snapshot)
+      performanceHistory.record(
+        live.snapshot,
+        excluding: requestCompleted ? nil : .firstTokenWaitTime
+      )
     }
     if requestCompleted {
       lastRecordedCompletedRequestCount = live.completedRequestCount

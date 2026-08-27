@@ -3,6 +3,64 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  func testActiveDownloadDoesNotReserveExtraModelListHeight() {
+    XCTAssertFalse(
+      shouldShowModelDownloadReason(
+        modelIsInstalled: false,
+        modelIsDownloading: true,
+        hasReason: true
+      )
+    )
+    XCTAssertTrue(
+      shouldShowModelDownloadReason(
+        modelIsInstalled: false,
+        modelIsDownloading: false,
+        hasReason: true
+      )
+    )
+  }
+
+  func testDownloadProgressHeightIncludesBottomPadding() {
+    XCTAssertEqual(modelDownloadProgressExtraHeight(hasProgressFraction: false), 40)
+    XCTAssertEqual(modelDownloadProgressExtraHeight(hasProgressFraction: true), 72)
+  }
+
+  func testServerAndModelDownloadControlsRemainIndependent() {
+    XCTAssertFalse(
+      modelDownloadIsDisabled(
+        serverIsActive: true,
+        operationIsBusy: false,
+        canStartDownload: true,
+        hasPartialDownload: false,
+        targetHasPartialDownload: false
+      )
+    )
+    XCTAssertFalse(
+      modelSelectionIsLocked(
+        serverIsActive: false,
+        operationIsBusy: true,
+        downloadIsActive: true,
+        hasPartialDownload: true
+      )
+    )
+    XCTAssertTrue(
+      modelSelectionIsLocked(
+        serverIsActive: true,
+        operationIsBusy: true,
+        downloadIsActive: true,
+        hasPartialDownload: true
+      )
+    )
+    XCTAssertTrue(
+      modelSelectionIsLocked(
+        serverIsActive: false,
+        operationIsBusy: true,
+        downloadIsActive: false,
+        hasPartialDownload: false
+      )
+    )
+  }
+
   func testPowerSavingLegendAnchorsAlignWithSliderNodes() {
     let count = ServerConfiguration.powerSavingLimitOptionsGBps.count
     let totalWidth = CGFloat(700)
@@ -56,6 +114,130 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(configuration.arguments.contains("--default-top-k"))
   }
 
+  func testModelAdvancedSettingsUseDefaultsForTheSelectedModel() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.host = "0.0.0.0"
+    configuration.powerSavingLimitGBps = 2
+
+    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+
+    XCTAssertEqual(configuration.defaultMaxTokens, 262_144)
+    XCTAssertEqual(configuration.defaultTemperature, 1.0)
+    XCTAssertEqual(configuration.defaultTopP, 0.95)
+    XCTAssertEqual(configuration.defaultTopK, 20)
+    XCTAssertFalse(configuration.dsparkEnabled)
+    XCTAssertEqual(configuration.host, "0.0.0.0")
+    XCTAssertEqual(configuration.powerSavingLimitGBps, 2)
+  }
+
+  func testRuntimeLoadsAdvancedSettingsForTheSelectedModel() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.powerSavingLimitGBps = 5
+    configuration.slots = 700
+    configuration.readWorkers = 3
+    configuration.defaultTopK = 7
+    configuration.dsparkEnabled = true
+    configuration.saveAdvancedSettings(for: .deepSeekV4, defaults: defaults)
+
+    configuration.slots = 900
+    configuration.readWorkers = 6
+    configuration.defaultTopK = 20
+    configuration.dsparkEnabled = true
+    configuration.saveAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+
+    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
+    XCTAssertEqual(configuration.slots, 700)
+    XCTAssertEqual(configuration.readWorkers, 3)
+    XCTAssertEqual(configuration.defaultTopK, 7)
+    XCTAssertTrue(configuration.dsparkEnabled)
+    XCTAssertEqual(configuration.powerSavingLimitGBps, 5)
+
+    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+    XCTAssertEqual(configuration.slots, 900)
+    XCTAssertEqual(configuration.readWorkers, 6)
+    XCTAssertEqual(configuration.defaultTopK, 20)
+    XCTAssertFalse(configuration.dsparkEnabled)
+    XCTAssertEqual(configuration.powerSavingLimitGBps, 5)
+  }
+
+  func testQwenAdvancedSettingsDiscardUnsupportedBF16KVCache() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.bf16KVCache = true
+
+    configuration.saveAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+    configuration.bf16KVCache = false
+    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+
+    XCTAssertFalse(configuration.bf16KVCache)
+    XCTAssertFalse(configuration.arguments.contains("--bf16-kv-cache"))
+  }
+
+  func testDeepSeekAdvancedSettingsKeepBF16KVCache() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.bf16KVCache = true
+
+    configuration.saveAdvancedSettings(for: .deepSeekV4, defaults: defaults)
+    configuration.bf16KVCache = false
+    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
+
+    XCTAssertTrue(configuration.bf16KVCache)
+    XCTAssertTrue(configuration.arguments.contains("--bf16-kv-cache"))
+  }
+
+  func testModelAdvancedSettingsMigrateTheExistingSelectedModelValues() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.slots = 640
+    configuration.defaultTemperature = 0.7
+
+    configuration.loadAdvancedSettings(
+      for: .deepSeekV4,
+      defaults: defaults,
+      migrateCurrent: true
+    )
+    configuration.slots = 1_152
+    configuration.defaultTemperature = 0.2
+    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
+
+    XCTAssertEqual(configuration.slots, 640)
+    XCTAssertEqual(configuration.defaultTemperature, 0.7)
+  }
+
+  func testModelAdvancedSettingsDoNotMigrateValuesFromAnotherModel() throws {
+    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+    configuration.publicModel = "deepseek-v4-flash-0731"
+    configuration.slots = 640
+    configuration.defaultTemperature = 0.7
+
+    configuration.loadAdvancedSettings(
+      for: .qwen3_8FlashNext,
+      defaults: defaults,
+      migrateCurrent: true
+    )
+
+    XCTAssertEqual(configuration.slots, 1_152)
+    XCTAssertEqual(configuration.defaultMaxTokens, 262_144)
+    XCTAssertEqual(configuration.defaultTemperature, 1.0)
+    XCTAssertEqual(configuration.defaultTopK, 20)
+  }
+
   func testLocalizationSupportsAllSelectableLanguages() {
     XCTAssertEqual(AppLanguage.appDefault, .system)
     XCTAssertEqual(L10n.string("Stopped", language: .english), "Stopped")
@@ -72,6 +254,14 @@ final class ServerConfigurationTests: XCTestCase {
       AppLanguage.system.displayName(language: .traditionalChinese), "跟隨系統")
     XCTAssertEqual(AppLanguage.system.displayName(language: .english), "Follow System")
     XCTAssertEqual(L10n.string("Advance", language: .traditionalChinese), "進階")
+    XCTAssertEqual(L10n.string("Back to Model", language: .traditionalChinese), "返回模型")
+    XCTAssertEqual(L10n.string("High-speed SSD", language: .traditionalChinese), "高速 SSD")
+    XCTAssertEqual(L10n.string("Stop Download", language: .simplifiedChinese), "停止下载")
+    XCTAssertEqual(
+      L10n.string(
+        "Advanced Settings for %@", language: .traditionalChinese, "DeepSeek-V4-Flash-0731"),
+      "DeepSeek-V4-Flash-0731 的進階設定"
+    )
     XCTAssertEqual(L10n.string("Logs", language: .traditionalChinese), "日誌")
     XCTAssertEqual(L10n.string("Unlimited", language: .simplifiedChinese), "无限制")
     XCTAssertEqual(L10n.string("Unlimited", language: .traditionalChinese), "無限制")

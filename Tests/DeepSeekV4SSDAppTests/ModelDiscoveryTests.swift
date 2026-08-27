@@ -98,18 +98,6 @@ final class ModelDiscoveryTests: XCTestCase {
   }
 
   @MainActor
-  func testModelLibraryRestoresDSparkInstallPreference() {
-    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
-    let library = ModelLibrary(defaults: defaults)
-
-    library.installDSparkWithModel = false
-
-    XCTAssertFalse(ModelLibrary(defaults: defaults).installDSparkWithModel)
-  }
-
-  @MainActor
   func testModelLibraryRestoresSelectedQwenInstallKind() {
     let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suite)!
@@ -134,6 +122,72 @@ final class ModelDiscoveryTests: XCTestCase {
     library.selectedModelKind = .qwen3_8FlashNext
 
     XCTAssertTrue(library.needsSelectedModelDownload)
+  }
+
+  @MainActor
+  func testModelLibraryUsesPinnedInstalledModelSizes() {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let library = ModelLibrary(defaults: defaults)
+
+    XCTAssertEqual(library.plannedInstalledBytes(for: .deepSeekV4), 166_878_580_480)
+    XCTAssertEqual(library.plannedInstalledBytes(for: .qwen3_8FlashNext), 125_291_490_955)
+  }
+
+  @MainActor
+  func testStartingDownloadKeepsSelectedModel() {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+    defaults.set("/dev/null/whallm-test", forKey: ModelLibrary.rootPreference)
+    let library = ModelLibrary(defaults: defaults)
+
+    library.startDownload(
+      for: .deepSeekV4,
+      to: URL(fileURLWithPath: "/dev/null/whallm-test/deepseek.dsv4")
+    )
+
+    XCTAssertEqual(library.selectedModelKind, .qwen3_8FlashNext)
+  }
+
+  @MainActor
+  func testResumingDownloadKeepsSelectedModel() throws {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let destination = root.appending(path: "deepseek.dsv4")
+    try FileManager.default.createDirectory(
+      at: destination.appendingPathExtension("partial"),
+      withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+    defaults.set("/dev/null/whallm-test", forKey: ModelLibrary.rootPreference)
+    defaults.set(true, forKey: "modelDownloadWasActive")
+    defaults.set(destination.path, forKey: "modelDownloadDestination")
+    defaults.set("deepseek-v4", forKey: "modelDownloadModelKind")
+    let library = ModelLibrary(defaults: defaults)
+
+    library.resumeDownloadIfNeeded()
+
+    XCTAssertEqual(library.selectedModelKind, .qwen3_8FlashNext)
+  }
+
+  func testDownloadStorageBlockUsesRequiredAndAvailableBytes() {
+    XCTAssertNil(
+      ModelLibrary.storageDownloadBlock(requiredBytes: 100, availableBytes: 100)
+    )
+    XCTAssertEqual(
+      ModelLibrary.storageDownloadBlock(requiredBytes: 101, availableBytes: 100),
+      .insufficientStorage(requiredBytes: 101, availableBytes: 100)
+    )
+    XCTAssertEqual(
+      ModelLibrary.storageDownloadBlock(requiredBytes: 0, availableBytes: nil),
+      .storageUnavailable
+    )
   }
 }
 

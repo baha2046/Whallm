@@ -143,6 +143,44 @@ struct PreflightCheck: Identifiable, Sendable {
   let blocksDownload: Bool
 }
 
+enum ModelDownloadBlock: Equatable, Sendable {
+  case loadingInstallationPlan
+  case installationPlanUnavailable
+  case unsupportedArchitecture
+  case modelFolderNotWritable
+  case storageUnavailable
+  case insufficientStorage(requiredBytes: UInt64, availableBytes: UInt64)
+
+  var message: String {
+    switch self {
+    case .loadingInstallationPlan:
+      L10n.string("Loading model installation information.")
+    case .installationPlanUnavailable:
+      L10n.string(
+        "The model installation information is not available. Check the network and try again.")
+    case .unsupportedArchitecture:
+      L10n.string("This runtime does not support Intel Mac.")
+    case .modelFolderNotWritable:
+      L10n.string("The app cannot write to this folder. Select another folder.")
+    case .storageUnavailable:
+      L10n.string(
+        "The app cannot read the available space for this model folder. Select another folder.")
+    case .insufficientStorage(let requiredBytes, let availableBytes):
+      L10n.string(
+        "Not enough space. The model needs %@. The model folder has %@ available.",
+        Self.formattedBytes(requiredBytes),
+        Self.formattedBytes(availableBytes)
+      )
+    }
+  }
+
+  private static func formattedBytes(_ bytes: UInt64) -> String {
+    if bytes == 0 { return "0 KB" }
+    return ByteCountFormatter.string(
+      fromByteCount: Int64(clamping: bytes), countStyle: .file)
+  }
+}
+
 enum ModelOperationPhase: Equatable {
   case idle
   case preparingDownload
@@ -187,7 +225,7 @@ final class ModelLibrary: ObservableObject {
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
-  private static let installDSparkPreference = "installDSparkWithModel"
+  private static let activeDownloadModelKindPreference = "modelDownloadModelKind"
   private static let selectedModelKindPreference = "selectedInstallModelKind"
   nonisolated private static let recommendedMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
 
@@ -198,41 +236,36 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var isScanning = false
   @Published private(set) var operationPhase = ModelOperationPhase.idle
   @Published private(set) var operationProgress: ModelOperationProgress?
+  @Published private(set) var downloadModelKind: ModelKind?
   @Published private(set) var message: String?
   @Published private(set) var verificationModelPath: String?
   @Published private(set) var verificationIssues: [InstalledFileIssue]?
-  @Published private(set) var plannedInstalledBytes: UInt64?
-  @Published private(set) var isPlanningInstallation = false
+  @Published private(set) var installationBytesByModel: [String: UInt64] = [
+    ModelKind.deepSeekV4.rawValue: 166_878_580_480,
+    ModelKind.qwen3_8FlashNext.rawValue: 125_291_490_955,
+  ]
+  @Published private(set) var planningModelKinds: Set<String> = []
+  @Published private(set) var installationPlanErrors: [String: String] = [:]
+  @Published private(set) var modelFolderAvailableBytes: UInt64?
+  @Published private(set) var modelFolderIsWritable = false
   @Published var selectedModelKind: ModelKind {
     didSet {
       defaults.set(selectedModelKind.rawValue, forKey: Self.selectedModelKindPreference)
-      plannedInstalledBytes = nil
       refreshPreflight()
-      Task { await refreshSelectedPlan() }
-    }
-  }
-  @Published var installDSparkWithModel: Bool {
-    didSet {
-      defaults.set(installDSparkWithModel, forKey: Self.installDSparkPreference)
-      if selectedModelKind == .deepSeekV4 {
-        plannedInstalledBytes = nil
-        refreshPreflight()
-        Task { await refreshSelectedPlan() }
-      }
+      Task { await refreshInstallationPlan(for: selectedModelKind) }
     }
   }
 
   private let defaults: UserDefaults
   private var operationTask: Task<Void, Never>?
   private var downloadStart: ContinuousClock.Instant?
+  private var partialAllocatedBytesByModel: [String: UInt64] = [:]
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
     selectedModelKind =
       defaults.string(forKey: Self.selectedModelKindPreference).flatMap(ModelKind.init(rawValue:))
       ?? .deepSeekV4
-    installDSparkWithModel =
-      defaults.object(forKey: Self.installDSparkPreference) as? Bool ?? true
     if let savedPath = defaults.string(forKey: Self.rootPreference) {
       rootURL = URL(fileURLWithPath: savedPath, isDirectory: true)
     } else {
@@ -246,17 +279,57 @@ final class ModelLibrary: ObservableObject {
   var needsSelectedModelDownload: Bool { usableModel(for: selectedModelKind) == nil }
   var isBusy: Bool { operationPhase != .idle }
   var canDownload: Bool {
-    plannedInstalledBytes != nil && !isPlanningInstallation
-      && !preflightChecks.contains { $0.blocksDownload && $0.status == .failed }
-  }
-  var canStartDownload: Bool {
-    let destination =
-      hasPartialDownload
-      ? partialDownloadURL.deletingPathExtension() : defaultDownloadDestination
-    return canDownload && !FileManager.default.fileExists(atPath: destination.path)
+    canDownload(selectedModelKind)
   }
   var hasPartialDownload: Bool {
-    FileManager.default.fileExists(atPath: partialDownloadURL.path)
+    Self.supportedModelKinds.contains(where: hasPartialDownload(for:))
+  }
+
+  func plannedInstalledBytes(for modelKind: ModelKind) -> UInt64? {
+    installationBytesByModel[modelKind.rawValue]
+  }
+
+  func isPlanningInstallation(for modelKind: ModelKind) -> Bool {
+    planningModelKinds.contains(modelKind.rawValue)
+  }
+
+  func hasPartialDownload(for modelKind: ModelKind) -> Bool {
+    FileManager.default.fileExists(atPath: partialDownloadURL(for: modelKind).path)
+  }
+
+  func requiredStorageBytes(for modelKind: ModelKind) -> UInt64? {
+    plannedInstalledBytes(for: modelKind).map {
+      let allocated = partialAllocatedBytesByModel[modelKind.rawValue] ?? 0
+      return $0 > allocated ? $0 - allocated : 0
+    }
+  }
+
+  func downloadBlock(for modelKind: ModelKind) -> ModelDownloadBlock? {
+    let key = modelKind.rawValue
+    guard plannedInstalledBytes(for: modelKind) != nil else {
+      return installationPlanErrors[key] == nil
+        ? .loadingInstallationPlan : .installationPlanUnavailable
+    }
+    guard !preflightChecks.contains(where: { $0.blocksDownload && $0.status == .failed }) else {
+      return .unsupportedArchitecture
+    }
+    guard modelFolderIsWritable else { return .modelFolderNotWritable }
+    guard let requiredBytes = requiredStorageBytes(for: modelKind) else {
+      return .loadingInstallationPlan
+    }
+    return Self.storageDownloadBlock(
+      requiredBytes: requiredBytes,
+      availableBytes: modelFolderAvailableBytes
+    )
+  }
+
+  func canDownload(_ modelKind: ModelKind) -> Bool {
+    downloadBlock(for: modelKind) == nil
+  }
+
+  func canStartDownload(_ modelKind: ModelKind) -> Bool {
+    canDownload(modelKind)
+      && !FileManager.default.fileExists(atPath: downloadDestination(for: modelKind).path)
   }
 
   func model(at path: String) -> InstalledModelInfo? {
@@ -273,7 +346,13 @@ final class ModelLibrary: ObservableObject {
   }
 
   func setRoot(_ url: URL) async {
-    rootURL = url.standardizedFileURL
+    let newRootURL = url.standardizedFileURL
+    if newRootURL != rootURL {
+      defaults.set(false, forKey: Self.activeDownloadPreference)
+      defaults.removeObject(forKey: Self.activeDestinationPreference)
+      defaults.removeObject(forKey: Self.activeDownloadModelKindPreference)
+    }
+    rootURL = newRootURL
     defaults.set(rootURL.path, forKey: Self.rootPreference)
     verificationModelPath = nil
     verificationIssues = nil
@@ -291,10 +370,8 @@ final class ModelLibrary: ObservableObject {
       }.value
       models = result.models
       invalidModelURLs = result.invalidModelURLs
+      refreshPreflight()
       await refreshSelectedPlan()
-      if models.isEmpty && invalidModelURLs.isEmpty && !hasPartialDownload {
-        message = L10n.string("No model is installed. Download a model or select another folder.")
-      }
     } catch {
       models = []
       invalidModelURLs = []
@@ -305,67 +382,83 @@ final class ModelLibrary: ObservableObject {
   }
 
   func refreshPreflight() {
-    preflightChecks = Self.makePreflightChecks(
-      root: rootURL, partial: partialDownloadURL, requiredStorageBytes: plannedInstalledBytes)
+    let folderStatus = Self.inspectModelFolder(rootURL)
+    modelFolderIsWritable = folderStatus.isWritable
+    modelFolderAvailableBytes = folderStatus.availableBytes
+    partialAllocatedBytesByModel = Dictionary(
+      uniqueKeysWithValues: Self.supportedModelKinds.map {
+        ($0.rawValue, Self.allocatedBytes(at: partialDownloadURL(for: $0)))
+      }
+    )
+    preflightChecks = Self.makePreflightChecks(root: rootURL)
   }
 
   func refreshSelectedPlan() async {
-    guard !isPlanningInstallation else { return }
-    let requestedKind = selectedModelKind
-    let requestedDSpark = installDSparkWithModel
-    isPlanningInstallation = true
-    refreshPreflight()
+    await refreshInstallationPlan(for: selectedModelKind)
+  }
+
+  func refreshInstallationPlan(for modelKind: ModelKind) async {
+    let key = modelKind.rawValue
+    guard installationBytesByModel[key] == nil, !planningModelKinds.contains(key) else { return }
+    planningModelKinds.insert(key)
+    installationPlanErrors.removeValue(forKey: key)
     do {
       let bytes: UInt64
-      switch requestedKind {
+      switch modelKind {
       case .deepSeekV4:
         bytes = try await DeepSeekV4Checkpoint()
-          .makeRepackPlan(includeDSpark: requestedDSpark).installedBytes
+          .makeRepackPlan(includeDSpark: true).installedBytes
       case .qwen3_8FlashNext:
         bytes = try await QwenInstalledModelArtifact().installedBytes()
       }
-      if selectedModelKind == requestedKind,
-        requestedKind != .deepSeekV4 || installDSparkWithModel == requestedDSpark
-      {
-        plannedInstalledBytes = bytes
-      }
+      planningModelKinds.remove(key)
+      installationBytesByModel[key] = bytes
     } catch {
-      plannedInstalledBytes = nil
-      message = L10n.string("The model installation information could not be loaded. Check the network and try again.\n%@", String(describing: error))
+      planningModelKinds.remove(key)
+      installationPlanErrors[key] = String(describing: error)
+      if selectedModelKind == modelKind {
+        message = L10n.string(
+          "The model installation information could not be loaded. Check the network and try again.\n%@",
+          String(describing: error)
+        )
+      }
     }
-    isPlanningInstallation = false
     refreshPreflight()
-    let selectionChanged =
-      selectedModelKind != requestedKind
-      || (requestedKind == .deepSeekV4 && installDSparkWithModel != requestedDSpark)
-    if selectionChanged { await refreshSelectedPlan() }
   }
 
   func resumeDownloadIfNeeded() {
     guard defaults.bool(forKey: Self.activeDownloadPreference), !isBusy else { return }
+    let modelKind =
+      defaults.string(forKey: Self.activeDownloadModelKindPreference)
+      .flatMap(ModelKind.init(rawValue:)) ?? selectedModelKind
     let saved = defaults.string(forKey: Self.activeDestinationPreference)
     let destination =
       saved.map { URL(fileURLWithPath: $0, isDirectory: true) }
-      ?? defaultDownloadDestination
+      ?? defaultDownloadDestination(for: modelKind)
     guard FileManager.default.fileExists(atPath: destination.appendingPathExtension("partial").path)
     else {
       defaults.set(false, forKey: Self.activeDownloadPreference)
       return
     }
-    startDownload(to: destination)
+    Task { [weak self] in
+      guard let self else { return }
+      await self.refreshInstallationPlan(for: modelKind)
+      self.startDownload(for: modelKind, to: destination)
+    }
   }
 
   func startDownload(to destination: URL? = nil) {
+    startDownload(for: selectedModelKind, to: destination)
+  }
+
+  func startDownload(for modelKind: ModelKind, to destination: URL? = nil) {
     guard !isBusy else { return }
     refreshPreflight()
-    guard canDownload else {
-      message = L10n.string("Correct the failed download checks first.")
+    if let block = downloadBlock(for: modelKind) {
+      message = block.message
       return
     }
-    let destination =
-      destination
-      ?? (hasPartialDownload
-        ? partialDownloadURL.deletingPathExtension() : defaultDownloadDestination)
+    let destination = destination ?? downloadDestination(for: modelKind)
     guard !FileManager.default.fileExists(atPath: destination.path) else {
       message = L10n.string(
         "A model already exists in this location. Verify and repair the existing model first.")
@@ -373,17 +466,23 @@ final class ModelLibrary: ObservableObject {
     }
     defaults.set(true, forKey: Self.activeDownloadPreference)
     defaults.set(destination.path, forKey: Self.activeDestinationPreference)
+    defaults.set(modelKind.rawValue, forKey: Self.activeDownloadModelKindPreference)
+    downloadModelKind = modelKind
     operationPhase = .preparingDownload
     operationProgress = nil
     downloadStart = nil
     message = nil
     operationTask = Task { [weak self] in
-      await self?.performDownload(to: destination)
+      await self?.performDownload(
+        to: destination,
+        modelKind: modelKind
+      )
     }
   }
 
   func startVerification(_ model: InstalledModelInfo) {
     guard !isBusy else { return }
+    downloadModelKind = nil
     operationPhase = .verifying
     operationProgress = nil
     message = nil
@@ -394,6 +493,7 @@ final class ModelLibrary: ObservableObject {
 
   func startRepair(_ model: InstalledModelInfo) {
     guard !isBusy else { return }
+    downloadModelKind = nil
     defaults.set(true, forKey: Self.activeDownloadPreference)
     defaults.set(model.url.path, forKey: Self.activeDestinationPreference)
     operationPhase = .verifying
@@ -406,6 +506,7 @@ final class ModelLibrary: ObservableObject {
 
   func startDSparkInstallation(_ model: InstalledModelInfo) {
     guard !isBusy, !model.hasDSpark, model.modelKind == .deepSeekV4 else { return }
+    downloadModelKind = nil
     operationPhase = .installingDSpark
     operationProgress = nil
     downloadStart = nil
@@ -431,8 +532,8 @@ final class ModelLibrary: ObservableObject {
   func reinstall(_ url: URL) {
     guard !isBusy else { return }
     refreshPreflight()
-    guard canDownload else {
-      message = L10n.string("Correct the failed download checks first.")
+    if let block = downloadBlock(for: selectedModelKind) {
+      message = block.message
       return
     }
     do {
@@ -456,29 +557,44 @@ final class ModelLibrary: ObservableObject {
     NSWorkspace.shared.activateFileViewerSelecting([url])
   }
 
-  private var defaultDownloadDestination: URL {
+  private func defaultDownloadDestination(for modelKind: ModelKind) -> URL {
     let name =
-      selectedModelKind == .qwen3_8FlashNext
+      modelKind == .qwen3_8FlashNext
       ? "qwen3.8-flash-next.dsv4" : "deepseek-v4-flash-0731.dsv4"
     return rootURL.appending(path: name, directoryHint: .isDirectory)
   }
 
-  private var partialDownloadURL: URL {
+  private func partialDownloadURL(for modelKind: ModelKind) -> URL {
+    let activeModelKind =
+      defaults.string(forKey: Self.activeDownloadModelKindPreference)
+      .flatMap(ModelKind.init(rawValue:)) ?? selectedModelKind
     let saved = defaults.string(forKey: Self.activeDestinationPreference)
-    let destination =
-      saved.map { URL(fileURLWithPath: $0, isDirectory: true) }
-      ?? defaultDownloadDestination
+    let destination: URL
+    if activeModelKind == modelKind, let saved {
+      destination = URL(fileURLWithPath: saved, isDirectory: true)
+    } else {
+      destination = defaultDownloadDestination(for: modelKind)
+    }
     return destination.appendingPathExtension("partial")
   }
 
-  private func performDownload(to destination: URL) async {
+  private func downloadDestination(for modelKind: ModelKind) -> URL {
+    hasPartialDownload(for: modelKind)
+      ? partialDownloadURL(for: modelKind).deletingPathExtension()
+      : defaultDownloadDestination(for: modelKind)
+  }
+
+  private func performDownload(
+    to destination: URL,
+    modelKind: ModelKind
+  ) async {
     do {
       let needsAudit: Bool
-      switch selectedModelKind {
+      switch modelKind {
       case .deepSeekV4:
         _ = try await DeepSeekV4Checkpoint().repack(
           to: destination,
-          includeDSpark: installDSparkWithModel
+          includeDSpark: true
         ) { [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
         }
@@ -636,7 +752,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   private func updateRepackProgress(_ progress: RepackProgress, phase: ModelOperationPhase) {
-    operationPhase = phase
+    if operationPhase != phase { operationPhase = phase }
     let now = ContinuousClock.now
     if progress.downloadedBytes > 0, downloadStart == nil { downloadStart = now }
     let speed = downloadStart.map {
@@ -658,16 +774,12 @@ final class ModelLibrary: ObservableObject {
     operationTask = nil
     operationPhase = .idle
     operationProgress = nil
+    downloadModelKind = nil
     downloadStart = nil
     refreshPreflight()
   }
 
-  nonisolated private static func makePreflightChecks(
-    root: URL, partial: URL, requiredStorageBytes: UInt64?
-  ) -> [PreflightCheck] {
-    let fileManager = FileManager.default
-    try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
-
+  nonisolated private static func makePreflightChecks(root: URL) -> [PreflightCheck] {
     #if arch(arm64)
       let architecture = PreflightCheck(
         id: "architecture", title: L10n.string("Apple Silicon"),
@@ -693,54 +805,12 @@ final class ModelLibrary: ObservableObject {
       blocksDownload: false
     )
 
-    let probe = root.appending(path: ".write-check-\(UUID().uuidString)")
-    let writable: Bool
-    do {
-      try Data().write(to: probe, options: .atomic)
-      try fileManager.removeItem(at: probe)
-      writable = true
-    } catch {
-      writable = false
-    }
-    let writableCheck = PreflightCheck(
-      id: "writable",
-      title: L10n.string("Model folder"),
-      detail: writable
-        ? L10n.string("The app can write to %@.", root.path)
-        : L10n.string("The app cannot write to this folder. Select another folder."),
-      status: writable ? .passed : .failed,
-      blocksDownload: true
-    )
-
-    let allocated = allocatedBytes(at: partial)
-    let required = requiredStorageBytes.map { $0 > allocated ? $0 - allocated : 0 }
-    let available =
-      (try? root.resourceValues(
-        forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-      ).volumeAvailableCapacityForImportantUsage) ?? nil
-    let hasStorage = required.flatMap { required in
-      available.map { $0 >= 0 && UInt64($0) >= required }
-    }
-    let storageCheck = PreflightCheck(
-      id: "storage",
-      title: L10n.string("Storage"),
-      detail: required == nil
-        ? L10n.string("Loading model installation information.")
-        : hasStorage == true
-          ? L10n.string("There is enough free space to complete installation.")
-          : L10n.string(
-            "The disk for this folder needs at least %@ of free space.",
-            formattedBytes(required ?? 0)),
-      status: required == nil ? .warning : (hasStorage == true ? .passed : .failed),
-      blocksDownload: true
-    )
-
     let isInternal =
       (try? root.resourceValues(forKeys: [.volumeIsInternalKey]).volumeIsInternal)
       ?? nil
     let storageTypeCheck = PreflightCheck(
       id: "ssd",
-      title: L10n.string("SSD"),
+      title: L10n.string("High-speed SSD"),
       detail: isInternal == false
         ? L10n.string(
           "Make sure that the external disk is a high-speed SSD. A slow disk reduces generation speed."
@@ -749,7 +819,43 @@ final class ModelLibrary: ObservableObject {
       status: isInternal == false ? .warning : .passed,
       blocksDownload: false
     )
-    return [architecture, memoryCheck, writableCheck, storageCheck, storageTypeCheck]
+    return [architecture, memoryCheck, storageTypeCheck]
+  }
+
+  nonisolated private static func inspectModelFolder(_ root: URL) -> (
+    isWritable: Bool, availableBytes: UInt64?
+  ) {
+    let fileManager = FileManager.default
+    let probe = root.appending(path: ".write-check-\(UUID().uuidString)")
+    let isWritable: Bool
+    do {
+      try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
+      try Data().write(to: probe, options: .atomic)
+      try fileManager.removeItem(at: probe)
+      isWritable = true
+    } catch {
+      try? fileManager.removeItem(at: probe)
+      isWritable = false
+    }
+    let available = try? root.resourceValues(
+      forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+    ).volumeAvailableCapacityForImportantUsage
+    let availableBytes = available.flatMap { $0 >= 0 ? UInt64($0) : nil }
+    return (isWritable, availableBytes)
+  }
+
+  nonisolated static func storageDownloadBlock(
+    requiredBytes: UInt64,
+    availableBytes: UInt64?
+  ) -> ModelDownloadBlock? {
+    guard let availableBytes else { return .storageUnavailable }
+    guard availableBytes >= requiredBytes else {
+      return .insufficientStorage(
+        requiredBytes: requiredBytes,
+        availableBytes: availableBytes
+      )
+    }
+    return nil
   }
 
   nonisolated private static func allocatedBytes(at root: URL) -> UInt64 {
@@ -771,10 +877,6 @@ final class ModelLibrary: ObservableObject {
       total = sum.partialValue
     }
     return total
-  }
-
-  nonisolated private static func formattedBytes(_ bytes: UInt64) -> String {
-    ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
   }
 
   nonisolated private static func seconds(from duration: Duration) -> Double {

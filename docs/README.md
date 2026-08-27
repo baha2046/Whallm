@@ -1,6 +1,7 @@
-# DeepSeekV4SSD 文件
+# Whallm 文件
 
 本目錄只放目前有效的文件。
+Whallm 的舊名稱是 DeepSeekV4SSD。
 
 最後核對日期是 2026-08-27。
 Qwen 支援核對版本是目前工作樹。這些變更尚未建立 commit。
@@ -8,6 +9,8 @@ DeepSeek checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
 Qwen FP8 checkpoint revision 是
 `bcd9f01ddc9cff2316eb84281bebcd5b058bddce`。
+Qwen installed model revision 是
+`753d0aa57059fad70a5f7e6cc249f25df56bbd34`。
 
 ## 文件入口
 
@@ -42,7 +45,26 @@ greedy 4K、prompt cache 和舊安裝路徑的 packaged App 驗證都已通過�
 
 App 的模型選單固定顯示 DeepSeek 與 Qwen。
 使用者可以選擇尚未安裝的模型。
-App 找不到所選模型時，App 會顯示該模型的下載與安裝區塊。
+Server 頁面上方會先顯示所選模型的設定狀態與下一步。
+模型尚未安裝時，App 不會顯示無法使用的啟動按鈕。
+Server 頁面的「模型」標題列提供模型資料夾按鈕。
+模型卡片會顯示模型資料夾路徑與可用空間。
+每個未安裝模型的列提供下載按鈕。
+DeepSeek 下載固定包含 DSpark。模型列不提供排除 DSpark 的選項。
+App 使用 pinned revision 的固定 installed model 大小執行下載前空間檢查。
+App 啟動時不會為了取得下載大小連線到 Hugging Face。
+每個模型列的「進階設定」動作使用 Tertiary icon button。
+按鈕提供 40 pt 點擊區域、Tooltip 和 VoiceOver 名稱。
+模型資料夾可用空間不足時，App 會停用下載按鈕。
+App 會在模型列顯示停用原因、所需空間與可用空間。
+游標停留在停用按鈕上時，App 也會顯示相同原因。
+下載期間，模型列會依序顯示目前階段、百分比、完成容量、下載速度與剩餘時間。
+下載模型時，使用者可以選擇另一個已安裝模型並啟動 Server。
+Server 執行時，App 可以下載另一個尚未安裝的模型。
+Server 執行時，App 會鎖定 Server 使用的模型。
+App 一次只執行一個模型下載。
+「系統檢查」固定顯示為單列區塊，不受所選模型的安裝狀態影響。
+該列使用硬體 SF Symbol 和狀態圖示顯示 Apple Silicon、記憶體和高速 SSD 檢查。
 
 ## 可信度規則
 
