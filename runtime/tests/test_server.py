@@ -9,7 +9,14 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START
-from deepseek_v4_ssd.server import APIError, OpenAIServer, ServerDefaults, _options, _parser
+from deepseek_v4_ssd.server import (
+    APIError,
+    OpenAIServer,
+    ServerDefaults,
+    _options,
+    _parser,
+    _reasoning_settings,
+)
 from deepseek_v4_ssd.tool_codec import AssistantTurn, ToolCall
 
 
@@ -115,6 +122,24 @@ class FakeRuntime:
             if index == self.pause_after_chunks:
                 self.chunk_paused.set()
                 self.chunk_gate.wait(timeout=2)
+
+
+class QwenServerSettingsTests(unittest.TestCase):
+    def test_qwen_reasoning_effort_maps_to_checkpoint_values(self):
+        cases = {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh",
+        }
+        for effort, native in cases.items():
+            with self.subTest(effort=effort):
+                self.assertEqual(
+                    _reasoning_settings({"reasoning_effort": effort}, qwen=True),
+                    ("thinking", native),
+                )
 
 
 class ServerArgumentTests(unittest.TestCase):

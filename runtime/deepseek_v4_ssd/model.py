@@ -53,10 +53,19 @@ class RuntimeConfig:
     power_saving_limit_gbps: float | None = None
 
 
-def _configure_memory_limits(config: RuntimeConfig) -> int:
+def _configure_memory_limits(
+    config: RuntimeConfig,
+    *,
+    automatic_cap_gib: int = 0,
+) -> int:
     maximum = mx.device_info()["max_recommended_working_set_size"]
     requested = config.memory_limit_gib * 1024**3
-    memory_limit = requested if requested > 0 else maximum
+    automatic = (
+        min(maximum, automatic_cap_gib * 1024**3)
+        if automatic_cap_gib > 0
+        else maximum
+    )
+    memory_limit = requested if requested > 0 else automatic
     mx.set_memory_limit(memory_limit)
     mx.set_wired_limit(min(memory_limit, maximum))
     return memory_limit
@@ -543,11 +552,29 @@ def load_model(
         raise ValueError(
             "power saving limit must be 0.5, 1, 2, 3, 5, 10, or 25 GB/s"
         )
-    _configure_memory_limits(config)
+    _configure_memory_limits(
+        config,
+        automatic_cap_gib=48 if installed_model.is_qwen else 0,
+    )
     mx.set_cache_limit(1024**3)
 
     with (installed_model.root / "config.json").open("rb") as file:
         raw_config = json.load(file)
+    read_limiter = (
+        _ReadLimiter(int(config.power_saving_limit_gbps * 1_000_000_000))
+        if config.power_saving_limit_gbps is not None
+        else None
+    )
+    if installed_model.is_qwen:
+        from .qwen4_exp import load as load_qwen
+
+        return load_qwen(
+            installed_model,
+            config,
+            raw_config,
+            _load_common_weights(installed_model),
+            read_limiter,
+        )
     args = deepseek_v4.ModelArgs.from_dict(raw_config)
 
     deepseek_v4.SwitchGLU = _EmptySwitchGLU
@@ -559,11 +586,6 @@ def load_model(
     deepseek_v4.Indexer.__call__ = _correct_indexer
     deepseek_v4._sparse_pooled_attention = _sparse_pooled_attention
     model = deepseek_v4.Model(args)
-    read_limiter = (
-        _ReadLimiter(int(config.power_saving_limit_gbps * 1_000_000_000))
-        if config.power_saving_limit_gbps is not None
-        else None
-    )
     cache = ExpertCache(
         installed_model,
         config.slots,

@@ -10,6 +10,7 @@ from pathlib import Path
 import mlx.core as mx
 
 from .generation import GenerationOptions, ModelRuntime
+from .manifest import InstalledModel
 from .model import (
     RuntimeConfig,
     _POWER_SAVING_LIMITS_GBPS,
@@ -29,14 +30,15 @@ def _token_sha256(tokens) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run DeepSeek-V4 from an installed model")
+    parser = argparse.ArgumentParser(description="Run an installed model")
     parser.add_argument("--model", required=True)
     prompt = parser.add_mutually_exclusive_group(required=True)
     prompt.add_argument("--prompt")
     prompt.add_argument("--prompt-file")
     parser.add_argument("--max-tokens", type=int, default=272_000)
-    parser.add_argument("--temperature", type=float, default=0.2)
-    parser.add_argument("--top-p", type=float, default=0.98)
+    parser.add_argument("--temperature", type=float)
+    parser.add_argument("--top-p", type=float)
+    parser.add_argument("--top-k", type=int)
     parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
@@ -49,7 +51,7 @@ def main() -> None:
         "--memory-limit-gib",
         type=int,
         default=0,
-        help="MLX memory limit in GiB; 0 uses Metal's recommended maximum",
+        help="MLX memory limit in GiB; 0 selects the model-safe automatic limit",
     )
     parser.add_argument("--prefill-step-size", type=int, default=0)
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
@@ -74,10 +76,27 @@ def main() -> None:
         parser.error(f"cannot read --prompt-file: {error}")
     if arguments.max_tokens < 1:
         parser.error("--max-tokens must be greater than zero")
-    if not 0 <= arguments.temperature <= 2:
+    try:
+        installed = InstalledModel.open(arguments.model)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+    if installed.is_qwen and arguments.dspark:
+        parser.error("Qwen3.8-Flash-Next does not support --dspark")
+    temperature = arguments.temperature
+    top_p = arguments.top_p
+    top_k = arguments.top_k
+    if temperature is None:
+        temperature = 1.0 if installed.is_qwen else 0.2
+    if top_p is None:
+        top_p = 0.95 if installed.is_qwen else 0.98
+    if top_k is None:
+        top_k = 20 if installed.is_qwen else 0
+    if not 0 <= temperature <= 2:
         parser.error("--temperature must be between zero and two")
-    if not 0 < arguments.top_p <= 1:
+    if not 0 < top_p <= 1:
         parser.error("--top-p must be greater than zero and at most one")
+    if not 0 <= top_k <= 248_320:
+        parser.error("--top-k must be between zero and 248320")
     if arguments.slots < 6:
         parser.error("--slots must be at least 6")
     if arguments.read_workers < 1:
@@ -135,8 +154,9 @@ def main() -> None:
             prompt_text,
             GenerationOptions(
                 max_tokens=arguments.max_tokens,
-                temperature=arguments.temperature,
-                top_p=arguments.top_p,
+                temperature=temperature,
+                top_p=top_p,
+                top_k=top_k,
             ),
         ):
             sys.stdout.write(response.text)

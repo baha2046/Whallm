@@ -276,7 +276,19 @@ class ToolCodec:
         self._encoding = encoding
 
     @classmethod
-    def open(cls, model_root: Path) -> ToolCodec:
+    def open(cls, model_root: Path, tokenizer=None) -> ToolCodec:
+        manifest_path = model_root / "manifest.json"
+        if manifest_path.is_file():
+            with manifest_path.open("rb") as file:
+                manifest = json.load(file)
+            if manifest.get("modelKind") == "qwen3.8-flash-next":
+                if tokenizer is None:
+                    from transformers import AutoTokenizer
+
+                    tokenizer = AutoTokenizer.from_pretrained(
+                        model_root / "tokenizer", trust_remote_code=True
+                    )
+                return QwenToolCodec(tokenizer)
         path = model_root / "encoding" / "encoding_dsv4.py"
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if digest != ENCODER_SHA256:
@@ -352,3 +364,224 @@ class ToolCodec:
         if choice.mode == "function":
             return f'Call the "{choice.name}" tool before you give a final answer.'
         return ""
+
+
+def _qwen_parameter_value(value: str) -> Any:
+    value = value.strip()
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return value
+
+
+def _parse_qwen_call(text: str) -> ToolCall:
+    match = re.fullmatch(
+        r"<tool_call>\s*<function=([A-Za-z0-9_-]{1,64})>\s*(.*?)\s*</function>\s*</tool_call>",
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise ValueError("invalid Qwen tool call XML")
+    body = match.group(2)
+    arguments: dict[str, Any] = {}
+    position = 0
+    pattern = re.compile(
+        r"\s*<parameter=([A-Za-z0-9_.-]{1,128})>\s*\n?(.*?)\n?\s*</parameter>",
+        re.DOTALL,
+    )
+    while position < len(body):
+        parameter = pattern.match(body, position)
+        if parameter is None:
+            if body[position:].strip():
+                raise ValueError("invalid Qwen tool parameter XML")
+            break
+        name = parameter.group(1)
+        if name in arguments:
+            raise ValueError(f"duplicate Qwen tool parameter {name}")
+        arguments[name] = _qwen_parameter_value(parameter.group(2))
+        position = parameter.end()
+    return ToolCall(
+        match.group(1),
+        json.dumps(arguments, ensure_ascii=False, separators=(",", ":")),
+    )
+
+
+def _split_qwen_output(text: str, thinking_mode: str) -> AssistantTurn:
+    reasoning = ""
+    content_and_calls = text
+    if thinking_mode == "thinking":
+        if "</think>" not in text:
+            raise ValueError("Qwen thinking output has no closing tag")
+        reasoning, content_and_calls = text.split("</think>", 1)
+        reasoning = reasoning.removeprefix("<think>").strip()
+        content_and_calls = content_and_calls.lstrip("\n")
+
+    first_call = content_and_calls.find("<tool_call>")
+    if first_call < 0:
+        if "</tool_call>" in content_and_calls or "<function=" in content_and_calls:
+            raise ValueError("invalid Qwen tool call XML")
+        return AssistantTurn(content_and_calls, reasoning, ())
+
+    content = content_and_calls[:first_call].rstrip()
+    suffix = content_and_calls[first_call:]
+    calls = []
+    while suffix.strip():
+        suffix = suffix.lstrip()
+        end = suffix.find("</tool_call>")
+        if end < 0:
+            raise ValueError("Qwen tool call XML is incomplete")
+        end += len("</tool_call>")
+        calls.append(_parse_qwen_call(suffix[:end]))
+        suffix = suffix[end:]
+    return AssistantTurn(content, reasoning, tuple(calls))
+
+
+class QwenToolCodec(ToolCodec):
+    """Use the checkpoint chat template and Qwen XML tool format."""
+
+    def __init__(self, tokenizer):
+        self._tokenizer = tokenizer
+
+    def encode(
+        self,
+        messages: list[dict[str, Any]],
+        thinking_mode: str,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: ToolChoice = ToolChoice(),
+        reasoning_effort: str = "low",
+    ) -> str:
+        prepared = copy.deepcopy(messages)
+        for message in prepared:
+            if message.get("role") == "developer":
+                message["role"] = "system"
+        active_tools = [] if tool_choice.mode == "none" else list(tools or [])
+        instruction = self._choice_instruction(tool_choice) if active_tools else ""
+        if instruction:
+            system = next(
+                (message for message in prepared if message.get("role") == "system"),
+                None,
+            )
+            if system is None:
+                system = {"role": "system", "content": ""}
+                prepared.insert(0, system)
+            system["content"] = f"{system.get('content') or ''}\n\n{instruction}".strip()
+        effort = {
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh",
+        }.get(reasoning_effort, "low")
+        return self._tokenizer.apply_chat_template(
+            prepared,
+            tools=active_tools or None,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=thinking_mode == "thinking",
+            reasoning_effort=effort,
+        )
+
+    def parse(self, text: str, thinking_mode: str) -> AssistantTurn:
+        return _split_qwen_output(text, thinking_mode)
+
+
+class QwenToolStreamParser:
+    """Incrementally separate Qwen text and XML tool calls."""
+
+    def __init__(self, thinking_mode: str):
+        self._state = "reasoning" if thinking_mode == "thinking" else "content"
+        self._buffer = ""
+        self._names: list[str] = []
+        self._arguments: list[str] = []
+        self.failed = False
+
+    def feed(self, text: str) -> tuple[ToolStreamDelta, ...]:
+        if self.failed:
+            return ()
+        self._buffer += text
+        deltas: list[ToolStreamDelta] = []
+        while not self.failed:
+            before = (self._state, self._buffer)
+            if self._state == "reasoning":
+                self._read_text("</think>", "content", deltas, reasoning=True)
+                if self._state == "content":
+                    self._buffer = self._buffer.lstrip("\n")
+            elif self._state == "content":
+                self._read_text("<tool_call>", "tool", deltas)
+                if self._state == "tool":
+                    self._buffer = "<tool_call>" + self._buffer
+            elif self._state == "tool":
+                end = self._buffer.find("</tool_call>")
+                if end < 0:
+                    break
+                end += len("</tool_call>")
+                try:
+                    call = _parse_qwen_call(self._buffer[:end])
+                except ValueError:
+                    self.failed = True
+                    break
+                index = len(self._names)
+                self._names.append(call.name)
+                self._arguments.append(call.arguments)
+                deltas.append(ToolStreamDelta(tool_index=index, tool_name=call.name))
+                deltas.append(ToolStreamDelta(tool_index=index, arguments=call.arguments))
+                self._buffer = self._buffer[end:].lstrip()
+            if before == (self._state, self._buffer):
+                break
+        return tuple(deltas)
+
+    def finish(self) -> tuple[ToolStreamDelta, ...]:
+        if self.failed:
+            return ()
+        if self._state == "content" and self._buffer:
+            value, self._buffer = self._buffer, ""
+            return (ToolStreamDelta(content=value),)
+        if self._state == "tool" and self._buffer.strip():
+            self.failed = True
+        return ()
+
+    def matches(self, calls: tuple[ToolCall, ...]) -> bool:
+        if self.failed or len(calls) != len(self._names):
+            return False
+        return all(
+            call.name == self._names[index]
+            and json.loads(call.arguments) == json.loads(self._arguments[index])
+            for index, call in enumerate(calls)
+        )
+
+    @property
+    def streamed_tool_count(self) -> int:
+        return len(self._names)
+
+    def _read_text(
+        self,
+        marker: str,
+        next_state: str,
+        deltas: list[ToolStreamDelta],
+        *,
+        reasoning: bool = False,
+    ) -> None:
+        position = self._buffer.find(marker)
+        if position >= 0:
+            self._emit(self._buffer[:position], deltas, reasoning)
+            self._buffer = self._buffer[position + len(marker) :]
+            self._state = next_state
+            return
+        keep = ToolStreamParser._marker_suffix_length(self._buffer, marker)
+        ready = self._buffer[:-keep] if keep else self._buffer
+        self._buffer = self._buffer[-keep:] if keep else ""
+        self._emit(ready, deltas, reasoning)
+
+    @staticmethod
+    def _emit(
+        value: str,
+        deltas: list[ToolStreamDelta],
+        reasoning: bool,
+    ) -> None:
+        if value:
+            deltas.append(
+                ToolStreamDelta(
+                    reasoning_content=value if reasoning else "",
+                    content="" if reasoning else value,
+                )
+            )

@@ -8,13 +8,14 @@ import os
 import threading
 import time
 from contextlib import contextmanager, nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterator
 
 import mlx.core as mx
 from mlx_lm.generate import stream_generate
 from mlx_lm.models.cache import CacheList, make_prompt_cache
+from mlx_lm.models.base import create_ssm_mask
 from mlx_lm.sample_utils import make_sampler
 from mlx_lm.tokenizer_utils import TokenizerWrapper
 from transformers import AutoTokenizer
@@ -31,7 +32,13 @@ from .model import (
     layer_major_prefill,
     load_model,
 )
-from .tool_codec import AssistantTurn, ToolChoice, ToolCodec
+from .tool_codec import (
+    AssistantTurn,
+    QwenToolStreamParser,
+    ToolChoice,
+    ToolCodec,
+    ToolStreamParser,
+)
 
 _mlx_lm_generate = importlib.import_module("mlx_lm.generate")
 _MLX_LM_GENERATION_LOCK = threading.Lock()
@@ -61,6 +68,7 @@ class GenerationOptions:
     max_tokens: int = 272_000
     temperature: float = 0.2
     top_p: float = 0.98
+    top_k: int = 0
 
 
 @dataclass(frozen=True)
@@ -89,6 +97,42 @@ def _make_prompt_cache(model: Any):
         if isinstance(layer_cache, CacheList):
             layer_cache.__class__ = _RawEvalCacheList
     return cache
+
+
+def _qwen_layer_major_prefill(
+    model: Any,
+    token_ids: list[int],
+    prompt_cache: Any,
+    step_size: int,
+    expert_cache: Any,
+) -> None:
+    """Populate Qwen caches while reading each complete expert layer once."""
+    if not token_ids:
+        return
+    core = model.model
+    if len(prompt_cache) != len(core.layers):
+        raise ValueError("prompt cache does not match the Qwen model layers")
+    inputs = mx.array(token_ids)[None]
+    hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
+    for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
+        outputs = []
+        with expert_cache.batched_layer(layer_index):
+            for start in range(0, len(token_ids), step_size):
+                end = min(start + step_size, len(token_ids))
+                chunk = hidden[:, start:end]
+                chunk_ids = inputs[:, start:end]
+                mask = (
+                    create_ssm_mask(chunk[..., : core.args.hidden_size], layer_cache)
+                    if layer.layer_type == "linear_attention"
+                    else None
+                )
+                output = layer(chunk, chunk_ids, mask, layer_cache)
+                eval_prompt_cache([layer_cache], output)
+                outputs.append(output)
+        if layer_index + 1 == len(core.layers):
+            return
+        hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+        mx.eval(hidden)
 
 
 @dataclass
@@ -630,6 +674,10 @@ class ModelRuntime:
 
     def __init__(self, installed: InstalledModel, config: RuntimeConfig):
         self.installed = installed
+        self._is_qwen = bool(getattr(installed, "is_qwen", False))
+        self._model_id = getattr(installed, "model_id", "deepseek-v4")
+        self._revision = getattr(installed, "revision", "")
+        self._manifest_format = getattr(installed, "format_version", 1)
         self.config = config
         self.metrics = RuntimeMetrics()
         self._codec: ToolCodec | None = None
@@ -638,6 +686,8 @@ class ModelRuntime:
         self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
+        if self._is_qwen and getattr(config, "dspark_enabled", False):
+            raise ValueError("Qwen3.8-Flash-Next does not support DSpark")
         with mx.stream(self._generation_stream):
             self.model, self.expert_cache = load_model(installed, config)
             try:
@@ -667,7 +717,7 @@ class ModelRuntime:
 
     @property
     def model_id(self) -> str:
-        return self.installed.model_id
+        return self._model_id
 
     def encode_chat(
         self,
@@ -678,7 +728,7 @@ class ModelRuntime:
         reasoning_effort: str = "low",
     ) -> str:
         if self._codec is None:
-            self._codec = ToolCodec.open(self.installed.root)
+            self._codec = ToolCodec.open(self.installed.root, self.tokenizer)
         return self._codec.encode(
             messages,
             thinking_mode,
@@ -689,8 +739,13 @@ class ModelRuntime:
 
     def parse_chat(self, text: str, thinking_mode: str) -> AssistantTurn:
         if self._codec is None:
-            self._codec = ToolCodec.open(self.installed.root)
+            self._codec = ToolCodec.open(self.installed.root, self.tokenizer)
         return self._codec.parse(text, thinking_mode)
+
+    def make_tool_stream_parser(self, thinking_mode: str):
+        if self._is_qwen:
+            return QwenToolStreamParser(thinking_mode)
+        return ToolStreamParser(thinking_mode)
 
     def stream(
         self,
@@ -700,10 +755,18 @@ class ModelRuntime:
         sampler = make_sampler(
             temp=options.temperature,
             top_p=options.top_p,
+            top_k=options.top_k,
         )
         with self._generation_lock:
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
+                available_tokens = getattr(
+                    self.installed, "maximum_context", 1_048_576
+                ) - len(prompt_tokens)
+                if available_tokens < 1:
+                    raise ValueError("prompt exceeds the checkpoint context limit")
+                if options.max_tokens > available_tokens:
+                    options = replace(options, max_tokens=available_tokens)
                 dspark = getattr(self.model, "dspark", None)
                 entry = (
                     _PromptCacheEntry(_make_prompt_cache(self.model), [])
@@ -721,7 +784,7 @@ class ModelRuntime:
                 )
                 use_layer_major = bool(
                     getattr(self.config, "layer_major_prefill", True)
-                    and len(generation_prompt) >= 4_096
+                    and len(generation_prompt) >= (128 if self._is_qwen else 4_096)
                 )
                 self.metrics.start(
                     len(prompt_tokens),
@@ -747,15 +810,24 @@ class ModelRuntime:
                         return
                     if use_layer_major:
                         with _route_phase(self.expert_cache, "prefill"):
-                            layer_major_prefill(
-                                self.model,
-                                generation_prompt[:-1],
-                                prompt_cache,
-                                step_size,
-                                self.expert_cache,
-                                getattr(self.config, "moe_prefill_step_size", 0),
-                                getattr(self.config, "batched_expert_prefill", True),
-                            )
+                            if self._is_qwen:
+                                _qwen_layer_major_prefill(
+                                    self.model,
+                                    generation_prompt[:-1],
+                                    prompt_cache,
+                                    step_size,
+                                    self.expert_cache,
+                                )
+                            else:
+                                layer_major_prefill(
+                                    self.model,
+                                    generation_prompt[:-1],
+                                    prompt_cache,
+                                    step_size,
+                                    self.expert_cache,
+                                    getattr(self.config, "moe_prefill_step_size", 0),
+                                    getattr(self.config, "batched_expert_prefill", True),
+                                )
                         snapshot_started = time.perf_counter()
                         prefill_persist_entry = _PromptCacheEntry(
                             copy.deepcopy(prompt_cache),
@@ -899,15 +971,20 @@ class ModelRuntime:
                     getattr(self.config, "prefill_step_size", 128),
                     len(tokens) - 1,
                 )
-                layer_major_prefill(
-                    self.model,
-                    tokens[:-1],
-                    cache,
-                    step_size,
-                    self.expert_cache,
-                    getattr(self.config, "moe_prefill_step_size", 0),
-                    getattr(self.config, "batched_expert_prefill", True),
-                )
+                if self._is_qwen:
+                    _qwen_layer_major_prefill(
+                        self.model, tokens[:-1], cache, step_size, self.expert_cache
+                    )
+                else:
+                    layer_major_prefill(
+                        self.model,
+                        tokens[:-1],
+                        cache,
+                        step_size,
+                        self.expert_cache,
+                        getattr(self.config, "moe_prefill_step_size", 0),
+                        getattr(self.config, "batched_expert_prefill", True),
+                    )
                 self._store_prompt_cache(
                     _PromptCacheEntry(cache, tokens[:-1]),
                     persist=True,
@@ -989,7 +1066,9 @@ class ModelRuntime:
             if configured
             else Path.home() / ".dsmodel" / "prompt-cache"
         )
-        directory = root / revision
+        model_key = getattr(self.installed, "model_id", "deepseek-v4").replace("/", "--")
+        manifest_format = getattr(self.installed, "format_version", 1)
+        directory = root / model_key / revision / f"format-{manifest_format}"
         try:
             directory.mkdir(parents=True, exist_ok=True)
         except OSError:
@@ -1012,7 +1091,10 @@ class ModelRuntime:
                 cache_format = int(metadata.get("format", 0))
                 if (
                     cache_format in _SUPPORTED_PROMPT_CACHE_FORMATS
-                    and metadata.get("revision") == self.installed.revision
+                    and metadata.get("revision") == self._revision
+                    and metadata.get("model_id", self._model_id) == self._model_id
+                    and metadata.get("manifest_format", self._manifest_format)
+                    == self._manifest_format
                     and data_path.is_file()
                 ):
                     entries.append(
@@ -1073,7 +1155,9 @@ class ModelRuntime:
         )
         metadata = {
             "format": _PROMPT_CACHE_FORMAT,
-            "revision": self.installed.revision,
+            "model_id": self._model_id,
+            "revision": self._revision,
+            "manifest_format": self._manifest_format,
             "tokens": entry.tokens,
             "data": data_path.name,
         }

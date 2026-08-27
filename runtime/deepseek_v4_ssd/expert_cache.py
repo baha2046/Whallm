@@ -47,6 +47,22 @@ class BatchedExperts:
     w13_scales: mx.array | None = None
 
 
+@dataclass(frozen=True)
+class QwenExpertWeights:
+    gate_up: mx.array
+    gate_up_scales: mx.array
+    down: mx.array
+    down_scales: mx.array
+
+
+@dataclass(frozen=True)
+class QwenBatchedExperts:
+    gate_up: mx.array
+    gate_up_scales: mx.array
+    down: mx.array
+    down_scales: mx.array
+
+
 @dataclass
 class CacheMetrics:
     hits: int = 0
@@ -187,6 +203,20 @@ def _fused_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
     return regions
 
 
+def _qwen_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
+    regions = {region.name: region for region in model.expert_regions}
+    if set(regions) != {
+        "gate_up.weight",
+        "gate_up.scale",
+        "down.weight",
+        "down.scale",
+    }:
+        raise ValueError("Qwen expert blob does not contain the required regions")
+    if sum(region.length for region in regions.values()) != model.expert_blob_size:
+        raise ValueError("Qwen expert slot size does not match the manifest")
+    return regions
+
+
 class _SlotPool:
     """Keep each expert slot in a directly writable Metal buffer."""
 
@@ -195,7 +225,9 @@ class _SlotPool:
         self._source_regions = {
             region.name: region for region in model.expert_regions
         }
-        self._regions = _fused_slot_regions(model)
+        self._regions = (
+            _qwen_slot_regions(model) if model.is_qwen else _fused_slot_regions(model)
+        )
         self._slots: list[mx.array | None] = [None] * slots
         self._views: list[memoryview | None] = [None] * slots
         self._loaded = bytearray(slots)
@@ -221,6 +253,16 @@ class _SlotPool:
             if not self._loaded[slot] or array is None:
                 raise RuntimeError("expert slot is empty")
             arrays.append(array)
+        if self._model.is_qwen:
+            return tuple(
+                QwenExpertWeights(
+                    gate_up=self._array(array, "gate_up.weight"),
+                    gate_up_scales=self._array(array, "gate_up.scale"),
+                    down=self._array(array, "down.weight"),
+                    down_scales=self._array(array, "down.scale"),
+                )
+                for array in arrays
+            )
         return tuple(
             ExpertWeights(
                 w1=self._array(array, "w1.weight"),
@@ -238,6 +280,8 @@ class _SlotPool:
     def _array(self, packed: mx.array, name: str) -> mx.array:
         region = self._regions[name]
         value = packed[region.offset : region.offset + region.length]
+        if region.dtype == "U32":
+            return value.view(mx.uint32).reshape(region.shape)
         value = value.reshape(region.shape)
         if region.dtype == "I8":
             value = value.view(mx.int8)
@@ -281,6 +325,13 @@ class _SlotPool:
         self._loaded[slot] = 0
 
     def batched(self, packed: mx.array) -> BatchedExperts:
+        if self._model.is_qwen:
+            return QwenBatchedExperts(
+                gate_up=self._batched_array(packed, "gate_up.weight"),
+                gate_up_scales=self._batched_array(packed, "gate_up.scale"),
+                down=self._batched_array(packed, "down.weight"),
+                down_scales=self._batched_array(packed, "down.scale"),
+            )
         return BatchedExperts(
             w1=self._batched_array(packed, "w1.weight"),
             w1_scales=self._batched_array(packed, "w1.scale"),
@@ -294,6 +345,22 @@ class _SlotPool:
 
     def _batched_array(self, packed: mx.array, name: str) -> mx.array:
         region = self._regions[name]
+        if region.dtype == "U32":
+            shape = (self._model.expert_count, *region.shape)
+            row_strides = []
+            stride = 1
+            for size in reversed(region.shape):
+                row_strides.append(stride)
+                stride *= size
+            return mx.as_strided(
+                packed,
+                shape=shape,
+                strides=(
+                    self._model.expert_blob_size // 4,
+                    *reversed(row_strides),
+                ),
+                offset=region.offset // 4,
+            )
         if (
             self._model.expert_blob_size % 4
             or region.offset % 4

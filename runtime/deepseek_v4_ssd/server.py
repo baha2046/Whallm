@@ -15,6 +15,7 @@ from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from .generation import GenerationOptions, GeneratedPiece, ModelRuntime, THINK_END
+from .manifest import InstalledModel
 from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
@@ -55,6 +56,7 @@ class ServerDefaults:
     max_tokens: int = 272_000
     temperature: float = 0.2
     top_p: float = 0.98
+    top_k: int = 0
 
 
 class GenerationMetrics:
@@ -222,7 +224,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                             "id": self.app.public_model,
                             "object": "model",
                             "created": 0,
-                            "owned_by": "deepseek-ai",
+                            "owned_by": self.app.runtime.model_id.split("/", 1)[0],
                         }
                     ],
                 },
@@ -252,7 +254,9 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             raise APIError("Route not found.", status=404, code="not_found")
         self._authorize()
         payload = self._request_json()
-        unknown = set(payload).difference({"max_tokens", "temperature", "top_p"})
+        unknown = set(payload).difference(
+            {"max_tokens", "temperature", "top_p", "top_k"}
+        )
         if unknown:
             name = sorted(unknown)[0]
             raise APIError(f"Unknown setting: {name}.", param=name)
@@ -261,6 +265,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             max_tokens=options.max_tokens,
             temperature=options.temperature,
             top_p=options.top_p,
+            top_k=options.top_k,
         )
         self._json(200, asdict(self.app.defaults))
 
@@ -268,7 +273,10 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         options, stream = self._common(payload)
         tools, tool_choice = _tool_request(payload)
         messages = _messages(payload.get("messages"))
-        thinking_mode, reasoning_effort = _reasoning_settings(payload)
+        thinking_mode, reasoning_effort = _reasoning_settings(
+            payload,
+            qwen=getattr(getattr(self.app.runtime, "installed", None), "is_qwen", False),
+        )
         prompt = self.app.runtime.encode_chat(
             messages,
             thinking_mode,
@@ -371,6 +379,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
             responses_api=True,
+            qwen=getattr(getattr(self.app.runtime, "installed", None), "is_qwen", False),
         )
         _validate_response_request(payload)
         prompt = self.app.runtime.encode_chat(
@@ -618,7 +627,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         send("response.created", response=created)
         raw_parts: list[str] = []
         if tool_calling:
-            parser = ToolStreamParser(thinking_mode)
+            factory = getattr(self.app.runtime, "make_tool_stream_parser", None)
+            parser = (
+                factory(thinking_mode)
+                if callable(factory)
+                else ToolStreamParser(thinking_mode)
+            )
             for piece in pieces:
                 raw_parts.append(piece.text)
                 prompt_tokens = piece.prompt_tokens
@@ -830,7 +844,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 ],
             }
         )
-        parser = ToolStreamParser(thinking_mode)
+        factory = getattr(self.app.runtime, "make_tool_stream_parser", None)
+        parser = (
+            factory(thinking_mode)
+            if callable(factory)
+            else ToolStreamParser(thinking_mode)
+        )
         raw_parts = []
         prompt_tokens = generated = 0
         finish = "stop"
@@ -1150,6 +1169,7 @@ def _reasoning_settings(
     payload: dict[str, Any],
     *,
     responses_api: bool = False,
+    qwen: bool = False,
 ) -> tuple[str, str]:
     thinking_mode = payload.get("thinking_mode")
     if thinking_mode is not None:
@@ -1173,7 +1193,18 @@ def _reasoning_settings(
         raise APIError(f"{param} is invalid.", param=param)
     if thinking_mode is None:
         thinking_mode = "chat" if effort in {None, "none"} else "thinking"
-    native_effort = _REASONING_EFFORT_MAP.get(effort, "low")
+    native_effort = (
+        {
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh",
+        }.get(effort, "low")
+        if qwen
+        else _REASONING_EFFORT_MAP.get(effort, "low")
+    )
     return thinking_mode, native_effort
 
 
@@ -1491,7 +1522,10 @@ def _options(payload: dict[str, Any], defaults: ServerDefaults) -> GenerationOpt
         minimum=0.000001,
         maximum=1,
     )
-    return GenerationOptions(max_tokens, temperature, top_p)
+    top_k = payload.get("top_k", defaults.top_k)
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= 248_320:
+        raise APIError("top_k must be between 0 and 248320.", param="top_k")
+    return GenerationOptions(max_tokens, temperature, top_p, top_k)
 
 
 def _tool_request(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], ToolChoice]:
@@ -1777,7 +1811,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
-    parser.add_argument("--public-model", default=PUBLIC_MODEL)
+    parser.add_argument("--public-model")
     parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
@@ -1790,7 +1824,7 @@ def _parser() -> argparse.ArgumentParser:
         "--memory-limit-gib",
         type=int,
         default=0,
-        help="MLX memory limit in GiB; 0 uses Metal's recommended maximum",
+        help="MLX memory limit in GiB; 0 selects the model-safe automatic limit",
     )
     parser.add_argument(
         "--prefill-step-size",
@@ -1813,8 +1847,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--default-max-tokens", type=int, default=272_000)
-    parser.add_argument("--default-temperature", type=float, default=0.2)
-    parser.add_argument("--default-top-p", type=float, default=0.98)
+    parser.add_argument("--default-temperature", type=float)
+    parser.add_argument("--default-top-p", type=float)
+    parser.add_argument("--default-top-k", type=int)
     return parser
 
 
@@ -1845,14 +1880,31 @@ def main() -> None:
         parser.error("--dspark-confidence-threshold must be between zero and one")
     if arguments.dspark_slots < 30:
         parser.error("--dspark-slots must be at least 30")
-    if not arguments.public_model:
+    try:
+        installed = InstalledModel.open(arguments.model)
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        parser.error(str(error))
+    if installed.is_qwen and arguments.dspark:
+        parser.error("Qwen3.8-Flash-Next does not support --dspark")
+    public_model = arguments.public_model or installed.model_id
+    if not public_model:
         parser.error("--public-model must not be empty")
+    default_temperature = arguments.default_temperature
+    default_top_p = arguments.default_top_p
+    default_top_k = arguments.default_top_k
+    if default_temperature is None:
+        default_temperature = 1.0 if installed.is_qwen else 0.2
+    if default_top_p is None:
+        default_top_p = 0.95 if installed.is_qwen else 0.98
+    if default_top_k is None:
+        default_top_k = 20 if installed.is_qwen else 0
     try:
         options = _options(
             {
                 "max_tokens": arguments.default_max_tokens,
-                "temperature": arguments.default_temperature,
-                "top_p": arguments.default_top_p,
+                "temperature": default_temperature,
+                "top_p": default_top_p,
+                "top_k": default_top_k,
             },
             ServerDefaults(),
         )
@@ -1860,6 +1912,7 @@ def main() -> None:
             options.max_tokens,
             options.temperature,
             options.top_p,
+            options.top_k,
         )
     except APIError as error:
         parser.error(str(error))
@@ -1900,7 +1953,7 @@ def main() -> None:
         server = OpenAIServer(
             (arguments.host, arguments.port),
             runtime,
-            public_model=arguments.public_model,
+            public_model=public_model,
             api_key=arguments.api_key,
             defaults=defaults,
         )

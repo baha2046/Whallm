@@ -520,6 +520,25 @@ class MemoryLimitTests(unittest.TestCase):
         set_memory_limit.assert_called_once_with(requested)
         set_wired_limit.assert_called_once_with(maximum)
 
+    def test_automatic_memory_limit_honors_a_model_cap(self):
+        maximum = 56 * 1024**3
+        cap = 48 * 1024**3
+        with (
+            patch(
+                "deepseek_v4_ssd.model.mx.device_info",
+                return_value={"max_recommended_working_set_size": maximum},
+            ),
+            patch("deepseek_v4_ssd.model.mx.set_memory_limit") as set_memory_limit,
+            patch("deepseek_v4_ssd.model.mx.set_wired_limit") as set_wired_limit,
+        ):
+            selected = _configure_memory_limits(
+                RuntimeConfig(), automatic_cap_gib=48
+            )
+
+        self.assertEqual(selected, cap)
+        set_memory_limit.assert_called_once_with(cap)
+        set_wired_limit.assert_called_once_with(cap)
+
 
 class PrefillTests(unittest.TestCase):
     def test_runtime_uses_1152_expert_slots_by_default(self):
