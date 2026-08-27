@@ -918,6 +918,10 @@ public enum InstalledModel {
   public static func loadManifest(at root: URL) throws -> InstalledManifest {
     let root = root.standardizedFileURL
     let data = try Data(contentsOf: root.appendingPathComponent("manifest.json"))
+    return try decodeManifest(data)
+  }
+
+  static func decodeManifest(_ data: Data) throws -> InstalledManifest {
     let manifest = try JSONDecoder().decode(InstalledManifest.self, from: data)
     if manifest.formatVersion == 2 || manifest.modelKind == .qwen3_8FlashNext {
       return try validateQwenManifest(manifest)

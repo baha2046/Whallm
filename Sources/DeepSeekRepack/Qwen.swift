@@ -460,3 +460,48 @@ public struct QwenFlashNextCheckpoint: Sendable {
     return (shard, 8 + headerLength, try SafeTensorsHeader.decode(data))
   }
 }
+
+public struct QwenInstalledModelArtifact: Sendable {
+  public static let repository = "Yanun/Qwen3.8-Flash-Next-MXFP4"
+  public static let revision = "main"
+
+  private let downloader: InstalledArtifactDownloader
+
+  public init() {
+    let source = HuggingFaceSource(modelID: Self.repository, revision: Self.revision)
+    downloader = InstalledArtifactDownloader(
+      repository: Self.repository, revision: Self.revision, source: source)
+  }
+
+  init(source: any CheckpointSource) {
+    downloader = InstalledArtifactDownloader(
+      repository: Self.repository, revision: Self.revision, source: source)
+  }
+
+  public func installedBytes() async throws -> UInt64 {
+    let manifest = try await downloader.manifest().manifest
+    return try manifest.files.reduce(UInt64(0)) { total, file in
+      let result = total.addingReportingOverflow(file.size)
+      guard !result.overflow else {
+        throw RepackError.invalidPlan("installed file sizes overflow")
+      }
+      return result.partialValue
+    }
+  }
+
+  public func install(
+    to output: URL,
+    progress: (@Sendable (RepackProgress) -> Void)? = nil
+  ) async throws -> InstalledManifest {
+    try await downloader.install(to: output, progress: progress)
+  }
+
+  public func repair(
+    at output: URL,
+    invalidFiles: Set<String>,
+    progress: (@Sendable (RepackProgress) -> Void)? = nil
+  ) async throws -> InstalledManifest {
+    try await downloader.repair(
+      at: output, invalidFiles: invalidFiles, progress: progress)
+  }
+}

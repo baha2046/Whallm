@@ -337,6 +337,31 @@ final class DeepSeekRepackTests: XCTestCase {
       "0fecfb3515a322ce43dca1e7d6115fcf2c1f34d474774097fb4eededdcc6cf49")
   }
 
+  func testInstalledArtifactFileDownloadResumesExistingBytes() async throws {
+    let sourceData = Data("0123456789".utf8)
+    let source = MemoryCheckpointSource(files: ["weights.bin": sourceData])
+    let file = InstalledFile(
+      path: "weights.bin", size: UInt64(sourceData.count), sha256: sha256(sourceData))
+    let parent = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let output = parent.appendingPathComponent("weights.bin")
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: parent) }
+    try Data(sourceData.prefix(4)).write(to: output)
+    let counter = DownloadByteCounter()
+
+    let digest = try await InstalledArtifactFileDownloader(source: source, chunkSize: 3).run(
+      file: file, to: output
+    ) { copiedBytes, downloadedBytes in
+      await counter.add(copiedBytes: copiedBytes, downloadedBytes: downloadedBytes)
+    }
+
+    XCTAssertEqual(try Data(contentsOf: output), sourceData)
+    XCTAssertEqual(digest, file.sha256)
+    let counts = await counter.counts
+    XCTAssertEqual(counts.copied, 10)
+    XCTAssertEqual(counts.downloaded, 6)
+  }
+
   func testQwenPlannerCreatesFormatTwoAndExcludesVisionAndMTP() throws {
     let fixture = makeQwenPlannerFixture()
     let plan = try QwenPlanner.makePlan(index: fixture.index, tensors: fixture.tensors)
@@ -445,6 +470,15 @@ final class DeepSeekRepackTests: XCTestCase {
     let repaired = try await Repacker(source: source).repair(
       plan: plan, output: output, invalidFiles: ["experts/layer_00.bin"], progress: nil)
     XCTAssertTrue(try InstalledModel.audit(manifest: repaired, at: output).isValid)
+  }
+}
+
+private actor DownloadByteCounter {
+  private(set) var counts: (copied: UInt64, downloaded: UInt64) = (0, 0)
+
+  func add(copiedBytes: UInt64, downloadedBytes: UInt64) {
+    counts.copied += copiedBytes
+    counts.downloaded += downloadedBytes
   }
 }
 
