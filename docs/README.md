@@ -35,8 +35,14 @@ M4 完成不代表 runtime 已驗證 1M context。
 本專案只驗證文件列出的測試長度。
 
 Qwen text model 第一版已完成。
-完整 FP8 安裝、SHA-256、對話、thinking、tool call、greedy 4K、prompt cache
-和 packaged App 驗證都已通過。
+官方 FP8 checkpoint 轉換、installed model SHA-256、對話、thinking、tool call、
+greedy 4K、prompt cache 和舊安裝路徑的 packaged App 驗證都已通過。
+目前 direct published installed model 下載路徑已通過 file 續傳單元測試。
+目前尚未重新執行完整 125 GB 的 App direct download。
+
+App 的模型選單固定顯示 DeepSeek 與 Qwen。
+使用者可以選擇尚未安裝的模型。
+App 找不到所選模型時，App 會顯示該模型的下載與安裝區塊。
 
 ## 可信度規則
 

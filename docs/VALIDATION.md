@@ -976,21 +976,25 @@ inspection 沒有下載 tensor payload。
 以及 125,268,506,112 installed weight bytes。
 
 Swift 輕量測試已覆蓋 format 2 planner、vision/MTP 排除、MXFP4 固定向量、
-Qwen expert 轉換、續傳與損壞 layer repair。Python 輕量測試已覆蓋 QSA、N-gram、PLE 資料路徑、
+Qwen expert 轉換、installed artifact file 續傳與損壞 layer repair。Python 輕量測試已覆蓋 QSA、N-gram、PLE 資料路徑、
 Qwen expert layout、layer-major prefill 和 XML tool parser。
 
 目前 Qwen 工作樹的自動測試結果如下：
 
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
-| Swift `DeepSeekRepackTests` | 15 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 19 | 0 | 3 |
+| Swift `DeepSeekRepackTests` | 16 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 20 | 0 | 3 |
 | Python runtime 與 server | 85 | 0 | 0 |
-| 合計 | 119 | 0 | 3 |
+| 合計 | 121 | 0 | 3 |
 
 三個 Swift App 測試需要現有的完整 DeepSeek installed model。
 使用者已把該模型移到外接硬碟。
 本次驗證沒有存取外接硬碟，並略過這三項。
+
+Swift App 測試也確認空的模型庫仍提供 DeepSeek 與 Qwen 選項。
+Swift repack 測試確認 direct installed artifact file 可以從現有 file size 續傳，
+並在完成時驗證 SHA-256。
 
 Qwen installed model 位於內建 SSD。
 完整 SHA-256 驗證已通過 57 個 manifest files。

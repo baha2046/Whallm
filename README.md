@@ -48,7 +48,8 @@ server → Chat in the app or connect Codex**
    [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
 2. Extract the ZIP and open `DeepSeekV4SSD.app`.
 3. Select DeepSeek or Qwen. Then select **Download Model**. The app checks the
-   selected repack plan size. You can stop the download and resume it later.
+   required storage. Qwen downloads the published MXFP4 installed model. You
+   can stop the download and resume it later.
 4. Select **Start Server** after the model is ready.
 5. Use the chat in the app, or connect Codex with the configuration below.
 
@@ -63,7 +64,7 @@ The local server starts at `http://127.0.0.1:11434` by default.
 | Mac | Apple Silicon M-series Mac |
 | macOS | macOS 15 or later |
 | Unified memory | 64 GiB or more |
-| Free storage | The app checks the selected repack plan and existing partial data |
+| Free storage | The app checks the selected model and existing partial data |
 | Model storage | A fast internal, Thunderbolt, or USB4 SSD |
 | Internet | Required to download the model and app updates |
 
@@ -115,6 +116,8 @@ for more options.
 - You can remove DSpark without reinstalling the main model.
 - Qwen installed weight files use 125,268,506,112 bytes. Qwen does not support
   DSpark.
+- Qwen downloads a verified MXFP4 installed model. Model installation does not
+  quantize the Qwen checkpoint on the user's Mac.
 
 ### OpenAI-compatible server
 

@@ -11,11 +11,18 @@ runtime 只在 router 選到 routed expert 時讀取 expert blob。
 ## 元件
 
 ```text
-Hugging Face checkpoint
+DeepSeek checkpoint or Qwen artifact production
   -> Swift checkpoint inspector
   -> repack plan
   -> resumable repacker
   -> installed model + manifest
+
+Published Qwen installed model artifact
+  -> resumable installed file downloader
+  -> complete SHA-256 verification
+  -> installed model + manifest
+
+installed model
   -> Python MLX runtime
   -> OpenAI-compatible server
   -> SwiftUI APP or API client
@@ -23,7 +30,7 @@ Hugging Face checkpoint
 
 | 元件 | 責任 |
 | --- | --- |
-| `DeepSeekRepack` | 檢查 checkpoint、建立 repack plan、安裝、驗證和 repair。 |
+| `DeepSeekRepack` | 檢查 checkpoint、建立 repack plan、下載 published installed model、安裝、驗證和 repair。 |
 | `dsv4-repack` | 提供 `inspect`、`plan`、`repack`、`verify`、`install-dspark` 和 `benchmark`。 |
 | `deepseek_v4_ssd` | 載入 installed model、執行推論、管理 cache 和記錄指標。 |
 | `deepseek_v4_ssd.server` | 提供 OpenAI 相容 API 和 APP 專用 API。 |
@@ -124,9 +131,10 @@ runtime slot 會把 `w3` 和 `w1` 放在相鄰區域。
 這個 slot layout 讓 runtime 可以建立 fused `w13` view。
 `preadv` 會把一個 expert blob 的各區域直接寫入對應 view。
 
-## Repack 與驗證
+## 安裝與驗證
 
-repack 流程如下。
+DeepSeek App 安裝和 Qwen artifact 產生使用 repack 流程。
+流程如下。
 
 1. inspector 下載 `config.json` 和 safetensors index。
 2. inspector 使用 HTTP Range 讀取每個 shard 的 safetensors header。
@@ -139,8 +147,16 @@ repack 流程如下。
 9. repacker 對每個 installed file 計算 SHA-256。
 10. repacker 寫入 manifest，然後以原子 move 完成安裝。
 
+Qwen App 不執行 FP8 到 MXFP4 轉換。
+Qwen App 直接下載 published installed model。
+Qwen App 使用四個並行 file 工作和 8 MiB range。
+Qwen App 使用 receipt 記錄完成的 file。
+Qwen App 驗證 manifest 合約、file size 和每個 file 的 SHA-256。
+完整驗證通過後，App 才完成原子 move。
+
 repair 會先做完整 audit。
-repair 只重新下載失敗 file 涉及的 checkpoint byte range。
+DeepSeek repair 只重新下載失敗 file 涉及的 checkpoint byte range。
+Qwen repair 直接重新下載失敗的 installed file。
 
 ### 完整性邊界
 

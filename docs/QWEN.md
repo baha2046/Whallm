@@ -68,12 +68,36 @@ qwen3.8-flash-next.dsv4/
 3. `down.weight`
 4. `down.scale`
 
+## App 安裝來源
+
+App 從
+[`Yanun/Qwen3.8-Flash-Next-MXFP4`](https://huggingface.co/Yanun/Qwen3.8-Flash-Next-MXFP4)
+下載 published installed model。
+程式碼固定 Hugging Face commit。
+App 不在使用者的 Mac 上執行 FP8 到 MXFP4 轉換。
+App 安裝不使用 GPU。
+App 使用 CPU 計算 SHA-256。
+
+App 使用四個並行 file 工作。
+每個工作使用 8 MiB range 續傳一個 file。
+receipt 記錄已完成 file 的 SHA-256。
+App 完成下載後，App 會驗證 manifest 合約、每個 file size 和每個 SHA-256。
+完整驗證通過後，App 才完成安裝。
+repair 只重新下載損壞的 installed file。
+
+App 下載 125,291,490,955 bytes 的 manifest files。
+這比從官方 checkpoint 選取的 181,906,343,706 tensor payload bytes
+少 56,614,852,751 bytes。
+
+## Artifact 產生
+
+`dsv4-repack` 仍可從固定的官方 FP8 checkpoint 產生 installed model。
 repacker 把連續 FP8 expert tensor 合併成最多 64 MiB 的 range request。
 repacker 讓每個 checkpoint shard 的 BF16 inverse scale 只下載一次。
 這會把完整 expert 轉換的 request 數從約 147,000 降到約 2,000。
 repacker 不保存完整 FP8 expert 暫存檔。
 receipt 會記錄 conversion version 和轉換後 digest。
-repair 只重建失敗的 installed file。
+這個轉換由 CPU 執行。
 
 ## Runtime
 
@@ -134,6 +158,10 @@ DeepSeek 的既有規則不變。
 - greedy 4,096-token prompt。
 - cold 與 warm prompt cache output token hash 比較。
 - packaged App、解壓後 ZIP、三種 localization、隔離啟動和 runtime import。
+
+上述 packaged App 驗證早於 direct installed artifact 下載路徑。
+目前 direct 下載路徑已通過 file 續傳和 SHA-256 單元測試。
+目前尚未重新執行完整 125 GB 的 App direct download。
 
 CLI 使用預設 `memory_limit_gib=0` 啟動完整模型時，runtime 套用 48 GiB
 自動上限。5-token prompt 產生 ` Paris`。runtime 從 SSD 讀取
