@@ -17,28 +17,78 @@ struct HuggingFaceSource: CheckpointSource {
   }
 
   func data(path: String) async throws -> Data {
-    let (data, response) = try await session.data(for: request(path: path))
-    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-      throw RepackError.badResponse("checkpoint request failed for \(path)")
+    var lastError = "unknown response"
+    for attempt in 0..<10 {
+      do {
+        let (data, response) = try await session.data(for: request(path: path))
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+          let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+          lastError = "HTTP \(status)"
+          if attempt < 9 {
+            try await retryDelay(status: status, attempt: attempt)
+          }
+          continue
+        }
+        return data
+      } catch is CancellationError {
+        throw CancellationError()
+      } catch {
+        lastError = String(describing: error)
+        if attempt < 9 {
+          try await retryDelay(status: 0, attempt: attempt)
+        }
+      }
     }
-    return data
+    throw RepackError.badResponse(
+      "checkpoint request failed for \(path) after 10 attempts: \(lastError)")
   }
 
   func data(path: String, range: Range<UInt64>) async throws -> Data {
     guard !range.isEmpty else { return Data() }
-    var request = request(path: path)
-    request.setValue(
-      "bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
-    let (data, response) = try await session.data(for: request)
-    guard let http = response as? HTTPURLResponse, http.statusCode == 206 else {
-      throw RepackError.badResponse("checkpoint did not honor the byte range for \(path)")
+    var lastError = "unknown response"
+    for attempt in 0..<10 {
+      do {
+        var request = request(path: path)
+        request.setValue(
+          "bytes=\(range.lowerBound)-\(range.upperBound - 1)", forHTTPHeaderField: "Range")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 206 else {
+          lastError = "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)"
+          if attempt < 9 {
+            try await retryDelay(status: (response as? HTTPURLResponse)?.statusCode ?? 0,
+              attempt: attempt)
+          }
+          continue
+        }
+        guard UInt64(data.count) == range.count else {
+          lastError = "returned \(data.count) bytes; expected \(range.count)"
+          if attempt < 9 {
+            try await retryDelay(status: 0, attempt: attempt)
+          }
+          continue
+        }
+        return data
+      } catch is CancellationError {
+        throw CancellationError()
+      } catch {
+        lastError = String(describing: error)
+        if attempt < 9 {
+          try await retryDelay(status: 0, attempt: attempt)
+        }
+      }
     }
-    guard UInt64(data.count) == range.count else {
-      throw RepackError.badResponse(
-        "checkpoint returned \(data.count) bytes for \(path); expected \(range.count)"
-      )
+    throw RepackError.badResponse(
+      "checkpoint range request failed for \(path) after 10 attempts: \(lastError)")
+  }
+
+  private func retryDelay(status: Int, attempt: Int) async throws {
+    let nanoseconds: UInt64
+    if status == 429 {
+      nanoseconds = UInt64(min(60, 5 << min(attempt, 4))) * 1_000_000_000
+    } else {
+      nanoseconds = UInt64(250_000_000 << min(attempt, 4))
     }
-    return data
+    try await Task.sleep(nanoseconds: nanoseconds)
   }
 
   private func request(path: String) -> URLRequest {

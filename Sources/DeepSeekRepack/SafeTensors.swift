@@ -36,7 +36,7 @@ struct CheckpointIndex: Sendable {
   }
 }
 
-struct SafeTensorsHeader {
+struct SafeTensorsHeader: Sendable {
   struct Entry: Equatable, Sendable {
     let dtype: String
     let shape: [Int]

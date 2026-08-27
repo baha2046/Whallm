@@ -7,7 +7,7 @@ from pathlib import Path
 
 from transformers import AutoTokenizer
 
-from deepseek_v4_ssd.manifest import MODEL_ID, REVISION
+from deepseek_v4_ssd.manifest import InstalledModel
 
 
 SEEDS = {
@@ -71,6 +71,7 @@ def main() -> None:
         parser.error("--tokens values must be at least 2")
 
     model = Path(arguments.model).expanduser().resolve()
+    installed = InstalledModel.open(model)
     output = Path(arguments.output).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -95,8 +96,8 @@ def main() -> None:
 
     manifest = {
         "schema_version": 1,
-        "model_id": MODEL_ID,
-        "revision": REVISION,
+        "model_id": installed.model_id,
+        "revision": installed.revision,
         "method": "repeat seed, decode a token prefix, then verify runtime encoding",
         "seeds": SEEDS,
         "prompts": prompts,

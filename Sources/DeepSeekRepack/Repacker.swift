@@ -4,9 +4,11 @@ import Foundation
 struct Repacker {
   private let source: any CheckpointSource
   private let chunkSize: UInt64 = 8 * 1_024 * 1_024
+  private let conversionBatchSize: UInt64 = 64 * 1_024 * 1_024
   private let mergeGap: UInt64 = 64 * 1_024
   private let receiptBatchSize = 256
   private let downloadConcurrency = 8
+  private let conversionConcurrency = 2
 
   init(source: any CheckpointSource) {
     self.source = source
@@ -117,6 +119,74 @@ struct Repacker {
           }
         }
       }
+      var pendingConversions: [ConversionWork] = []
+      for conversion in plan.expertConversions ?? [] {
+        let layout = try conversionLayout(conversion, plan: plan)
+        try Task.checkCancellation()
+        let range = conversionSourceRange(conversion, layout: layout)
+        let scaleRange = conversionScaleRange(conversion, layout: layout)
+        let id = conversionChunkID(
+          conversion: conversion,
+          version: plan.expertQuantization?.conversionVersion ?? 0)
+        let completedChunkIsValid = try receipt?.completed[id].map { expectedDigest in
+          try conversionDestinationDigest(
+            conversion: conversion, layout: layout, handles: handles) == expectedDigest
+        } ?? false
+        let sourceByteCount = range.upperBound - range.lowerBound
+          + scaleRange.upperBound - scaleRange.lowerBound
+        if completedChunkIsValid {
+          copied += sourceByteCount
+        } else {
+          pendingConversions.append(
+            ConversionWork(
+              conversion: conversion, layout: layout, range: range,
+              scaleRange: scaleRange, id: id, sourceByteCount: sourceByteCount))
+        }
+        progress?(
+          RepackProgress(
+            copiedBytes: copied,
+            downloadedBytes: downloadedBytes,
+            totalBytes: plan.checkpointTensorBytes))
+      }
+      let scaleBundles = try await readConversionScales(pendingConversions)
+      let conversionBatches = makeConversionBatches(pendingConversions)
+      try await withThrowingTaskGroup(of: ConvertedBatch.self) { group in
+        var iterator = conversionBatches.makeIterator()
+        for _ in 0..<min(conversionConcurrency, conversionBatches.count) {
+          guard let batch = iterator.next() else { break }
+          group.addTask { try await convert(batch, scaleBundles: scaleBundles) }
+        }
+        while let convertedBatch = try await group.next() {
+          for converted in convertedBatch.chunks {
+            let digest = try writeConversion(
+              (converted.weights, converted.scales),
+              conversion: converted.work.conversion,
+              layout: converted.work.layout,
+              handles: handles,
+              dirtyFiles: &dirtyFiles)
+            copied += converted.work.sourceByteCount
+            downloadedBytes += converted.work.sourceByteCount
+            receipt?.completed[converted.work.id] = digest
+            pendingReceiptCount += 1
+            if pendingReceiptCount >= receiptBatchSize, let receipt {
+              try persist(
+                receipt: receipt,
+                handles: handles,
+                dirtyFiles: &dirtyFiles,
+                receiptURL: receiptURL)
+              pendingReceiptCount = 0
+            }
+            progress?(
+              RepackProgress(
+                copiedBytes: copied,
+                downloadedBytes: downloadedBytes,
+                totalBytes: plan.checkpointTensorBytes))
+          }
+          if let next = iterator.next() {
+            group.addTask { try await convert(next, scaleBundles: scaleBundles) }
+          }
+        }
+      }
       guard copied == plan.checkpointTensorBytes else {
         throw RepackError.invalidPlan(
           "copied \(copied) bytes; expected \(plan.checkpointTensorBytes)"
@@ -141,7 +211,9 @@ struct Repacker {
         }
         return InstalledFile(path: file.path, size: size, sha256: try sha256(url))
       }
-      for companion in ModelContract.companions {
+      let companions =
+        plan.modelKind == .qwen3_8FlashNext ? QwenContract.companions : ModelContract.companions
+      for companion in companions {
         let data = try await read(path: companion.source)
         let url = try safeFileURL(root: partial, path: companion.destination)
         try fileManager.createDirectory(
@@ -165,7 +237,11 @@ struct Repacker {
         files: installedFiles,
         commonTensors: plan.commonTensors,
         expertRegions: plan.expertRegions,
-        dspark: plan.dspark
+        dspark: plan.dspark,
+        modelKind: plan.modelKind,
+        maximumContext: plan.maximumContext,
+        expertQuantization: plan.expertQuantization,
+        ngram: plan.ngram
       )
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -253,6 +329,25 @@ struct Repacker {
             }
           }
           position = end
+        }
+      }
+      for conversion in plan.expertConversions ?? []
+      where !invalidFiles.contains(conversion.destinationFile)
+      {
+        let layout = try conversionLayout(conversion, plan: plan)
+        let id = conversionChunkID(
+          conversion: conversion,
+          version: plan.expertQuantization?.conversionVersion ?? 0)
+        receipt?.completed[id] = try conversionDestinationDigest(
+          conversion: conversion, layout: layout, handles: handles)
+        preparedCount += 1
+        if preparedCount == receiptBatchSize, let receipt {
+          try persist(
+            receipt: receipt,
+            handles: handles,
+            dirtyFiles: &dirtyFiles,
+            receiptURL: receiptURL)
+          preparedCount = 0
         }
       }
       if let receipt {
@@ -388,6 +483,257 @@ struct Repacker {
 
   private func chunkID(sourceFile: String, range: Range<UInt64>) -> String {
     "\(sourceFile):\(range.lowerBound)-\(range.upperBound)"
+  }
+
+  private struct ConversionLayout: Sendable {
+    let rows: Int
+    let columns: Int
+    let scaleRows: Int
+    let scaleColumns: Int
+    let weight: ExpertRegion
+    let scale: ExpertRegion
+  }
+
+  private struct ConversionWork: Sendable {
+    let conversion: ExpertConversion
+    let layout: ConversionLayout
+    let range: Range<UInt64>
+    let scaleRange: Range<UInt64>
+    let id: String
+    let sourceByteCount: UInt64
+  }
+
+  private struct ConvertedChunk: Sendable {
+    let work: ConversionWork
+    let weights: Data
+    let scales: Data
+  }
+
+  private struct ConversionBatch: Sendable {
+    let sourceFile: String
+    let range: Range<UInt64>
+    let works: [ConversionWork]
+  }
+
+  private struct ConvertedBatch: Sendable {
+    let chunks: [ConvertedChunk]
+  }
+
+  private struct ScaleBundle: Sendable {
+    let range: Range<UInt64>
+    let data: Data
+  }
+
+  private func makeConversionBatches(_ works: [ConversionWork]) -> [ConversionBatch] {
+    let sorted = works.sorted {
+      ($0.conversion.sourceFile, $0.range.lowerBound)
+        < ($1.conversion.sourceFile, $1.range.lowerBound)
+    }
+    var batches: [ConversionBatch] = []
+    var current: [ConversionWork] = []
+    var sourceFile = ""
+    var range: Range<UInt64> = 0..<0
+    for work in sorted {
+      let canAppend = !current.isEmpty
+        && work.conversion.sourceFile == sourceFile
+        && work.range.lowerBound == range.upperBound
+        && work.range.upperBound - range.lowerBound <= conversionBatchSize
+      if canAppend {
+        current.append(work)
+        range = range.lowerBound..<work.range.upperBound
+        continue
+      }
+      if !current.isEmpty {
+        batches.append(ConversionBatch(sourceFile: sourceFile, range: range, works: current))
+      }
+      sourceFile = work.conversion.sourceFile
+      range = work.range
+      current = [work]
+    }
+    if !current.isEmpty {
+      batches.append(ConversionBatch(sourceFile: sourceFile, range: range, works: current))
+    }
+    return batches
+  }
+
+  private func readConversionScales(_ works: [ConversionWork]) async throws
+    -> [String: ScaleBundle]
+  {
+    var ranges: [String: Range<UInt64>] = [:]
+    for work in works {
+      let file = work.conversion.sourceScaleFile
+      if let range = ranges[file] {
+        let lowerBound = min(range.lowerBound, work.scaleRange.lowerBound)
+        let upperBound = max(range.upperBound, work.scaleRange.upperBound)
+        ranges[file] = lowerBound..<upperBound
+      } else {
+        ranges[file] = work.scaleRange
+      }
+    }
+    let requests = ranges.sorted { $0.key < $1.key }
+    return try await withThrowingTaskGroup(
+      of: (String, Range<UInt64>, Data).self,
+      returning: [String: ScaleBundle].self
+    ) { group in
+      var iterator = requests.makeIterator()
+      for _ in 0..<min(conversionConcurrency, requests.count) {
+        guard let request = iterator.next() else { break }
+        group.addTask {
+          (request.key, request.value, try await read(path: request.key, range: request.value))
+        }
+      }
+      var result: [String: ScaleBundle] = [:]
+      while let (file, range, data) = try await group.next() {
+        result[file] = ScaleBundle(range: range, data: data)
+        if let request = iterator.next() {
+          group.addTask {
+            (request.key, request.value, try await read(path: request.key, range: request.value))
+          }
+        }
+      }
+      return result
+    }
+  }
+
+  private func convert(
+    _ batch: ConversionBatch,
+    scaleBundles: [String: ScaleBundle]
+  ) async throws -> ConvertedBatch {
+    let sourceData = try await read(path: batch.sourceFile, range: batch.range)
+    var chunks: [ConvertedChunk] = []
+    chunks.reserveCapacity(batch.works.count)
+    for work in batch.works {
+      try Task.checkCancellation()
+      guard let scaleBundle = scaleBundles[work.conversion.sourceScaleFile],
+        batch.range.lowerBound <= work.range.lowerBound,
+        work.range.upperBound <= batch.range.upperBound,
+        scaleBundle.range.lowerBound <= work.scaleRange.lowerBound,
+        work.scaleRange.upperBound <= scaleBundle.range.upperBound
+      else {
+        throw RepackError.invalidPlan("MXFP4 source range is outside its download batch")
+      }
+      let sourceStart = Int(work.range.lowerBound - batch.range.lowerBound)
+      let sourceEnd = sourceStart + Int(work.range.count)
+      let scaleStart = Int(work.scaleRange.lowerBound - scaleBundle.range.lowerBound)
+      let scaleEnd = scaleStart + Int(work.scaleRange.count)
+      let quantized = try MXFP4.quantizeFP8(
+        Data(sourceData[sourceStart..<sourceEnd]),
+        inverseScales: Data(scaleBundle.data[scaleStart..<scaleEnd]),
+        rows: work.layout.rows,
+        columns: work.layout.columns)
+      chunks.append(
+        ConvertedChunk(work: work, weights: quantized.weights, scales: quantized.scales))
+    }
+    return ConvertedBatch(chunks: chunks)
+  }
+
+  private func conversionLayout(_ conversion: ExpertConversion, plan: RepackPlan) throws
+    -> ConversionLayout
+  {
+    guard conversion.sourceDType == "F8_E4M3", conversion.sourceShape.count == 2,
+      conversion.sourceScaleDType == "BF16", conversion.sourceScaleShape.count == 2,
+      let weight = plan.expertRegions.first(where: { $0.name == conversion.weightRegion }),
+      let scale = plan.expertRegions.first(where: { $0.name == conversion.scaleRegion })
+    else {
+      throw RepackError.invalidPlan("invalid MXFP4 conversion for \(conversion.tensor)")
+    }
+    let rows = conversion.sourceShape[0]
+    let columns = conversion.sourceShape[1]
+    let scaleRows = conversion.sourceScaleShape[0]
+    let scaleColumns = conversion.sourceScaleShape[1]
+    guard plan.expertQuantization?.mode == "mxfp4",
+      plan.expertQuantization?.bits == 4,
+      plan.expertQuantization?.groupSize == 32,
+      conversion.expert >= 0, conversion.expert < plan.expertCount,
+      conversion.destinationRow >= 0,
+      rows.isMultiple(of: 128), columns.isMultiple(of: 128),
+      scaleRows == rows / 128, scaleColumns == columns / 128,
+      UInt64((conversion.destinationRow + rows) * columns / 2) <= weight.length,
+      UInt64((conversion.destinationRow + rows) * columns / 32) <= scale.length
+    else {
+      throw RepackError.invalidPlan("MXFP4 conversion layout does not match the expert blob")
+    }
+    return ConversionLayout(
+      rows: rows, columns: columns, scaleRows: scaleRows, scaleColumns: scaleColumns,
+      weight: weight, scale: scale)
+  }
+
+  private func conversionSourceRange(
+    _ conversion: ExpertConversion,
+    layout: ConversionLayout
+  ) -> Range<UInt64> {
+    let bytes = UInt64(layout.rows * layout.columns)
+    return conversion.sourceOffset..<(conversion.sourceOffset + bytes)
+  }
+
+  private func conversionScaleRange(
+    _ conversion: ExpertConversion,
+    layout: ConversionLayout
+  ) -> Range<UInt64> {
+    let bytes = UInt64(layout.scaleRows * layout.scaleColumns * 2)
+    return conversion.sourceScaleOffset..<(conversion.sourceScaleOffset + bytes)
+  }
+
+  private func conversionChunkID(
+    conversion: ExpertConversion,
+    version: Int
+  ) -> String {
+    "mxfp4-v\(version):\(conversion.tensor)"
+  }
+
+  private func writeConversion(
+    _ quantized: (weights: Data, scales: Data),
+    conversion: ExpertConversion,
+    layout: ConversionLayout,
+    handles: [String: FileHandle],
+    dirtyFiles: inout Set<String>
+  ) throws -> String {
+    guard let handle = handles[conversion.destinationFile] else {
+      throw RepackError.invalidPlan("missing destination \(conversion.destinationFile)")
+    }
+    let base = UInt64(conversion.expert) * QwenContract.expertBlobSize
+    let weightOffset = UInt64(conversion.destinationRow * layout.columns / 2)
+    let scaleOffset = UInt64(conversion.destinationRow * layout.columns / 32)
+    try handle.seek(toOffset: base + layout.weight.offset + weightOffset)
+    try handle.write(contentsOf: quantized.weights)
+    try handle.seek(toOffset: base + layout.scale.offset + scaleOffset)
+    try handle.write(contentsOf: quantized.scales)
+    dirtyFiles.insert(conversion.destinationFile)
+    var hasher = SHA256()
+    hasher.update(data: quantized.weights)
+    hasher.update(data: quantized.scales)
+    return hex(hasher.finalize())
+  }
+
+  private func conversionDestinationDigest(
+    conversion: ExpertConversion,
+    layout: ConversionLayout,
+    handles: [String: FileHandle]
+  ) throws -> String {
+    guard let handle = handles[conversion.destinationFile] else {
+      throw RepackError.invalidPlan("missing destination \(conversion.destinationFile)")
+    }
+    let base = UInt64(conversion.expert) * QwenContract.expertBlobSize
+    var hasher = SHA256()
+    let slices = [
+      (layout.weight, UInt64(conversion.destinationRow * layout.columns / 2),
+        quantizedLength(rows: layout.rows, columns: layout.columns, divisor: 2)),
+      (layout.scale, UInt64(conversion.destinationRow * layout.columns / 32),
+        quantizedLength(rows: layout.rows, columns: layout.columns, divisor: 32)),
+    ]
+    for (region, offset, length) in slices {
+      try handle.seek(toOffset: base + region.offset + offset)
+      guard let data = try handle.read(upToCount: length), data.count == length
+      else {
+        throw RepackError.invalidPlan("cannot validate converted data for \(conversion.tensor)")
+      }
+      hasher.update(data: data)
+    }
+    return hex(hasher.finalize())
+  }
+
+  private func quantizedLength(rows: Int, columns: Int, divisor: Int) -> Int {
+    rows * columns / divisor
   }
 
   private func payloadByteCount(span: SourceSpan, range: Range<UInt64>) -> UInt64 {
@@ -551,7 +897,11 @@ public enum InstalledModel {
       expertBlobSize: current.expertBlobSize,
       files: files,
       commonTensors: current.commonTensors,
-      expertRegions: current.expertRegions
+      expertRegions: current.expertRegions,
+      modelKind: current.modelKind,
+      maximumContext: current.maximumContext,
+      expertQuantization: current.expertQuantization,
+      ngram: current.ngram
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -569,6 +919,9 @@ public enum InstalledModel {
     let root = root.standardizedFileURL
     let data = try Data(contentsOf: root.appendingPathComponent("manifest.json"))
     let manifest = try JSONDecoder().decode(InstalledManifest.self, from: data)
+    if manifest.formatVersion == 2 || manifest.modelKind == .qwen3_8FlashNext {
+      return try validateQwenManifest(manifest)
+    }
     guard manifest.formatVersion == 1,
       manifest.modelID == ModelContract.modelID,
       manifest.revision == ModelContract.revision,
@@ -647,6 +1000,68 @@ public enum InstalledModel {
         guard manifest.files.first(where: { $0.path == path })?.size == layerSize else {
           throw RepackError.invalidPlan("installed DSpark expert layer has an invalid size")
         }
+      }
+    }
+    return manifest
+  }
+
+  private static func validateQwenManifest(_ manifest: InstalledManifest) throws
+    -> InstalledManifest
+  {
+    guard manifest.formatVersion == 2,
+      manifest.modelKind == .qwen3_8FlashNext,
+      manifest.modelID == QwenContract.modelID,
+      manifest.revision == QwenContract.revision,
+      manifest.layerCount == QwenContract.layerCount,
+      manifest.expertCount == QwenContract.expertCount,
+      manifest.selectedExpertCount == QwenContract.selectedExpertCount,
+      manifest.expertBlobSize == QwenContract.expertBlobSize,
+      manifest.maximumContext == QwenContract.maximumContext,
+      manifest.expertRegions == QwenContract.expertRegions,
+      manifest.expertQuantization == QwenContract.quantization,
+      manifest.ngram == QwenContract.ngram,
+      manifest.dspark == nil
+    else {
+      throw RepackError.incompatibleModel(
+        "installed manifest does not match the pinned Qwen model contract")
+    }
+
+    let requiredPaths = Set(
+      [
+        "common.bin", "ngram.bin", "config.json", "generation_config.json",
+        "tokenizer/tokenizer.json", "tokenizer/tokenizer_config.json",
+        "tokenizer/chat_template.jinja", "tokenizer/vocab.json", "tokenizer/merges.txt",
+      ] + (0..<QwenContract.layerCount).map {
+        String(format: "experts/layer_%02d.bin", $0)
+      })
+    let actualPaths = Set(manifest.files.map(\.path))
+    guard actualPaths == requiredPaths, manifest.files.count == actualPaths.count else {
+      throw RepackError.invalidPlan("installed Qwen manifest has an incomplete file set")
+    }
+    let layerSize = UInt64(QwenContract.expertCount) * QwenContract.expertBlobSize
+    for layer in 0..<QwenContract.layerCount {
+      let path = String(format: "experts/layer_%02d.bin", layer)
+      guard manifest.files.first(where: { $0.path == path })?.size == layerSize else {
+        throw RepackError.invalidPlan("installed Qwen expert layer has an invalid size")
+      }
+    }
+    guard let commonSize = manifest.files.first(where: { $0.path == "common.bin" })?.size,
+      let ngramSize = manifest.files.first(where: { $0.path == "ngram.bin" })?.size,
+      ngramSize == UInt64(QwenContract.ngramShardCount * QwenContract.ngramShardRowCount
+        * QwenContract.ngramRowBytes),
+      !manifest.commonTensors.isEmpty
+    else {
+      throw RepackError.invalidPlan("installed Qwen tensor files have an invalid size")
+    }
+    var names = Set<String>()
+    for tensor in manifest.commonTensors {
+      guard !tensor.name.hasPrefix("model.visual."), !tensor.name.hasPrefix("mtp."),
+        !tensor.name.contains("ngram_embedding.shard_"),
+        names.insert(tensor.name).inserted,
+        tensor.offset <= commonSize,
+        tensor.length <= commonSize - tensor.offset
+      else {
+        throw RepackError.invalidPlan("invalid Qwen common tensor \(tensor.name)")
       }
     }
     return manifest

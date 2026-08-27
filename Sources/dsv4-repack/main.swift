@@ -19,11 +19,11 @@ struct CLI {
     }
     switch command {
     case "inspect":
-      let plan = try await DeepSeekV4Checkpoint().makeRepackPlan()
+      let plan = try await makePlan(model: modelSelection(in: arguments))
       printSummary(plan)
     case "plan":
       let output = try value(after: "--output", in: arguments)
-      let plan = try await DeepSeekV4Checkpoint().makeRepackPlan()
+      let plan = try await makePlan(model: modelSelection(in: arguments))
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
       let url = URL(fileURLWithPath: output).standardizedFileURL
@@ -36,16 +36,25 @@ struct CLI {
     case "repack":
       let output = try value(after: "--output", in: arguments)
       let printer = ProgressPrinter()
-      let checkpoint = DeepSeekV4Checkpoint()
       let outputURL = URL(fileURLWithPath: output)
       let progress: @Sendable (RepackProgress) -> Void = { printer.update($0) }
       let manifest: InstalledManifest
       if let planPath = optionalValue(after: "--plan", in: arguments) {
         let data = try Data(contentsOf: URL(fileURLWithPath: planPath))
         let plan = try JSONDecoder().decode(RepackPlan.self, from: data)
-        manifest = try await checkpoint.repack(plan: plan, to: outputURL, progress: progress)
+        if plan.modelKind == .qwen3_8FlashNext {
+          manifest = try await QwenFlashNextCheckpoint().repack(
+            plan: plan, to: outputURL, progress: progress)
+        } else {
+          manifest = try await DeepSeekV4Checkpoint().repack(
+            plan: plan, to: outputURL, progress: progress)
+        }
+      } else if try modelSelection(in: arguments) == .qwen3_8FlashNext {
+        manifest = try await QwenFlashNextCheckpoint().repack(
+          to: outputURL, progress: progress)
       } else {
-        manifest = try await checkpoint.repack(to: outputURL, progress: progress)
+        manifest = try await DeepSeekV4Checkpoint().repack(
+          to: outputURL, progress: progress)
       }
       print("installed: \(output)")
       print("files: \(manifest.files.count)")
@@ -84,6 +93,24 @@ struct CLI {
     return arguments[index + 1]
   }
 
+  private static func modelSelection(in arguments: [String]) throws -> ModelKind {
+    guard let value = optionalValue(after: "--model", in: arguments) else {
+      return .deepSeekV4
+    }
+    switch value {
+    case "deepseek-v4", "deepseek-v4-flash-0731": return .deepSeekV4
+    case "qwen3.8-flash-next": return .qwen3_8FlashNext
+    default: throw RepackError.invalidPlan("unknown model \(value)")
+    }
+  }
+
+  private static func makePlan(model: ModelKind) async throws -> RepackPlan {
+    switch model {
+    case .deepSeekV4: return try await DeepSeekV4Checkpoint().makeRepackPlan()
+    case .qwen3_8FlashNext: return try await QwenFlashNextCheckpoint().makeRepackPlan()
+    }
+  }
+
   private static func optionalValue(after option: String, in arguments: [String]) -> String? {
     guard let index = arguments.firstIndex(of: option), arguments.indices.contains(index + 1)
     else {
@@ -120,6 +147,7 @@ struct CLI {
     print("layers: \(plan.layerCount)")
     print("experts per layer: \(plan.expertCount)")
     print("expert blob: \(plan.expertBlobSize) bytes")
+    print("checkpoint tensor bytes: \(plan.checkpointTensorBytes)")
     print("installed weight bytes: \(plan.installedBytes)")
     print("copy operations: \(plan.copies.count)")
   }
@@ -128,9 +156,9 @@ struct CLI {
     print(
       """
       Usage:
-        dsv4-repack inspect
-        dsv4-repack plan --output plan.json
-        dsv4-repack repack --output deepseek-v4-flash-0731.dsv4 [--plan plan.json]
+        dsv4-repack inspect [--model qwen3.8-flash-next]
+        dsv4-repack plan [--model qwen3.8-flash-next] --output plan.json
+        dsv4-repack repack [--model qwen3.8-flash-next] --output MODEL.dsv4 [--plan plan.json]
         dsv4-repack verify --model deepseek-v4-flash-0731.dsv4
         dsv4-repack install-dspark --model deepseek-v4-flash-0731.dsv4
         dsv4-repack benchmark --model deepseek-v4-flash-0731.dsv4 [--samples 32]
@@ -149,6 +177,6 @@ private final class ProgressPrinter: @unchecked Sendable {
     defer { lock.unlock() }
     guard percent != lastPercent else { return }
     lastPercent = percent
-    print("repack: \(percent)%")
+    FileHandle.standardOutput.write(Data("repack: \(percent)%\n".utf8))
   }
 }

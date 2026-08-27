@@ -28,6 +28,27 @@ final class DeepSeekRepackTests: XCTestCase {
     XCTAssertEqual(secondExpert.destinationOffset, 13_369_344)
   }
 
+  func testFormatOnePlanDecodesWithoutFormatTwoFields() throws {
+    let fixture = makePlannerFixture()
+    let plan = try RepackPlanner.makePlan(index: fixture.index, tensors: fixture.tensors)
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as? [String: Any]
+    )
+    for key in [
+      "modelKind", "maximumContext", "expertQuantization", "ngram", "expertConversions",
+    ] {
+      object.removeValue(forKey: key)
+    }
+
+    let decoded = try JSONDecoder().decode(
+      RepackPlan.self, from: JSONSerialization.data(withJSONObject: object))
+
+    XCTAssertEqual(decoded.formatVersion, 1)
+    XCTAssertNil(decoded.modelKind)
+    XCTAssertNil(decoded.expertQuantization)
+    XCTAssertNil(decoded.ngram)
+  }
+
   func testPlannerRejectsMissingExpertTensor() throws {
     var fixture = makePlannerFixture()
     let missing = "layers.42.ffn.experts.255.w3.scale"
@@ -237,6 +258,194 @@ final class DeepSeekRepackTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: output.appendingPathComponent("common.bin")), Data(1...4))
     XCTAssertTrue(try InstalledModel.audit(manifest: repaired, at: output).isValid)
   }
+
+  func testMXFP4MatchesMLXFixedVector() throws {
+    let values: [Float] = [
+      0.5, 1, 1.5, 2, 3, 4, 6, -0.5, -1, -1.5, -2, -3, -4, -6,
+    ] + Array(repeating: 0, count: 18)
+    let source = Data(values.flatMap { value -> [UInt8] in
+      let bits = UInt16(value.bitPattern >> 16)
+      return [UInt8(bits & 0xff), UInt8(bits >> 8)]
+    })
+
+    let result = try MXFP4.quantizeBF16(source, rows: 1, columns: 32)
+
+    XCTAssertEqual(
+      [UInt8](result.weights),
+      [0x21, 0x43, 0x65, 0x97, 0xba, 0xdc, 0xfe] + Array(repeating: 0, count: 9))
+    XCTAssertEqual([UInt8](result.scales), [127])
+  }
+
+  func testMXFP4MatchesMLXBF16Rows() throws {
+    let bits: [UInt16] = [
+      49381, 49134, 16475, 49335, 48859, 16539, 49289, 16256,
+      16585, 49207, 16411, 49367, 49079, 16503, 49321, 0,
+      16553, 49271, 16311, 16599, 49179, 16439, 49353, 49024,
+      16521, 49307, 16091, 16567, 49243, 16366, 16613, 49152,
+      16466, 49339, 48914, 16535, 49294, 16219, 16581, 49216,
+      16402, 49371, 49097, 16494, 49326, 48658, 16549, 49280,
+      16293, 16594, 49189, 16430, 49358, 49042, 16517, 49312,
+      16018, 16562, 49253, 16347, 16608, 49161, 16457, 49344,
+    ]
+    let source = Data(bits.flatMap { [UInt8($0 & 0xff), UInt8($0 >> 8)] })
+
+    let result = try MXFP4.quantizeBF16(source, rows: 2, columns: 32)
+
+    XCTAssertEqual(
+      [UInt8](result.weights),
+      [
+        207, 245, 105, 46, 215, 244, 107, 15, 231, 115, 92, 175, 230, 113, 77, 199,
+        245, 105, 46, 215, 244, 107, 143, 231, 115, 93, 175, 230, 113, 62, 199, 245,
+      ])
+    XCTAssertEqual([UInt8](result.scales), [127, 127])
+  }
+
+  func testMXFP4ConvertsOfficialFP8Blocks() throws {
+    let firstRow: [UInt8] = [
+      0x30, 0x38, 0x3c, 0x40, 0x44, 0x48, 0x4c,
+      0xb0, 0xb8, 0xbc, 0xc0, 0xc4, 0xc8, 0xcc,
+    ] + Array(repeating: 0, count: 114)
+    let source = Data(firstRow + Array(repeating: 0, count: 127 * 128))
+    let result = try MXFP4.quantizeFP8(
+      source,
+      inverseScales: Data([0x80, 0x3f]),
+      rows: 128,
+      columns: 128)
+
+    XCTAssertEqual(
+      [UInt8](result.weights.prefix(16)),
+      [0x21, 0x43, 0x65, 0x97, 0xba, 0xdc, 0xfe] + Array(repeating: 0, count: 9))
+    XCTAssertEqual([UInt8](result.scales.prefix(4)), [127, 0, 0, 0])
+  }
+
+  func testMXFP4FP8ConversionMatchesMLXFixedVector() throws {
+    let source = Data((0..<(128 * 128)).map { index -> UInt8 in
+      let value = UInt8(truncatingIfNeeded: index * 37 + 11)
+      return value & 0x7f == 0x7f ? value ^ 1 : value
+    })
+    let result = try MXFP4.quantizeFP8(
+      source,
+      inverseScales: Data([0x40, 0x3f]),
+      rows: 128,
+      columns: 128)
+
+    XCTAssertEqual(
+      sha256(result.weights),
+      "7c332f3b69c7e580b8f3dd7c89bf44d18f81debfb17a648a7d131e28907a3b71")
+    XCTAssertEqual(
+      sha256(result.scales),
+      "0fecfb3515a322ce43dca1e7d6115fcf2c1f34d474774097fb4eededdcc6cf49")
+  }
+
+  func testQwenPlannerCreatesFormatTwoAndExcludesVisionAndMTP() throws {
+    let fixture = makeQwenPlannerFixture()
+    let plan = try QwenPlanner.makePlan(index: fixture.index, tensors: fixture.tensors)
+
+    XCTAssertEqual(plan.formatVersion, 2)
+    XCTAssertEqual(plan.modelKind, .qwen3_8FlashNext)
+    XCTAssertEqual(plan.revision, QwenContract.revision)
+    XCTAssertEqual(plan.maximumContext, 262_144)
+    XCTAssertEqual(plan.expertBlobSize, 2_611_200)
+    XCTAssertEqual(plan.files.count, 50)
+    XCTAssertEqual(plan.expertConversions?.count, 48 * 512 * 3)
+    XCTAssertEqual(plan.ngram?.dtype, "F8_E4M3")
+    XCTAssertEqual(plan.ngram?.rowBytes, 160)
+    XCTAssertEqual(plan.ngram?.headOffsets.count, 16)
+    XCTAssertEqual(
+      plan.commonTensors.map(\.name),
+      [
+        "model.language_model.embed_tokens.weight",
+        QwenContract.ngramScaleName,
+      ])
+    XCTAssertFalse(plan.copies.contains { $0.tensor.hasPrefix("model.visual.") })
+    XCTAssertFalse(plan.copies.contains { $0.tensor.hasPrefix("mtp.") })
+  }
+
+  func testQwenConversionCanRepairOneDamagedExpertLayer() async throws {
+    let gateBytes = QwenContract.expertIntermediateSize * QwenContract.hiddenSize
+    let downBytes = QwenContract.hiddenSize * QwenContract.expertIntermediateSize
+    let scaleBytes = 5 * 20 * 2
+    var files = qwenCompanionFiles()
+    files["common"] = Data([7])
+    files["gate"] = Data(repeating: 0, count: gateBytes)
+    files["up"] = Data(repeating: 0, count: gateBytes)
+    files["down"] = Data(repeating: 0, count: downBytes)
+    files["gate-scale"] = Data(repeating: 0, count: scaleBytes)
+    files["up-scale"] = Data(repeating: 0, count: scaleBytes)
+    files["down-scale"] = Data(repeating: 0, count: scaleBytes)
+    let source = MemoryCheckpointSource(files: files)
+    let plan = RepackPlan(
+      formatVersion: 2,
+      modelID: QwenContract.modelID,
+      revision: QwenContract.revision,
+      layerCount: 1,
+      expertCount: 1,
+      selectedExpertCount: 1,
+      expertBlobSize: QwenContract.expertBlobSize,
+      checkpointTensorBytes: UInt64(1 + gateBytes * 2 + downBytes + scaleBytes * 3),
+      files: [
+        PlannedFile(path: "common.bin", size: 1),
+        PlannedFile(path: "experts/layer_00.bin", size: QwenContract.expertBlobSize),
+      ],
+      commonTensors: [
+        InstalledTensor(name: "fixture", dtype: "U8", shape: [1], offset: 0, length: 1)
+      ],
+      expertRegions: QwenContract.expertRegions,
+      copies: [
+        TensorCopy(
+          tensor: "fixture", sourceFile: "common", sourceOffset: 0, length: 1,
+          destinationFile: "common.bin", destinationOffset: 0)
+      ],
+      modelKind: .qwen3_8FlashNext,
+      maximumContext: QwenContract.maximumContext,
+      expertQuantization: QwenContract.quantization,
+      expertConversions: [
+        ExpertConversion(
+          tensor: "gate", sourceFile: "gate", sourceOffset: 0, sourceDType: "F8_E4M3",
+          sourceShape: [QwenContract.expertIntermediateSize, QwenContract.hiddenSize],
+          sourceScaleTensor: "gate-scale", sourceScaleFile: "gate-scale",
+          sourceScaleOffset: 0, sourceScaleDType: "BF16", sourceScaleShape: [5, 20],
+          destinationFile: "experts/layer_00.bin", expert: 0, destinationRow: 0,
+          weightRegion: "gate_up.weight",
+          scaleRegion: "gate_up.scale"),
+        ExpertConversion(
+          tensor: "up", sourceFile: "up", sourceOffset: 0, sourceDType: "F8_E4M3",
+          sourceShape: [QwenContract.expertIntermediateSize, QwenContract.hiddenSize],
+          sourceScaleTensor: "up-scale", sourceScaleFile: "up-scale",
+          sourceScaleOffset: 0, sourceScaleDType: "BF16", sourceScaleShape: [5, 20],
+          destinationFile: "experts/layer_00.bin", expert: 0,
+          destinationRow: QwenContract.expertIntermediateSize,
+          weightRegion: "gate_up.weight", scaleRegion: "gate_up.scale"),
+        ExpertConversion(
+          tensor: "down", sourceFile: "down", sourceOffset: 0, sourceDType: "F8_E4M3",
+          sourceShape: [QwenContract.hiddenSize, QwenContract.expertIntermediateSize],
+          sourceScaleTensor: "down-scale", sourceScaleFile: "down-scale",
+          sourceScaleOffset: 0, sourceScaleDType: "BF16", sourceScaleShape: [20, 5],
+          destinationFile: "experts/layer_00.bin", expert: 0, destinationRow: 0,
+          weightRegion: "down.weight",
+          scaleRegion: "down.scale"),
+      ]
+    )
+    let parent = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let output = parent.appendingPathComponent("qwen.dsv4")
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+    defer { try? FileManager.default.removeItem(at: parent) }
+
+    let manifest = try await Repacker(source: source).run(
+      plan: plan, output: output, progress: nil)
+    let layer = output.appendingPathComponent("experts/layer_00.bin")
+    XCTAssertEqual(try Data(contentsOf: layer), Data(repeating: 0, count: 2_611_200))
+    let handle = try FileHandle(forWritingTo: layer)
+    try handle.write(contentsOf: Data([1]))
+    try handle.close()
+    XCTAssertEqual(
+      try InstalledModel.audit(manifest: manifest, at: output).issues.first?.kind,
+      .checksumMismatch)
+
+    let repaired = try await Repacker(source: source).repair(
+      plan: plan, output: output, invalidFiles: ["experts/layer_00.bin"], progress: nil)
+    XCTAssertTrue(try InstalledModel.audit(manifest: repaired, at: output).isValid)
+  }
 }
 
 private struct PlannerFixture {
@@ -315,6 +524,56 @@ private func makePlannerFixture(includeDSpark: Bool = false) -> PlannerFixture {
   )
 }
 
+private func makeQwenPlannerFixture() -> PlannerFixture {
+  var tensors: [String: SafeTensor] = [:]
+  var weightMap: [String: String] = [:]
+  var offset: UInt64 = 0
+
+  func add(_ name: String, shape: [Int], dtype: String = "BF16") {
+    let itemSize: UInt64 = dtype == "I64" ? 8 : (dtype == "F8_E4M3" ? 1 : 2)
+    let length = shape.reduce(itemSize) { $0 * UInt64($1) }
+    let tensor = SafeTensor(
+      name: name, sourceFile: "fixture.safetensors", dtype: dtype, shape: shape,
+      sourceOffset: offset, length: length)
+    tensors[name] = tensor
+    weightMap[name] = tensor.sourceFile
+    offset += length
+  }
+
+  add("model.language_model.embed_tokens.weight", shape: [2, 2])
+  add("model.visual.blocks.0.weight", shape: [2, 2])
+  add("mtp.layers.0.weight", shape: [2, 2])
+  add(
+    "model.language_model.layers.1.ple.ple_embedding.ngram_heads_offsets",
+    shape: [16], dtype: "I64")
+  add(
+    "model.language_model.layers.1.ple.ple_embedding.ngram_heads_vocab_sizes",
+    shape: [16], dtype: "I64")
+  for shard in 0..<QwenContract.ngramShardCount {
+    add(
+      "model.language_model.layers.1.ple.ple_embedding.ngram_embedding.shard_\(shard).weight",
+      shape: [QwenContract.ngramShardRowCount, QwenContract.ngramRowBytes],
+      dtype: "F8_E4M3")
+  }
+  add(QwenContract.ngramScaleName, shape: [1])
+  for layer in 0..<QwenContract.layerCount {
+    for expert in 0..<QwenContract.expertCount {
+      for projection in ["gate_proj", "up_proj", "down_proj"] {
+        let rows = projection == "down_proj"
+          ? QwenContract.hiddenSize : QwenContract.expertIntermediateSize
+        let columns = projection == "down_proj"
+          ? QwenContract.expertIntermediateSize : QwenContract.hiddenSize
+        let prefix =
+          "model.language_model.layers.\(layer).mlp.experts.\(expert).\(projection)"
+        add("\(prefix).weight", shape: [rows, columns], dtype: "F8_E4M3")
+        add("\(prefix).weight_scale_inv", shape: [rows / 128, columns / 128])
+      }
+    }
+  }
+  return PlannerFixture(
+    index: CheckpointIndex(totalSize: offset, weightMap: weightMap), tensors: tensors)
+}
+
 private struct MemoryCheckpointSource: CheckpointSource {
   let files: [String: Data]
 
@@ -368,6 +627,13 @@ private actor FailingCheckpointSource: CheckpointSource {
 private func companionFiles() -> [String: Data] {
   Dictionary(
     uniqueKeysWithValues: ModelContract.companions.map {
+      ($0.source, Data($0.source.utf8))
+    })
+}
+
+private func qwenCompanionFiles() -> [String: Data] {
+  Dictionary(
+    uniqueKeysWithValues: QwenContract.companions.map {
       ($0.source, Data($0.source.utf8))
     })
 }

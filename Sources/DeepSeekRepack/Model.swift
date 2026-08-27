@@ -5,6 +5,11 @@ struct CompanionFile: Sendable {
   let destination: String
 }
 
+public enum ModelKind: String, Codable, Equatable, Sendable {
+  case deepSeekV4 = "deepseek-v4"
+  case qwen3_8FlashNext = "qwen3.8-flash-next"
+}
+
 enum ModelContract {
   static let modelID = "deepseek-ai/DeepSeek-V4-Flash-0731"
   static let revision = "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
@@ -188,6 +193,100 @@ public struct DSparkDescriptor: Codable, Equatable, Sendable {
   public let commonTensors: [InstalledTensor]
 }
 
+public struct ExpertQuantizationDescriptor: Codable, Equatable, Sendable {
+  public let mode: String
+  public let bits: Int
+  public let groupSize: Int
+  public let conversionVersion: Int
+
+  public init(mode: String, bits: Int, groupSize: Int, conversionVersion: Int) {
+    self.mode = mode
+    self.bits = bits
+    self.groupSize = groupSize
+    self.conversionVersion = conversionVersion
+  }
+}
+
+public struct NGramDescriptor: Codable, Equatable, Sendable {
+  public let file: String
+  public let dtype: String
+  public let rowBytes: Int
+  public let shardCount: Int
+  public let shardRowCount: Int
+  public let headOffsets: [Int64]
+  public let headVocabSizes: [Int64]
+
+  public init(
+    file: String,
+    dtype: String,
+    rowBytes: Int,
+    shardCount: Int,
+    shardRowCount: Int,
+    headOffsets: [Int64],
+    headVocabSizes: [Int64]
+  ) {
+    self.file = file
+    self.dtype = dtype
+    self.rowBytes = rowBytes
+    self.shardCount = shardCount
+    self.shardRowCount = shardRowCount
+    self.headOffsets = headOffsets
+    self.headVocabSizes = headVocabSizes
+  }
+}
+
+public struct ExpertConversion: Codable, Equatable, Sendable {
+  public let tensor: String
+  public let sourceFile: String
+  public let sourceOffset: UInt64
+  public let sourceDType: String
+  public let sourceShape: [Int]
+  public let sourceScaleTensor: String
+  public let sourceScaleFile: String
+  public let sourceScaleOffset: UInt64
+  public let sourceScaleDType: String
+  public let sourceScaleShape: [Int]
+  public let destinationFile: String
+  public let expert: Int
+  public let destinationRow: Int
+  public let weightRegion: String
+  public let scaleRegion: String
+
+  public init(
+    tensor: String,
+    sourceFile: String,
+    sourceOffset: UInt64,
+    sourceDType: String,
+    sourceShape: [Int],
+    sourceScaleTensor: String,
+    sourceScaleFile: String,
+    sourceScaleOffset: UInt64,
+    sourceScaleDType: String,
+    sourceScaleShape: [Int],
+    destinationFile: String,
+    expert: Int,
+    destinationRow: Int,
+    weightRegion: String,
+    scaleRegion: String
+  ) {
+    self.tensor = tensor
+    self.sourceFile = sourceFile
+    self.sourceOffset = sourceOffset
+    self.sourceDType = sourceDType
+    self.sourceShape = sourceShape
+    self.sourceScaleTensor = sourceScaleTensor
+    self.sourceScaleFile = sourceScaleFile
+    self.sourceScaleOffset = sourceScaleOffset
+    self.sourceScaleDType = sourceScaleDType
+    self.sourceScaleShape = sourceScaleShape
+    self.destinationFile = destinationFile
+    self.expert = expert
+    self.destinationRow = destinationRow
+    self.weightRegion = weightRegion
+    self.scaleRegion = scaleRegion
+  }
+}
+
 public struct RepackPlan: Codable, Equatable, Sendable {
   public let formatVersion: Int
   public let modelID: String
@@ -202,6 +301,11 @@ public struct RepackPlan: Codable, Equatable, Sendable {
   public let expertRegions: [ExpertRegion]
   public let dspark: DSparkDescriptor?
   public let copies: [TensorCopy]
+  public let modelKind: ModelKind?
+  public let maximumContext: Int?
+  public let expertQuantization: ExpertQuantizationDescriptor?
+  public let ngram: NGramDescriptor?
+  public let expertConversions: [ExpertConversion]?
 
   public var installedBytes: UInt64 { files.reduce(0) { $0 + $1.size } }
 
@@ -218,7 +322,12 @@ public struct RepackPlan: Codable, Equatable, Sendable {
     commonTensors: [InstalledTensor],
     expertRegions: [ExpertRegion],
     dspark: DSparkDescriptor? = nil,
-    copies: [TensorCopy]
+    copies: [TensorCopy],
+    modelKind: ModelKind? = nil,
+    maximumContext: Int? = nil,
+    expertQuantization: ExpertQuantizationDescriptor? = nil,
+    ngram: NGramDescriptor? = nil,
+    expertConversions: [ExpertConversion]? = nil
   ) {
     self.formatVersion = formatVersion
     self.modelID = modelID
@@ -233,6 +342,11 @@ public struct RepackPlan: Codable, Equatable, Sendable {
     self.expertRegions = expertRegions
     self.dspark = dspark
     self.copies = copies
+    self.modelKind = modelKind
+    self.maximumContext = maximumContext
+    self.expertQuantization = expertQuantization
+    self.ngram = ngram
+    self.expertConversions = expertConversions
   }
 }
 
@@ -254,6 +368,10 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
   public let commonTensors: [InstalledTensor]
   public let expertRegions: [ExpertRegion]
   public let dspark: DSparkDescriptor?
+  public let modelKind: ModelKind?
+  public let maximumContext: Int?
+  public let expertQuantization: ExpertQuantizationDescriptor?
+  public let ngram: NGramDescriptor?
 
   public init(
     formatVersion: Int,
@@ -266,7 +384,11 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     files: [InstalledFile],
     commonTensors: [InstalledTensor],
     expertRegions: [ExpertRegion],
-    dspark: DSparkDescriptor? = nil
+    dspark: DSparkDescriptor? = nil,
+    modelKind: ModelKind? = nil,
+    maximumContext: Int? = nil,
+    expertQuantization: ExpertQuantizationDescriptor? = nil,
+    ngram: NGramDescriptor? = nil
   ) {
     self.formatVersion = formatVersion
     self.modelID = modelID
@@ -279,6 +401,10 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     self.commonTensors = commonTensors
     self.expertRegions = expertRegions
     self.dspark = dspark
+    self.modelKind = modelKind
+    self.maximumContext = maximumContext
+    self.expertQuantization = expertQuantization
+    self.ngram = ngram
   }
 }
 
