@@ -27,6 +27,14 @@ DEEPSEEK_API_KEY=local-key make server
 MODEL=/path/to/model.dsv4 HOST=127.0.0.1 PORT=11434 make server
 ```
 
+Research-only runs can start the Python server with
+`--expert-file-cache-policy bypass`; production and APP startup use the
+`cached` default. The bypass setting applies only to expert-file descriptors
+and is not a system-wide cache purge.
+Atomic DSpark prefix reuse is a separate default-off research option:
+`--dspark --dspark-prompt-cache`. The second flag is rejected without
+`--dspark`; the APP does not enable it by default.
+
 ## 驗證與網路邊界
 
 本機 host 可以不設定 API key。
@@ -337,6 +345,76 @@ server restart 會還原 command-line 預設值。
 
 `runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
 `null` 代表 routed expert SSD 讀取速度沒有限制。
+`runtime.expert_page_cache_probe` 表示 research-only pre-read `mincore` probe 是否啟用；
+預設為 `false`。`performance.request_expert_page_cache_*` 將本次 logical expert reads
+分為讀取前 resident、nonresident 與 unclassified bytes，並回報 calls／failures。
+Nonresident 是 expert-file-specific page-cache-miss proxy，不是 physical SSD bytes。
+`performance.dspark_draft_page_cache_*` 與
+`performance.dspark_hash_prefetch_*_page_cache_*` 分別保存 draft 與 exact hash-prefetch
+useful／wasted partition。Probe 本身會改變 timing，不應在服務模式預設開啟。
+`runtime.expert_file_cache_policy` 是 `cached` 或 `bypass`；預設為 `cached`。
+`runtime.expert_file_direct_io_alignment_bytes` 是目前 expert descriptors 要求的
+alignment，cached mode 為 0，本次 APFS bypass mode 為 4,096。Darwin bypass mode
+會對 main 與 DSpark expert descriptors 設定 `F_NOCACHE` 並停用 read-ahead；它不清除
+啟用前已 resident 的 pages。若 destination、offset 或 iovec length 不符合 alignment，
+runtime 會拒絕該 read。
+`performance.request_staged_expert_reads`、`request_staged_w13_bytes_read`、
+`request_staged_w2_bytes_read`、`request_staged_read_seconds`、
+`request_staged_w2_wait_seconds` 與 `request_staged_first_stage_submit_seconds`
+只供 stopped split-slot research prototype 計帳。一般 server 全部回傳 0；本 API、CLI
+與 APP 都沒有啟用 `staged_expert_streaming` 的介面。First-stage submit 是 CPU graph
+submission wall，不是 GPU kernel duration。
+`performance.request_adaptive_prefill_planned_layers`、
+`request_adaptive_prefill_full_layers`、`request_adaptive_prefill_selective_layers`、
+`request_adaptive_prefill_union_experts`、`request_adaptive_prefill_read_experts`、
+`request_adaptive_prefill_bytes_read`、`request_adaptive_prefill_avoided_bytes` 與
+`request_adaptive_prefill_plan_seconds` 只供 stopped adaptive prefill research
+prototype 計帳。一般 server 全部回傳 0；本 API、CLI 與 APP 都沒有啟用 internal
+`adaptive_expert_prefill_threshold` 的介面。Adaptive batched bytes 只在 read futures
+成功後累加，且已包含於 `request_expert_bytes_read`；avoided bytes 是相對 42 層
+full-layer logical budget，不是 physical SSD bytes。
+`runtime.dspark_prompt_cache` 表示 atomic target-KV + DSpark-context prefix
+reuse 是否啟用，預設為 `false`，且需要 DSpark。它使用獨立 format-3 namespace，不會讀取
+一般 target-only prompt entries。`performance.dspark_prompt_cache_source` 回報最近一次
+request 的 `disabled`、`none`、`memory` 或 `persistent`；啟用 gate 只把後三者視為 reuse
+contract 狀態。`performance.prompt_cache_reused_tokens` 同時回報實際重用的 prefix 長度。
+一般 target-only persistent cache 預設使用 format 4；它會驗證 model／RoPE／KV／attention
+contract 與 content-addressed token-block chain，並可在 suffix 分岔時重用已保存的 bounded
+prefill checkpoint。這不需要額外 API flag。舊 normal format 1／2 不再載入。
+`runtime.dspark_hash_prefetch` 表示實驗性 exact prefetch 是否啟用；
+`runtime.dspark_hash_prefetch_scratch_slots` 是 main model verification scratch 的
+expert blob slot 數，停用時為 0。`runtime.dspark_adaptive_block` 表示 storage-aware
+DSpark verification prefix selector 是否啟用。兩個實驗開關都預設為 `false`，也都
+需要 DSpark；adaptive selector 另要求 installed model 的 target hash layers。
+`runtime.dspark_fallback_enabled` 預設為 `true`。`--no-dspark-fallback` 只供隔離的
+研究控制使用；它不代表建議的服務設定，也不會把 would-trigger round 變成效能證據。
+`runtime.dspark_sequential_verification` 表示逐 token target verification oracle 是否啟用；
+預設為 `false`，只供 correctness diagnosis。`--dspark-sequential-verification` 需要
+DSpark，且不能與 `--dspark-hash-prefetch` 同時使用，避免 speculative scratch 改變
+ready-expert execution path。
+`runtime.dspark_hybrid_verification` 表示 token-shaped hybrid target verifier 是否啟用；
+預設為 `false`，需要 DSpark，且與 sequential oracle 互斥。Hybrid 可與 hash prefetch
+或 adaptive selector 組合；它逐 token 執行 target math，但每層只 acquire 一次
+expert union。
+
+`performance.dspark_block_verification_rounds`、
+`performance.dspark_sequential_verification_rounds` 與
+`performance.dspark_hybrid_verification_rounds` 分開記錄 verifier mode。
+`performance.dspark_hybrid_attention_layers`、
+`performance.dspark_hybrid_attention_token_calls`、
+`performance.dspark_hybrid_ffn_token_calls`、
+`performance.dspark_hybrid_moe_token_calls` 與
+`performance.dspark_last_hybrid_verification_positions` 證明 hybrid token-shaped path
+實際執行。`performance.dspark_last_verification_mode`、
+`performance.dspark_last_sequential_position_seconds` 與 round trace 另保存最近一輪
+mode、sequential／hybrid position 數。
+
+`performance.dspark_verification_expert_union_calls` 是本次 request 的 target
+verification／replay `get_many` acquisition 總次數。它必須和
+`dspark_verification_routed_expert_assignments`、
+`dspark_verification_expert_union_experts`、reuse、misses、target bytes 與 read time
+一起解讀。Calls 減少只證明 acquisition batching；不等於 expert bytes 或 target math
+一定更快。
 
 ## Error
 
