@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+  "method": "decode an exact filler token prefix, append a fixed instruction suffix, then verify runtime encoding",
+  "filler": "Background reference: SSD expert routing, cache residency, verification, and deterministic decoding are being audited. ",
+  "prompts": [
+    {
+      "name": "storage_sentence",
+      "target_tokens": 4096,
+      "file": "storage_sentence-4096.txt",
+      "suffix": "\n\nWrite one short sentence about storage.",
+      "separator_padding": " \n\n",
+      "text_sha256": "46092169bd8c41d520cf8b284344149d997f5f7172b0e0f498ebbc558c508633",
+      "prompt_token_sha256": "af84f5ac5fbdebc1fe09c568b5c58fd64245e10079d5320d67ee1e21b67327e1"
+    },
+    {
+      "name": "creative_metaphor",
+      "target_tokens": 4096,
+      "file": "creative_metaphor-4096.txt",
+      "suffix": "\n\nWrite one original seven-word metaphor about memory. Output only the metaphor.",
+      "separator_padding": " \n\n",
+      "text_sha256": "558e6192e79bb4924e5932b8f19e2961821d0750fbcd2775dfacff8d949add60",
+      "prompt_token_sha256": "e31c8a88ae01e0180f8e533ccc4e86bb05b3bf1eeb6a78a37ad2764507b0d4f2"
+    },
+    {
+      "name": "balanced_choice",
+      "target_tokens": 4096,
+      "file": "balanced_choice-4096.txt",
+      "suffix": "\n\nChoose exactly one of alpha or beta. Both choices are equally valid. Reply with only the chosen word.\nAnswer:",
+      "separator_padding": "\n ",
+      "text_sha256": "306a045ee72a9902ca924f1b9f82b435e0bcced4ff1c2efadd72f268ec0708d5",
+      "prompt_token_sha256": "81a3f5d4732ac877e96f1dead3eef57f51a9e5d674cf885d8995e7e7bb1a7cbe"
+    },
+    {
+      "name": "multilingual_choice",
+      "target_tokens": 4096,
+      "file": "multilingual_choice-4096.txt",
+      "suffix": "\n\nWrite one short sentence, choosing freely between English, Traditional Chinese, Japanese, and Spanish. Output only the sentence.\nAnswer:",
+      "separator_padding": "\n ",
+      "text_sha256": "facebab3803add77c7fd1623d7d5b162fa5b0aeb4bb0f38900b79b30073b458b",
+      "prompt_token_sha256": "2ff4b8ae8eaa99170dc6e13e48d020f8fd7e51790435ca1d928525aa787d5fe6"
+    },
+    {
+      "name": "random_hex",
+      "target_tokens": 4096,
+      "file": "random_hex-4096.txt",
+      "suffix": "\n\nReturn exactly 32 different eight-digit hexadecimal strings, one per line, with no explanation.\n",
+      "separator_padding": "\n ",
+      "text_sha256": "8115abf46ca721976f97d1a677db34f44aeb0a1d403a6d874a4379381d778ac8",
+      "prompt_token_sha256": "73200813d08029033cc1e9c4db7132589895c2844b18e65f308a63633bd73118"
+    }
+  ]
+}

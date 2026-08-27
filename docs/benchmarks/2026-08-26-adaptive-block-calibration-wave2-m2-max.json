@@ -1,0 +1,3075 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T22:06:32.391962+08:00",
+  "evidence_kind": "exploratory_five_workload_adaptive_block_abba",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_run": "5efa48a5391d9384a90491f50b0abd15a6f8e8c00a95d946d72086b05cf4fc89",
+    "runtime_python_tree_sha256": "9725c218f98f107dd01739f764875786441e0868d0e03a0cd5c61fb0e6e1879d",
+    "benchmark_script_sha256": "31855d36bc08447069964861729ca79918a931cab91a0af63bc129c57264489c"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "mac_model": "Mac14,13",
+    "chip": "Apple M2 Max",
+    "memory_bytes": 68719476736,
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1"
+  },
+  "checkpoint": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "layer_count": 43,
+    "expert_count": 256,
+    "selected_expert_count": 6,
+    "expert_blob_bytes": 13369344,
+    "dspark_block_size": 5
+  },
+  "experiment": {
+    "objective": "Calibrate fixed five-token hash prefetch against the default-off storage-aware adaptive selector across the five R0 domains",
+    "control": "fixed five-token DSpark with hash exact prefetch",
+    "candidate": "adaptive DSpark prefix with hash exact prefetch",
+    "workload_order": [
+      "repeated",
+      "code",
+      "zh_technical",
+      "mixed_math",
+      "tool_like"
+    ],
+    "run_pattern_per_workload": [
+      "fixed",
+      "adaptive",
+      "adaptive",
+      "fixed"
+    ],
+    "warmup_per_workload": true,
+    "fresh_process_per_run": true,
+    "os_page_cache": "not purged",
+    "prompt_cache": "persistent cache disabled",
+    "prompt_tokens": [
+      128
+    ],
+    "max_output_tokens": 8,
+    "batch_size": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "dspark_confidence_threshold": 0,
+    "adaptive_full_block_commit_fraction_floor": 0.9,
+    "main_expert_slots": 1152,
+    "dspark_expert_slots": 768,
+    "hash_prefetch_scratch_slots": 108
+  },
+  "prompt_manifest_sha256": "a30a4d10682d803a67a916566feb75628c993c5a986dbd0ed3a9336a7b0d1375",
+  "prompt_manifest_repository_path": "docs/benchmarks/prompts/2026-08-26-adaptive-128/manifest.json",
+  "workloads": [
+    {
+      "name": "repeated",
+      "target_tokens": 128,
+      "file": "repeated-128.txt",
+      "text_sha256": "5726c1347b8a76cd4f4b84456c94247e9d0d17e369a084ca885b8391e084f55f",
+      "prompt_token_sha256": "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6"
+    },
+    {
+      "name": "code",
+      "target_tokens": 128,
+      "file": "code-128.txt",
+      "text_sha256": "a3ac2ac1b0fb75a165c71967db9325f91d3ee3a769f94a743149f850dd33bfac",
+      "prompt_token_sha256": "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c"
+    },
+    {
+      "name": "zh_technical",
+      "target_tokens": 128,
+      "file": "zh_technical-128.txt",
+      "text_sha256": "ed544233ea04d4436eb7267f336592f4a917259d916c2a57e027f0af04571afa",
+      "prompt_token_sha256": "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972"
+    },
+    {
+      "name": "mixed_math",
+      "target_tokens": 128,
+      "file": "mixed_math-128.txt",
+      "text_sha256": "e444117db44b0fdfda3e3eece14260dcf9f864d6bc897232b4157a751eb8a4f6",
+      "prompt_token_sha256": "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4"
+    },
+    {
+      "name": "tool_like",
+      "target_tokens": 128,
+      "file": "tool_like-128.txt",
+      "text_sha256": "0aa1c55bad28a3d23ef5814f7d9d9142890f9a6e1fcc4b57fde9735fd5d150b7",
+      "prompt_token_sha256": "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856"
+    }
+  ],
+  "runs": [
+    {
+      "id": "repeated-01-fixed",
+      "workload": "repeated",
+      "mode": "fixed",
+      "raw_metrics_sha256": "4591b72bf711fba3ce334ce08b8b5a2e0f48b5576196b25c3a8e9e8ad96925b9",
+      "metrics": {
+        "prompt_token_sha256": "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6",
+        "token_sha256": "03f40e52aa3a6f874badbf2c339e67b1f8adba4177067e9ef36e7a6d99e289f3",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 6.237498166010482,
+        "time_to_first_token_seconds": 5.6142087079933845,
+        "decode_tokens_per_second": 11.237056792637357,
+        "peak_memory_bytes": 27369860300,
+        "request_expert_bytes_read": 28623765504,
+        "request_process_disk_bytes_read": 27209555968,
+        "request_expert_evictions": 989,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.11422629101434723,
+        "dspark_verification_seconds": 0.4224061669956427,
+        "dspark_target_expert_bytes_read": 1951924224,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 18,
+        "dspark_hash_prefetch_cache_resident_experts": 18,
+        "dspark_hash_prefetch_experts_read": 0,
+        "dspark_hash_prefetch_bytes_read": 0,
+        "dspark_hash_prefetch_useful_bytes": 0,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          6,
+          6,
+          6
+        ]
+      },
+      "sequence": 1
+    },
+    {
+      "id": "repeated-02-adaptive",
+      "workload": "repeated",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "c87160f3e8c6542db2eb7065723df7c0d8ab0d302e3b1e5eb670f2a86856877f",
+      "metrics": {
+        "prompt_token_sha256": "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6",
+        "token_sha256": "03f40e52aa3a6f874badbf2c339e67b1f8adba4177067e9ef36e7a6d99e289f3",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 6.003191915981006,
+        "time_to_first_token_seconds": 5.298624916002154,
+        "decode_tokens_per_second": 9.941227237598678,
+        "peak_memory_bytes": 27366522929,
+        "request_expert_bytes_read": 28623765504,
+        "request_process_disk_bytes_read": 24490811392,
+        "request_expert_evictions": 989,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.11903575001633726,
+        "dspark_verification_seconds": 0.4901227079972159,
+        "dspark_target_expert_bytes_read": 1951924224,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 18,
+        "dspark_hash_prefetch_cache_resident_experts": 18,
+        "dspark_hash_prefetch_experts_read": 0,
+        "dspark_hash_prefetch_bytes_read": 0,
+        "dspark_hash_prefetch_useful_bytes": 0,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.975935149407769,
+        "dspark_adaptive_block_requested_hash_experts": 18,
+        "dspark_adaptive_block_resident_hash_experts": 18,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0010647489980328828,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.998799204826355,
+          2.9954458723754342,
+          4.984216112575412,
+          5.975935149407769
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          18,
+          18,
+          18,
+          18
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          18,
+          18,
+          18,
+          18
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "dspark_last_adaptive_block_scores": [
+          1.998799204826355,
+          2.9954458723754342,
+          4.984216112575412,
+          5.975935149407769
+        ],
+        "dspark_last_adaptive_block_selected_score": 5.975935149407769,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9959891915679614,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          6,
+          6,
+          6
+        ]
+      },
+      "sequence": 2
+    },
+    {
+      "id": "repeated-03-adaptive",
+      "workload": "repeated",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "cad440b22d6d704844ce9bf9c50701c7a657343fb09e9eca2cb7d408ab4a289f",
+      "metrics": {
+        "prompt_token_sha256": "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6",
+        "token_sha256": "03f40e52aa3a6f874badbf2c339e67b1f8adba4177067e9ef36e7a6d99e289f3",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 6.291214833006961,
+        "time_to_first_token_seconds": 5.659139333001804,
+        "decode_tokens_per_second": 11.080687587957456,
+        "peak_memory_bytes": 27369873773,
+        "request_expert_bytes_read": 28623765504,
+        "request_process_disk_bytes_read": 27203592192,
+        "request_expert_evictions": 989,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.11506125002051704,
+        "dspark_verification_seconds": 0.43079849999048747,
+        "dspark_target_expert_bytes_read": 1951924224,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 18,
+        "dspark_hash_prefetch_cache_resident_experts": 18,
+        "dspark_hash_prefetch_experts_read": 0,
+        "dspark_hash_prefetch_bytes_read": 0,
+        "dspark_hash_prefetch_useful_bytes": 0,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.975935149407769,
+        "dspark_adaptive_block_requested_hash_experts": 18,
+        "dspark_adaptive_block_resident_hash_experts": 18,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0007297919946722686,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.998799204826355,
+          2.9954458723754342,
+          4.984216112575412,
+          5.975935149407769
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          18,
+          18,
+          18,
+          18
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          18,
+          18,
+          18,
+          18
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "dspark_last_adaptive_block_scores": [
+          1.998799204826355,
+          2.9954458723754342,
+          4.984216112575412,
+          5.975935149407769
+        ],
+        "dspark_last_adaptive_block_selected_score": 5.975935149407769,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9959891915679614,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          6,
+          6,
+          6
+        ]
+      },
+      "sequence": 3
+    },
+    {
+      "id": "repeated-04-fixed",
+      "workload": "repeated",
+      "mode": "fixed",
+      "raw_metrics_sha256": "094963d85c8a117b59fb6d8787a581c2bb07a9636acf63eb038ea13912138466",
+      "metrics": {
+        "prompt_token_sha256": "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6",
+        "token_sha256": "03f40e52aa3a6f874badbf2c339e67b1f8adba4177067e9ef36e7a6d99e289f3",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 6.016410957992775,
+        "time_to_first_token_seconds": 5.31031804200029,
+        "decode_tokens_per_second": 9.920495476668108,
+        "peak_memory_bytes": 27366514608,
+        "request_expert_bytes_read": 28623765504,
+        "request_process_disk_bytes_read": 24596504576,
+        "request_expert_evictions": 989,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.11796999999205582,
+        "dspark_verification_seconds": 0.489417249977123,
+        "dspark_target_expert_bytes_read": 1951924224,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 18,
+        "dspark_hash_prefetch_cache_resident_experts": 18,
+        "dspark_hash_prefetch_experts_read": 0,
+        "dspark_hash_prefetch_bytes_read": 0,
+        "dspark_hash_prefetch_useful_bytes": 0,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          6,
+          6,
+          6
+        ]
+      },
+      "sequence": 4
+    },
+    {
+      "id": "code-01-fixed",
+      "workload": "code",
+      "mode": "fixed",
+      "raw_metrics_sha256": "b58e938160168eca303d31de0c76e37f6be454747fb59308d3035fe0b9a00af4",
+      "metrics": {
+        "prompt_token_sha256": "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c",
+        "token_sha256": "fa9f4d3a31b5fc37b0f148537646b8637ebb9f8e0a2297ed436162fed0d8752a",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.278934334026417,
+        "time_to_first_token_seconds": 9.800329209014308,
+        "decode_tokens_per_second": 4.735399676567093,
+        "peak_memory_bytes": 27623205340,
+        "request_expert_bytes_read": 60883992576,
+        "request_process_disk_bytes_read": 56286519296,
+        "request_expert_evictions": 3327,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.16532616701442748,
+        "dspark_verification_seconds": 1.084351917001186,
+        "dspark_target_expert_bytes_read": 6564347904,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 104,
+        "dspark_hash_prefetch_cache_resident_experts": 29,
+        "dspark_hash_prefetch_experts_read": 75,
+        "dspark_hash_prefetch_bytes_read": 1002700800,
+        "dspark_hash_prefetch_useful_bytes": 1002700800,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1287936660228297,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          36
+        ]
+      },
+      "sequence": 1
+    },
+    {
+      "id": "code-02-adaptive",
+      "workload": "code",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "f048cb125695a781728c4086ee038802a3b46c73f084d44d35096e04799cc5b8",
+      "metrics": {
+        "prompt_token_sha256": "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c",
+        "token_sha256": "fa9f4d3a31b5fc37b0f148537646b8637ebb9f8e0a2297ed436162fed0d8752a",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.267620415979763,
+        "time_to_first_token_seconds": 9.80015074997209,
+        "decode_tokens_per_second": 4.771410661615067,
+        "peak_memory_bytes": 27623217373,
+        "request_expert_bytes_read": 60883992576,
+        "request_process_disk_bytes_read": 56352776192,
+        "request_expert_evictions": 3327,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.1638640419987496,
+        "dspark_verification_seconds": 1.0789015420014039,
+        "dspark_target_expert_bytes_read": 6564347904,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 104,
+        "dspark_hash_prefetch_cache_resident_experts": 29,
+        "dspark_hash_prefetch_experts_read": 75,
+        "dspark_hash_prefetch_bytes_read": 1002700800,
+        "dspark_hash_prefetch_useful_bytes": 1002700800,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1243915839586407,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.998362349070422,
+        "dspark_adaptive_block_requested_hash_experts": 104,
+        "dspark_adaptive_block_resident_hash_experts": 29,
+        "dspark_adaptive_block_missing_hash_experts": 75,
+        "dspark_adaptive_block_predicted_hash_bytes": 1002700800,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 167116800.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006544589705299586,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999881386756897,
+          2.9999440912249753,
+          4.999412638279272,
+          5.998362349070422
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          36,
+          53,
+          87,
+          104
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          8,
+          25,
+          28,
+          29
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          28,
+          28,
+          59,
+          75
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          374341632,
+          374341632,
+          788791296,
+          1002700800
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.07142814780984606,
+          0.10714086040089198,
+          0.08473580742846223,
+          0.0799781646542723
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.0799781646542723,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9997270581784036,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          36
+        ]
+      },
+      "sequence": 2
+    },
+    {
+      "id": "code-03-adaptive",
+      "workload": "code",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "f4a40a1d860f927a4e4f74e789735d0706b97b3b42e575b228c1686cd3633450",
+      "metrics": {
+        "prompt_token_sha256": "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c",
+        "token_sha256": "fa9f4d3a31b5fc37b0f148537646b8637ebb9f8e0a2297ed436162fed0d8752a",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.28350595801021,
+        "time_to_first_token_seconds": 9.809934332995908,
+        "decode_tokens_per_second": 4.751610546437783,
+        "peak_memory_bytes": 27623205828,
+        "request_expert_bytes_read": 60883992576,
+        "request_process_disk_bytes_read": 56310308864,
+        "request_expert_evictions": 3327,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.16569316599634476,
+        "dspark_verification_seconds": 1.0801571249903645,
+        "dspark_target_expert_bytes_read": 6564347904,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 104,
+        "dspark_hash_prefetch_cache_resident_experts": 29,
+        "dspark_hash_prefetch_experts_read": 75,
+        "dspark_hash_prefetch_bytes_read": 1002700800,
+        "dspark_hash_prefetch_useful_bytes": 1002700800,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1253427079936955,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.998362349070422,
+        "dspark_adaptive_block_requested_hash_experts": 104,
+        "dspark_adaptive_block_resident_hash_experts": 29,
+        "dspark_adaptive_block_missing_hash_experts": 75,
+        "dspark_adaptive_block_predicted_hash_bytes": 1002700800,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 167116800.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006388750043697655,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999881386756897,
+          2.9999440912249753,
+          4.999412638279272,
+          5.998362349070422
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          36,
+          53,
+          87,
+          104
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          8,
+          25,
+          28,
+          29
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          28,
+          28,
+          59,
+          75
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          374341632,
+          374341632,
+          788791296,
+          1002700800
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.07142814780984606,
+          0.10714086040089198,
+          0.08473580742846223,
+          0.0799781646542723
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.0799781646542723,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9997270581784036,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          36
+        ]
+      },
+      "sequence": 3
+    },
+    {
+      "id": "code-04-fixed",
+      "workload": "code",
+      "mode": "fixed",
+      "raw_metrics_sha256": "79dec30000eda6a4601c1c72c8c515c7ffc2eac382bf3a5cc2b2bed18236a8b4",
+      "metrics": {
+        "prompt_token_sha256": "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c",
+        "token_sha256": "fa9f4d3a31b5fc37b0f148537646b8637ebb9f8e0a2297ed436162fed0d8752a",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.26103554200381,
+        "time_to_first_token_seconds": 9.792211332998704,
+        "decode_tokens_per_second": 4.76706015588458,
+        "peak_memory_bytes": 27756158693,
+        "request_expert_bytes_read": 60883992576,
+        "request_process_disk_bytes_read": 56297824256,
+        "request_expert_evictions": 3327,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.16302908302168362,
+        "dspark_verification_seconds": 1.0803069160028826,
+        "dspark_target_expert_bytes_read": 6564347904,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 104,
+        "dspark_hash_prefetch_cache_resident_experts": 29,
+        "dspark_hash_prefetch_experts_read": 75,
+        "dspark_hash_prefetch_bytes_read": 1002700800,
+        "dspark_hash_prefetch_useful_bytes": 1002700800,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.12547783402260393,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          36
+        ]
+      },
+      "sequence": 4
+    },
+    {
+      "id": "zh_technical-01-fixed",
+      "workload": "zh_technical",
+      "mode": "fixed",
+      "raw_metrics_sha256": "1bb25dc4354c5d4c545af657769769cfeae359c05a565aa6b63aa2ad08794aaf",
+      "metrics": {
+        "prompt_token_sha256": "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972",
+        "token_sha256": "2d181fcf43dff20e2777c8993cbc450c6de2278811eaac8ad37564be20de1b23",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.958908625005279,
+        "time_to_first_token_seconds": 10.55450254198513,
+        "decode_tokens_per_second": 4.985687220741961,
+        "peak_memory_bytes": 27675840584,
+        "request_expert_bytes_read": 64854687744,
+        "request_process_disk_bytes_read": 60496027648,
+        "request_expert_evictions": 3632,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17648291599471122,
+        "dspark_verification_seconds": 1.0336150839866605,
+        "dspark_target_expert_bytes_read": 6283591680,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 102,
+        "dspark_hash_prefetch_cache_resident_experts": 35,
+        "dspark_hash_prefetch_experts_read": 67,
+        "dspark_hash_prefetch_bytes_read": 895746048,
+        "dspark_hash_prefetch_useful_bytes": 895746048,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1131744590238668,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          34
+        ]
+      },
+      "sequence": 1
+    },
+    {
+      "id": "zh_technical-02-adaptive",
+      "workload": "zh_technical",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "0b5a7bae15213d8e25b5c422fb50bfb5fc665868b08eca5c672cd320f8b6ebe2",
+      "metrics": {
+        "prompt_token_sha256": "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972",
+        "token_sha256": "2d181fcf43dff20e2777c8993cbc450c6de2278811eaac8ad37564be20de1b23",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.91238858300494,
+        "time_to_first_token_seconds": 10.525479624979198,
+        "decode_tokens_per_second": 5.048603934247455,
+        "peak_memory_bytes": 27675840584,
+        "request_expert_bytes_read": 64854687744,
+        "request_process_disk_bytes_read": 60439420928,
+        "request_expert_evictions": 3632,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17206174999591894,
+        "dspark_verification_seconds": 1.0270182919921353,
+        "dspark_target_expert_bytes_read": 6283591680,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 102,
+        "dspark_hash_prefetch_cache_resident_experts": 35,
+        "dspark_hash_prefetch_experts_read": 67,
+        "dspark_hash_prefetch_bytes_read": 895746048,
+        "dspark_hash_prefetch_useful_bytes": 895746048,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1117556249955669,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.981565555758019,
+        "dspark_adaptive_block_requested_hash_experts": 102,
+        "dspark_adaptive_block_resident_hash_experts": 35,
+        "dspark_adaptive_block_missing_hash_experts": 67,
+        "dspark_adaptive_block_predicted_hash_bytes": 895746048,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 149291008.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0013007079833187163,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9998134970664978,
+          2.9995394512398725,
+          4.997142474368109,
+          5.981565555758019
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          36,
+          53,
+          87,
+          102
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          22,
+          27,
+          35,
+          35
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          14,
+          26,
+          52,
+          67
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          187170816,
+          347602944,
+          695205888,
+          895746048
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.14284382121903555,
+          0.11536690197076432,
+          0.09609889373784826,
+          0.08927709784713461
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.08927709784713461,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9969275926263365,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          34
+        ]
+      },
+      "sequence": 2
+    },
+    {
+      "id": "zh_technical-03-adaptive",
+      "workload": "zh_technical",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "166ddfd572e6344b30bfa4cd44c8c05a89adf1291b822a09ee2d606e41b9771a",
+      "metrics": {
+        "prompt_token_sha256": "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972",
+        "token_sha256": "2d181fcf43dff20e2777c8993cbc450c6de2278811eaac8ad37564be20de1b23",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.913320082996506,
+        "time_to_first_token_seconds": 10.520966707990738,
+        "decode_tokens_per_second": 5.028792831039088,
+        "peak_memory_bytes": 27808564336,
+        "request_expert_bytes_read": 64854687744,
+        "request_process_disk_bytes_read": 60441534464,
+        "request_expert_evictions": 3632,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17692133301170543,
+        "dspark_verification_seconds": 1.023372208001092,
+        "dspark_target_expert_bytes_read": 6283591680,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 102,
+        "dspark_hash_prefetch_cache_resident_experts": 35,
+        "dspark_hash_prefetch_experts_read": 67,
+        "dspark_hash_prefetch_bytes_read": 895746048,
+        "dspark_hash_prefetch_useful_bytes": 895746048,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.11083600000711158,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.981565555758019,
+        "dspark_adaptive_block_requested_hash_experts": 102,
+        "dspark_adaptive_block_resident_hash_experts": 35,
+        "dspark_adaptive_block_missing_hash_experts": 67,
+        "dspark_adaptive_block_predicted_hash_bytes": 895746048,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 149291008.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006349169998429716,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9998134970664978,
+          2.9995394512398725,
+          4.997142474368109,
+          5.981565555758019
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          36,
+          53,
+          87,
+          102
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          22,
+          27,
+          35,
+          35
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          14,
+          26,
+          52,
+          67
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          187170816,
+          347602944,
+          695205888,
+          895746048
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.14284382121903555,
+          0.11536690197076432,
+          0.09609889373784826,
+          0.08927709784713461
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.08927709784713461,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9969275926263365,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          34
+        ]
+      },
+      "sequence": 3
+    },
+    {
+      "id": "zh_technical-04-fixed",
+      "workload": "zh_technical",
+      "mode": "fixed",
+      "raw_metrics_sha256": "dba156c522ee25f7befaa3c095f0b112fc80d02e682e6d861ddaf0037cc923b8",
+      "metrics": {
+        "prompt_token_sha256": "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972",
+        "token_sha256": "2d181fcf43dff20e2777c8993cbc450c6de2278811eaac8ad37564be20de1b23",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.890832125005545,
+        "time_to_first_token_seconds": 10.50646258398774,
+        "decode_tokens_per_second": 5.058506592995755,
+        "peak_memory_bytes": 27675840968,
+        "request_expert_bytes_read": 64854687744,
+        "request_process_disk_bytes_read": 60442095616,
+        "request_expert_evictions": 3632,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.1750101670040749,
+        "dspark_verification_seconds": 1.0182626659807283,
+        "dspark_target_expert_bytes_read": 6283591680,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 102,
+        "dspark_hash_prefetch_cache_resident_experts": 35,
+        "dspark_hash_prefetch_experts_read": 67,
+        "dspark_hash_prefetch_bytes_read": 895746048,
+        "dspark_hash_prefetch_useful_bytes": 895746048,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.11072737400536425,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          35,
+          33,
+          34
+        ]
+      },
+      "sequence": 4
+    },
+    {
+      "id": "mixed_math-01-fixed",
+      "workload": "mixed_math",
+      "mode": "fixed",
+      "raw_metrics_sha256": "3d206987861255e286b2c38e509b9e632c32e08e46a343eb7b835049a65cf8ec",
+      "metrics": {
+        "prompt_token_sha256": "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4",
+        "token_sha256": "ba92d956830600423d097a23d65d887dcaf04951b4edfe49807d1079e7fc72e9",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.783800584002165,
+        "time_to_first_token_seconds": 10.375663834012812,
+        "decode_tokens_per_second": 4.972590371521334,
+        "peak_memory_bytes": 27823275780,
+        "request_expert_bytes_read": 63584600064,
+        "request_process_disk_bytes_read": 59798183936,
+        "request_expert_evictions": 3566,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.2017130839813035,
+        "dspark_verification_seconds": 0.99121604199172,
+        "dspark_target_expert_bytes_read": 6069682176,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 103,
+        "dspark_hash_prefetch_cache_resident_experts": 65,
+        "dspark_hash_prefetch_experts_read": 38,
+        "dspark_hash_prefetch_bytes_read": 508035072,
+        "dspark_hash_prefetch_useful_bytes": 508035072,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.048243625031318516,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          34,
+          35,
+          34
+        ]
+      },
+      "sequence": 1
+    },
+    {
+      "id": "mixed_math-02-adaptive",
+      "workload": "mixed_math",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "acd48435bfc4ba679363bf879288bef9149969564640867f788a67416c012ed0",
+      "metrics": {
+        "prompt_token_sha256": "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4",
+        "token_sha256": "ba92d956830600423d097a23d65d887dcaf04951b4edfe49807d1079e7fc72e9",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.809281957976054,
+        "time_to_first_token_seconds": 10.393602374999318,
+        "decode_tokens_per_second": 4.945918731442863,
+        "peak_memory_bytes": 27823271780,
+        "request_expert_bytes_read": 63584600064,
+        "request_process_disk_bytes_read": 59866587136,
+        "request_expert_evictions": 3566,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.19904862501425669,
+        "dspark_verification_seconds": 0.9981399169773795,
+        "dspark_target_expert_bytes_read": 6069682176,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 103,
+        "dspark_hash_prefetch_cache_resident_experts": 65,
+        "dspark_hash_prefetch_experts_read": 38,
+        "dspark_hash_prefetch_bytes_read": 508035072,
+        "dspark_hash_prefetch_useful_bytes": 508035072,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.050398292019963264,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.9997150995022395,
+        "dspark_adaptive_block_requested_hash_experts": 103,
+        "dspark_adaptive_block_resident_hash_experts": 65,
+        "dspark_adaptive_block_missing_hash_experts": 38,
+        "dspark_adaptive_block_predicted_hash_bytes": 508035072,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 84672512.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006263749965000898,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999943375587463,
+          2.9999803901187825,
+          4.99987280556064,
+          5.9997150995022395
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          34,
+          52,
+          88,
+          103
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          24,
+          28,
+          50,
+          65
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          10,
+          24,
+          38,
+          38
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          133693440,
+          320864256,
+          508035072,
+          508035072
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.19999943375587464,
+          0.12499918292161594,
+          0.13157560014633263,
+          0.15788723946058525
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.15788723946058525,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9999525165837065,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          34,
+          35,
+          34
+        ]
+      },
+      "sequence": 2
+    },
+    {
+      "id": "mixed_math-03-adaptive",
+      "workload": "mixed_math",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "6bc07c193bd1da93e73858eb617725e54b2e12238d4a25a78b69ebb093660cef",
+      "metrics": {
+        "prompt_token_sha256": "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4",
+        "token_sha256": "ba92d956830600423d097a23d65d887dcaf04951b4edfe49807d1079e7fc72e9",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.791500999999698,
+        "time_to_first_token_seconds": 10.383540249982616,
+        "decode_tokens_per_second": 4.973074499142072,
+        "peak_memory_bytes": 27823272268,
+        "request_expert_bytes_read": 63584600064,
+        "request_process_disk_bytes_read": 59820679168,
+        "request_expert_evictions": 3566,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.19971058299415745,
+        "dspark_verification_seconds": 0.9870325830124784,
+        "dspark_target_expert_bytes_read": 6069682176,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 103,
+        "dspark_hash_prefetch_cache_resident_experts": 65,
+        "dspark_hash_prefetch_experts_read": 38,
+        "dspark_hash_prefetch_bytes_read": 508035072,
+        "dspark_hash_prefetch_useful_bytes": 508035072,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.04811475099995732,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.9997150995022395,
+        "dspark_adaptive_block_requested_hash_experts": 103,
+        "dspark_adaptive_block_resident_hash_experts": 65,
+        "dspark_adaptive_block_missing_hash_experts": 38,
+        "dspark_adaptive_block_predicted_hash_bytes": 508035072,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 84672512.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.001085916010197252,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999943375587463,
+          2.9999803901187825,
+          4.99987280556064,
+          5.9997150995022395
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          34,
+          52,
+          88,
+          103
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          24,
+          28,
+          50,
+          65
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          10,
+          24,
+          38,
+          38
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          133693440,
+          320864256,
+          508035072,
+          508035072
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.19999943375587464,
+          0.12499918292161594,
+          0.13157560014633263,
+          0.15788723946058525
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.15788723946058525,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9999525165837065,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          34,
+          35,
+          34
+        ]
+      },
+      "sequence": 3
+    },
+    {
+      "id": "mixed_math-04-fixed",
+      "workload": "mixed_math",
+      "mode": "fixed",
+      "raw_metrics_sha256": "c72a4ad7de023e8019341c251adb992d8f59f874ed5563ff496f7df83b9f725f",
+      "metrics": {
+        "prompt_token_sha256": "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4",
+        "token_sha256": "ba92d956830600423d097a23d65d887dcaf04951b4edfe49807d1079e7fc72e9",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 11.801224875001935,
+        "time_to_first_token_seconds": 10.398668584006373,
+        "decode_tokens_per_second": 4.992345664474774,
+        "peak_memory_bytes": 27823263780,
+        "request_expert_bytes_read": 63584600064,
+        "request_process_disk_bytes_read": 59816304640,
+        "request_expert_evictions": 3566,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.20187429201905616,
+        "dspark_verification_seconds": 0.9813306250143796,
+        "dspark_target_expert_bytes_read": 6069682176,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 103,
+        "dspark_hash_prefetch_cache_resident_experts": 65,
+        "dspark_hash_prefetch_experts_read": 38,
+        "dspark_hash_prefetch_bytes_read": 508035072,
+        "dspark_hash_prefetch_useful_bytes": 508035072,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.04737416698480956,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          34,
+          35,
+          34
+        ]
+      },
+      "sequence": 4
+    },
+    {
+      "id": "tool_like-01-fixed",
+      "workload": "tool_like",
+      "mode": "fixed",
+      "raw_metrics_sha256": "70a26b079ee87685c65a1f840b60e16748ad53b4cc495b30b69c743e97b902be",
+      "metrics": {
+        "prompt_token_sha256": "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856",
+        "token_sha256": "6dd344178799e282acb57e70f9cd15ad029a610a957a613421270010255ebbb6",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 14.418859708996024,
+        "time_to_first_token_seconds": 12.695727833983256,
+        "decode_tokens_per_second": 4.063326750193135,
+        "peak_memory_bytes": 27664198816,
+        "request_expert_bytes_read": 76459278336,
+        "request_process_disk_bytes_read": 72531173376,
+        "request_expert_evictions": 4515,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17694012500578538,
+        "dspark_verification_seconds": 1.2460653749876656,
+        "dspark_target_expert_bytes_read": 7353139200,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 84,
+        "dspark_hash_prefetch_cache_resident_experts": 32,
+        "dspark_hash_prefetch_experts_read": 52,
+        "dspark_hash_prefetch_bytes_read": 695205888,
+        "dspark_hash_prefetch_useful_bytes": 695205888,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0827315429924056,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          27,
+          28,
+          29
+        ]
+      },
+      "sequence": 1
+    },
+    {
+      "id": "tool_like-02-adaptive",
+      "workload": "tool_like",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "91b85135f4512b21356dcd79da51e477aa55fd27e37cc228d663455ebe1319ef",
+      "metrics": {
+        "prompt_token_sha256": "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856",
+        "token_sha256": "6dd344178799e282acb57e70f9cd15ad029a610a957a613421270010255ebbb6",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 13.846123750001425,
+        "time_to_first_token_seconds": 12.161430417007068,
+        "decode_tokens_per_second": 4.156014090144403,
+        "peak_memory_bytes": 27664182920,
+        "request_expert_bytes_read": 76459278336,
+        "request_process_disk_bytes_read": 72582569984,
+        "request_expert_evictions": 4515,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17398741701617837,
+        "dspark_verification_seconds": 1.2089451249921694,
+        "dspark_target_expert_bytes_read": 7353139200,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 84,
+        "dspark_hash_prefetch_cache_resident_experts": 32,
+        "dspark_hash_prefetch_experts_read": 52,
+        "dspark_hash_prefetch_bytes_read": 695205888,
+        "dspark_hash_prefetch_useful_bytes": 695205888,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.07635766701423563,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.999196831800052,
+        "dspark_adaptive_block_requested_hash_experts": 84,
+        "dspark_adaptive_block_resident_hash_experts": 32,
+        "dspark_adaptive_block_missing_hash_experts": 52,
+        "dspark_adaptive_block_predicted_hash_bytes": 695205888,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 115867648.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006507500074803829,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999815821647644,
+          2.9998916996766916,
+          4.999593750757607,
+          5.999196831800052
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          35,
+          52,
+          70,
+          84
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          14,
+          16,
+          29,
+          32
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          21,
+          36,
+          41,
+          52
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          280756224,
+          481296384,
+          548143104,
+          695205888
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.09523721819832212,
+          0.08333032499101921,
+          0.12194131099408798,
+          0.1153691698423087
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.1153691698423087,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9998661386333421,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          27,
+          28,
+          29
+        ]
+      },
+      "sequence": 2
+    },
+    {
+      "id": "tool_like-03-adaptive",
+      "workload": "tool_like",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "e9e513e8e637b7ca73e0a22babf1865a0d9dc9c28df48d83569365978c0e69c1",
+      "metrics": {
+        "prompt_token_sha256": "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856",
+        "token_sha256": "6dd344178799e282acb57e70f9cd15ad029a610a957a613421270010255ebbb6",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 13.874865290999878,
+        "time_to_first_token_seconds": 12.183553457987728,
+        "decode_tokens_per_second": 4.139694998872059,
+        "peak_memory_bytes": 27797091376,
+        "request_expert_bytes_read": 76459278336,
+        "request_process_disk_bytes_read": 72648138752,
+        "request_expert_evictions": 4515,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17400445800740272,
+        "dspark_verification_seconds": 1.2156309999991208,
+        "dspark_target_expert_bytes_read": 7353139200,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 84,
+        "dspark_hash_prefetch_cache_resident_experts": 32,
+        "dspark_hash_prefetch_experts_read": 52,
+        "dspark_hash_prefetch_bytes_read": 695205888,
+        "dspark_hash_prefetch_useful_bytes": 695205888,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.07725266498164274,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 5,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 5.999196831800052,
+        "dspark_adaptive_block_requested_hash_experts": 84,
+        "dspark_adaptive_block_resident_hash_experts": 32,
+        "dspark_adaptive_block_missing_hash_experts": 52,
+        "dspark_adaptive_block_predicted_hash_bytes": 695205888,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 115867648.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 1,
+        "dspark_adaptive_block_plan_seconds": 0.0006975840078666806,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9999815821647644,
+          2.9998916996766916,
+          4.999593750757607,
+          5.999196831800052
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          35,
+          52,
+          70,
+          84
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          14,
+          16,
+          29,
+          32
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          21,
+          36,
+          41,
+          52
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          280756224,
+          481296384,
+          548143104,
+          695205888
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.09523721819832212,
+          0.08333032499101921,
+          0.12194131099408798,
+          0.1153691698423087
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.1153691698423087,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9998661386333421,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          27,
+          28,
+          29
+        ]
+      },
+      "sequence": 3
+    },
+    {
+      "id": "tool_like-04-fixed",
+      "workload": "tool_like",
+      "mode": "fixed",
+      "raw_metrics_sha256": "88511c510cda6b6cd07e7813a29b597ec418076bbf09904ba5c667966649318a",
+      "metrics": {
+        "prompt_token_sha256": "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856",
+        "token_sha256": "6dd344178799e282acb57e70f9cd15ad029a610a957a613421270010255ebbb6",
+        "prompt_tokens": 128,
+        "generated_tokens": 8,
+        "request_seconds": 13.880438416992547,
+        "time_to_first_token_seconds": 12.184625082998537,
+        "decode_tokens_per_second": 4.128772281011939,
+        "peak_memory_bytes": 27797107368,
+        "request_expert_bytes_read": 76459278336,
+        "request_process_disk_bytes_read": 72642207744,
+        "request_expert_evictions": 4515,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 5,
+        "dspark_accepted_tokens": 5,
+        "dspark_committed_tokens": 6,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": false,
+        "dspark_draft_seconds": 0.17305166597361676,
+        "dspark_verification_seconds": 1.2235887499991804,
+        "dspark_target_expert_bytes_read": 7353139200,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 84,
+        "dspark_hash_prefetch_cache_resident_experts": 32,
+        "dspark_hash_prefetch_experts_read": 52,
+        "dspark_hash_prefetch_bytes_read": 695205888,
+        "dspark_hash_prefetch_useful_bytes": 695205888,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.07734320900635794,
+        "dspark_adaptive_block_decisions": 0,
+        "dspark_adaptive_block_original_tokens": 0,
+        "dspark_adaptive_block_selected_tokens": 0,
+        "dspark_adaptive_block_trimmed_tokens": 0,
+        "dspark_adaptive_block_expected_committed": 0.0,
+        "dspark_adaptive_block_requested_hash_experts": 0,
+        "dspark_adaptive_block_resident_hash_experts": 0,
+        "dspark_adaptive_block_missing_hash_experts": 0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 0,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_plan_seconds": 0.0,
+        "dspark_last_adaptive_block_candidate_tokens": [],
+        "dspark_last_adaptive_block_expected_committed": [],
+        "dspark_last_adaptive_block_requested_hash_experts": [],
+        "dspark_last_adaptive_block_resident_hash_experts": [],
+        "dspark_last_adaptive_block_missing_hash_experts": [],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [],
+        "dspark_last_adaptive_block_scores": [],
+        "dspark_last_adaptive_block_selected_score": 0.0,
+        "dspark_last_adaptive_block_selection_reason": "",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.0,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          27,
+          28,
+          29
+        ]
+      },
+      "sequence": 4
+    }
+  ],
+  "workload_summaries": [
+    {
+      "name": "repeated",
+      "greedy_parity": true,
+      "prompt_token_sha256": [
+        "9ff4045d9f23e568465076760a89bb4abd9b4ab3e98543608b1261e90c45aaf6"
+      ],
+      "output_token_sha256": [
+        "03f40e52aa3a6f874badbf2c339e67b1f8adba4177067e9ef36e7a6d99e289f3"
+      ],
+      "generated_token_counts": [
+        8
+      ],
+      "fixed_medians": {
+        "request_seconds": 6.126954562001629,
+        "time_to_first_token_seconds": 5.462263374996837,
+        "decode_tokens_per_second": 10.578776134652733,
+        "peak_memory_bytes": 27368187454.0,
+        "request_expert_bytes_read": 28623765504.0,
+        "request_process_disk_bytes_read": 25903030272.0,
+        "request_expert_evictions": 989.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.11609814550320152,
+        "dspark_verification_seconds": 0.45591170848638285,
+        "dspark_target_expert_bytes_read": 1951924224.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 18.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 0.0,
+        "dspark_adaptive_block_original_tokens": 0.0,
+        "dspark_adaptive_block_selected_tokens": 0.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 0.0,
+        "dspark_adaptive_block_plan_seconds": 0.0
+      },
+      "adaptive_medians": {
+        "request_seconds": 6.147203374493984,
+        "time_to_first_token_seconds": 5.478882124501979,
+        "decode_tokens_per_second": 10.510957412778067,
+        "peak_memory_bytes": 27368198351.0,
+        "request_expert_bytes_read": 28623765504.0,
+        "request_process_disk_bytes_read": 25847201792.0,
+        "request_expert_evictions": 989.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.11704850001842715,
+        "dspark_verification_seconds": 0.4604606039938517,
+        "dspark_target_expert_bytes_read": 1951924224.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 18.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.0,
+        "dspark_adaptive_block_decisions": 1.0,
+        "dspark_adaptive_block_original_tokens": 5.0,
+        "dspark_adaptive_block_selected_tokens": 5.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 1.0,
+        "dspark_adaptive_block_plan_seconds": 0.0008972704963525757
+      },
+      "adaptive_change_fraction": {
+        "request_seconds": 0.003304873944705678,
+        "time_to_first_token_seconds": 0.0030424657992899093,
+        "decode_tokens_per_second": -0.0064108287207735705,
+        "peak_memory_bytes": 3.9816301383917e-07,
+        "request_expert_bytes_read": 0.0,
+        "request_process_disk_bytes_read": -0.0021552876020203724,
+        "request_expert_evictions": 0.0,
+        "dspark_rounds": 0.0,
+        "dspark_proposed_tokens": 0.0,
+        "dspark_accepted_tokens": 0.0,
+        "dspark_committed_tokens": 0.0,
+        "dspark_output_budget_trimmed_tokens": null,
+        "dspark_draft_seconds": 0.008185785493011338,
+        "dspark_verification_seconds": 0.009977579919083627,
+        "dspark_target_expert_bytes_read": 0.0,
+        "dspark_replay_expert_bytes_read": null,
+        "dspark_hash_prefetch_requested_experts": 0.0,
+        "dspark_hash_prefetch_experts_read": null,
+        "dspark_hash_prefetch_bytes_read": null,
+        "dspark_hash_prefetch_useful_bytes": null,
+        "dspark_hash_prefetch_wasted_bytes": null,
+        "dspark_hash_prefetch_useful_rate": null,
+        "dspark_hash_prefetch_wait_seconds": null,
+        "dspark_adaptive_block_decisions": null,
+        "dspark_adaptive_block_original_tokens": null,
+        "dspark_adaptive_block_selected_tokens": null,
+        "dspark_adaptive_block_trimmed_tokens": null,
+        "dspark_adaptive_block_predicted_hash_bytes": null,
+        "dspark_adaptive_block_high_confidence_full_decisions": null,
+        "dspark_adaptive_block_storage_score_decisions": null,
+        "dspark_adaptive_block_full_block_decisions": null,
+        "dspark_adaptive_block_plan_seconds": null
+      },
+      "paired_adaptive_change_fraction": {
+        "request_seconds": [
+          -0.03756413930608643,
+          0.04567571546107737
+        ],
+        "time_to_first_token_seconds": [
+          -0.056211624541479724,
+          0.06568745755764933
+        ],
+        "decode_tokens_per_second": [
+          -0.11531752299122676,
+          0.11694900864760127
+        ],
+        "peak_memory_bytes": [
+          -0.00012193598956732709,
+          0.00012274727155127098
+        ],
+        "request_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "request_process_disk_bytes_read": [
+          -0.09991874101868475,
+          0.10599423214564649
+        ],
+        "request_expert_evictions": [
+          0.0,
+          0.0
+        ],
+        "dspark_rounds": [
+          0.0,
+          0.0
+        ],
+        "dspark_proposed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_accepted_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_committed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_output_budget_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_draft_seconds": [
+          0.042104658737330006,
+          -0.024656692139820798
+        ],
+        "dspark_verification_seconds": [
+          0.16031144025004665,
+          -0.11977254579681358
+        ],
+        "dspark_target_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_replay_expert_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_requested_experts": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_experts_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_wasted_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_rate": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_wait_seconds": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_original_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_selected_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_predicted_hash_bytes": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_high_confidence_full_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_storage_score_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_full_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_plan_seconds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "code",
+      "greedy_parity": true,
+      "prompt_token_sha256": [
+        "e17b78c1b67897d4f47c3627579741b428aca1250ececf4ea482eb7cf41df02c"
+      ],
+      "output_token_sha256": [
+        "fa9f4d3a31b5fc37b0f148537646b8637ebb9f8e0a2297ed436162fed0d8752a"
+      ],
+      "generated_token_counts": [
+        8
+      ],
+      "fixed_medians": {
+        "request_seconds": 11.269984938015114,
+        "time_to_first_token_seconds": 9.796270271006506,
+        "decode_tokens_per_second": 4.751229916225837,
+        "peak_memory_bytes": 27689682016.5,
+        "request_expert_bytes_read": 60883992576.0,
+        "request_process_disk_bytes_read": 56292171776.0,
+        "request_expert_evictions": 3327.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.16417762501805555,
+        "dspark_verification_seconds": 1.0823294165020343,
+        "dspark_target_expert_bytes_read": 6564347904.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 104.0,
+        "dspark_hash_prefetch_experts_read": 75.0,
+        "dspark_hash_prefetch_bytes_read": 1002700800.0,
+        "dspark_hash_prefetch_useful_bytes": 1002700800.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.12713575002271682,
+        "dspark_adaptive_block_decisions": 0.0,
+        "dspark_adaptive_block_original_tokens": 0.0,
+        "dspark_adaptive_block_selected_tokens": 0.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 0.0,
+        "dspark_adaptive_block_plan_seconds": 0.0
+      },
+      "adaptive_medians": {
+        "request_seconds": 11.275563186994987,
+        "time_to_first_token_seconds": 9.805042541484,
+        "decode_tokens_per_second": 4.761510604026425,
+        "peak_memory_bytes": 27623211600.5,
+        "request_expert_bytes_read": 60883992576.0,
+        "request_process_disk_bytes_read": 56331542528.0,
+        "request_expert_evictions": 3327.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.16477860399754718,
+        "dspark_verification_seconds": 1.0795293334958842,
+        "dspark_target_expert_bytes_read": 6564347904.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 104.0,
+        "dspark_hash_prefetch_experts_read": 75.0,
+        "dspark_hash_prefetch_bytes_read": 1002700800.0,
+        "dspark_hash_prefetch_useful_bytes": 1002700800.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.1248671459761681,
+        "dspark_adaptive_block_decisions": 1.0,
+        "dspark_adaptive_block_original_tokens": 5.0,
+        "dspark_adaptive_block_selected_tokens": 5.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 1002700800.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 1.0,
+        "dspark_adaptive_block_plan_seconds": 0.0006466669874498621
+      },
+      "adaptive_change_fraction": {
+        "request_seconds": 0.0004949650785296856,
+        "time_to_first_token_seconds": 0.0008954704428129255,
+        "decode_tokens_per_second": 0.002163795055566244,
+        "peak_memory_bytes": -0.0024005481883248407,
+        "request_expert_bytes_read": 0.0,
+        "request_process_disk_bytes_read": 0.0006994001254146959,
+        "request_expert_evictions": 0.0,
+        "dspark_rounds": 0.0,
+        "dspark_proposed_tokens": 0.0,
+        "dspark_accepted_tokens": 0.0,
+        "dspark_committed_tokens": 0.0,
+        "dspark_output_budget_trimmed_tokens": null,
+        "dspark_draft_seconds": 0.003660541315697164,
+        "dspark_verification_seconds": -0.0025870894419553333,
+        "dspark_target_expert_bytes_read": 0.0,
+        "dspark_replay_expert_bytes_read": null,
+        "dspark_hash_prefetch_requested_experts": 0.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": null,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": -0.01784395062870482,
+        "dspark_adaptive_block_decisions": null,
+        "dspark_adaptive_block_original_tokens": null,
+        "dspark_adaptive_block_selected_tokens": null,
+        "dspark_adaptive_block_trimmed_tokens": null,
+        "dspark_adaptive_block_predicted_hash_bytes": null,
+        "dspark_adaptive_block_high_confidence_full_decisions": null,
+        "dspark_adaptive_block_storage_score_decisions": null,
+        "dspark_adaptive_block_full_block_decisions": null,
+        "dspark_adaptive_block_plan_seconds": null
+      },
+      "paired_adaptive_change_fraction": {
+        "request_seconds": [
+          -0.0010031016859918507,
+          0.0019954129371658916
+        ],
+        "time_to_first_token_seconds": [
+          -1.820949464161229e-05,
+          0.0018099078333286738
+        ],
+        "decode_tokens_per_second": [
+          0.007604634773738878,
+          -0.0032409092693586046
+        ],
+        "peak_memory_bytes": [
+          4.35612009971034e-07,
+          -0.0047900311592299055
+        ],
+        "request_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "request_process_disk_bytes_read": [
+          0.0011771361389672668,
+          0.0002217600442821632
+        ],
+        "request_expert_evictions": [
+          0.0,
+          0.0
+        ],
+        "dspark_rounds": [
+          0.0,
+          0.0
+        ],
+        "dspark_proposed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_accepted_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_committed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_output_budget_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_draft_seconds": [
+          -0.00884388141382537,
+          0.016341151684615723
+        ],
+        "dspark_verification_seconds": [
+          -0.005026389416874254,
+          -0.00013865597849945467
+        ],
+        "dspark_target_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_replay_expert_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_requested_experts": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_experts_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_useful_bytes": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wasted_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_rate": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wait_seconds": [
+          -0.03417933660968011,
+          -0.0010768916276007335
+        ],
+        "dspark_adaptive_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_original_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_selected_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_predicted_hash_bytes": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_high_confidence_full_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_storage_score_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_full_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_plan_seconds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "zh_technical",
+      "greedy_parity": true,
+      "prompt_token_sha256": [
+        "8b2e748e355854bb8391bc11c242daba1b8bdf79189767d26852416afc425972"
+      ],
+      "output_token_sha256": [
+        "2d181fcf43dff20e2777c8993cbc450c6de2278811eaac8ad37564be20de1b23"
+      ],
+      "generated_token_counts": [
+        8
+      ],
+      "fixed_medians": {
+        "request_seconds": 11.924870375005412,
+        "time_to_first_token_seconds": 10.530482562986435,
+        "decode_tokens_per_second": 5.022096906868859,
+        "peak_memory_bytes": 27675840776.0,
+        "request_expert_bytes_read": 64854687744.0,
+        "request_process_disk_bytes_read": 60469061632.0,
+        "request_expert_evictions": 3632.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.17574654149939306,
+        "dspark_verification_seconds": 1.0259388749836944,
+        "dspark_target_expert_bytes_read": 6283591680.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 102.0,
+        "dspark_hash_prefetch_experts_read": 67.0,
+        "dspark_hash_prefetch_bytes_read": 895746048.0,
+        "dspark_hash_prefetch_useful_bytes": 895746048.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.11195091651461553,
+        "dspark_adaptive_block_decisions": 0.0,
+        "dspark_adaptive_block_original_tokens": 0.0,
+        "dspark_adaptive_block_selected_tokens": 0.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 0.0,
+        "dspark_adaptive_block_plan_seconds": 0.0
+      },
+      "adaptive_medians": {
+        "request_seconds": 11.912854333000723,
+        "time_to_first_token_seconds": 10.523223166484968,
+        "decode_tokens_per_second": 5.038698382643272,
+        "peak_memory_bytes": 27742202460.0,
+        "request_expert_bytes_read": 64854687744.0,
+        "request_process_disk_bytes_read": 60440477696.0,
+        "request_expert_evictions": 3632.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.1744915415038122,
+        "dspark_verification_seconds": 1.0251952499966137,
+        "dspark_target_expert_bytes_read": 6283591680.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 102.0,
+        "dspark_hash_prefetch_experts_read": 67.0,
+        "dspark_hash_prefetch_bytes_read": 895746048.0,
+        "dspark_hash_prefetch_useful_bytes": 895746048.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.11129581250133924,
+        "dspark_adaptive_block_decisions": 1.0,
+        "dspark_adaptive_block_original_tokens": 5.0,
+        "dspark_adaptive_block_selected_tokens": 5.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 895746048.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 1.0,
+        "dspark_adaptive_block_plan_seconds": 0.0009678124915808439
+      },
+      "adaptive_change_fraction": {
+        "request_seconds": -0.0010076455027867076,
+        "time_to_first_token_seconds": -0.0006893697851021183,
+        "decode_tokens_per_second": 0.003305686067448638,
+        "peak_memory_bytes": 0.0023978199808674895,
+        "request_expert_bytes_read": 0.0,
+        "request_process_disk_bytes_read": -0.0004727034822196329,
+        "request_expert_evictions": 0.0,
+        "dspark_rounds": 0.0,
+        "dspark_proposed_tokens": 0.0,
+        "dspark_accepted_tokens": 0.0,
+        "dspark_committed_tokens": 0.0,
+        "dspark_output_budget_trimmed_tokens": null,
+        "dspark_draft_seconds": -0.007140965534079705,
+        "dspark_verification_seconds": -0.0007248238712978996,
+        "dspark_target_expert_bytes_read": 0.0,
+        "dspark_replay_expert_bytes_read": null,
+        "dspark_hash_prefetch_requested_experts": 0.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": null,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": -0.0058517074595879764,
+        "dspark_adaptive_block_decisions": null,
+        "dspark_adaptive_block_original_tokens": null,
+        "dspark_adaptive_block_selected_tokens": null,
+        "dspark_adaptive_block_trimmed_tokens": null,
+        "dspark_adaptive_block_predicted_hash_bytes": null,
+        "dspark_adaptive_block_high_confidence_full_decisions": null,
+        "dspark_adaptive_block_storage_score_decisions": null,
+        "dspark_adaptive_block_full_block_decisions": null,
+        "dspark_adaptive_block_plan_seconds": null
+      },
+      "paired_adaptive_change_fraction": {
+        "request_seconds": [
+          -0.003889990588528132,
+          0.0018912013687982885
+        ],
+        "time_to_first_token_seconds": [
+          -0.0027498138249984466,
+          0.0013804954700073538
+        ],
+        "decode_tokens_per_second": [
+          0.012619466629142264,
+          -0.005874018627910818
+        ],
+        "peak_memory_bytes": [
+          0.0,
+          0.004795639928465425
+        ],
+        "request_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "request_process_disk_bytes_read": [
+          -0.0009357097019554708,
+          -9.284125480445023e-06
+        ],
+        "request_expert_evictions": [
+          0.0,
+          0.0
+        ],
+        "dspark_rounds": [
+          0.0,
+          0.0
+        ],
+        "dspark_proposed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_accepted_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_committed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_output_budget_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_draft_seconds": [
+          -0.025051523961247147,
+          0.01092031417572459
+        ],
+        "dspark_verification_seconds": [
+          -0.0063822520556503955,
+          0.005017901756657782
+        ],
+        "dspark_target_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_replay_expert_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_requested_experts": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_experts_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_useful_bytes": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wasted_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_rate": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wait_seconds": [
+          -0.012536698125508044,
+          0.0009810221069819882
+        ],
+        "dspark_adaptive_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_original_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_selected_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_predicted_hash_bytes": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_high_confidence_full_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_storage_score_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_full_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_plan_seconds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "mixed_math",
+      "greedy_parity": true,
+      "prompt_token_sha256": [
+        "1977c6826b7859543af1b595b78def2a50a806eef5ab63c2737a00931938faf4"
+      ],
+      "output_token_sha256": [
+        "ba92d956830600423d097a23d65d887dcaf04951b4edfe49807d1079e7fc72e9"
+      ],
+      "generated_token_counts": [
+        8
+      ],
+      "fixed_medians": {
+        "request_seconds": 11.79251272950205,
+        "time_to_first_token_seconds": 10.387166209009592,
+        "decode_tokens_per_second": 4.982468017998054,
+        "peak_memory_bytes": 27823269780.0,
+        "request_expert_bytes_read": 63584600064.0,
+        "request_process_disk_bytes_read": 59807244288.0,
+        "request_expert_evictions": 3566.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.20179368800017983,
+        "dspark_verification_seconds": 0.9862733335030498,
+        "dspark_target_expert_bytes_read": 6069682176.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 103.0,
+        "dspark_hash_prefetch_experts_read": 38.0,
+        "dspark_hash_prefetch_bytes_read": 508035072.0,
+        "dspark_hash_prefetch_useful_bytes": 508035072.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.04780889600806404,
+        "dspark_adaptive_block_decisions": 0.0,
+        "dspark_adaptive_block_original_tokens": 0.0,
+        "dspark_adaptive_block_selected_tokens": 0.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 0.0,
+        "dspark_adaptive_block_plan_seconds": 0.0
+      },
+      "adaptive_medians": {
+        "request_seconds": 11.800391478987876,
+        "time_to_first_token_seconds": 10.388571312490967,
+        "decode_tokens_per_second": 4.959496615292467,
+        "peak_memory_bytes": 27823272024.0,
+        "request_expert_bytes_read": 63584600064.0,
+        "request_process_disk_bytes_read": 59843633152.0,
+        "request_expert_evictions": 3566.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.19937960400420707,
+        "dspark_verification_seconds": 0.992586249994929,
+        "dspark_target_expert_bytes_read": 6069682176.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 103.0,
+        "dspark_hash_prefetch_experts_read": 38.0,
+        "dspark_hash_prefetch_bytes_read": 508035072.0,
+        "dspark_hash_prefetch_useful_bytes": 508035072.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.049256521509960294,
+        "dspark_adaptive_block_decisions": 1.0,
+        "dspark_adaptive_block_original_tokens": 5.0,
+        "dspark_adaptive_block_selected_tokens": 5.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 508035072.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 1.0,
+        "dspark_adaptive_block_plan_seconds": 0.0008561455033486709
+      },
+      "adaptive_change_fraction": {
+        "request_seconds": 0.000668114562735673,
+        "time_to_first_token_seconds": 0.00013527303338574923,
+        "decode_tokens_per_second": -0.0046104465944602595,
+        "peak_memory_bytes": 8.065191538390065e-08,
+        "request_expert_bytes_read": 0.0,
+        "request_process_disk_bytes_read": 0.0006084357243542356,
+        "request_expert_evictions": 0.0,
+        "dspark_rounds": 0.0,
+        "dspark_proposed_tokens": 0.0,
+        "dspark_accepted_tokens": 0.0,
+        "dspark_committed_tokens": 0.0,
+        "dspark_output_budget_trimmed_tokens": null,
+        "dspark_draft_seconds": -0.011963129371869196,
+        "dspark_verification_seconds": 0.006400777834534882,
+        "dspark_target_expert_bytes_read": 0.0,
+        "dspark_replay_expert_bytes_read": null,
+        "dspark_hash_prefetch_requested_experts": 0.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": null,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": 0.030279417070247353,
+        "dspark_adaptive_block_decisions": null,
+        "dspark_adaptive_block_original_tokens": null,
+        "dspark_adaptive_block_selected_tokens": null,
+        "dspark_adaptive_block_trimmed_tokens": null,
+        "dspark_adaptive_block_predicted_hash_bytes": null,
+        "dspark_adaptive_block_high_confidence_full_decisions": null,
+        "dspark_adaptive_block_storage_score_decisions": null,
+        "dspark_adaptive_block_full_block_decisions": null,
+        "dspark_adaptive_block_plan_seconds": null
+      },
+      "paired_adaptive_change_fraction": {
+        "request_seconds": [
+          0.0021624070937251863,
+          -0.0008239716728756465
+        ],
+        "time_to_first_token_seconds": [
+          0.0017289053764156597,
+          -0.0014548337512193604
+        ],
+        "decode_tokens_per_second": [
+          -0.005363731593742867,
+          -0.0038601424316097427
+        ],
+        "peak_memory_bytes": [
+          -1.4376452404915206e-07,
+          3.050684516063629e-07
+        ],
+        "request_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "request_process_disk_bytes_read": [
+          0.0011439009598219515,
+          7.313270230128346e-05
+        ],
+        "request_expert_evictions": [
+          0.0,
+          0.0
+        ],
+        "dspark_rounds": [
+          0.0,
+          0.0
+        ],
+        "dspark_proposed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_accepted_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_committed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_output_budget_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_draft_seconds": [
+          -0.013209152894086817,
+          -0.010718100869894132
+        ],
+        "dspark_verification_seconds": [
+          0.006985232978823534,
+          0.005810435191518917
+        ],
+        "dspark_target_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_replay_expert_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_requested_experts": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_experts_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_useful_bytes": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wasted_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_rate": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wait_seconds": [
+          0.044662211582276304,
+          0.015632655142732692
+        ],
+        "dspark_adaptive_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_original_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_selected_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_predicted_hash_bytes": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_high_confidence_full_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_storage_score_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_full_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_plan_seconds": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "name": "tool_like",
+      "greedy_parity": true,
+      "prompt_token_sha256": [
+        "da748b01bee88ca671d3cd9ce70fb97ff48d5c734a9edb39ea0fb02650840856"
+      ],
+      "output_token_sha256": [
+        "6dd344178799e282acb57e70f9cd15ad029a610a957a613421270010255ebbb6"
+      ],
+      "generated_token_counts": [
+        8
+      ],
+      "fixed_medians": {
+        "request_seconds": 14.149649062994285,
+        "time_to_first_token_seconds": 12.440176458490896,
+        "decode_tokens_per_second": 4.096049515602537,
+        "peak_memory_bytes": 27730653092.0,
+        "request_expert_bytes_read": 76459278336.0,
+        "request_process_disk_bytes_read": 72586690560.0,
+        "request_expert_evictions": 4515.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.17499589548970107,
+        "dspark_verification_seconds": 1.234827062493423,
+        "dspark_target_expert_bytes_read": 7353139200.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 84.0,
+        "dspark_hash_prefetch_experts_read": 52.0,
+        "dspark_hash_prefetch_bytes_read": 695205888.0,
+        "dspark_hash_prefetch_useful_bytes": 695205888.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.08003737599938177,
+        "dspark_adaptive_block_decisions": 0.0,
+        "dspark_adaptive_block_original_tokens": 0.0,
+        "dspark_adaptive_block_selected_tokens": 0.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 0.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 0.0,
+        "dspark_adaptive_block_plan_seconds": 0.0
+      },
+      "adaptive_medians": {
+        "request_seconds": 13.860494520500652,
+        "time_to_first_token_seconds": 12.172491937497398,
+        "decode_tokens_per_second": 4.147854544508231,
+        "peak_memory_bytes": 27730637148.0,
+        "request_expert_bytes_read": 76459278336.0,
+        "request_process_disk_bytes_read": 72615354368.0,
+        "request_expert_evictions": 4515.0,
+        "dspark_rounds": 1.0,
+        "dspark_proposed_tokens": 5.0,
+        "dspark_accepted_tokens": 5.0,
+        "dspark_committed_tokens": 6.0,
+        "dspark_output_budget_trimmed_tokens": 0.0,
+        "dspark_draft_seconds": 0.17399593751179054,
+        "dspark_verification_seconds": 1.2122880624956451,
+        "dspark_target_expert_bytes_read": 7353139200.0,
+        "dspark_replay_expert_bytes_read": 0.0,
+        "dspark_hash_prefetch_requested_experts": 84.0,
+        "dspark_hash_prefetch_experts_read": 52.0,
+        "dspark_hash_prefetch_bytes_read": 695205888.0,
+        "dspark_hash_prefetch_useful_bytes": 695205888.0,
+        "dspark_hash_prefetch_wasted_bytes": 0.0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.07680516599793918,
+        "dspark_adaptive_block_decisions": 1.0,
+        "dspark_adaptive_block_original_tokens": 5.0,
+        "dspark_adaptive_block_selected_tokens": 5.0,
+        "dspark_adaptive_block_trimmed_tokens": 0.0,
+        "dspark_adaptive_block_predicted_hash_bytes": 695205888.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 1.0,
+        "dspark_adaptive_block_storage_score_decisions": 0.0,
+        "dspark_adaptive_block_full_block_decisions": 1.0,
+        "dspark_adaptive_block_plan_seconds": 0.0006741670076735318
+      },
+      "adaptive_change_fraction": {
+        "request_seconds": -0.020435456823439006,
+        "time_to_first_token_seconds": -0.0215177430872207,
+        "decode_tokens_per_second": 0.01264755924174249,
+        "peak_memory_bytes": -5.749594121387525e-07,
+        "request_expert_bytes_read": 0.0,
+        "request_process_disk_bytes_read": 0.00039489068559072217,
+        "request_expert_evictions": 0.0,
+        "dspark_rounds": 0.0,
+        "dspark_proposed_tokens": 0.0,
+        "dspark_accepted_tokens": 0.0,
+        "dspark_committed_tokens": 0.0,
+        "dspark_output_budget_trimmed_tokens": null,
+        "dspark_draft_seconds": -0.005714179610397639,
+        "dspark_verification_seconds": -0.018252758367852756,
+        "dspark_target_expert_bytes_read": 0.0,
+        "dspark_replay_expert_bytes_read": null,
+        "dspark_hash_prefetch_requested_experts": 0.0,
+        "dspark_hash_prefetch_experts_read": 0.0,
+        "dspark_hash_prefetch_bytes_read": 0.0,
+        "dspark_hash_prefetch_useful_bytes": 0.0,
+        "dspark_hash_prefetch_wasted_bytes": null,
+        "dspark_hash_prefetch_useful_rate": 0.0,
+        "dspark_hash_prefetch_wait_seconds": -0.04038375772673442,
+        "dspark_adaptive_block_decisions": null,
+        "dspark_adaptive_block_original_tokens": null,
+        "dspark_adaptive_block_selected_tokens": null,
+        "dspark_adaptive_block_trimmed_tokens": null,
+        "dspark_adaptive_block_predicted_hash_bytes": null,
+        "dspark_adaptive_block_high_confidence_full_decisions": null,
+        "dspark_adaptive_block_storage_score_decisions": null,
+        "dspark_adaptive_block_full_block_decisions": null,
+        "dspark_adaptive_block_plan_seconds": null
+      },
+      "paired_adaptive_change_fraction": {
+        "request_seconds": [
+          -0.03972130740943857,
+          -0.00040150936341074977
+        ],
+        "time_to_first_token_seconds": [
+          -0.04208481970966707,
+          -8.79489523484962e-05
+        ],
+        "decode_tokens_per_second": [
+          0.02281070306414866,
+          0.002645512301648048
+        ],
+        "peak_memory_bytes": [
+          -5.746054713432117e-07,
+          -5.753116606086133e-07
+        ],
+        "request_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "request_process_disk_bytes_read": [
+          0.0007086140428690037,
+          8.164685771805829e-05
+        ],
+        "request_expert_evictions": [
+          0.0,
+          0.0
+        ],
+        "dspark_rounds": [
+          0.0,
+          0.0
+        ],
+        "dspark_proposed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_accepted_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_committed_tokens": [
+          0.0,
+          0.0
+        ],
+        "dspark_output_budget_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_draft_seconds": [
+          -0.016687611074709383,
+          0.005505824104179474
+        ],
+        "dspark_verification_seconds": [
+          -0.029789969884897544,
+          -0.006503614878826677
+        ],
+        "dspark_target_expert_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_replay_expert_bytes_read": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_requested_experts": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_experts_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_bytes_read": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_useful_bytes": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wasted_bytes": [
+          null,
+          null
+        ],
+        "dspark_hash_prefetch_useful_rate": [
+          0.0,
+          0.0
+        ],
+        "dspark_hash_prefetch_wait_seconds": [
+          -0.07704287563880027,
+          -0.0011706784070435578
+        ],
+        "dspark_adaptive_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_original_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_selected_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_trimmed_tokens": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_predicted_hash_bytes": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_high_confidence_full_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_storage_score_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_full_block_decisions": [
+          null,
+          null
+        ],
+        "dspark_adaptive_block_plan_seconds": [
+          null,
+          null
+        ]
+      }
+    }
+  ],
+  "aggregate_summary": {
+    "all_workloads_greedy_parity": true,
+    "workloads_measured": 5,
+    "workloads_with_lower_request_logical_expert_bytes": 0,
+    "workloads_with_lower_target_logical_expert_bytes": 0,
+    "workloads_with_lower_wasted_prefetch_bytes": 0,
+    "median_adaptive_change_fraction_across_workloads": {
+      "request_seconds": 0.0004949650785296856,
+      "time_to_first_token_seconds": 0.00013527303338574923,
+      "decode_tokens_per_second": 0.002163795055566244,
+      "peak_memory_bytes": 8.065191538390065e-08,
+      "request_expert_bytes_read": 0.0,
+      "request_process_disk_bytes_read": 0.00039489068559072217,
+      "request_expert_evictions": 0.0,
+      "dspark_rounds": 0.0,
+      "dspark_proposed_tokens": 0.0,
+      "dspark_accepted_tokens": 0.0,
+      "dspark_committed_tokens": 0.0,
+      "dspark_output_budget_trimmed_tokens": null,
+      "dspark_draft_seconds": -0.005714179610397639,
+      "dspark_verification_seconds": -0.0007248238712978996,
+      "dspark_target_expert_bytes_read": 0.0,
+      "dspark_replay_expert_bytes_read": null,
+      "dspark_hash_prefetch_requested_experts": 0.0,
+      "dspark_hash_prefetch_experts_read": 0.0,
+      "dspark_hash_prefetch_bytes_read": 0.0,
+      "dspark_hash_prefetch_useful_bytes": 0.0,
+      "dspark_hash_prefetch_wasted_bytes": null,
+      "dspark_hash_prefetch_useful_rate": 0.0,
+      "dspark_hash_prefetch_wait_seconds": -0.011847829044146399,
+      "dspark_adaptive_block_decisions": null,
+      "dspark_adaptive_block_original_tokens": null,
+      "dspark_adaptive_block_selected_tokens": null,
+      "dspark_adaptive_block_trimmed_tokens": null,
+      "dspark_adaptive_block_predicted_hash_bytes": null,
+      "dspark_adaptive_block_high_confidence_full_decisions": null,
+      "dspark_adaptive_block_storage_score_decisions": null,
+      "dspark_adaptive_block_full_block_decisions": null,
+      "dspark_adaptive_block_plan_seconds": null
+    }
+  },
+  "evidence_limits": [
+    "This is one ABBA wave per workload, not a formal repeated-wave result.",
+    "Prompts contain 128 tokens and outputs contain at most eight tokens; this does not represent the historical 4K/256-token matrix.",
+    "Each workload has an untimed same-prompt warmup, but the operating-system page cache is not controlled or purged.",
+    "Process disk counters include all reads attributed to the process and do not isolate physical expert-file SSD traffic.",
+    "Adaptive selection only models the three exact target hash layers and still computes the complete five-position DSpark draft.",
+    "Timing, process-disk, and peak-memory changes remain exploratory until repeated waves establish stable paired results."
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "captured_at": "2026-08-26T18:42:53.521783+00:00",
+  "contract": {
+    "checkpoint_index_mtp_stages": [
+      0,
+      1,
+      2
+    ],
+    "checkpoint_index_mtp_tensor_count": 4705,
+    "checkpoint_index_tensor_counts_by_stage": [
+      [
+        0,
+        1568
+      ],
+      [
+        1,
+        1565
+      ],
+      [
+        2,
+        1572
+      ]
+    ],
+    "installed_common_tensor_count": 97,
+    "installed_dspark_total_bytes": 10862841600,
+    "installed_expert_tensor_count": 4608,
+    "installed_files": [
+      {
+        "actual_sha256": "c1c67ec50452a56b463e5dd4f556cc9fcb875c0d8c513641a2c05de7447efffd",
+        "bytes": 595185408,
+        "hash_verified": true,
+        "manifest_sha256": "c1c67ec50452a56b463e5dd4f556cc9fcb875c0d8c513641a2c05de7447efffd",
+        "path": "dspark/common.bin"
+      },
+      {
+        "actual_sha256": "f15200226325776268c09ad4f8f5a22d5cbc95be27729556f036be4a24902f12",
+        "bytes": 3422552064,
+        "hash_verified": true,
+        "manifest_sha256": "f15200226325776268c09ad4f8f5a22d5cbc95be27729556f036be4a24902f12",
+        "path": "dspark/experts/layer_00.bin"
+      },
+      {
+        "actual_sha256": "11d4c28e0dcddc6bd9c695fbaa5f22d6bfd721ef42db000e1a42c6cac8f65a7c",
+        "bytes": 3422552064,
+        "hash_verified": true,
+        "manifest_sha256": "11d4c28e0dcddc6bd9c695fbaa5f22d6bfd721ef42db000e1a42c6cac8f65a7c",
+        "path": "dspark/experts/layer_01.bin"
+      },
+      {
+        "actual_sha256": "bc1b827684405d1001567eff7668091ade40fa36b902d8da5be2f4ec7347a890",
+        "bytes": 3422552064,
+        "hash_verified": true,
+        "manifest_sha256": "bc1b827684405d1001567eff7668091ade40fa36b902d8da5be2f4ec7347a890",
+        "path": "dspark/experts/layer_02.bin"
+      }
+    ],
+    "installed_tensor_contract_matches_checkpoint_index": true,
+    "local_config_matches_pinned_remote": true,
+    "local_inference_config_matches_pinned_remote": true,
+    "missing_from_installed_tensor_contract": [],
+    "reference_graph_checks": {
+      "constructs_configured_stage_count": true,
+      "does_not_consume_num_nextn_predict_layers": true,
+      "enters_through_stage_zero": true,
+      "executes_every_stage": true,
+      "exits_through_last_stage": true,
+      "first_stage_owns_input_adapter": true,
+      "last_stage_owns_output_heads": true
+    },
+    "self_contained_single_stage_candidates": [],
+    "stage_ownership": [
+      {
+        "input_adapter_complete": true,
+        "input_adapter_tensors_present": [
+          "main_norm.weight",
+          "main_proj.scale",
+          "main_proj.weight"
+        ],
+        "output_head_complete": false,
+        "output_head_tensors_present": [],
+        "self_contained_single_stage": false,
+        "stage": 0,
+        "tensor_count": 1568
+      },
+      {
+        "input_adapter_complete": false,
+        "input_adapter_tensors_present": [],
+        "output_head_complete": false,
+        "output_head_tensors_present": [],
+        "self_contained_single_stage": false,
+        "stage": 1,
+        "tensor_count": 1565
+      },
+      {
+        "input_adapter_complete": false,
+        "input_adapter_tensors_present": [],
+        "output_head_complete": true,
+        "output_head_tensors_present": [
+          "confidence_head.proj.weight",
+          "hc_head_base",
+          "hc_head_fn",
+          "hc_head_scale",
+          "markov_head.markov_w1.weight",
+          "markov_head.markov_w2.weight",
+          "norm.weight"
+        ],
+        "self_contained_single_stage": false,
+        "stage": 2,
+        "tensor_count": 1572
+      }
+    ],
+    "unexpected_in_installed_tensor_contract": [],
+    "values": {
+      "inference_n_mtp_layers": 3,
+      "installed_dspark_block_size": 5,
+      "installed_dspark_layer_count": 3,
+      "installed_dspark_markov_rank": 256,
+      "installed_dspark_target_layer_ids": [
+        40,
+        41,
+        42
+      ],
+      "transformers_num_nextn_predict_layers": 1
+    }
+  },
+  "decision": {
+    "adoption": "reject_runtime_truncation",
+    "native_mtp1_checkpoint_exposed": false,
+    "next_valid_options": [
+      "Obtain a checkpoint whose reference contract exposes a self-contained one-stage MTP drafter.",
+      "Train or distill a new one-stage resident drafter and classify it as a new checkpoint candidate.",
+      "Continue optimizing the complete three-stage DSpark graph without labeling it MTP-1."
+    ],
+    "reason": [
+      "num_nextn_predict_layers=1 is not consumed by the pinned inference graph; that graph uses n_mtp_layers=3.",
+      "The pinned graph enters through mtp.0, executes all three stages, and exits through mtp.2.",
+      "mtp.0 alone has the target-hidden input adapter but no output head; mtp.2 has the output head but no input adapter.",
+      "Stitching mtp.0 directly to mtp.2 heads or changing block size would define a graph outside the pinned reference contract, not a faithful MTP-1 baseline."
+    ],
+    "runtime_stage_truncation_is_checkpoint_faithful": false,
+    "status": "faithful_native_mtp1_not_exposed_by_pinned_checkpoint"
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7"
+  },
+  "evidence_kind": "mtp1_checkpoint_contract_audit",
+  "evidence_limits": [
+    "This is a checkpoint and reference-graph contract audit, not a timing result.",
+    "It does not claim that a separately trained MTP-1 checkpoint is impossible.",
+    "It does not evaluate the quality of an intentionally approximate stage truncation."
+  ],
+  "formal_performance_result": false,
+  "schema_version": 1,
+  "source_provenance": {
+    "audit_script": "Scripts/audit_mtp1_contract.py",
+    "audit_script_sha256": "faec28be7b5a4173feaaf15481e4e56e0da2f24c2aae74adc26b7065f119981a",
+    "git_commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "git_status_short": "M Makefile\n M Tests/DeepSeekV4SSDAppTests/ModelDiscoveryTests.swift\n M docs/API.md\n M docs/ARCHITECTURE.md\n M docs/PERFORMANCE.md\n M docs/README.md\n M docs/RESEARCH.md\n M docs/VALIDATION.md\n M runtime/deepseek_v4_ssd/cli.py\n M runtime/deepseek_v4_ssd/dspark.py\n M runtime/deepseek_v4_ssd/expert_cache.py\n M runtime/deepseek_v4_ssd/generation.py\n M runtime/deepseek_v4_ssd/model.py\n M runtime/deepseek_v4_ssd/server.py\n M runtime/tests/test_runtime.py\n?? PLAN.md\n?? Scripts/audit_mtp1_contract.py\n?? Scripts/benchmark_dspark_adaptive.py\n?? Scripts/diagnose_block_parity.py\n?? Scripts/diagnose_hybrid_verifier.py\n?? Scripts/diagnose_layer0_attention.py\n?? Scripts/diagnose_layer0_ffn.py\n?? Scripts/diagnose_layer_parity.py\n?? Scripts/prepare_adaptive_discovery_prompts.py\n?? docs/benchmarks/2026-08-26-adaptive-block-4k256-survey-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-calibration-wave1-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-calibration-wave2-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-discovery-4k16-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-random-hex-4k256-no-fallback-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-repair-validation-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-smoke-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-storage-4k16-fallback-m2-max.json\n?? docs/benchmarks/2026-08-26-adaptive-block-storage-4k16-no-fallback-m2-max.json\n?? docs/benchmarks/2026-08-26-dspark-block-parity-diagnostic-m2-max.json\n?? docs/benchmarks/2026-08-26-fixed-block-random-hex-4k256-no-fallback-m2-max.json\n?? docs/benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json\n?? docs/benchmarks/2026-08-26-random-hex-4k32-fixed-adaptive-failed-m2-max.json\n?? docs/benchmarks/2026-08-26-random-hex-4k32-normal-layer-major-m2-max.json\n?? docs/benchmarks/2026-08-26-random-hex-4k32-normal-sequential-prefill-m2-max.json\n?? docs/benchmarks/2026-08-26-random-hex-4k32-sequential-adaptive-oracle-m2-max.json\n?? docs/benchmarks/2026-08-26-random-hex-4k32-sequential-fixed-oracle-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-random-hex-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v2-discovery-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v2-random-hex-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v3-discovery-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v3-failing-workloads-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v3-hash-adaptive-discovery-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v3-hash-discovery-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-v3-hash-failing-workloads-4k32-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-hybrid-verifier-diagnostic-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-layer-parity-diagnostic-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-layer0-attention-component-diagnostic-m2-max.json\n?? docs/benchmarks/2026-08-27-dspark-layer0-ffn-component-diagnostic-m2-max.json\n?? docs/benchmarks/2026-08-27-mtp1-checkpoint-contract-audit.json\n?? docs/benchmarks/prompts/\n?? research/HASH_EXACT_PREFETCH_2026-08-26.md\n?? research/PLAN_EXECUTION_STATUS_2026-08-27.md\n?? runtime/deepseek_v4_ssd/io_metrics.py\n?? runtime/tests/test_mtp1_contract_audit.py",
+    "installed_sources": [
+      {
+        "bytes": 320118,
+        "path": "manifest.json",
+        "sha256": "61b102940075f311a6cfb0dfa3b5ae06c6386bb92365c98046b99f5b3e8fce64"
+      },
+      {
+        "bytes": 1888,
+        "path": "config.json",
+        "sha256": "6c8f3d2d3b48707541b88f32f22ef3f0f8a6b57d8523281e2b8d3cdb0ae9a023"
+      },
+      {
+        "bytes": 1162,
+        "path": "inference/config.json",
+        "sha256": "c90861f3d10a9e4ef5954f8f1a34c529d480da1c5799f84660028f4e38e14e71"
+      }
+    ],
+    "pinned_remote_sources": [
+      {
+        "bytes": 1888,
+        "path": "config.json",
+        "sha256": "6c8f3d2d3b48707541b88f32f22ef3f0f8a6b57d8523281e2b8d3cdb0ae9a023",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/resolve/7872f01b1d1fe23eabc4c98b48bffcef5a386062/config.json"
+      },
+      {
+        "bytes": 1162,
+        "path": "inference/config.json",
+        "sha256": "c90861f3d10a9e4ef5954f8f1a34c529d480da1c5799f84660028f4e38e14e71",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/resolve/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/config.json"
+      },
+      {
+        "bytes": 45118,
+        "path": "inference/model.py",
+        "sha256": "c0c19e6c9fa439bac7fbb1c5bc1868232dfd5aa2f439a548d0e33dcc2a9edd3f",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/resolve/7872f01b1d1fe23eabc4c98b48bffcef5a386062/inference/model.py"
+      },
+      {
+        "bytes": 5602871,
+        "path": "model.safetensors.index.json",
+        "sha256": "98efab455cf08dfbbbaaba6f570e1bf10bf927d2b4c3c453a59c2f6f0e3be92b",
+        "url": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/resolve/7872f01b1d1fe23eabc4c98b48bffcef5a386062/model.safetensors.index.json"
+      }
+    ]
+  },
+  "subject": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
+  }
+}

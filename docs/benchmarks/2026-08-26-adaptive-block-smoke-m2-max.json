@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-08-26",
+  "timezone": "Asia/Taipei",
+  "evidence_kind": "exploratory_full_model_adaptive_block_smoke",
+  "experiment": {
+    "id": "P1-adaptive-block-correctness-smoke",
+    "stage": "correctness_and_metric_plumbing_gate",
+    "formal_performance_result": false,
+    "run_count": 1
+  },
+  "source": {
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "working_tree_dirty": true,
+    "runtime_python_tree_sha256": "21e0dd8eaed72204f86fe635fad37eaca74122645f5f089d41f49f9c0f919258",
+    "tracked_diff_sha256_at_run": "99befb88709b1bd57de0c7f8f6e8a5a1744b5ab3334dcb2c9c4dfe5e53ca200a",
+    "raw_metrics_sha256": "e1034e64f7cd52b3edfacd068796005b5133746ea117901dbdcc6245cdda476a"
+  },
+  "hardware": {
+    "machine": "Mac Studio",
+    "model_identifier": "Mac14,13",
+    "chip": "Apple M2 Max",
+    "cpu_cores": 12,
+    "memory_bytes": 68719476736,
+    "power_source": "AC Power"
+  },
+  "software": {
+    "os": "macOS 26.6.2",
+    "os_build": "25G83",
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1"
+  },
+  "checkpoint": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "main_layers": 43,
+    "expert_count": 256,
+    "selected_experts_per_token": 6,
+    "expert_blob_bytes": 13369344,
+    "dspark_block_size": 5
+  },
+  "workload": {
+    "prompt": "Write one short sentence about storage.",
+    "prompt_text_sha256": "e11c2385c88ee4ad64cc0196cca68ba00116abd33cea7cc78f4712d5eb93b854",
+    "prompt_token_sha256": "684104d3236aa5b8d7427d90c2e08e0a1e9571f0f400d9902117ed3aa768deb2",
+    "output_token_sha256": "749bdfdbeeb3f8dbe4777f1725f27901c9881e2517cedb5113143736d4aca696",
+    "prompt_tokens": 7,
+    "generated_tokens": 8,
+    "batch_size": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "dspark_confidence_threshold": 0
+  },
+  "runtime_config": {
+    "main_expert_slots": 1152,
+    "main_read_workers": 4,
+    "main_prefetch_read_workers": 2,
+    "dspark_enabled": true,
+    "dspark_slots": 768,
+    "dspark_hash_prefetch": true,
+    "dspark_adaptive_block": true,
+    "hash_prefetch_scratch_slots": 108,
+    "hash_prefetch_scratch_capacity_bytes": 1443889152,
+    "persistent_prompt_cache": false,
+    "fp8_kv_cache": true,
+    "ready_expert_decode": true
+  },
+  "cache_state": {
+    "fresh_process": true,
+    "persistent_prompt_cache": false,
+    "os_page_cache": "warm_and_not_purged",
+    "comparator_cache_state_is_not_matched": true
+  },
+  "run": {
+    "request_seconds": 5.6024867499945685,
+    "time_to_first_token_seconds": 3.0539321250107605,
+    "decode_tokens_per_second": 2.7475508554885097,
+    "peak_memory_bytes": 28195146130,
+    "request_expert_bytes_read": 26872381440,
+    "request_process_disk_bytes_read": 25580552192,
+    "request_expert_evictions": 791,
+    "dspark_proposed_tokens": 2,
+    "dspark_accepted_tokens": 1,
+    "dspark_committed_tokens": 3,
+    "dspark_rounds": 2,
+    "dspark_fallback": true,
+    "dspark_verification_seconds": 1.1892659999721218,
+    "dspark_target_expert_bytes_read": 6029574144,
+    "dspark_replay_expert_bytes_read": 80216064,
+    "hash_prefetch_requested_experts": 70,
+    "hash_prefetch_cache_resident_experts": 3,
+    "hash_prefetch_experts_read": 67,
+    "hash_prefetch_bytes_read": 895746048,
+    "hash_prefetch_useful_bytes": 655097856,
+    "hash_prefetch_wasted_bytes": 240648192,
+    "hash_prefetch_useful_rate": 0.7313432835820896,
+    "hash_prefetch_wait_seconds": 0.07574662394472398,
+    "hash_prefetch_plan_seconds": 0.0011673330154735595,
+    "adaptive_block_decisions": 2,
+    "adaptive_block_original_tokens": 10,
+    "adaptive_block_selected_tokens": 2,
+    "adaptive_block_trimmed_tokens": 8,
+    "adaptive_block_expected_committed": 3.6463860273361206,
+    "adaptive_block_requested_hash_experts": 70,
+    "adaptive_block_resident_hash_experts": 3,
+    "adaptive_block_missing_hash_experts": 67,
+    "adaptive_block_predicted_hash_bytes": 895746048,
+    "adaptive_block_predicted_hash_bytes_per_committed_token": 298582016.0,
+    "adaptive_block_plan_seconds": 0.001283541030716151,
+    "last_decision": {
+      "candidate_tokens": [1, 2, 4, 5],
+      "expected_committed": [
+        1.814039945602417,
+        2.319045640281786,
+        2.6297414138109736,
+        2.644774434032393
+      ],
+      "requested_hash_experts": [36, 54, 84, 100],
+      "resident_hash_experts": [1, 1, 3, 4],
+      "missing_hash_experts": [35, 53, 81, 96],
+      "predicted_hash_bytes": [467927040, 708575232, 1082916864, 1283457024],
+      "scores": [
+        0.051829712731497626,
+        0.04375557811852426,
+        0.03246594338038239,
+        0.02754973368783743
+      ],
+      "selected_tokens": 1,
+      "selected_score": 0.051829712731497626,
+      "selected_hash_union_by_layer": [12, 12, 12]
+    }
+  },
+  "correctness_gate": {
+    "passed": true,
+    "comparator": "docs/benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json",
+    "same_prompt_token_hash": true,
+    "same_output_token_hash": true,
+    "same_generated_token_count": true
+  },
+  "deterministic_comparison_to_fixed_five_token_hash_prefetch": {
+    "comparison_scope": "logical counters and deterministic token outcome only",
+    "fixed_hash_prefetch_requested_experts": 102,
+    "adaptive_hash_prefetch_requested_experts": 70,
+    "fixed_hash_prefetch_experts_read": 79,
+    "adaptive_hash_prefetch_experts_read": 67,
+    "prefetch_bytes_saved": 160432128,
+    "prefetch_blobs_saved": 12,
+    "prefetch_bytes_saved_fraction": 0.1518987341772152,
+    "wasted_prefetch_bytes_saved": 187170816,
+    "wasted_prefetch_blobs_saved": 14,
+    "wasted_prefetch_bytes_saved_fraction": 0.4375,
+    "useful_prefetch_bytes_added": 26738688,
+    "useful_prefetch_blobs_added": 2,
+    "useful_rate_increase_fraction_points": 0.1364065747213301,
+    "target_expert_bytes_saved": 2981363712,
+    "target_expert_blobs_saved": 223,
+    "target_expert_bytes_saved_fraction": 0.33086053412462907,
+    "request_logical_expert_bytes_saved": 3328966656,
+    "request_logical_expert_blobs_saved": 249,
+    "request_logical_expert_bytes_saved_fraction": 0.1102257636122178,
+    "replay_expert_bytes_added": 53477376,
+    "replay_expert_blobs_added": 4,
+    "speculative_round_change": "one fixed five-token round became two one-token adaptive rounds"
+  },
+  "non_adopted_timing_observations": {
+    "request_seconds_vs_fixed_prefetch_two_run_median_fraction": -0.03583636766150141,
+    "process_disk_bytes_vs_fixed_prefetch_two_run_median_fraction": -0.03733331278083068,
+    "peak_memory_bytes_vs_fixed_prefetch_two_run_median_fraction": 0.023182511292903014,
+    "conclusion": "not_adopted_single_unmatched_warm_run"
+  },
+  "evidence_limits": [
+    "This is one short greedy workload and one adaptive run.",
+    "The comparator used a different run order and unmatched operating-system page-cache state.",
+    "Adaptive scheduling changed the number and length of speculative rounds, so acceptance totals are not directly comparable as one block.",
+    "The score covers exact hash-layer routes only; it does not predict the other 40 learned-router layers, GPU idle time, memory pressure, or hidden I/O.",
+    "The DSpark model still computes its complete five-position draft before the runtime trims the verification prefix.",
+    "Only greedy output parity, scheduler decisions, and deterministic logical-byte accounting are adopted from this artifact."
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T23:25:06.909250+08:00",
+  "evidence_kind": "dspark_block_parity_diagnostic",
+  "formal_performance_result": false,
+  "model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+  "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+  "workload": "random_hex",
+  "prompt_tokens": 4096,
+  "prompt_token_sha256": "73200813d08029033cc1e9c4db7132589895c2844b18e65f308a63633bd73118",
+  "reference_token_metrics": "docs/benchmarks/2026-08-26-random-hex-4k32-normal-sequential-prefill-m2-max.json",
+  "reference_output_token_sha256": "e76fb39a649d7997bdb1dcdace279117f6c7fc2ba02062f28c65389c85048570",
+  "anchor_index": 13,
+  "anchor_token": 1312,
+  "following_reference_token": 1281,
+  "prefix_reconstruction": {
+    "expected_tokens": [
+      1718,
+      82,
+      1018,
+      1718,
+      2512,
+      1018,
+      361,
+      2728,
+      2512,
+      1018,
+      361,
+      818,
+      2512,
+      1312
+    ],
+    "predicted_tokens": [
+      1718,
+      82,
+      1018,
+      1718,
+      2512,
+      1018,
+      361,
+      2728,
+      2512,
+      1018,
+      361,
+      818,
+      2512,
+      1312
+    ],
+    "exact": true
+  },
+  "position_zero": {
+    "sequential": {
+      "token_ids": [
+        1281,
+        31
+      ],
+      "logits": [
+        35.0,
+        28.625
+      ],
+      "margin": 6.375
+    },
+    "block": {
+      "token_ids": [
+        1281,
+        31
+      ],
+      "logits": [
+        35.25,
+        29.0
+      ],
+      "margin": 6.25
+    },
+    "top_token_match": true,
+    "maximum_absolute_logit_delta": 2.6875,
+    "mean_absolute_logit_delta": 0.32882237434387207
+  },
+  "position_one": {
+    "sequential": {
+      "token_ids": [
+        20400,
+        15207
+      ],
+      "logits": [
+        26.25,
+        26.125
+      ],
+      "margin": 0.125
+    },
+    "block": {
+      "token_ids": [
+        15207,
+        729
+      ],
+      "logits": [
+        26.875,
+        26.875
+      ],
+      "margin": 0.0
+    },
+    "top_token_match": false,
+    "maximum_absolute_logit_delta": 1.9375,
+    "mean_absolute_logit_delta": 0.2673593759536743
+  },
+  "evidence_limits": [
+    "This diagnostic compares one cache state and one two-token block.",
+    "It does not establish a safe numerical tolerance for every workload.",
+    "Timing and expert-I/O counters from this diagnostic are not performance evidence."
+  ]
+}
