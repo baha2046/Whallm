@@ -2,10 +2,12 @@
 
 本目錄只放目前有效的文件。
 
-最後核對日期是 2026-08-26。
-核對版本是 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`。
-checkpoint revision 是
+最後核對日期是 2026-08-27。
+Qwen 支援核對版本是目前工作樹。這些變更尚未建立 commit。
+DeepSeek checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
+Qwen FP8 checkpoint revision 是
+`bcd9f01ddc9cff2316eb84281bebcd5b058bddce`。
 
 ## 文件入口
 
@@ -16,6 +18,7 @@ checkpoint revision 是
 | [驗證](VALIDATION.md) | 目前測試、完整 SHA-256、SSD 量測、端到端量測與歷史基準。 |
 | [效能與瓶頸](PERFORMANCE.md) | 指標定義、瓶頸判讀、A/B 方法與 profiling 流程。 |
 | [研究結論](RESEARCH.md) | 已採用、未採用、延後研究與 DSpark 決策。 |
+| [Qwen 支援](QWEN.md) | Qwen checkpoint、installed model、runtime、API 和目前驗證邊界。 |
 
 專案使用方式仍以根目錄的 [README](../README.md) 為入口。
 
@@ -30,6 +33,10 @@ checkpoint revision 是
 
 M4 完成不代表 runtime 已驗證 1M context。
 本專案只驗證文件列出的測試長度。
+
+Qwen text model 第一版已完成。
+完整 FP8 安裝、SHA-256、對話、thinking、tool call、greedy 4K、prompt cache
+和 packaged App 驗證都已通過。
 
 ## 可信度規則
 
@@ -61,7 +68,8 @@ M4 完成不代表 runtime 已驗證 1M context。
 
 - **checkpoint**：固定 revision 的 Hugging Face 模型與 safetensors shards。
 - **common tensor**：runtime 保留在記憶體的非 routed expert tensor。
-- **routed expert**：一組 `w1`、`w2`、`w3` 與 scales。
+- **routed expert**：一個模型專用 expert。DeepSeek 使用 `w1`、`w2`、`w3`。
+  Qwen 使用 fused `gate_up` 和 `down`。
 - **expert blob**：一個 routed expert 的標準封裝 bytes。
 - **repack plan**：checkpoint byte range 到 installed model byte range 的完整對應。
 - **installed model**：由 repack plan 產生並驗證的本機目錄。
@@ -69,3 +77,5 @@ M4 完成不代表 runtime 已驗證 1M context。
 - **slot**：可放置一個 expert blob 的固定 Metal 可見記憶體區域。
 - **main model**：43 個目標模型層。main model 不包含 DSpark。
 - **DSpark**：儲存在 `mtp.*` 的可選 speculative decoding 模組。
+- **N-gram store**：Qwen 使用的 read-only `ngram.bin` row store。
+- **model kind**：manifest 用來選擇 DeepSeek 或 Qwen runtime 的欄位。

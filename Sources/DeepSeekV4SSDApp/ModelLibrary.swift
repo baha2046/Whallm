@@ -8,10 +8,24 @@ struct InstalledModelInfo: Identifiable, Equatable, Sendable {
   let size: UInt64
   let quickIssues: [InstalledFileIssue]
   let hasDSpark: Bool
+  let modelKind: ModelKind
+  let modelID: String
 
   var id: String { url.path }
   var name: String { url.deletingPathExtension().lastPathComponent }
   var isUsable: Bool { quickIssues.isEmpty }
+  var modelKindLabel: String {
+    switch modelKind {
+    case .deepSeekV4: "DeepSeek V4"
+    case .qwen3_8FlashNext: "Qwen3.8 Flash Next"
+    }
+  }
+  var assistantName: String {
+    switch modelKind {
+    case .deepSeekV4: "DeepSeek"
+    case .qwen3_8FlashNext: "Qwen"
+    }
+  }
 }
 
 struct ModelDiscoveryResult: Sendable {
@@ -57,12 +71,11 @@ enum InstalledModelDiscovery {
     let root = root.standardizedFileURL.resolvingSymlinksInPath()
     guard let manifest = try? InstalledModel.loadManifest(at: root) else { return nil }
     let paths = Set(manifest.files.map(\.path))
-    let requiredPaths = [
-      "common.bin",
-      "config.json",
-      "encoding/encoding_dsv4.py",
-      "tokenizer/tokenizer.json",
-    ]
+    let modelKind = manifest.modelKind ?? .deepSeekV4
+    let requiredPaths =
+      modelKind == .qwen3_8FlashNext
+      ? ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"]
+      : ["common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json"]
     guard requiredPaths.allSatisfy(paths.contains) else { return nil }
     let expectedLayerSize = UInt64(manifest.expertCount) * manifest.expertBlobSize
     var totalSize: UInt64 = 0
@@ -89,7 +102,9 @@ enum InstalledModelDiscovery {
       url: root,
       size: totalSize,
       quickIssues: issues,
-      hasDSpark: manifest.dspark != nil
+      hasDSpark: manifest.dspark != nil,
+      modelKind: modelKind,
+      modelID: manifest.modelID
     )
   }
 }
@@ -117,6 +132,7 @@ enum ModelOperationPhase: Equatable {
   case preparingRepair
   case repairing
   case installingDSpark
+  case installingQwen
 
   var label: String {
     switch self {
@@ -128,6 +144,7 @@ enum ModelOperationPhase: Equatable {
     case .preparingRepair: L10n.string("Preparing repair")
     case .repairing: L10n.string("Downloading damaged data again")
     case .installingDSpark: L10n.string("Installing DSpark")
+    case .installingQwen: L10n.string("Downloading and converting routed experts to MXFP4")
     }
   }
 }
@@ -150,8 +167,8 @@ final class ModelLibrary: ObservableObject {
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
   private static let installDSparkPreference = "installDSparkWithModel"
+  private static let selectedModelKindPreference = "selectedInstallModelKind"
   nonisolated private static let recommendedMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
-  nonisolated private static let requiredStorageBytes: UInt64 = 160 * 1_024 * 1_024 * 1_024
 
   @Published private(set) var rootURL: URL
   @Published private(set) var models: [InstalledModelInfo] = []
@@ -163,8 +180,25 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var message: String?
   @Published private(set) var verificationModelPath: String?
   @Published private(set) var verificationIssues: [InstalledFileIssue]?
+  @Published private(set) var plannedInstalledBytes: UInt64?
+  @Published private(set) var isPlanningInstallation = false
+  @Published var selectedModelKind: ModelKind {
+    didSet {
+      defaults.set(selectedModelKind.rawValue, forKey: Self.selectedModelKindPreference)
+      plannedInstalledBytes = nil
+      refreshPreflight()
+      Task { await refreshSelectedPlan() }
+    }
+  }
   @Published var installDSparkWithModel: Bool {
-    didSet { defaults.set(installDSparkWithModel, forKey: Self.installDSparkPreference) }
+    didSet {
+      defaults.set(installDSparkWithModel, forKey: Self.installDSparkPreference)
+      if selectedModelKind == .deepSeekV4 {
+        plannedInstalledBytes = nil
+        refreshPreflight()
+        Task { await refreshSelectedPlan() }
+      }
+    }
   }
 
   private let defaults: UserDefaults
@@ -173,6 +207,9 @@ final class ModelLibrary: ObservableObject {
 
   init(defaults: UserDefaults = .standard) {
     self.defaults = defaults
+    selectedModelKind =
+      defaults.string(forKey: Self.selectedModelKindPreference).flatMap(ModelKind.init(rawValue:))
+      ?? .deepSeekV4
     installDSparkWithModel =
       defaults.object(forKey: Self.installDSparkPreference) as? Bool ?? true
     if let savedPath = defaults.string(forKey: Self.rootPreference) {
@@ -187,7 +224,8 @@ final class ModelLibrary: ObservableObject {
   var damagedModels: [InstalledModelInfo] { models.filter { !$0.isUsable } }
   var isBusy: Bool { operationPhase != .idle }
   var canDownload: Bool {
-    !preflightChecks.contains { $0.blocksDownload && $0.status == .failed }
+    plannedInstalledBytes != nil && !isPlanningInstallation
+      && !preflightChecks.contains { $0.blocksDownload && $0.status == .failed }
   }
   var canStartDownload: Bool {
     let destination =
@@ -227,7 +265,7 @@ final class ModelLibrary: ObservableObject {
       }.value
       models = result.models
       invalidModelURLs = result.invalidModelURLs
-      refreshPreflight()
+      await refreshSelectedPlan()
       if models.isEmpty && invalidModelURLs.isEmpty && !hasPartialDownload {
         message = L10n.string("No model is installed. Download a model or select another folder.")
       }
@@ -241,7 +279,40 @@ final class ModelLibrary: ObservableObject {
   }
 
   func refreshPreflight() {
-    preflightChecks = Self.makePreflightChecks(root: rootURL, partial: partialDownloadURL)
+    preflightChecks = Self.makePreflightChecks(
+      root: rootURL, partial: partialDownloadURL, requiredStorageBytes: plannedInstalledBytes)
+  }
+
+  func refreshSelectedPlan() async {
+    guard !isPlanningInstallation else { return }
+    let requestedKind = selectedModelKind
+    let requestedDSpark = installDSparkWithModel
+    isPlanningInstallation = true
+    refreshPreflight()
+    do {
+      let bytes: UInt64
+      switch requestedKind {
+      case .deepSeekV4:
+        bytes = try await DeepSeekV4Checkpoint()
+          .makeRepackPlan(includeDSpark: requestedDSpark).installedBytes
+      case .qwen3_8FlashNext:
+        bytes = try await QwenFlashNextCheckpoint().makeRepackPlan().installedBytes
+      }
+      if selectedModelKind == requestedKind,
+        requestedKind != .deepSeekV4 || installDSparkWithModel == requestedDSpark
+      {
+        plannedInstalledBytes = bytes
+      }
+    } catch {
+      plannedInstalledBytes = nil
+      message = L10n.string("The installation plan could not be loaded. Check the network and try again.\n%@", String(describing: error))
+    }
+    isPlanningInstallation = false
+    refreshPreflight()
+    let selectionChanged =
+      selectedModelKind != requestedKind
+      || (requestedKind == .deepSeekV4 && installDSparkWithModel != requestedDSpark)
+    if selectionChanged { await refreshSelectedPlan() }
   }
 
   func resumeDownloadIfNeeded() {
@@ -308,7 +379,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   func startDSparkInstallation(_ model: InstalledModelInfo) {
-    guard !isBusy, !model.hasDSpark else { return }
+    guard !isBusy, !model.hasDSpark, model.modelKind == .deepSeekV4 else { return }
     operationPhase = .installingDSpark
     operationProgress = nil
     downloadStart = nil
@@ -360,7 +431,10 @@ final class ModelLibrary: ObservableObject {
   }
 
   private var defaultDownloadDestination: URL {
-    rootURL.appending(path: "deepseek-v4-flash-0731.dsv4", directoryHint: .isDirectory)
+    let name =
+      selectedModelKind == .qwen3_8FlashNext
+      ? "qwen3.8-flash-next.dsv4" : "deepseek-v4-flash-0731.dsv4"
+    return rootURL.appending(path: name, directoryHint: .isDirectory)
   }
 
   private var partialDownloadURL: URL {
@@ -373,11 +447,18 @@ final class ModelLibrary: ObservableObject {
 
   private func performDownload(to destination: URL) async {
     do {
-      _ = try await DeepSeekV4Checkpoint().repack(
-        to: destination,
-        includeDSpark: installDSparkWithModel
-      ) { [weak self] progress in
-        Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
+      switch selectedModelKind {
+      case .deepSeekV4:
+        _ = try await DeepSeekV4Checkpoint().repack(
+          to: destination,
+          includeDSpark: installDSparkWithModel
+        ) { [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
+        }
+      case .qwen3_8FlashNext:
+        _ = try await QwenFlashNextCheckpoint().repack(to: destination) { [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
+        }
       }
       try Task.checkCancellation()
       let verification = try await audit(destination)
@@ -434,11 +515,19 @@ final class ModelLibrary: ObservableObject {
       operationPhase = .preparingRepair
       operationProgress = nil
       downloadStart = nil
-      _ = try await DeepSeekV4Checkpoint().repair(
-        at: url,
-        invalidFiles: Set(verification.issues.map(\.path))
-      ) { [weak self] progress in
-        Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
+      let invalidFiles = Set(verification.issues.map(\.path))
+      let modelKind = verification.manifest.modelKind ?? .deepSeekV4
+      switch modelKind {
+      case .deepSeekV4:
+        _ = try await DeepSeekV4Checkpoint().repair(at: url, invalidFiles: invalidFiles) {
+          [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
+        }
+      case .qwen3_8FlashNext:
+        _ = try await QwenFlashNextCheckpoint().repair(at: url, invalidFiles: invalidFiles) {
+          [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
+        }
       }
       try Task.checkCancellation()
       let repaired = try await audit(url)
@@ -541,7 +630,9 @@ final class ModelLibrary: ObservableObject {
     refreshPreflight()
   }
 
-  nonisolated private static func makePreflightChecks(root: URL, partial: URL) -> [PreflightCheck] {
+  nonisolated private static func makePreflightChecks(
+    root: URL, partial: URL, requiredStorageBytes: UInt64?
+  ) -> [PreflightCheck] {
     let fileManager = FileManager.default
     try? fileManager.createDirectory(at: root, withIntermediateDirectories: true)
 
@@ -590,20 +681,25 @@ final class ModelLibrary: ObservableObject {
     )
 
     let allocated = allocatedBytes(at: partial)
-    let required = requiredStorageBytes > allocated ? requiredStorageBytes - allocated : 0
+    let required = requiredStorageBytes.map { $0 > allocated ? $0 - allocated : 0 }
     let available =
       (try? root.resourceValues(
         forKeys: [.volumeAvailableCapacityForImportantUsageKey]
       ).volumeAvailableCapacityForImportantUsage) ?? nil
-    let hasStorage = available.map { $0 >= 0 && UInt64($0) >= required } ?? false
+    let hasStorage = required.flatMap { required in
+      available.map { $0 >= 0 && UInt64($0) >= required }
+    }
     let storageCheck = PreflightCheck(
       id: "storage",
       title: L10n.string("Storage"),
-      detail: hasStorage
-        ? L10n.string("There is enough free space to complete installation.")
-        : L10n.string(
-          "The disk for this folder needs at least %@ of free space.", formattedBytes(required)),
-      status: hasStorage ? .passed : .failed,
+      detail: required == nil
+        ? L10n.string("Loading the selected model installation plan.")
+        : hasStorage == true
+          ? L10n.string("There is enough free space to complete installation.")
+          : L10n.string(
+            "The disk for this folder needs at least %@ of free space.",
+            formattedBytes(required ?? 0)),
+      status: required == nil ? .warning : (hasStorage == true ? .passed : .failed),
       blocksDownload: true
     )
 

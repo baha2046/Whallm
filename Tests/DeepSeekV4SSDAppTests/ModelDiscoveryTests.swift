@@ -47,6 +47,22 @@ final class ModelDiscoveryTests: XCTestCase {
     XCTAssertEqual(result.invalidModelURLs.map(\.lastPathComponent), ["broken.dsv4"])
   }
 
+  func testDiscoveryRecognizesQwenFormatTwoForRepair() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try JSONSerialization.data(withJSONObject: qwenManifestFixture()).write(
+      to: root.appending(path: "manifest.json"))
+
+    let model = try XCTUnwrap(InstalledModelDiscovery.inspect(root))
+
+    XCTAssertEqual(model.modelKind, .qwen3_8FlashNext)
+    XCTAssertEqual(model.modelID, "Qwen/Qwen3.8-Flash-Next-FP8")
+    XCTAssertEqual(model.modelKindLabel, "Qwen3.8 Flash Next")
+    XCTAssertFalse(model.hasDSpark)
+    XCTAssertFalse(model.isUsable)
+  }
+
   func testDiscoveryRejectsModelWithoutOfficialEncoder() throws {
     let project = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     let source = project.appending(path: "scratch/deepseek-v4-flash-0731.dsv4/manifest.json")
@@ -92,4 +108,75 @@ final class ModelDiscoveryTests: XCTestCase {
 
     XCTAssertFalse(ModelLibrary(defaults: defaults).installDSparkWithModel)
   }
+
+  @MainActor
+  func testModelLibraryRestoresSelectedQwenInstallKind() {
+    let suite = "ModelDiscoveryTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+
+    XCTAssertEqual(ModelLibrary(defaults: defaults).selectedModelKind, .qwen3_8FlashNext)
+  }
+}
+
+private func qwenManifestFixture() -> [String: Any] {
+  let checksum = String(repeating: "0", count: 64)
+  var files: [[String: Any]] = [
+    ["path": "common.bin", "size": 1, "sha256": checksum],
+    ["path": "ngram.bin", "size": 51_200_245_760, "sha256": checksum],
+  ]
+  for path in [
+    "config.json", "generation_config.json", "tokenizer/tokenizer.json",
+    "tokenizer/tokenizer_config.json", "tokenizer/chat_template.jinja",
+    "tokenizer/vocab.json", "tokenizer/merges.txt",
+  ] {
+    files.append(["path": path, "size": 1, "sha256": checksum])
+  }
+  for layer in 0..<48 {
+    files.append([
+      "path": String(format: "experts/layer_%02d.bin", layer),
+      "size": 1_336_934_400,
+      "sha256": checksum,
+    ])
+  }
+  return [
+    "formatVersion": 2,
+    "modelKind": "qwen3.8-flash-next",
+    "modelID": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "layerCount": 48,
+    "expertCount": 512,
+    "selectedExpertCount": 10,
+    "expertBlobSize": 2_611_200,
+    "maximumContext": 262_144,
+    "files": files,
+    "commonTensors": [
+      ["name": "fixture", "dtype": "U8", "shape": [1], "offset": 0, "length": 1]
+    ],
+    "expertRegions": [
+      ["name": "gate_up.weight", "dtype": "U32", "shape": [1_280, 320], "offset": 0, "length": 1_638_400],
+      ["name": "gate_up.scale", "dtype": "U8", "shape": [1_280, 80], "offset": 1_638_400, "length": 102_400],
+      ["name": "down.weight", "dtype": "U32", "shape": [2_560, 80], "offset": 1_740_800, "length": 819_200],
+      ["name": "down.scale", "dtype": "U8", "shape": [2_560, 20], "offset": 2_560_000, "length": 51_200],
+    ],
+    "expertQuantization": [
+      "mode": "mxfp4", "bits": 4, "groupSize": 32, "conversionVersion": 2,
+    ],
+    "ngram": [
+      "file": "ngram.bin", "dtype": "F8_E4M3", "rowBytes": 160,
+      "shardCount": 128,
+      "shardRowCount": 2_500_012,
+      "headOffsets": [
+        0, 20_000_003, 40_000_026, 60_000_059, 80_000_106, 100_000_165,
+        120_000_228, 140_000_297, 160_000_374, 180_000_455, 200_000_548,
+        220_000_655, 240_000_802, 260_000_955, 280_001_114, 300_001_275,
+      ],
+      "headVocabSizes": [
+        20_000_003, 20_000_023, 20_000_033, 20_000_047, 20_000_059, 20_000_063,
+        20_000_069, 20_000_077, 20_000_081, 20_000_093, 20_000_107, 20_000_147,
+        20_000_153, 20_000_159, 20_000_161, 20_000_171,
+      ],
+    ],
+  ]
 }

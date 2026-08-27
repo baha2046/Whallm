@@ -210,6 +210,7 @@ struct ServerConfiguration: Codable, Equatable {
   var defaultMaxTokens: Int
   var defaultTemperature: Double
   var defaultTopP: Double
+  var defaultTopK: Int
 
   static var localDefault: ServerConfiguration {
     load(defaults: .standard, apiKey: AppKeychain.readAPIKey())
@@ -242,7 +243,8 @@ struct ServerConfiguration: Codable, Equatable {
       dsparkConfidenceThreshold: 0.6,
       defaultMaxTokens: 272_000,
       defaultTemperature: 0.2,
-      defaultTopP: 0.98
+      defaultTopP: 0.98,
+      defaultTopK: 0
     )
     if let data = defaults.data(forKey: preferenceKey),
       var saved = decodeSavedConfiguration(data)
@@ -268,11 +270,10 @@ struct ServerConfiguration: Codable, Equatable {
     if let configuration = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
       return configuration
     }
-    guard
-      var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      payload["memoryLimitGiB"] == nil
+    guard var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { return nil }
-    payload["memoryLimitGiB"] = 0
+    if payload["memoryLimitGiB"] == nil { payload["memoryLimitGiB"] = 0 }
+    if payload["defaultTopK"] == nil { payload["defaultTopK"] = 0 }
     guard let migrated = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
     return try? JSONDecoder().decode(ServerConfiguration.self, from: migrated)
   }
@@ -311,6 +312,7 @@ struct ServerConfiguration: Codable, Equatable {
       "--default-max-tokens", String(defaultMaxTokens),
       "--default-temperature", String(defaultTemperature),
       "--default-top-p", String(defaultTopP),
+      "--default-top-k", String(defaultTopK),
     ]
     if let powerSavingLimitGBps {
       values += ["--power-saving-limit-gbps", String(powerSavingLimitGBps)]
@@ -384,6 +386,7 @@ struct ServerConfiguration: Codable, Equatable {
     guard (1...272_000).contains(defaultMaxTokens),
       (0...2).contains(defaultTemperature),
       (0.000_001...1).contains(defaultTopP),
+      defaultTopK >= 0,
       (0...1).contains(dsparkConfidenceThreshold)
     else {
       throw ConfigurationError(L10n.string("Correct the default generation parameters."))

@@ -9,7 +9,7 @@
 "%lld min" = "%lld 分鐘";
 "%lld model files need repair." = "模型有 %lld 個檔案需要修復。";
 "0 selects 128, 256, or 1024 based on the prompt length." = "0 會依 prompt 長度自動選擇 128、256 或 1024。";
-"0 automatically uses Metal's recommended maximum." = "0 會自動使用 Metal 建議的最大值。";
+"0 selects the model-safe automatic limit." = "0 會選擇適合該模型的安全自動上限。";
 "A higher value increases output variation." = "較高的值會增加輸出變化。";
 "A lower value reduces the candidate token range." = "較低的值會縮小候選 token 範圍。";
 "A model already exists in this location. Verify and repair the existing model first." = "此位置已有模型。請先驗證並修復現有模型。";
@@ -235,3 +235,13 @@
 "Local DeepSeek inference from SSD." = "從 SSD 執行本地 DeepSeek 推論。";
 "Version %@ · build %@" = "版本 %@ · build %@";
 "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text." = "Copyright © 2026 Yanun。完整內容請查看 Repository 中的 LICENSE 檔案。";
+"Downloading and converting routed experts to MXFP4" = "正在下載並將 routed expert 轉換為 MXFP4";
+"The installation plan could not be loaded. Check the network and try again.\n%@" = "無法載入安裝計畫。請檢查網路後再試。\n%@";
+"Loading the selected model installation plan." = "正在載入所選模型的安裝計畫。";
+"Model to install" = "要安裝的模型";
+"Select the model that the app will download and install." = "選擇 App 要下載和安裝的模型。";
+"Qwen routed experts are converted from official FP8 to MXFP4 during installation." = "安裝期間，App 會將 Qwen routed expert 從官方 FP8 轉換為 MXFP4。";
+"%@ · %@ · %@" = "%@ · %@ · %@";
+"Top K" = "Top K";
+"0 disables Top K. Qwen uses 20 by default." = "0 表示停用 Top K。Qwen 預設使用 20。";
+"Start the server. Then send a message to %@." = "啟動伺服器，然後向 %@ 傳送訊息。";

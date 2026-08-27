@@ -45,6 +45,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(configuration.defaultMaxTokens, 272_000)
     XCTAssertEqual(configuration.defaultTemperature, 0.2)
     XCTAssertEqual(configuration.defaultTopP, 0.98)
+    XCTAssertEqual(configuration.defaultTopK, 0)
     XCTAssertEqual(configuration.dsparkSlots, 768)
     XCTAssertTrue(configuration.arguments.contains("272000"))
     XCTAssertTrue(configuration.arguments.contains("0.2"))
@@ -52,6 +53,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(configuration.arguments.contains("11434"))
     XCTAssertTrue(configuration.arguments.contains("--dspark-slots"))
     XCTAssertTrue(configuration.arguments.contains("--memory-limit-gib"))
+    XCTAssertTrue(configuration.arguments.contains("--default-top-k"))
   }
 
   func testLocalizationSupportsAllSelectableLanguages() {
@@ -75,6 +77,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(L10n.string("Unlimited", language: .traditionalChinese), "無限制")
     XCTAssertEqual(L10n.string("Power saving", language: .traditionalChinese), "省電")
     XCTAssertEqual(L10n.string("Performance", language: .traditionalChinese), "效能")
+    XCTAssertEqual(L10n.string("Model to install", language: .traditionalChinese), "要安裝的模型")
     XCTAssertEqual(
       L10n.string("127.0.0.1 (Local only)", language: .traditionalChinese),
       "127.0.0.1（僅本機）"
@@ -137,6 +140,7 @@ final class ServerConfigurationTests: XCTestCase {
     configuration.defaultMaxTokens = 4_096
     configuration.defaultTemperature = 0.8
     configuration.defaultTopP = 0.9
+    configuration.defaultTopK = 20
 
     configuration.save(defaults: defaults)
     let restored = ServerConfiguration.load(defaults: defaults, apiKey: "secret")
@@ -146,7 +150,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
   }
 
-  func testConfigurationPersistenceMigratesMissingMemoryLimit() throws {
+  func testConfigurationPersistenceMigratesNewFields() throws {
     let suite = "ServerConfigurationTests.\(UUID().uuidString)"
     let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
@@ -160,6 +164,7 @@ final class ServerConfigurationTests: XCTestCase {
       JSONSerialization.jsonObject(with: storedData) as? [String: Any]
     )
     payload.removeValue(forKey: "memoryLimitGiB")
+    payload.removeValue(forKey: "defaultTopK")
     defaults.set(
       try JSONSerialization.data(withJSONObject: payload),
       forKey: "serverConfiguration"
@@ -170,6 +175,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restored.modelPath, configuration.modelPath)
     XCTAssertEqual(restored.slots, configuration.slots)
     XCTAssertEqual(restored.memoryLimitGiB, 0)
+    XCTAssertEqual(restored.defaultTopK, 0)
   }
 
   func testAPIKeyRoundTripsThroughIsolatedKeychainItem() {

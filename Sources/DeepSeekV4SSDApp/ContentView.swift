@@ -1,4 +1,5 @@
 import AppKit
+import DeepSeekRepack
 import SwiftUI
 
 struct ContentView: View {
@@ -59,11 +60,17 @@ struct ContentView: View {
             configuration: $configuration,
             serverActive: server.isActive,
             dsparkAvailable: selectedModel?.hasDSpark == true,
+            supportsDSpark: selectedModel?.modelKind != .qwen3_8FlashNext,
             language: selectedLanguage
           )
           .pageVisibility(selectedPage == .advanced)
 
-          ChatView(configuration: configuration, server: server, language: selectedLanguage)
+          ChatView(
+            configuration: configuration,
+            server: server,
+            assistantName: selectedModel?.assistantName ?? configuration.publicModel,
+            language: selectedLanguage
+          )
             .pageVisibility(selectedPage == .chat)
 
           MetricView(
@@ -99,6 +106,7 @@ struct ContentView: View {
       modelLibrary.resumeDownloadIfNeeded()
     }
     .onChange(of: modelLibrary.models) { selectDetectedModel() }
+    .onChange(of: configuration.modelPath) { synchronizeSelectedModelDefaults() }
     .onChange(of: configuration) {
       configuration.save()
       AppKeychain.saveAPIKey(configuration.apiKey)
@@ -121,6 +129,24 @@ struct ContentView: View {
       return
     }
     configuration.modelPath = modelLibrary.usableModels.first?.url.path ?? ""
+  }
+
+  private func synchronizeSelectedModelDefaults() {
+    guard let selectedModel else { return }
+    configuration.publicModel = selectedModel.modelID
+    switch selectedModel.modelKind {
+    case .deepSeekV4:
+      configuration.defaultMaxTokens = 272_000
+      configuration.defaultTemperature = 0.2
+      configuration.defaultTopP = 0.98
+      configuration.defaultTopK = 0
+    case .qwen3_8FlashNext:
+      configuration.dsparkEnabled = false
+      configuration.defaultMaxTokens = 262_144
+      configuration.defaultTemperature = 1.0
+      configuration.defaultTopP = 0.95
+      configuration.defaultTopK = 20
+    }
   }
 }
 
@@ -464,13 +490,27 @@ private struct ServerView: View {
         .foregroundStyle(.secondary)
       }
 
-      preflightPanel
+      Picker(L10n.string("Model to install"), selection: $modelLibrary.selectedModelKind) {
+        Text("DeepSeek-V4-Flash-0731").tag(ModelKind.deepSeekV4)
+        Text("Qwen3.8-Flash-Next").tag(ModelKind.qwen3_8FlashNext)
+      }
+      .pickerStyle(.segmented)
+      .disabled(modelLibrary.isBusy || modelLibrary.hasPartialDownload)
+      .accessibilityHint(L10n.string("Select the model that the app will download and install."))
 
-      Toggle(
-        L10n.string("Install DSpark with the model (adds 10.12 GiB)"),
-        isOn: $modelLibrary.installDSparkWithModel
-      )
-      .disabled(modelLibrary.isBusy)
+      if modelLibrary.selectedModelKind == .deepSeekV4 {
+        Toggle(
+          L10n.string("Install DSpark with the model (adds 10.12 GiB)"),
+          isOn: $modelLibrary.installDSparkWithModel
+        )
+        .disabled(modelLibrary.isBusy)
+      } else {
+        Text(L10n.string("Qwen routed experts are converted from official FP8 to MXFP4 during installation."))
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+
+      preflightPanel
 
       HStack(spacing: 12) {
         Button(L10n.string("Select Model Folder")) { chooseModelDirectory() }
@@ -530,12 +570,14 @@ private struct ServerView: View {
         Spacer()
         Picker(L10n.string("Installed model"), selection: $configuration.modelPath) {
           ForEach(modelLibrary.usableModels) { model in
-            Text(L10n.string("%@ · %@", model.name, formattedBytes(model.size)))
+            Text(
+              L10n.string(
+                "%@ · %@ · %@", model.name, model.modelKindLabel, formattedBytes(model.size)))
               .tag(model.url.path)
           }
         }
         .labelsHidden()
-        .frame(width: 420, alignment: .trailing)
+        .frame(minWidth: 420, idealWidth: 520, maxWidth: 560, alignment: .trailing)
       }
 
       Divider()
@@ -548,7 +590,10 @@ private struct ServerView: View {
           if let selectedModel { modelLibrary.startVerification(selectedModel) }
         }
         .disabled(server.isActive || modelLibrary.isBusy)
-        if let selectedModel, !selectedModel.hasDSpark {
+        if let selectedModel,
+          selectedModel.modelKind == .deepSeekV4,
+          !selectedModel.hasDSpark
+        {
           Button(L10n.string("Install DSpark (10.12 GiB)")) {
             modelLibrary.startDSparkInstallation(selectedModel)
           }
@@ -721,6 +766,7 @@ private struct AdvancedView: View {
   @Binding var configuration: ServerConfiguration
   let serverActive: Bool
   let dsparkAvailable: Bool
+  let supportsDSpark: Bool
   let language: AppLanguage
 
   var body: some View {
@@ -744,6 +790,12 @@ private struct AdvancedView: View {
             "Top P",
             hint: "A lower value reduces the candidate token range.",
             value: $configuration.defaultTopP
+          )
+          Divider()
+          integerField(
+            "Top K",
+            hint: "0 disables Top K. Qwen uses 20 by default.",
+            value: $configuration.defaultTopK
           )
         }
         .appCard()
@@ -773,7 +825,7 @@ private struct AdvancedView: View {
           Divider()
           integerField(
             "Memory limit GiB",
-            hint: "0 automatically uses Metal's recommended maximum.",
+            hint: "0 selects the model-safe automatic limit.",
             value: $configuration.memoryLimitGiB
           )
           Divider()
@@ -818,29 +870,31 @@ private struct AdvancedView: View {
             hint: "Stores the KV cache in BF16 format.",
             value: $configuration.bf16KVCache
           )
-          Divider()
-          toggleField(
-            "Use DSpark",
-            hint: "Uses DSpark speculative decoding when it is installed.",
-            value: $configuration.dsparkEnabled
-          )
-          .disabled(!dsparkAvailable)
-          Divider()
-          integerField(
-            "DSpark slots",
-            hint:
-              "Number of DSpark routed experts kept in memory. The recommended value is 768.",
-            value: $configuration.dsparkSlots
-          )
-          .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
-          Divider()
-          doubleField(
-            "DSpark confidence threshold",
-            hint:
-              "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
-            value: $configuration.dsparkConfidenceThreshold
-          )
-          .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+          if supportsDSpark {
+            Divider()
+            toggleField(
+              "Use DSpark",
+              hint: "Uses DSpark speculative decoding when it is installed.",
+              value: $configuration.dsparkEnabled
+            )
+            .disabled(!dsparkAvailable)
+            Divider()
+            integerField(
+              "DSpark slots",
+              hint:
+                "Number of DSpark routed experts kept in memory. The recommended value is 768.",
+              value: $configuration.dsparkSlots
+            )
+            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+            Divider()
+            doubleField(
+              "DSpark confidence threshold",
+              hint:
+                "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
+              value: $configuration.dsparkConfidenceThreshold
+            )
+            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+          }
         }
         .appCard()
         .disabled(serverActive)
@@ -1557,6 +1611,7 @@ private struct SettingRow<Value: View>: View {
 private struct ChatView: View {
   let configuration: ServerConfiguration
   @ObservedObject var server: ServerController
+  let assistantName: String
   let language: AppLanguage
   @State private var messages = ChatHistory.load()
   @AppStorage("chatDraft") private var input = ""
@@ -1595,13 +1650,19 @@ private struct ChatView: View {
                 ContentUnavailableView(
                   localized("No Test Messages"),
                   systemImage: "bubble.left",
-                  description: Text(localized("Start the server. Then send a message."))
+                  description: Text(
+                    L10n.string(
+                      "Start the server. Then send a message to %@.",
+                      language: language,
+                      assistantName
+                    )
+                  )
                 )
                 .frame(maxWidth: .infinity, minHeight: 280)
               } else {
                 ForEach(messages) { message in
                   VStack(alignment: .leading, spacing: 6) {
-                    Text(message.role == "user" ? localized("You") : "DeepSeek")
+                    Text(message.role == "user" ? localized("You") : assistantName)
                       .font(.callout.bold())
                       .foregroundStyle(.secondary)
                     if !message.reasoningContent.isEmpty {

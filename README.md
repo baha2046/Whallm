@@ -13,12 +13,12 @@
 </p>
 
 Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
-DeepSeekV4SSD streams routed experts from SSD to run all 284 billion parameters
-of `DeepSeek-V4-Flash-0731` on an M-series Mac with about 30 GB of memory.
+DeepSeekV4SSD streams routed experts from SSD on an M-series Mac. It supports
+the pinned `DeepSeek-V4-Flash-0731` and `Qwen3.8-Flash-Next-FP8` text checkpoints.
 
 ## Benchmark
 
-These results were measured on a MacBook Pro with an Apple M5 Pro, 18 CPU
+These DeepSeek results were measured on a MacBook Pro with an Apple M5 Pro, 18 CPU
 cores, 20 GPU cores, and 64 GiB of unified memory. DSpark was disabled.
 
 | Test | Prefill | Decode | Peak memory |
@@ -33,7 +33,7 @@ See the [validation record](docs/VALIDATION.md) for the full test details.
 
 ## How to use it
 
-**Download the app → Open the app → Download the 167 GB full model → Start the
+**Download the app → Open the app → Select and download a model → Start the
 server → Chat in the app or connect Codex**
 
 > [!IMPORTANT]
@@ -47,8 +47,8 @@ server → Chat in the app or connect Codex**
 1. Download the latest `DeepSeekV4SSD-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
 2. Extract the ZIP and open `DeepSeekV4SSD.app`.
-3. Select **Download Model**. The default installation includes DSpark and uses
-   about 167 GB. You can stop the download and resume it later.
+3. Select DeepSeek or Qwen. Then select **Download Model**. The app checks the
+   selected repack plan size. You can stop the download and resume it later.
 4. Select **Start Server** after the model is ready.
 5. Use the chat in the app, or connect Codex with the configuration below.
 
@@ -63,7 +63,7 @@ The local server starts at `http://127.0.0.1:11434` by default.
 | Mac | Apple Silicon M-series Mac |
 | macOS | macOS 15 or later |
 | Unified memory | 64 GiB or more |
-| Free storage | About 172 GB (160 GiB) |
+| Free storage | The app checks the selected repack plan and existing partial data |
 | Model storage | A fast internal, Thunderbolt, or USB4 SSD |
 | Internet | Required to download the model and app updates |
 
@@ -113,6 +113,8 @@ for more options.
 - Installing DSpark does not enable it. Enable **Use DSpark** in the runtime
   settings when you want to test speculative decoding.
 - You can remove DSpark without reinstalling the main model.
+- Qwen installed weight files use 125,268,506,112 bytes. Qwen does not support
+  DSpark.
 
 ### OpenAI-compatible server
 
@@ -140,7 +142,12 @@ requests.
 
 ### Current limits
 
-- The runtime supports only the pinned `DeepSeek-V4-Flash-0731` checkpoint.
+- The runtime supports only the two pinned checkpoint revisions in the current
+  documentation.
+- Qwen supports text only. Qwen vision, video, MTP, and DSpark are not supported.
+- Qwen full-model SHA-256, text, thinking, tool call, greedy 4K, prompt cache,
+  and packaged App validation passed on the recorded M5 Pro environment. See
+  the [Qwen support status](docs/QWEN.md).
 - The runtime processes one generation request at a time.
 - Images, audio, logprobs, `response_format`, and `stop` are not supported.
 - Request bodies are limited to 1 MiB.

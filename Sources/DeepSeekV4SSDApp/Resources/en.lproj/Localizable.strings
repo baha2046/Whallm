@@ -9,7 +9,7 @@
 "%lld min" = "%lld min";
 "%lld model files need repair." = "%lld model files need repair.";
 "0 selects 128, 256, or 1024 based on the prompt length." = "0 selects 128, 256, or 1024 based on the prompt length.";
-"0 automatically uses Metal's recommended maximum." = "0 automatically uses Metal's recommended maximum.";
+"0 selects the model-safe automatic limit." = "0 selects the model-safe automatic limit.";
 "A higher value increases output variation." = "A higher value increases output variation.";
 "A lower value reduces the candidate token range." = "A lower value reduces the candidate token range.";
 "A model already exists in this location. Verify and repair the existing model first." = "A model already exists in this location. Verify and repair the existing model first.";
@@ -235,3 +235,13 @@
 "Local DeepSeek inference from SSD." = "Local DeepSeek inference from SSD.";
 "Version %@ · build %@" = "Version %@ · build %@";
 "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text." = "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text.";
+"Downloading and converting routed experts to MXFP4" = "Downloading and converting routed experts to MXFP4";
+"The installation plan could not be loaded. Check the network and try again.\n%@" = "The installation plan could not be loaded. Check the network and try again.\n%@";
+"Loading the selected model installation plan." = "Loading the selected model installation plan.";
+"Model to install" = "Model to install";
+"Select the model that the app will download and install." = "Select the model that the app will download and install.";
+"Qwen routed experts are converted from official FP8 to MXFP4 during installation." = "Qwen routed experts are converted from official FP8 to MXFP4 during installation.";
+"%@ · %@ · %@" = "%@ · %@ · %@";
+"Top K" = "Top K";
+"0 disables Top K. Qwen uses 20 by default." = "0 disables Top K. Qwen uses 20 by default.";
+"Start the server. Then send a message to %@." = "Start the server. Then send a message to %@.";

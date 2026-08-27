@@ -1,7 +1,7 @@
 # 架構與目前實作
 
 DeepSeekV4SSD 在 Apple Silicon 上執行固定的
-`DeepSeek-V4-Flash-0731` checkpoint。
+`DeepSeek-V4-Flash-0731` 或 `Qwen3.8-Flash-Next-FP8` checkpoint。
 runtime 將 common tensor 保留在統一記憶體。
 runtime 只在 router 選到 routed expert 時讀取 expert blob。
 
@@ -28,6 +28,12 @@ Hugging Face checkpoint
 | `deepseek_v4_ssd` | 載入 installed model、執行推論、管理 cache 和記錄指標。 |
 | `deepseek_v4_ssd.server` | 提供 OpenAI 相容 API 和 APP 專用 API。 |
 | `DeepSeekV4SSDApp` | 管理模型、啟動 server、顯示對話和效能。 |
+
+Qwen 使用 manifest format 2。
+format 2 新增 `modelKind`、`maximumContext`、`expertQuantization` 和 `ngram`。
+DeepSeek 保留 manifest format 1。現有 installed model 不需要轉換。
+
+Qwen 的完整合約和資料路徑請見 [Qwen 支援](QWEN.md)。
 
 ## Checkpoint 合約
 
@@ -126,11 +132,12 @@ repack 流程如下。
 2. inspector 使用 HTTP Range 讀取每個 shard 的 safetensors header。
 3. planner 檢查每個 routed expert 的 dtype、shape 和大小。
 4. planner 建立 checkpoint byte range 到 installed model byte range 的對應。
-5. repacker 使用最多八個並行下載工作。
-6. repacker 使用 8 MiB chunk 寫入 `.partial` 目錄。
-7. repacker 使用 receipt 記錄已完成 chunk 的 digest。
-8. repacker 對每個 installed file 計算 SHA-256。
-9. repacker 寫入 manifest，然後以原子 move 完成安裝。
+5. common tensor 和 N-gram 使用最多八個並行下載工作與 8 MiB chunk。
+6. Qwen expert weight 使用兩個並行工作。每個工作合併最多 64 MiB 的連續 range。
+7. Qwen 每個 checkpoint shard 的 expert scale 只下載一次。
+8. repacker 使用 receipt 記錄已完成 chunk 的 digest。
+9. repacker 對每個 installed file 計算 SHA-256。
+10. repacker 寫入 manifest，然後以原子 move 完成安裝。
 
 repair 會先做完整 audit。
 repair 只重新下載失敗 file 涉及的 checkpoint byte range。
@@ -167,7 +174,7 @@ Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
 | `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
 | persistent cache entries | 8 | revision 專用的磁碟 cache 上限。 |
-| `memory_limit_gib` | 0 | 0 使用 Metal 建議上限；正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
+| `memory_limit_gib` | 0 | 0 使用模型安全自動上限。Qwen 自動上限不超過 48 GiB。DeepSeek 使用 Metal 建議上限。正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
 | `dspark_enabled` | `false` | DSpark 預設停用。 |
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |
 
@@ -209,6 +216,12 @@ runtime 已移除 M1 prototype 和相關開關。
 
 cache-only prefill 不執行最後一層 MoE。
 因此 4K layer-major prefill 通常記錄 42 個 batched expert layers。
+
+Qwen 使用不同門檻。
+少於 128 個未快取 token 時，Qwen 使用 selected expert cache。
+短 prompt 不會建立 48 個完整 expert layer buffer。
+128 個或更多未快取 token 時，Qwen 使用 layer-major path。
+該 path 每次只保留一個完整 expert layer buffer。
 
 ## Decode 資料路徑
 

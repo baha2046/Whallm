@@ -25,6 +25,7 @@
 - [`benchmarks/2026-08-11-p4-attention-step-pilot-m5-pro.json`](benchmarks/2026-08-11-p4-attention-step-pilot-m5-pro.json)：P4 attention step 探索、記憶體與 expert route 比較。
 - [`benchmarks/2026-08-11-d2-top6-profile-m5-pro.json`](benchmarks/2026-08-11-d2-top6-profile-m5-pro.json)：D2 routed expert top-6 dispatch 與 shader profile gate。
 - [`benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json`](benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json)：D3 相鄰 Decode CSA row 與 `gather` profile gate。
+- [`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)：Qwen 完整安裝、API、4K prompt cache 與 packaged App 驗證。
 
 ## 證據標記
 
@@ -966,10 +967,74 @@ R3 的總 throughput 降低 24.60%。
 
 ## 驗證矩陣
 
+### Qwen 第一版驗證結果
+
+2026-08-27 已執行官方 FP8 header inspection。
+inspection 沒有下載 tensor payload。
+結果為 48 層、每層 512 個 routed expert、每個 expert blob 2,611,200 bytes，
+181,906,343,706 checkpoint tensor payload bytes，
+以及 125,268,506,112 installed weight bytes。
+
+Swift 輕量測試已覆蓋 format 2 planner、vision/MTP 排除、MXFP4 固定向量、
+Qwen expert 轉換、續傳與損壞 layer repair。Python 輕量測試已覆蓋 QSA、N-gram、PLE 資料路徑、
+Qwen expert layout、layer-major prefill 和 XML tool parser。
+
+目前 Qwen 工作樹的自動測試結果如下：
+
+| Suite | 通過 | 失敗 | 略過 |
+| --- | ---: | ---: | ---: |
+| Swift `DeepSeekRepackTests` | 15 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 19 | 0 | 3 |
+| Python runtime 與 server | 85 | 0 | 0 |
+| 合計 | 119 | 0 | 3 |
+
+三個 Swift App 測試需要現有的完整 DeepSeek installed model。
+使用者已把該模型移到外接硬碟。
+本次驗證沒有存取外接硬碟，並略過這三項。
+
+Qwen installed model 位於內建 SSD。
+完整 SHA-256 驗證已通過 57 個 manifest files。
+manifest files 合計是 125,291,490,955 bytes。
+common tensor 共 1,069 個。
+
+完整模型 API 驗證結果如下：
+
+| 項目 | 結果 |
+| --- | --- |
+| thinking 關閉 | 回覆 `OK`，`stop`。 |
+| thinking 開啟 | reasoning 與答案 `4` 正確，`stop`。 |
+| forced tool call | `get_weather`，`{"city":"Taipei"}`。 |
+| streaming tool call | function 名稱與 arguments 和完整 response 相同。 |
+| packaged App | App、ZIP、三種 localization、隔離啟動和 runtime import 通過。 |
+
+CLI 也使用預設 `memory_limit_gib=0` 執行完整模型。
+runtime 套用 48 GiB 自動上限。
+5-token prompt 產生 ` Paris`。
+該 request 從 SSD 讀取 4,658,380,800 bytes 的 routed expert。
+MLX peak memory 是 13,048,438,112 bytes。
+request 結束時的 active memory 是 13,040,928,562 bytes。
+修正前的 MLX peak memory 是 74,069,529,060 bytes。
+修正前後的 output token SHA-256 相同。
+
+4K 使用 4,096-token repeated prompt、greedy generation 和 1 個 output token。
+runtime memory limit 是 48 GiB。
+
+| Cache state | 重用 prompt tokens | Wall time | Expert bytes read | Output token SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Cold | 0 | 65.42 s | 66,081,638,400 | `6dfb9763…b3b2bd1` |
+| Warm | 4,095 | 0.214 s | 0 | `6dfb9763…b3b2bd1` |
+
+兩次 output token ID 都是 `1228`。
+兩次完整 SHA-256 都是
+`6dfb97632210ac38a071667cf8be7df83a16178e12f1248e45b2a3d24b3b2bd1`。
+這些時間是一個本機驗證結果，不是效能保證。
+完整 artifact 位於
+[`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)。
+
 | 能力 | 狀態 | 證據邊界 |
 | --- | --- | --- |
 | 固定 checkpoint 合約 | 通過 | 程式檢查、測試和完整 manifest 驗證。 |
-| Installed model SHA-256 | 通過 | 目前 54 個 manifest files。 |
+| Installed model SHA-256 | 通過 | Qwen 目前 57 個 manifest files。 |
 | Repack 續傳與 repair | 通過 | Fixture 自動測試。 |
 | MXFP4 routed expert | 通過 | Dequantized reference 和 batched parity 單元測試。 |
 | Layer-major prefill parity | 通過 | Fixture next-token logits 和歷史 full-model token。 |

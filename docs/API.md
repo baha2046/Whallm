@@ -72,10 +72,11 @@ server 不提供 TLS、CORS 或 rate limit。
 
 | 欄位 | 規則 |
 | --- | --- |
-| `model` | 必須等於 server 的公開 model ID。預設值是 `deepseek-v4-flash-0731`。 |
+| `model` | 必須等於 server 的公開 model ID。未指定 `--public-model` 時，server 使用 manifest model ID。 |
 | `max_tokens` | 1 至 272,000。預設值是 272,000。 |
-| `temperature` | 0 至 2。預設值是 0.2。 |
-| `top_p` | 0.000001 至 1。預設值是 0.98。 |
+| `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 預設 1.0。 |
+| `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 預設 0.95。 |
+| `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 預設 20。 |
 | `stream` | 必須是 boolean。 |
 | `stream_options.include_usage` | 必須是 boolean。只影響 streaming response。 |
 | `n` | 只接受 `1`。 |
@@ -226,12 +227,13 @@ Text Completions 只接受 `tool_choice: none` 或省略該欄位。
 Chat Completions 使用 `reasoning_effort`。
 Responses 使用 `reasoning.effort`。
 
-| API effort | 預設 thinking mode | DeepSeek encoder effort |
-| --- | --- | --- |
-| 省略、`none` | `chat` | `low` |
-| `minimal`、`low`、`medium` | `thinking` | `low` |
-| `high` | `thinking` | `high` |
-| `xhigh`、`max` | `thinking` | `max` |
+| API effort | 預設 thinking mode | DeepSeek encoder effort | Qwen effort |
+| --- | --- | --- | --- |
+| 省略、`none` | `chat` | `low` | `low` |
+| `minimal`、`low` | `thinking` | `low` | `low` |
+| `medium` | `thinking` | `low` | `medium` |
+| `high` | `thinking` | `high` | `xhigh` |
+| `xhigh`、`max` | `thinking` | `max` | `xhigh` |
 
 `thinking_mode` 可以是 `chat` 或 `thinking`。
 明確的 `thinking_mode` 只覆寫 mode。
@@ -301,6 +303,8 @@ server 會在 `response.completed` 或 `error` 後關閉連線。
 
 tool streaming 會在 generation 過程中傳送 function name 和 arguments fragment。
 server 會在 generation 結束時驗證完整 tool block。
+DeepSeek 使用 DSML。Qwen 使用官方 XML tool-call 格式。
+兩個 model kind 都會比較 streaming parser 和完整 parser 的 tool call。
 Chat Completions 驗證失敗時會傳送 error object，然後傳送 `[DONE]`。
 Responses 驗證失敗時會傳送 `error` event，然後關閉連線。
 
@@ -312,7 +316,8 @@ Responses 驗證失敗時會傳送 `error` event，然後關閉連線。
 {
   "max_tokens": 272000,
   "temperature": 0.2,
-  "top_p": 0.98
+  "top_p": 0.98,
+  "top_k": 0
 }
 ```
 
@@ -372,6 +377,7 @@ server restart 會還原 command-line 預設值。
 - requested output 上限是 272,000 token。
 - output 上限不是已驗證 context 長度。
 - API 只支援文字。
+- Qwen 不支援 vision、video、MTP 或 DSpark。
 - API 不支援 image、audio、logprobs、stop 和 structured output。
 - server 一次只執行一個 generation request。
 - server 不執行 tool、web search 或外部 command。
