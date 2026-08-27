@@ -265,6 +265,28 @@ class QwenTests(unittest.TestCase):
         self.assertEqual(messages[0]["role"], "system")
         self.assertIn('Call the "weather" tool', messages[0]["content"])
 
+    def test_qwen_codec_merges_leading_developer_messages(self):
+        tokenizer = FakeTokenizer()
+        QwenToolCodec(tokenizer).encode(
+            [
+                {"role": "developer", "content": "Codex instructions."},
+                {"role": "developer", "content": "Workspace instructions."},
+                {"role": "user", "content": "Reply with OK."},
+            ],
+            "chat",
+        )
+
+        self.assertEqual(
+            tokenizer.arguments[0],
+            [
+                {
+                    "role": "system",
+                    "content": "Codex instructions.\n\nWorkspace instructions.",
+                },
+                {"role": "user", "content": "Reply with OK."},
+            ],
+        )
+
     def test_qwen_codec_rejects_malformed_xml(self):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             QwenToolCodec(FakeTokenizer()).parse(

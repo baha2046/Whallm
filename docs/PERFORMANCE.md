@@ -32,6 +32,12 @@ runtime TTFT 也不包含 persistent prompt cache 載入時間。
 `time_to_first_token_seconds` 從 runtime request 開始計到第一個 output token
 完成 cache evaluation。
 
+第一個 output token 出現前，App 使用即時 `request_seconds` 顯示
+First Token wait time。
+第一個 output token 出現後，App 改為顯示最終的
+`time_to_first_token_seconds`。
+效能歷史只記錄每個 request 的最終 First Token wait time。
+
 `request_seconds` 在 generation 結束時停止。
 `request_seconds` 不包含 response 結束後的 persistent cache serialize 和 write。
 
@@ -875,6 +881,62 @@ xcrun xctrace record \
 ```
 
 只有 capture 證明 section 足夠大時，才評估 custom Metal kernel。
+
+## API input size benchmark
+
+`Scripts/benchmark_api.py` 透過 Whallm API 執行 input size benchmark。
+預設 input size 是 1K、4K、16K 和 32K token。
+腳本使用 installed model 的 tokenizer 建立精確 token 數的 raw completion prompt。
+腳本也會確認 server 回報相同的 input token 數。
+
+```sh
+make benchmark-dsv4
+make benchmark-qwen
+```
+
+Python CLI 的預設值是每個 input size 執行 5 次。
+目前兩個 Make entry 明確指定每個 input size 執行 3 次。
+
+腳本會先重用目前的 Server。
+本機 Server 未執行時，腳本會從 Whallm model folder 找出指定的 installed model，
+並使用 App 已儲存的設定啟動 Server。
+測試完成後，腳本只會停止自己啟動的 Server。
+腳本不會停止 App 或其他 process 啟動的 Server。
+
+`--model-path` 可以指定另一個 installed model。
+自動啟動只支援本機 `http://HOST:PORT/v1` URL。
+`--server-start-timeout` 的預設值是 900 秒。
+API key 從 `OPENAI_API_KEY` environment variable 讀取。
+
+```sh
+OPENAI_API_KEY='<local-key>' \
+  .venv/bin/python Scripts/benchmark_api.py \
+  --model-path /Volumes/Models/deepseek-v4-flash-0731.dsv4 \
+  --model deepseek-v4-flash-0731 \
+  --runs 5
+```
+
+```sh
+.venv/bin/python Scripts/benchmark_api.py \
+  --model Qwen/Qwen3.8-Flash-Next-FP8 \
+  --runs 5 \
+  --max-output-tokens 64
+```
+
+每個 run 記錄最終 TTFT、Prefill tok/s、Decode tok/s 和 request 期間最高的
+`performance.active_memory_bytes`。
+每個 input size 的 Peak 和 P95 使用個別 run 的結果計算。
+P95 使用 nearest-rank 方法。
+少於 20 個 run 時，nearest-rank P95 會等於 Peak。
+
+腳本會在終端顯示 ASCII 表格。
+腳本也會把每個 run、source、environment、runtime configuration、cache state
+和 output text hash 寫入 `docs/benchmarks/`。
+artifact 的 `server.started_by_benchmark` 會記錄 Server 是否由腳本啟動。
+每個 run 使用不同的 prompt prefix。
+腳本不會清除 prompt cache 或作業系統 page cache。
+Memory 是 MLX active memory，不是 process RSS。
+API 不提供生成 token ID，所以 artifact 不宣稱具有正式 output token hash。
 
 ## A/B 驗收
 

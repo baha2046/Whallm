@@ -46,6 +46,8 @@ struct InstalledArtifactFileDownloader: Sendable {
       let input = try FileHandle(forReadingFrom: destination)
       defer { try? input.close() }
       var remaining = existingBytes
+      var copiedSinceProgress: UInt64 = 0
+      let progressIntervalBytes: UInt64 = 256 * 1_024 * 1_024
       while remaining > 0 {
         try Task.checkCancellation()
         let count = Int(min(UInt64(8 * 1_024 * 1_024), remaining))
@@ -54,7 +56,14 @@ struct InstalledArtifactFileDownloader: Sendable {
         }
         hasher.update(data: data)
         remaining -= UInt64(data.count)
-        await progress(UInt64(data.count), 0)
+        copiedSinceProgress += UInt64(data.count)
+        if copiedSinceProgress >= progressIntervalBytes {
+          await progress(copiedSinceProgress, 0)
+          copiedSinceProgress = 0
+        }
+      }
+      if copiedSinceProgress > 0 {
+        await progress(copiedSinceProgress, 0)
       }
     }
 

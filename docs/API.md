@@ -162,7 +162,7 @@ curl http://127.0.0.1:11434/v1/chat/completions \
 response 包含 `choices` 和 `usage`。
 
 thinking mode 完成後，assistant message 可以包含 `reasoning_content`。
-`reasoning_content` 是 DeepSeekV4SSD extension。
+`reasoning_content` 是 Whallm extension。
 
 ## Responses
 
@@ -180,6 +180,8 @@ thinking mode 完成後，assistant message 可以包含 `reasoning_content`。
 
 server 接受 replay 的 `reasoning` item，但不把該 item 加入 prompt。
 client 必須在後續 `input` 中重送需要的歷史 message 和 tool item。
+`input` 可以用 `assistant` message 作為最後一個 item。
+這可讓 client 重送先前的 model output。
 
 `instructions` 必須是 string。
 server 會把 `instructions` 轉成 `developer` message。

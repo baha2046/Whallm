@@ -260,6 +260,21 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(self.server.runtime.last_thinking_mode, "thinking")
         self.assertEqual(self.server.runtime.last_reasoning_effort, "high")
 
+    def test_chat_rejects_final_assistant_history(self):
+        status, _, body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "messages": [
+                    {"role": "user", "content": "Hi"},
+                    {"role": "assistant", "content": "Hello"},
+                ],
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["param"], "messages.1.role")
+
     def test_streaming_chat_uses_openai_sse_shape(self):
         status, headers, body = self.request(
             "/v1/chat/completions",
@@ -496,6 +511,35 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response["output"][0]["type"], "message")
         self.assertEqual(response["output"][0]["content"][0]["text"], "Hello")
         self.assertEqual(response["usage"]["total_tokens"], 7)
+
+    def test_responses_accepts_final_assistant_history(self):
+        status, _, body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "input": [
+                    {
+                        "type": "message",
+                        "role": "user",
+                        "content": [{"type": "input_text", "text": "Inspect this."}],
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "phase": "commentary",
+                        "content": [
+                            {"type": "output_text", "text": "I am checking it."}
+                        ],
+                    },
+                ],
+            },
+        )
+        self.assertEqual(status, 200, body)
+        self.assertEqual(
+            self.server.runtime.last_messages[-1],
+            {"role": "assistant", "content": "I am checking it."},
+        )
 
     def test_responses_maps_codex_reasoning_effort(self):
         cases = (
@@ -793,7 +837,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(
             json.loads(body),
-            {"name": "DeepSeekV4SSD", "status": "ok", "api_base": "/v1"},
+            {"name": "Whallm", "status": "ok", "api_base": "/v1"},
         )
 
 

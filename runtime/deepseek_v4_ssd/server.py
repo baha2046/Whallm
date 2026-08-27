@@ -157,7 +157,7 @@ class ReasoningParser:
 
 class OpenAIHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
-    server_version = "DeepSeekV4SSD/1"
+    server_version = "Whallm/1"
 
     @property
     def app(self) -> OpenAIServer:
@@ -199,7 +199,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             self._json(
                 200,
                 {
-                    "name": "DeepSeekV4SSD",
+                    "name": "Whallm",
                     "status": "ok",
                     "api_base": "/v1",
                 },
@@ -1219,7 +1219,7 @@ def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
     value = payload.get("input")
     if isinstance(value, str):
         messages.append({"role": "user", "content": value})
-        return _messages(messages)
+        return _messages(messages, allow_assistant_final=True)
     if not isinstance(value, list) or not value:
         raise APIError("input must be a string or a non-empty array.", param="input")
 
@@ -1276,7 +1276,7 @@ def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
             raise APIError("Only text messages and function calls are supported.", param=param)
         messages.append({"role": raw.get("role"), "content": raw.get("content")})
     flush_calls()
-    return _messages(messages)
+    return _messages(messages, allow_assistant_final=True)
 
 
 def _response_tool_request(
@@ -1638,7 +1638,11 @@ def _assistant_tool_calls(value: Any, param: str) -> list[dict[str, Any]]:
     return result
 
 
-def _messages(value: Any) -> list[dict[str, Any]]:
+def _messages(
+    value: Any,
+    *,
+    allow_assistant_final: bool = False,
+) -> list[dict[str, Any]]:
     if not isinstance(value, list) or not value:
         raise APIError("messages must be a non-empty array.", param="messages")
     result = []
@@ -1713,7 +1717,10 @@ def _messages(value: Any) -> list[dict[str, Any]]:
             "Provide every tool result before requesting another response.",
             param="messages",
         )
-    if result[-1]["role"] not in {"user", "developer", "tool"}:
+    allowed_final_roles = {"user", "developer", "tool"}
+    if allow_assistant_final:
+        allowed_final_roles.add("assistant")
+    if result[-1]["role"] not in allowed_final_roles:
         raise APIError(
             "The final message must have the user, developer, or tool role.",
             param=f"messages.{len(result) - 1}.role",

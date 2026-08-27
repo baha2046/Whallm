@@ -45,5 +45,13 @@ server:
 	PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.server \
 		--model "$(MODEL)" --host "$(HOST)" --port "$(PORT)" $(ARGS)
 
+## benchmark-dsv4: benchmark an API model with 1K, 4K, 16K, and 32K inputs
+benchmark-dsv4:
+	.venv/bin/python Scripts/benchmark_api.py $(ARGS) --model deepseek-v4-flash-0731 --runs 3
+
+## benchmark-qwen: benchmark an API model with 1K, 4K, 16K, and 32K inputs
+benchmark-qwen:
+	.venv/bin/python Scripts/benchmark_api.py $(ARGS) --model Qwen/Qwen3.8-Flash-Next-FP8 --runs 3
+
 %:
 	@:

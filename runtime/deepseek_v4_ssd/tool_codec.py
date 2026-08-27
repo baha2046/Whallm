@@ -454,6 +454,13 @@ class QwenToolCodec(ToolCodec):
         for message in prepared:
             if message.get("role") == "developer":
                 message["role"] = "system"
+        if prepared and prepared[0].get("role") == "system":
+            while len(prepared) > 1 and prepared[1].get("role") == "system":
+                content = prepared.pop(1).get("content")
+                if content:
+                    prepared[0]["content"] = "\n\n".join(
+                        part for part in (prepared[0].get("content"), content) if part
+                    )
         active_tools = [] if tool_choice.mode == "none" else list(tools or [])
         instruction = self._choice_instruction(tool_choice) if active_tools else ""
         if instruction:

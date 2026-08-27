@@ -73,7 +73,10 @@ qwen3.8-flash-next.dsv4/
 App 從
 [`Yanun/Qwen3.8-Flash-Next-MXFP4`](https://huggingface.co/Yanun/Qwen3.8-Flash-Next-MXFP4)
 下載 published installed model。
-程式碼固定 Hugging Face commit。
+程式碼固定 Hugging Face commit
+`753d0aa57059fad70a5f7e6cc249f25df56bbd34`。
+遠端 `manifest.json` 的 SHA-256 是
+`3f4cb52a88335591cfb8233778eb56396e9d2756c153485e4dcfb0a12daed0ce`。
 App 不在使用者的 Mac 上執行 FP8 到 MXFP4 轉換。
 App 安裝不使用 GPU。
 App 使用 CPU 計算 SHA-256。
@@ -124,6 +127,9 @@ Qwen layer-major prefill 每層只載入一次完整 expert layer。
 
 prompt cache 路徑會包含 model ID、revision 和 manifest format。
 DeepSeek 和 Qwen 不會共用 prompt cache entry。
+
+Qwen runtime 不支援 BF16 KV cache 選項。
+App 不會在 Qwen 的進階設定中顯示這個選項。
 
 ## 對話與 API 預設值
 

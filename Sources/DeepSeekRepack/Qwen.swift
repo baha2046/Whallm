@@ -463,7 +463,7 @@ public struct QwenFlashNextCheckpoint: Sendable {
 
 public struct QwenInstalledModelArtifact: Sendable {
   public static let repository = "Yanun/Qwen3.8-Flash-Next-MXFP4"
-  public static let revision = "main"
+  public static let revision = "753d0aa57059fad70a5f7e6cc249f25df56bbd34"
 
   private let downloader: InstalledArtifactDownloader
 

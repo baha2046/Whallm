@@ -98,7 +98,7 @@ struct HuggingFaceSource: CheckpointSource {
     let url = URL(string: "https://huggingface.co/\(modelID)/resolve/\(revision)/\(encodedPath)")!
     var request = URLRequest(url: url)
     request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
-    request.setValue("DeepSeekV4SSD/1", forHTTPHeaderField: "User-Agent")
+    request.setValue("Whallm/1", forHTTPHeaderField: "User-Agent")
     return request
   }
 }
