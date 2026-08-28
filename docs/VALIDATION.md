@@ -129,9 +129,9 @@ PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
 | Swift `DeepSeekRepackTests` | 16 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 42 | 0 | 0 |
-| Python runtime 與 server | 233 | 0 | 0 |
-| 合計 | 291 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 45 | 0 | 0 |
+| Python runtime 與 server | 239 | 0 | 0 |
+| 合計 | 300 | 0 | 0 |
 
 本次沒有略過測試。
 2026-08-28 的目前工作樹已執行 `make package`。

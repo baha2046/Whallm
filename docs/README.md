@@ -4,7 +4,7 @@
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
 最後核對日期是 2026-08-28。
-Qwen 支援核對版本是目前工作樹。這些變更尚未建立 commit。
+Qwen 支援核對版本是目前工作樹。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact
