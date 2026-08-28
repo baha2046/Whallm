@@ -63,6 +63,109 @@ _mlx_lm_generate = importlib.import_module("mlx_lm.generate")
 
 
 class ModelRuntimeTests(unittest.TestCase):
+    def test_generation_passes_sampler_and_presence_processor_options(self):
+        installed = SimpleNamespace(
+            root=Path("/tmp/tokenizer"),
+            is_qwen=True,
+            maximum_context=262_144,
+        )
+        config = SimpleNamespace(
+            dspark_enabled=False,
+            prefill_step_size=1,
+            layer_major_prefill=False,
+        )
+        response = SimpleNamespace(
+            text="OK",
+            token=1,
+            prompt_tokens=1,
+            generation_tokens=1,
+            finish_reason="stop",
+        )
+        sampler = object()
+        presence_processor = object()
+        received_options = {}
+
+        def fake_stream_generate(*_args, **options):
+            received_options.update(options)
+            yield response
+
+        with (
+            patch(
+                "deepseek_v4_ssd.generation.load_model",
+                return_value=(object(), SimpleNamespace(close=lambda: None)),
+            ),
+            patch(
+                "deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained",
+                return_value=SimpleNamespace(
+                    bos_token=None,
+                    encode=lambda *_args, **_kwargs: [1],
+                ),
+            ),
+            patch("deepseek_v4_ssd.generation.make_prompt_cache", return_value=[]),
+            patch(
+                "deepseek_v4_ssd.generation.make_sampler",
+                return_value=sampler,
+            ) as make_sampler,
+            patch(
+                "deepseek_v4_ssd.generation.make_logits_processors",
+                return_value=[presence_processor],
+            ) as make_logits_processors,
+            patch(
+                "deepseek_v4_ssd.generation.stream_generate",
+                side_effect=fake_stream_generate,
+            ),
+        ):
+            runtime = ModelRuntime(installed, config)
+            list(
+                runtime.stream(
+                    "test",
+                    GenerationOptions(
+                        max_tokens=1,
+                        temperature=0.7,
+                        top_p=0.8,
+                        top_k=20,
+                        min_p=0.0,
+                        presence_penalty=1.5,
+                        repetition_penalty=1.0,
+                    ),
+                )
+            )
+            make_sampler.assert_called_once_with(
+                temp=0.7,
+                top_p=0.8,
+                top_k=20,
+                min_p=0.0,
+            )
+            make_logits_processors.assert_called_once_with(presence_penalty=1.5)
+            self.assertIs(received_options["sampler"], sampler)
+            self.assertEqual(
+                received_options["logits_processors"],
+                [presence_processor],
+            )
+
+            make_sampler.reset_mock()
+            make_logits_processors.reset_mock()
+            received_options.clear()
+            list(
+                runtime.stream(
+                    "test",
+                    GenerationOptions(
+                        max_tokens=1,
+                        temperature=0,
+                        top_p=0.95,
+                        top_k=20,
+                    ),
+                )
+            )
+            make_sampler.assert_called_once_with(
+                temp=0,
+                top_p=0.95,
+                top_k=20,
+                min_p=0.0,
+            )
+            make_logits_processors.assert_not_called()
+            self.assertEqual(received_options["logits_processors"], [])
+
     def test_model_load_and_request_share_cross_thread_stream(self):
         load_stream = None
         pending = None

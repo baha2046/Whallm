@@ -1,0 +1,524 @@
+from __future__ import annotations
+
+import gc
+import json
+import threading
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
+from typing import Any, Callable, Iterator
+
+import mlx.core as mx
+
+from .generation import ModelRuntime, RuntimeMetrics
+from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
+
+CATALOG_VERSION = 1
+MAX_GENERATION_TOKENS = 272_000
+MODEL_IDS = {
+    "deepseek-v4": "deepseek-v4-flash-0731",
+    "qwen3.8-flash-next": "qwen3.8-flash-next-fp8",
+}
+MODEL_OWNERS = {
+    "deepseek-v4": "deepseek-ai",
+    "qwen3.8-flash-next": "Qwen",
+}
+
+
+class ModelCatalogError(ValueError):
+    pass
+
+
+class ModelNotFound(Exception):
+    pass
+
+
+class ModelLoadFailed(Exception):
+    def __init__(self, model: str, cause: Exception):
+        super().__init__(f"Unable to load model '{model}'.")
+        self.model = model
+        self.cause = cause
+
+
+@dataclass(frozen=True)
+class ModelDefaults:
+    max_tokens: int
+    temperature: float
+    top_p: float
+    top_k: int
+
+
+@dataclass(frozen=True)
+class ModelSpec:
+    id: str
+    alias: str | None
+    path: str
+    model_kind: str
+    runtime: RuntimeConfig
+    defaults: ModelDefaults
+    warmup_prompt_path: str | None = None
+
+    @property
+    def public_name(self) -> str:
+        return self.alias or self.id
+
+    @property
+    def owner(self) -> str:
+        return MODEL_OWNERS[self.model_kind]
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "alias": self.alias,
+            "path": self.path,
+            "model_kind": self.model_kind,
+            "runtime": asdict(self.runtime),
+            "defaults": asdict(self.defaults),
+            "warmup_prompt_path": self.warmup_prompt_path,
+        }
+
+
+@dataclass(frozen=True)
+class ModelRequest:
+    name: str
+    model_id: str
+    runtime: Any
+    defaults: ModelDefaults
+
+
+def load_model_catalog(path: str | Path) -> tuple[ModelSpec, ...]:
+    try:
+        with Path(path).expanduser().open("rb") as file:
+            value = json.load(file)
+    except (OSError, json.JSONDecodeError) as error:
+        raise ModelCatalogError(f"cannot read model catalog: {error}") from error
+    return parse_model_catalog(value)
+
+
+def parse_model_catalog(value: Any) -> tuple[ModelSpec, ...]:
+    if not isinstance(value, dict):
+        raise ModelCatalogError("model catalog must be a JSON object")
+    if set(value) != {"version", "models"}:
+        raise ModelCatalogError("model catalog must contain only version and models")
+    if value["version"] != CATALOG_VERSION:
+        raise ModelCatalogError(
+            f"model catalog version must be {CATALOG_VERSION}"
+        )
+    raw_models = value["models"]
+    if not isinstance(raw_models, list):
+        raise ModelCatalogError("model catalog models must be an array")
+
+    specs = tuple(_parse_model(item, index) for index, item in enumerate(raw_models))
+    ids: dict[str, ModelSpec] = {}
+    for spec in specs:
+        if spec.id in ids:
+            raise ModelCatalogError(f"duplicate model ID: {spec.id}")
+        ids[spec.id] = spec
+
+    aliases: dict[str, ModelSpec] = {}
+    for spec in specs:
+        alias = spec.alias
+        if alias is None or alias == spec.id:
+            continue
+        owner = ids.get(alias)
+        if owner is not None and owner.id != spec.id:
+            raise ModelCatalogError(
+                f"alias '{alias}' conflicts with model ID '{owner.id}'"
+            )
+        owner = aliases.get(alias)
+        if owner is not None:
+            raise ModelCatalogError(
+                f"alias '{alias}' conflicts with alias for '{owner.id}'"
+            )
+        aliases[alias] = spec
+    return specs
+
+
+def _parse_model(value: Any, index: int) -> ModelSpec:
+    prefix = f"models.{index}"
+    required = {
+        "id",
+        "alias",
+        "path",
+        "model_kind",
+        "runtime",
+        "defaults",
+        "warmup_prompt_path",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ModelCatalogError(f"{prefix} has invalid fields")
+
+    model_kind = value["model_kind"]
+    if model_kind not in MODEL_IDS:
+        raise ModelCatalogError(f"{prefix}.model_kind is not supported")
+    model_id = value["id"]
+    if model_id != MODEL_IDS[model_kind]:
+        raise ModelCatalogError(
+            f"{prefix}.id must be '{MODEL_IDS[model_kind]}'"
+        )
+    path = value["path"]
+    if not isinstance(path, str) or not path.strip():
+        raise ModelCatalogError(f"{prefix}.path must be a non-empty string")
+
+    raw_alias = value["alias"]
+    if raw_alias is not None and not isinstance(raw_alias, str):
+        raise ModelCatalogError(f"{prefix}.alias must be a string or null")
+    alias = raw_alias.strip() if isinstance(raw_alias, str) else None
+    alias = alias or None
+
+    warmup = value["warmup_prompt_path"]
+    if warmup is not None and (not isinstance(warmup, str) or not warmup.strip()):
+        raise ModelCatalogError(
+            f"{prefix}.warmup_prompt_path must be a non-empty string or null"
+        )
+
+    runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime")
+    if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
+        raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
+    defaults = _parse_defaults(value["defaults"], f"{prefix}.defaults")
+    return ModelSpec(
+        id=model_id,
+        alias=alias,
+        path=path,
+        model_kind=model_kind,
+        runtime=runtime,
+        defaults=defaults,
+        warmup_prompt_path=warmup,
+    )
+
+
+def _parse_runtime(value: Any, prefix: str) -> RuntimeConfig:
+    names = {field.name for field in fields(RuntimeConfig)}
+    if not isinstance(value, dict) or set(value) != names:
+        raise ModelCatalogError(f"{prefix} must contain every RuntimeConfig field")
+    try:
+        config = RuntimeConfig(**value)
+    except TypeError as error:
+        raise ModelCatalogError(f"{prefix} is invalid: {error}") from error
+    try:
+        validate_runtime_config(config)
+    except ValueError as error:
+        raise ModelCatalogError(f"{prefix}.{error}") from error
+    return config
+
+
+def validate_runtime_config(config: RuntimeConfig) -> None:
+    integer_minimums = {
+        "slots": 6,
+        "read_workers": 1,
+        "prefetch_read_workers": 1,
+        "prefill_step_size": 0,
+        "memory_limit_gib": 0,
+        "prompt_cache_entries": 1,
+        "prompt_cache_memory_gib": 1,
+        "persistent_prompt_cache_entries": 1,
+        "moe_prefill_step_size": 0,
+        "dspark_slots": 30,
+    }
+    for name, minimum in integer_minimums.items():
+        value = getattr(config, name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+            raise ValueError(f"{name} must be an integer of at least {minimum}")
+
+    boolean_names = {
+        "fp8_kv_cache",
+        "layer_major_prefill",
+        "persistent_prompt_cache",
+        "batched_expert_prefill",
+        "fp4_index_cache",
+        "dspark_enabled",
+        "ready_expert_decode",
+    }
+    for name in boolean_names:
+        if type(getattr(config, name)) is not bool:
+            raise ValueError(f"{name} must be a boolean")
+
+    if not isinstance(config.dspark_confidence_threshold, (int, float)) or isinstance(
+        config.dspark_confidence_threshold, bool
+    ) or not 0 <= config.dspark_confidence_threshold <= 1:
+        raise ValueError("dspark_confidence_threshold must be between zero and one")
+    if config.power_saving_limit_gbps is not None and (
+        isinstance(config.power_saving_limit_gbps, bool)
+        or config.power_saving_limit_gbps not in _POWER_SAVING_LIMITS_GBPS
+    ):
+        raise ValueError("power_saving_limit_gbps is not supported")
+    for name in ("prompt_cache_directory", "expert_route_trace"):
+        value = getattr(config, name)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{name} must be a string or null")
+
+
+def _parse_defaults(value: Any, prefix: str) -> ModelDefaults:
+    if not isinstance(value, dict) or set(value) != {
+        "max_tokens",
+        "temperature",
+        "top_p",
+        "top_k",
+    }:
+        raise ModelCatalogError(f"{prefix} has invalid fields")
+    max_tokens = value["max_tokens"]
+    temperature = value["temperature"]
+    top_p = value["top_p"]
+    top_k = value["top_k"]
+    if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or not (
+        1 <= max_tokens <= MAX_GENERATION_TOKENS
+    ):
+        raise ModelCatalogError(
+            f"{prefix}.max_tokens must be between 1 and {MAX_GENERATION_TOKENS}"
+        )
+    if isinstance(temperature, bool) or not isinstance(temperature, (int, float)) or not (
+        0 <= temperature <= 2
+    ):
+        raise ModelCatalogError(f"{prefix}.temperature must be between 0 and 2")
+    if isinstance(top_p, bool) or not isinstance(top_p, (int, float)) or not (
+        0.000001 <= top_p <= 1
+    ):
+        raise ModelCatalogError(f"{prefix}.top_p must be between 0.000001 and 1")
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or not (
+        0 <= top_k <= 248_320
+    ):
+        raise ModelCatalogError(f"{prefix}.top_k must be between 0 and 248320")
+    return ModelDefaults(max_tokens, float(temperature), float(top_p), top_k)
+
+
+def _zero_runtime_metrics() -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for name, value in RuntimeMetrics().snapshot().items():
+        if isinstance(value, bool):
+            result[name] = False
+        elif isinstance(value, int):
+            result[name] = 0
+        elif isinstance(value, float):
+            result[name] = 0.0
+        elif isinstance(value, str):
+            result[name] = ""
+        elif isinstance(value, tuple):
+            result[name] = ()
+        elif isinstance(value, list):
+            result[name] = []
+        elif isinstance(value, dict):
+            result[name] = {}
+        else:
+            result[name] = None
+    return result
+
+
+class ModelManager:
+    """Load one catalog model at a time and serialize generation requests."""
+
+    def __init__(
+        self,
+        models: tuple[ModelSpec, ...] | list[ModelSpec],
+        *,
+        runtime_loader: Callable[[ModelSpec], Any] | None = None,
+        clear_cache: Callable[[], None] = mx.clear_cache,
+    ):
+        self._models = tuple(models)
+        self._by_name: dict[str, ModelSpec] = {}
+        for spec in self._models:
+            self._by_name[spec.id] = spec
+            if spec.alias:
+                self._by_name[spec.alias] = spec
+        self._runtime_loader = runtime_loader or (
+            lambda spec: ModelRuntime.open(spec.path, spec.runtime)
+        )
+        self._clear_cache = clear_cache
+        self._generation_lock = threading.Lock()
+        self._state_lock = threading.Lock()
+        self._runtime: Any | None = None
+        self._loaded: ModelSpec | None = None
+        self._loading: ModelSpec | None = None
+        self._accumulated_generation_tokens = 0
+        self._completed_request_count = 0
+        self._empty_runtime_metrics = _zero_runtime_metrics()
+
+    def models(self) -> list[dict[str, Any]]:
+        result = []
+        for spec in self._models:
+            for name in (spec.id, spec.alias):
+                if name is None or (name == spec.id and result and result[-1]["id"] == name):
+                    continue
+                result.append(
+                    {
+                        "id": name,
+                        "object": "model",
+                        "created": 0,
+                        "owned_by": spec.owner,
+                    }
+                )
+        return result
+
+    @contextmanager
+    def request(self, name: Any) -> Iterator[ModelRequest]:
+        spec = self._by_name.get(name) if isinstance(name, str) else None
+        if spec is None:
+            raise ModelNotFound(str(name) if name is not None else "")
+        with self._generation_lock:
+            runtime = self._ensure_loaded(spec, name)
+            yield ModelRequest(name, spec.id, runtime, spec.defaults)
+
+    def status_snapshot(self) -> dict[str, Any]:
+        with self._state_lock:
+            runtime = self._runtime
+            loaded = self._loaded
+            loading = self._loading
+            accumulated = self._accumulated_generation_tokens
+            completed = self._completed_request_count
+            if runtime is None or loaded is None:
+                performance = {
+                    **self._empty_runtime_metrics,
+                    "generating": False,
+                    "generation_tokens": 0,
+                    "tokens_per_second": 0,
+                    "ssd_bytes_read": 0,
+                    "ssd_read_seconds": 0,
+                    "expert_pack_seconds": 0,
+                    "expert_eviction_seconds": 0,
+                    "routing_sync_seconds": 0,
+                    "active_parameters_cache": {
+                        "hit_rate": 0,
+                        "hits": 0,
+                        "misses": 0,
+                        "resident_slots": 0,
+                        "capacity_slots": 0,
+                    },
+                }
+                return {
+                    "model": None,
+                    "source_model": None,
+                    "model_path": None,
+                    "runtime": None,
+                    "loaded_model": None,
+                    "loading_model": loading.id if loading else None,
+                    "performance": performance,
+                }
+
+            runtime_metrics = runtime.metrics.snapshot()
+            runtime_metrics["accumulated_generation_tokens"] = (
+                accumulated + runtime_metrics["accumulated_generation_tokens"]
+            )
+            runtime_metrics["completed_request_count"] = (
+                completed + runtime_metrics["completed_request_count"]
+            )
+            config = runtime.config
+            installed = runtime.installed
+            cache = runtime.expert_cache
+            cache_metrics = cache.metrics
+            return {
+                "model": loaded.public_name,
+                "source_model": runtime.model_id,
+                "model_path": str(installed.root),
+                "loaded_model": loaded.id,
+                "loading_model": loading.id if loading else None,
+                "runtime": {
+                    "slots": config.slots,
+                    "read_workers": config.read_workers,
+                    "prefetch_read_workers": config.prefetch_read_workers,
+                    "power_saving_limit_gbps": config.power_saving_limit_gbps,
+                    "prefill_step_size": config.prefill_step_size,
+                    "moe_prefill_step_size": config.moe_prefill_step_size,
+                    "layer_major_prefill": config.layer_major_prefill,
+                    "batched_expert_prefill": config.batched_expert_prefill,
+                    "prompt_cache_entries": config.prompt_cache_entries,
+                    "prompt_cache_memory_gib": config.prompt_cache_memory_gib,
+                    "persistent_prompt_cache": config.persistent_prompt_cache,
+                    "fp4_index_cache": config.fp4_index_cache,
+                    "dspark_available": installed.has_dspark,
+                    "dspark_enabled": bool(
+                        getattr(getattr(runtime, "model", None), "dspark", None)
+                    ),
+                    "dspark_confidence_threshold": config.dspark_confidence_threshold,
+                    "dspark_slots": config.dspark_slots,
+                    "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
+                },
+                "performance": {
+                    "generating": False,
+                    "generation_tokens": 0,
+                    "tokens_per_second": 0,
+                    **runtime_metrics,
+                    "ssd_bytes_read": cache_metrics.bytes_read,
+                    "ssd_read_seconds": cache_metrics.read_seconds,
+                    "expert_pack_seconds": cache_metrics.pack_seconds,
+                    "expert_eviction_seconds": cache_metrics.eviction_seconds,
+                    "routing_sync_seconds": cache_metrics.routing_sync_seconds,
+                    "active_parameters_cache": {
+                        "hit_rate": cache_metrics.hit_rate,
+                        "hits": cache_metrics.hits,
+                        "misses": cache_metrics.misses,
+                        "resident_slots": cache.resident_count,
+                        "capacity_slots": config.slots,
+                    },
+                },
+            }
+
+    def close(self) -> None:
+        with self._generation_lock:
+            runtime = self._detach_runtime()
+            if runtime is not None:
+                try:
+                    runtime.close()
+                finally:
+                    del runtime
+                    gc.collect()
+                    self._clear_cache()
+
+    def _ensure_loaded(self, spec: ModelSpec, requested_name: str) -> Any:
+        with self._state_lock:
+            if self._loaded == spec and self._runtime is not None:
+                return self._runtime
+
+        old_runtime = self._detach_runtime(loading=spec)
+        if old_runtime is not None:
+            try:
+                old_runtime.close()
+            except Exception as error:
+                self._finish_loading()
+                raise ModelLoadFailed(requested_name, error) from error
+            finally:
+                del old_runtime
+                gc.collect()
+                self._clear_cache()
+
+        runtime = None
+        try:
+            runtime = self._runtime_loader(spec)
+            if spec.warmup_prompt_path:
+                with open(spec.warmup_prompt_path, encoding="utf-8") as file:
+                    runtime.warm_prompt(file.read())
+        except Exception as error:
+            if runtime is not None:
+                try:
+                    runtime.close()
+                except Exception:
+                    pass
+                del runtime
+            gc.collect()
+            self._clear_cache()
+            self._finish_loading()
+            raise ModelLoadFailed(requested_name, error) from error
+
+        with self._state_lock:
+            self._runtime = runtime
+            self._loaded = spec
+            self._loading = None
+        return runtime
+
+    def _detach_runtime(self, loading: ModelSpec | None = None) -> Any | None:
+        with self._state_lock:
+            runtime = self._runtime
+            if runtime is not None:
+                snapshot = runtime.metrics.snapshot()
+                self._accumulated_generation_tokens += snapshot.get(
+                    "accumulated_generation_tokens", 0
+                )
+                self._completed_request_count += snapshot.get(
+                    "completed_request_count", 0
+                )
+            self._runtime = None
+            self._loaded = None
+            self._loading = loading
+            return runtime
+
+    def _finish_loading(self) -> None:
+        with self._state_lock:
+            self._loading = None

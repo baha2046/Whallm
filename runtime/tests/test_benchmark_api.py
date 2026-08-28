@@ -32,6 +32,10 @@ class FakeTokenizer:
     def decode(self, tokens, **_):
         return "".join(chr(token) for token in tokens)
 
+    def apply_chat_template(self, messages, *, add_generation_prompt, tokenize):
+        assert add_generation_prompt and not tokenize
+        return f"<user>{messages[0]['content']}</user><assistant>"
+
 
 class FakeBenchmarkHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -97,12 +101,64 @@ class BenchmarkAPITests(unittest.TestCase):
     def test_builds_an_exact_prompt(self):
         prompt, tokens = benchmark_api.build_exact_prompt(
             FakeTokenizer(),
+            {
+                "role": "user",
+                "content": "API benchmark test-run." + (" test" * 1_024),
+            },
             1_024,
-            "test-run",
         )
 
         self.assertEqual(len(tokens), 1_024)
-        self.assertTrue(prompt.startswith("API benchmark test-run."))
+        self.assertTrue(prompt.startswith("<user>API benchmark test-run."))
+        self.assertTrue(prompt.endswith("</user><assistant>"))
+
+    def test_loads_exact_speed_bench_mixed_prompts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "throughput_1k.jsonl"
+            rows = [
+                {
+                    "question_id": "skip",
+                    "category": "high_entropy",
+                    "messages": [{"role": "user", "content": "x" * 2_000}],
+                },
+                *[
+                    {
+                        "question_id": f"mixed-{index}",
+                        "category": "mixed",
+                        "sub_category": "test",
+                        "source": "fixture",
+                        "src_id": str(index),
+                        "messages": [
+                            {"role": "user", "content": character * 2_000}
+                        ],
+                    }
+                    for index, character in enumerate(("a", "b"), 1)
+                ],
+            ]
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+
+            actual_path, samples = benchmark_api.load_speed_bench_samples(
+                Path(directory),
+                FakeTokenizer(),
+                1_024,
+                2,
+            )
+
+        self.assertEqual(actual_path, path)
+        self.assertEqual(
+            [sample["question_id"] for sample in samples],
+            ["mixed-1", "mixed-2"],
+        )
+        self.assertTrue(all(len(sample["tokens"]) == 1_024 for sample in samples))
+        self.assertTrue(
+            all(
+                sample["prompt"].endswith("</user><assistant>")
+                for sample in samples
+            )
+        )
 
     def test_runs_api_request_and_formats_peak_and_p95(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), FakeBenchmarkHandler)
@@ -149,6 +205,7 @@ class BenchmarkAPITests(unittest.TestCase):
                 {
                     "target_input_tokens": 1_024,
                     "input_tokens": 1_024,
+                    "wall_seconds": value,
                     "ttft_seconds": value,
                     "prefill_tokens_per_second": value,
                     "decode_tokens_per_second": value,
@@ -159,9 +216,12 @@ class BenchmarkAPITests(unittest.TestCase):
         table = benchmark_api.render_ascii_table(summaries)
         self.assertEqual(summaries[0]["metrics"]["ttft_seconds"]["peak"], 20)
         self.assertEqual(summaries[0]["metrics"]["ttft_seconds"]["p95"], 19)
-        self.assertIn("| 1K", table)
-        self.assertIn("| Peak", table)
+        self.assertEqual(summaries[0]["metrics"]["wall_seconds"]["p95"], 19)
+        self.assertIn("| Actual", table)
+        self.assertIn("| Maximum", table)
         self.assertIn("| P95", table)
+        self.assertIn("| Total time (s)", table)
+        self.assertNotIn("| Peak", table)
 
     def test_uses_the_model_selected_in_whallm_for_server_startup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -233,6 +293,46 @@ class BenchmarkAPITests(unittest.TestCase):
         self.assertEqual(actual_path, model_path.resolve())
         self.assertEqual(public_model, "deepseek-v4-flash-0731")
         self.assertEqual(configuration, {})
+
+    def test_uses_the_qwen_api_model_id_and_new_app_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model_root = Path(directory)
+            model_path = model_root / "qwen3.8-flash-next.dsv4"
+            model_path.mkdir()
+            (model_path / "manifest.json").write_text(
+                json.dumps(
+                    {
+                        "modelID": "Qwen/Qwen3.8-Flash-Next-FP8",
+                        "modelKind": "qwen3.8-flash-next",
+                    }
+                ),
+                encoding="utf-8",
+            )
+            preferences = {
+                "modelLibraryRoot": str(model_root),
+                "serverConfiguration": json.dumps(
+                    {"powerSavingLimitGBps": 2}
+                ).encode(),
+                "modelAdvancedSettings.qwen3.8-flash-next": json.dumps(
+                    {"slots": 900}
+                ).encode(),
+            }
+            with mock.patch.object(
+                benchmark_api,
+                "app_preferences",
+                return_value=preferences,
+            ):
+                actual_path, public_model, configuration = (
+                    benchmark_api.launch_configuration(
+                        None,
+                        "qwen3.8-flash-next-fp8",
+                    )
+                )
+
+        self.assertEqual(actual_path, model_path.resolve())
+        self.assertEqual(public_model, "qwen3.8-flash-next-fp8")
+        self.assertEqual(configuration["slots"], 900)
+        self.assertEqual(configuration["powerSavingLimitGBps"], 2)
 
     def test_stops_a_server_started_by_the_benchmark(self):
         arguments = SimpleNamespace(

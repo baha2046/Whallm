@@ -16,7 +16,7 @@ import mlx.core as mx
 from mlx_lm.generate import stream_generate
 from mlx_lm.models.cache import CacheList, make_prompt_cache
 from mlx_lm.models.base import create_ssm_mask
-from mlx_lm.sample_utils import make_sampler
+from mlx_lm.sample_utils import make_logits_processors, make_sampler
 from mlx_lm.tokenizer_utils import TokenizerWrapper
 from transformers import AutoTokenizer
 
@@ -69,6 +69,9 @@ class GenerationOptions:
     temperature: float = 0.2
     top_p: float = 0.98
     top_k: int = 0
+    min_p: float = 0.0
+    presence_penalty: float = 0.0
+    repetition_penalty: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -756,6 +759,15 @@ class ModelRuntime:
             temp=options.temperature,
             top_p=options.top_p,
             top_k=options.top_k,
+            min_p=options.min_p,
+        )
+        processor_options = {}
+        if options.presence_penalty != 0:
+            processor_options["presence_penalty"] = options.presence_penalty
+        if options.repetition_penalty != 1:
+            processor_options["repetition_penalty"] = options.repetition_penalty
+        logits_processors = (
+            make_logits_processors(**processor_options) if processor_options else []
         )
         with self._generation_lock:
             with mx.stream(self._generation_stream):
@@ -849,6 +861,7 @@ class ModelRuntime:
                                 generation_prompt,
                                 max_tokens=options.max_tokens,
                                 sampler=sampler,
+                                logits_processors=logits_processors,
                                 prompt_cache=prompt_cache,
                                 prefill_step_size=step_size,
                             )

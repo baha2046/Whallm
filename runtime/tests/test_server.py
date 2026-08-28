@@ -3,12 +3,20 @@ from __future__ import annotations
 import json
 import threading
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from deepseek_v4_ssd.generation import GeneratedPiece, THINK_START
+from deepseek_v4_ssd.generation import GenerationOptions, GeneratedPiece, THINK_START
+from deepseek_v4_ssd.model import RuntimeConfig
+from deepseek_v4_ssd.model_manager import (
+    ModelDefaults,
+    ModelManager,
+    ModelSpec,
+)
 from deepseek_v4_ssd.server import (
     APIError,
     OpenAIServer,
@@ -25,10 +33,25 @@ class FakeRuntime:
     config = SimpleNamespace(
         slots=1024,
         read_workers=4,
+        prefetch_read_workers=2,
         prefill_step_size=32,
+        moe_prefill_step_size=0,
         fp8_kv_cache=True,
+        layer_major_prefill=True,
+        batched_expert_prefill=True,
+        prompt_cache_entries=2,
+        prompt_cache_memory_gib=8,
+        persistent_prompt_cache=True,
+        fp4_index_cache=True,
+        dspark_confidence_threshold=0.6,
+        dspark_slots=768,
+        power_saving_limit_gbps=None,
     )
-    installed = SimpleNamespace(root=Path("/tmp/model"))
+    installed = SimpleNamespace(
+        root=Path("/tmp/model"),
+        is_qwen=False,
+        has_dspark=False,
+    )
     expert_cache = SimpleNamespace(
         metrics=SimpleNamespace(
             hits=3,
@@ -83,8 +106,10 @@ class FakeRuntime:
         self.last_tool_choice = None
         self.last_thinking_mode = None
         self.last_reasoning_effort = None
+        self.last_options = None
         self.last_parse_text = None
         self.parse_error = False
+        self.closed = False
 
     def encode_chat(
         self,
@@ -108,6 +133,7 @@ class FakeRuntime:
         return self.parsed_turn
 
     def stream(self, prompt, options):
+        self.last_options = options
         if self.generation_gate is not None:
             self.generation_entered.set()
             self.generation_gate.wait(timeout=2)
@@ -122,6 +148,9 @@ class FakeRuntime:
             if index == self.pause_after_chunks:
                 self.chunk_paused.set()
                 self.chunk_gate.wait(timeout=2)
+
+    def close(self):
+        self.closed = True
 
 
 class QwenServerSettingsTests(unittest.TestCase):
@@ -141,8 +170,198 @@ class QwenServerSettingsTests(unittest.TestCase):
                     ("thinking", native),
                 )
 
+    def test_qwen_thinking_mode_uses_or_rule(self):
+        cases = (
+            ({}, False, "chat"),
+            ({"thinking_mode": "chat"}, False, "chat"),
+            ({"thinking_mode": "thinking"}, False, "thinking"),
+            ({"reasoning_effort": "none"}, False, "chat"),
+            (
+                {"thinking_mode": "chat", "reasoning_effort": "medium"},
+                False,
+                "thinking",
+            ),
+            ({"reasoning": {"effort": "none"}}, True, "chat"),
+            (
+                {"thinking_mode": "chat", "reasoning": {"effort": "high"}},
+                True,
+                "thinking",
+            ),
+        )
+        for payload, responses_api, expected in cases:
+            with self.subTest(payload=payload, responses_api=responses_api):
+                mode, _ = _reasoning_settings(
+                    payload,
+                    responses_api=responses_api,
+                    qwen=True,
+                )
+                self.assertEqual(mode, expected)
+
+
+class QwenSamplingServerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.runtime = FakeRuntime()
+        cls.runtime.installed = SimpleNamespace(
+            root=Path("/tmp/qwen-model"),
+            is_qwen=True,
+            has_dspark=False,
+        )
+        cls.model_manager = ModelManager(
+            [
+                ModelSpec(
+                    id="qwen3.8-flash-next-fp8",
+                    alias=None,
+                    path="/tmp/qwen-model",
+                    model_kind="qwen3.8-flash-next",
+                    runtime=RuntimeConfig(),
+                    defaults=ModelDefaults(262_144, 0.7, 0.8, 20),
+                )
+            ],
+            runtime_loader=lambda _: cls.runtime,
+            clear_cache=lambda: None,
+        )
+        cls.server = OpenAIServer(("127.0.0.1", 0), cls.model_manager)
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        cls.base = f"http://127.0.0.1:{cls.server.server_port}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join()
+        cls.model_manager.close()
+
+    def request(self, path, body):
+        request = Request(
+            self.base + path,
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urlopen(request) as response:
+                return response.status, response.read()
+        except HTTPError as error:
+            try:
+                return error.code, error.read()
+            finally:
+                error.close()
+
+    def test_qwen_endpoints_select_mode_sampling_options(self):
+        cases = (
+            (
+                "/v1/chat/completions",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                    "thinking_mode": "chat",
+                },
+                GenerationOptions(
+                    max_tokens=262_144,
+                    temperature=0.7,
+                    top_p=0.8,
+                    top_k=20,
+                    min_p=0.0,
+                    presence_penalty=1.5,
+                    repetition_penalty=1.0,
+                ),
+            ),
+            (
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": "Hi",
+                    "reasoning": {"effort": "high"},
+                },
+                GenerationOptions(
+                    max_tokens=262_144,
+                    temperature=1.0,
+                    top_p=0.95,
+                    top_k=20,
+                    min_p=0.0,
+                    presence_penalty=0.0,
+                    repetition_penalty=1.0,
+                ),
+            ),
+            (
+                "/v1/completions",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "prompt": "Hi",
+                    "thinking_mode": "thinking",
+                    "reasoning_effort": "high",
+                },
+                GenerationOptions(
+                    max_tokens=262_144,
+                    temperature=0.7,
+                    top_p=0.8,
+                    top_k=20,
+                    min_p=0.0,
+                    presence_penalty=1.5,
+                    repetition_penalty=1.0,
+                ),
+            ),
+        )
+        for path, payload, expected in cases:
+            with self.subTest(path=path):
+                status, body = self.request(path, payload)
+                self.assertEqual(status, 200, body)
+                self.assertEqual(self.runtime.last_options, expected)
+
+    def test_qwen_request_sampling_fields_override_mode_defaults(self):
+        status, body = self.request(
+            "/v1/chat/completions",
+            {
+                "model": "qwen3.8-flash-next-fp8",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "thinking_mode": "thinking",
+                "temperature": 0,
+                "top_p": 0.6,
+                "top_k": 7,
+                "min_p": 0.4,
+                "presence_penalty": 0,
+                "repetition_penalty": 1.2,
+            },
+        )
+        self.assertEqual(status, 200, body)
+        self.assertEqual(
+            self.runtime.last_options,
+            GenerationOptions(
+                max_tokens=262_144,
+                temperature=0,
+                top_p=0.6,
+                top_k=7,
+                min_p=0.0,
+                presence_penalty=0.0,
+                repetition_penalty=1.0,
+            ),
+        )
+
+    def test_qwen_request_rejects_nonzero_presence_penalty(self):
+        status, body = self.request(
+            "/v1/chat/completions",
+            {
+                "model": "qwen3.8-flash-next-fp8",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "presence_penalty": 1.5,
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["param"], "presence_penalty")
+
 
 class ServerArgumentTests(unittest.TestCase):
+    def test_model_and_catalog_are_optional_and_mutually_exclusive(self):
+        arguments = _parser().parse_args([])
+        self.assertIsNone(arguments.model)
+        self.assertIsNone(arguments.model_catalog)
+        with self.assertRaises(SystemExit):
+            _parser().parse_args(
+                ["--model", "/tmp/model", "--model-catalog", "/tmp/catalog.json"]
+            )
+
     def test_power_saving_limit_uses_fixed_values(self):
         self.assertIsNone(
             _parser().parse_args(["--model", "/tmp/model"]).power_saving_limit_gbps
@@ -175,9 +394,11 @@ class ServerTests(unittest.TestCase):
 
     def test_generation_defaults_match_app_defaults(self):
         options = _options({}, ServerDefaults())
-        self.assertEqual(options.max_tokens, 272_000)
-        self.assertEqual(options.temperature, 0.2)
-        self.assertEqual(options.top_p, 0.98)
+        self.assertEqual(options, GenerationOptions())
+        self.assertEqual(
+            _options({}, ServerDefaults(), thinking_mode="thinking"),
+            GenerationOptions(),
+        )
 
     def test_generation_token_limit_is_272000(self):
         self.assertEqual(_options({"max_tokens": 272_000}, ServerDefaults()).max_tokens, 272_000)
@@ -186,9 +407,24 @@ class ServerTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.runtime = FakeRuntime()
+        cls.model_manager = ModelManager(
+            [
+                ModelSpec(
+                    id="deepseek-v4-flash-0731",
+                    alias="work-model",
+                    path="/tmp/model",
+                    model_kind="deepseek-v4",
+                    runtime=RuntimeConfig(),
+                    defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
+                )
+            ],
+            runtime_loader=lambda _: cls.runtime,
+            clear_cache=lambda: None,
+        )
         cls.server = OpenAIServer(
             ("127.0.0.1", 0),
-            FakeRuntime(),
+            cls.model_manager,
             api_key="secret",
         )
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -200,6 +436,7 @@ class ServerTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join()
+        cls.model_manager.close()
 
     def request(self, path, *, method="GET", body=None, authenticated=True):
         headers = {}
@@ -226,7 +463,92 @@ class ServerTests(unittest.TestCase):
 
         status, _, body = self.request("/v1/models")
         self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body)["data"][0]["id"], "deepseek-v4-flash-0731")
+        models = json.loads(body)["data"]
+        self.assertEqual(
+            [model["id"] for model in models],
+            ["deepseek-v4-flash-0731", "work-model"],
+        )
+        self.assertEqual(models[0]["owned_by"], models[1]["owned_by"])
+
+    def test_generation_responses_preserve_the_requested_alias(self):
+        chat_status, _, chat_body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "work-model",
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+        )
+        completion_status, _, completion_body = self.request(
+            "/v1/completions",
+            method="POST",
+            body={"model": "work-model", "prompt": "Hi"},
+        )
+        response_status, _, response_body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={"model": "work-model", "input": "Hi"},
+        )
+        self.assertEqual((chat_status, completion_status, response_status), (200, 200, 200))
+        self.assertEqual(json.loads(chat_body)["model"], "work-model")
+        self.assertEqual(json.loads(completion_body)["model"], "work-model")
+        self.assertEqual(json.loads(response_body)["model"], "work-model")
+
+    def test_streaming_events_preserve_the_requested_alias(self):
+        requests = (
+            (
+                "/v1/chat/completions",
+                {
+                    "model": "work-model",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                    "stream": True,
+                },
+            ),
+            (
+                "/v1/completions",
+                {"model": "work-model", "prompt": "Hi", "stream": True},
+            ),
+        )
+        for path, payload in requests:
+            with self.subTest(path=path):
+                status, _, body = self.request(path, method="POST", body=payload)
+                events = [
+                    json.loads(line[6:])
+                    for line in body.decode().splitlines()
+                    if line.startswith("data: {")
+                ]
+                self.assertEqual(status, 200)
+                self.assertTrue(events)
+                self.assertTrue(all(event["model"] == "work-model" for event in events))
+
+        status, _, body = self.request(
+            "/v1/responses",
+            method="POST",
+            body={"model": "work-model", "input": "Hi", "stream": True},
+        )
+        events = [
+            json.loads(line[6:])
+            for line in body.decode().splitlines()
+            if line.startswith("data: {")
+        ]
+        self.assertEqual(status, 200)
+        response_events = [event["response"] for event in events if "response" in event]
+        self.assertTrue(response_events)
+        self.assertTrue(
+            all(response["model"] == "work-model" for response in response_events)
+        )
+
+    def test_unknown_model_uses_model_not_found(self):
+        status, _, body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "unknown",
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["code"], "model_not_found")
 
     def test_chat_completion_and_reasoning(self):
         status, _, body = self.request(
@@ -257,8 +579,8 @@ class ServerTests(unittest.TestCase):
         response = json.loads(body)
         self.assertEqual(status, 200)
         self.assertEqual(response["choices"][0]["message"]["reasoning_content"], "plan")
-        self.assertEqual(self.server.runtime.last_thinking_mode, "thinking")
-        self.assertEqual(self.server.runtime.last_reasoning_effort, "high")
+        self.assertEqual(self.runtime.last_thinking_mode, "thinking")
+        self.assertEqual(self.runtime.last_reasoning_effort, "high")
 
     def test_chat_rejects_final_assistant_history(self):
         status, _, body = self.request(
@@ -298,7 +620,7 @@ class ServerTests(unittest.TestCase):
         self.assertTrue(text.endswith("data: [DONE]\n\n"))
 
     def test_chat_returns_tool_calls_and_accepts_tool_results(self):
-        runtime = self.server.runtime
+        runtime = self.runtime
         runtime.response_chunks = ["raw", " tool", " output"]
         runtime.parsed_turn = AssistantTurn(
             "",
@@ -356,7 +678,7 @@ class ServerTests(unittest.TestCase):
             runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
     def test_streaming_tool_call_handles_fragments_and_parse_errors(self):
-        runtime = self.server.runtime
+        runtime = self.runtime
         raw = (
             '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n'
             '<｜DSML｜parameter name="city" string="true">Taipei'
@@ -422,7 +744,7 @@ class ServerTests(unittest.TestCase):
             runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
     def test_streaming_tool_call_emits_before_generation_finishes(self):
-        runtime = self.server.runtime
+        runtime = self.runtime
         runtime.response_chunks = [
             '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n',
             '<｜DSML｜parameter name="city" string="true">Taipei'
@@ -537,7 +859,7 @@ class ServerTests(unittest.TestCase):
         )
         self.assertEqual(status, 200, body)
         self.assertEqual(
-            self.server.runtime.last_messages[-1],
+            self.runtime.last_messages[-1],
             {"role": "assistant", "content": "I am checking it."},
         )
 
@@ -563,9 +885,9 @@ class ServerTests(unittest.TestCase):
                     },
                 )
                 self.assertEqual(status, 200, body)
-                self.assertEqual(self.server.runtime.last_thinking_mode, thinking_mode)
+                self.assertEqual(self.runtime.last_thinking_mode, thinking_mode)
                 self.assertEqual(
-                    self.server.runtime.last_reasoning_effort,
+                    self.runtime.last_reasoning_effort,
                     native_effort,
                 )
 
@@ -610,7 +932,7 @@ class ServerTests(unittest.TestCase):
             "Hello",
         )
 
-        runtime = self.server.runtime
+        runtime = self.runtime
         raw = (
             '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="get_weather">\n'
             '<｜DSML｜parameter name="city" string="true">Taipei'
@@ -681,8 +1003,46 @@ class ServerTests(unittest.TestCase):
             runtime.response_chunks = None
             runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
+    def test_responses_tool_error_ends_for_codex(self):
+        runtime = self.runtime
+        runtime.response_chunks = ["I am checking the project."]
+        runtime.parse_error = True
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "Review the project.",
+                    "tools": [{"type": "function", **self.tool["function"]}],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200)
+            self.assertEqual(events[-2]["type"], "error")
+            self.assertEqual(events[-1]["type"], "response.completed")
+            failed = events[-1]["response"]
+            self.assertEqual(failed["status"], "failed")
+            self.assertEqual(failed["error"]["code"], "invalid_tool_call")
+            self.assertIn(
+                "Whallm could not complete the request",
+                "".join(
+                    event["delta"]
+                    for event in events
+                    if event["type"] == "response.output_text.delta"
+                ),
+            )
+        finally:
+            runtime.response_chunks = None
+            runtime.parse_error = False
+
     def test_responses_accepts_codex_namespace_tools(self):
-        runtime = self.server.runtime
+        runtime = self.runtime
         runtime.response_chunks = [
             '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="multi_agent_v1__spawn_agent">\n',
             '<｜DSML｜parameter name="task" string="true">inspect'
@@ -773,9 +1133,17 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(performance["active_parameters_cache"]["hit_rate"], 0.75)
         self.assertEqual(performance["active_parameters_cache"]["resident_slots"], 3)
 
+    def test_status_poll_does_not_write_access_log(self):
+        output = StringIO()
+        with redirect_stderr(output):
+            status, _, _ = self.request("/api/status")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(output.getvalue(), "")
+
     def test_status_responds_while_generation_is_busy(self):
         gate = threading.Event()
-        runtime = self.server.runtime
+        runtime = self.runtime
         runtime.generation_gate = gate
         runtime.generation_entered.clear()
         request_thread = threading.Thread(
@@ -805,8 +1173,12 @@ class ServerTests(unittest.TestCase):
             method="PUT",
             body={"max_tokens": 12, "temperature": 0.5, "top_p": 0.9},
         )
-        self.assertEqual(status, 200)
-        self.assertEqual(json.loads(body)["max_tokens"], 12)
+        self.assertEqual(status, 404)
+        self.assertEqual(json.loads(body)["error"]["code"], "not_found")
+
+        status, _, body = self.request("/api/settings")
+        self.assertEqual(status, 404)
+        self.assertEqual(json.loads(body)["error"]["code"], "not_found")
 
         status, _, body = self.request(
             "/v1/chat/completions",
@@ -839,6 +1211,182 @@ class ServerTests(unittest.TestCase):
             json.loads(body),
             {"name": "Whallm", "status": "ok", "api_base": "/v1"},
         )
+
+
+class EmptyCatalogServerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.manager = ModelManager([], clear_cache=lambda: None)
+        cls.server = OpenAIServer(("127.0.0.1", 0), cls.manager)
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        cls.base = f"http://127.0.0.1:{cls.server.server_port}"
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join()
+        cls.manager.close()
+
+    def request(self, path, *, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        request = Request(
+            self.base + path,
+            data=data,
+            headers={"Content-Type": "application/json"} if data else {},
+            method="POST" if data else "GET",
+        )
+        try:
+            with urlopen(request) as response:
+                return response.status, response.read()
+        except HTTPError as error:
+            try:
+                return error.code, error.read()
+            finally:
+                error.close()
+
+    def test_empty_catalog_starts_with_empty_models_and_zero_status(self):
+        status, body = self.request("/v1/models")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["data"], [])
+
+        status, body = self.request("/api/status")
+        payload = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertIsNone(payload["loaded_model"])
+        self.assertIsNone(payload["loading_model"])
+        self.assertIsNone(payload["model"])
+        self.assertIsNone(payload["runtime"])
+        self.assertEqual(payload["performance"]["generation_tokens"], 0)
+
+    def test_model_load_failure_returns_500_and_allows_retry(self):
+        attempts = 0
+
+        def fail(_):
+            nonlocal attempts
+            attempts += 1
+            raise RuntimeError("load failed")
+
+        manager = ModelManager(
+            [
+                ModelSpec(
+                    id="deepseek-v4-flash-0731",
+                    alias=None,
+                    path="/tmp/missing",
+                    model_kind="deepseek-v4",
+                    runtime=RuntimeConfig(),
+                    defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
+                )
+            ],
+            runtime_loader=fail,
+            clear_cache=lambda: None,
+        )
+        server = OpenAIServer(("127.0.0.1", 0), manager)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base = f"http://127.0.0.1:{server.server_port}"
+        body = json.dumps(
+            {
+                "model": "deepseek-v4-flash-0731",
+                "messages": [{"role": "user", "content": "Hi"}],
+            }
+        ).encode()
+        try:
+            for _ in range(2):
+                request = Request(
+                    base + "/v1/chat/completions",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with self.assertRaises(HTTPError) as caught:
+                    urlopen(request)
+                error = caught.exception
+                try:
+                    self.assertEqual(error.code, 500)
+                    self.assertEqual(
+                        json.loads(error.read())["error"]["code"],
+                        "model_load_failed",
+                    )
+                finally:
+                    error.close()
+            self.assertEqual(attempts, 2)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+            manager.close()
+
+    def test_health_and_status_respond_while_a_model_is_loading(self):
+        entered = threading.Event()
+        release = threading.Event()
+        request_errors = []
+
+        def load(_):
+            entered.set()
+            release.wait(timeout=2)
+            return FakeRuntime()
+
+        manager = ModelManager(
+            [
+                ModelSpec(
+                    id="deepseek-v4-flash-0731",
+                    alias=None,
+                    path="/tmp/model",
+                    model_kind="deepseek-v4",
+                    runtime=RuntimeConfig(),
+                    defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
+                )
+            ],
+            runtime_loader=load,
+            clear_cache=lambda: None,
+        )
+        server = OpenAIServer(("127.0.0.1", 0), manager)
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        base = f"http://127.0.0.1:{server.server_port}"
+        body = json.dumps(
+            {
+                "model": "deepseek-v4-flash-0731",
+                "messages": [{"role": "user", "content": "Hi"}],
+            }
+        ).encode()
+
+        def generate():
+            try:
+                request = Request(
+                    base + "/v1/chat/completions",
+                    data=body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urlopen(request, timeout=2) as response:
+                    response.read()
+            except Exception as error:
+                request_errors.append(error)
+
+        generation_thread = threading.Thread(target=generate)
+        generation_thread.start()
+        try:
+            self.assertTrue(entered.wait(timeout=1))
+            with urlopen(base + "/healthz", timeout=1) as response:
+                self.assertEqual(json.loads(response.read()), {"status": "ok"})
+            with urlopen(base + "/api/status", timeout=1) as response:
+                status = json.loads(response.read())
+            self.assertIsNone(status["loaded_model"])
+            self.assertEqual(
+                status["loading_model"], "deepseek-v4-flash-0731"
+            )
+        finally:
+            release.set()
+            generation_thread.join(timeout=2)
+            server.shutdown()
+            server.server_close()
+            server_thread.join()
+            manager.close()
+        self.assertFalse(generation_thread.is_alive())
+        self.assertEqual(request_errors, [])
 
 
 if __name__ == "__main__":

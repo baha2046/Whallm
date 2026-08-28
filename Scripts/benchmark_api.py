@@ -15,7 +15,6 @@ import sys
 import tempfile
 import threading
 import time
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, TextIO
@@ -24,12 +23,19 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
-DEFAULT_INPUT_TOKENS = (1_024, 4_096, 16_384, 32_768)
+DEFAULT_INPUT_TOKENS = (1_024, 2_048, 8_192, 16_384, 32_768)
+SPEED_BENCH_SUBSETS = {
+    1_024: "throughput_1k",
+    2_048: "throughput_2k",
+    8_192: "throughput_8k",
+    16_384: "throughput_16k",
+    32_768: "throughput_32k",
+}
 GIB = 1024**3
 APP_PREFERENCES_DOMAIN = "com.deepseekv4ssd.app"
 DEFAULT_PUBLIC_MODELS = {
     "deepseek-v4": "deepseek-v4-flash-0731",
-    "qwen3.8-flash-next": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "qwen3.8-flash-next": "qwen3.8-flash-next-fp8",
 }
 
 
@@ -313,7 +319,7 @@ def launch_configuration(
                 f"'{public_model}'."
             )
         public_model = requested_model
-    configuration = (
+    configuration = dict(
         saved
         if uses_saved_settings
         else saved_advanced_configuration(
@@ -321,6 +327,8 @@ def launch_configuration(
             manifest.get("modelKind") or "deepseek-v4",
         )
     )
+    if "powerSavingLimitGBps" in saved:
+        configuration["powerSavingLimitGBps"] = saved["powerSavingLimitGBps"]
     return model_path, public_model, configuration
 
 
@@ -466,25 +474,127 @@ def token_sha256(tokens: list[int]) -> str:
 
 def build_exact_prompt(
     tokenizer: Any,
+    message: dict[str, Any],
     target_tokens: int,
-    marker: str,
 ) -> tuple[str, list[int]]:
-    source = f"API benchmark {marker}." + (" test" * (target_tokens + 128))
-    source_tokens = list(tokenizer.encode(source, add_special_tokens=False))
-    body_tokens = target_tokens
+    content_tokens = list(
+        tokenizer.encode(message["content"], add_special_tokens=False)
+    )
+    prompt = tokenizer.apply_chat_template(
+        [message],
+        add_generation_prompt=True,
+        tokenize=False,
+    )
+    if not isinstance(prompt, str):
+        raise TypeError("The chat template did not return text")
+    prompt_tokens = encode_prompt(tokenizer, prompt)
+    if len(prompt_tokens) < target_tokens:
+        raise BenchmarkError(
+            f"SPEED-Bench prompt has {len(prompt_tokens)} tokens; "
+            f"{target_tokens} are required"
+        )
+    body_tokens = len(content_tokens) - (len(prompt_tokens) - target_tokens)
     for _ in range(12):
-        prompt = tokenizer.decode(
-            source_tokens[:body_tokens],
+        if body_tokens < 0 or body_tokens > len(content_tokens):
+            break
+        content = tokenizer.decode(
+            content_tokens[:body_tokens],
             skip_special_tokens=False,
             clean_up_tokenization_spaces=False,
         )
+        candidate = {**message, "content": content}
+        prompt = tokenizer.apply_chat_template(
+            [candidate],
+            add_generation_prompt=True,
+            tokenize=False,
+        )
+        if not isinstance(prompt, str):
+            raise TypeError("The chat template did not return text")
         tokens = encode_prompt(tokenizer, prompt)
         if len(tokens) == target_tokens:
             return prompt, tokens
         body_tokens += target_tokens - len(tokens)
-        if body_tokens < 1 or body_tokens > len(source_tokens):
-            break
     raise BenchmarkError(f"Unable to construct a {target_tokens}-token prompt")
+
+
+def speed_bench_file(directory: Path, target_tokens: int) -> Path:
+    subset = SPEED_BENCH_SUBSETS.get(target_tokens)
+    if subset is None:
+        supported = ", ".join(input_label(value) for value in SPEED_BENCH_SUBSETS)
+        raise BenchmarkError(
+            f"SPEED-Bench does not provide a {input_label(target_tokens)} "
+            f"throughput subset. Use one of: {supported}"
+        )
+    path = directory / f"{subset}.jsonl"
+    if not path.is_file():
+        raise BenchmarkError(
+            f"Missing SPEED-Bench file: {path}. Prepare the official throughput "
+            "subsets and use --speed-bench-dir DIRECTORY."
+        )
+    return path
+
+
+def load_speed_bench_samples(
+    directory: Path,
+    tokenizer: Any,
+    target_tokens: int,
+    count: int,
+) -> tuple[Path, list[dict[str, Any]]]:
+    path = speed_bench_file(directory, target_tokens)
+    samples = []
+    try:
+        lines = path.open(encoding="utf-8")
+    except OSError as error:
+        raise BenchmarkError(f"Unable to read SPEED-Bench file: {path}") from error
+    with lines:
+        for line_number, line in enumerate(lines, 1):
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise BenchmarkError(
+                    f"Invalid SPEED-Bench JSON at {path}:{line_number}"
+                ) from error
+            if not isinstance(row, dict) or row.get("category") != "mixed":
+                continue
+            messages = row.get("messages")
+            if (
+                not isinstance(messages, list)
+                or not messages
+                or not isinstance(messages[0], dict)
+                or not isinstance(messages[0].get("content"), str)
+            ):
+                raise BenchmarkError(
+                    f"Invalid SPEED-Bench messages at {path}:{line_number}"
+                )
+            try:
+                prompt, tokens = build_exact_prompt(
+                    tokenizer,
+                    messages[0],
+                    target_tokens,
+                )
+            except BenchmarkError:
+                continue
+            except Exception as error:
+                raise BenchmarkError(
+                    f"Unable to apply the chat template to {path}:{line_number}: "
+                    f"{error}"
+                ) from error
+            samples.append(
+                {
+                    "prompt": prompt,
+                    "tokens": tokens,
+                    "question_id": row.get("question_id"),
+                    "sub_category": row.get("sub_category"),
+                    "source": row.get("source"),
+                    "src_id": row.get("src_id"),
+                }
+            )
+            if len(samples) == count:
+                return path, samples
+    raise BenchmarkError(
+        f"SPEED-Bench file {path} contains only {len(samples)} usable mixed "
+        f"prompts; {count} are required"
+    )
 
 
 def load_tokenizer(model_path: str) -> Any:
@@ -662,6 +772,7 @@ def summarize(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         group = [run for run in runs if run["target_input_tokens"] == target]
         metrics = {}
         for key in (
+            "wall_seconds",
             "ttft_seconds",
             "prefill_tokens_per_second",
             "decode_tokens_per_second",
@@ -688,9 +799,15 @@ def input_label(tokens: int) -> str:
 
 def render_ascii_table(summaries: list[dict[str, Any]]) -> str:
     headers = (
-        "Input",
         "Actual",
-        "Stat",
+        "P95",
+        "Total time (s)",
+        "TTFT (s)",
+        "Prefill tok/s",
+        "Decode tok/s",
+        "Memory (GiB)",
+        "Maximum",
+        "Total time (s)",
         "TTFT (s)",
         "Prefill tok/s",
         "Decode tok/s",
@@ -702,18 +819,23 @@ def render_ascii_table(summaries: list[dict[str, Any]]) -> str:
         maximum = summary["actual_input_tokens_max"]
         actual = f"{minimum:,}" if minimum == maximum else f"{minimum:,}-{maximum:,}"
         metrics = summary["metrics"]
-        for statistic in ("peak", "p95"):
-            rows.append(
-                (
-                    input_label(summary["target_input_tokens"]),
-                    actual,
-                    "Peak" if statistic == "peak" else "P95",
-                    f"{metrics['ttft_seconds'][statistic]:.2f}",
-                    f"{metrics['prefill_tokens_per_second'][statistic]:.1f}",
-                    f"{metrics['decode_tokens_per_second'][statistic]:.1f}",
-                    f"{metrics['peak_active_memory_bytes'][statistic] / GIB:.2f}",
-                )
+        rows.append(
+            (
+                actual,
+                "",
+                f"{metrics['wall_seconds']['p95']:.2f}",
+                f"{metrics['ttft_seconds']['p95']:.2f}",
+                f"{metrics['prefill_tokens_per_second']['p95']:.1f}",
+                f"{metrics['decode_tokens_per_second']['p95']:.1f}",
+                f"{metrics['peak_active_memory_bytes']['p95'] / GIB:.2f}",
+                "",
+                f"{metrics['wall_seconds']['peak']:.2f}",
+                f"{metrics['ttft_seconds']['peak']:.2f}",
+                f"{metrics['prefill_tokens_per_second']['peak']:.1f}",
+                f"{metrics['decode_tokens_per_second']['peak']:.1f}",
+                f"{metrics['peak_active_memory_bytes']['peak'] / GIB:.2f}",
             )
+        )
     widths = [
         max(len(headers[index]), *(len(row[index]) for row in rows))
         for index in range(len(headers))
@@ -826,7 +948,17 @@ def parse_arguments() -> argparse.Namespace:
         type=parse_token_count,
         default=list(DEFAULT_INPUT_TOKENS),
         metavar="TOKENS",
-        help="Input sizes (default: 1K 4K 16K 32K)",
+        help="Input sizes (default: 1K 2K 8K 16K 32K)",
+    )
+    parser.add_argument(
+        "--speed-bench-dir",
+        type=Path,
+        default=(
+            Path(os.environ["SPEED_BENCH_DIR"])
+            if os.environ.get("SPEED_BENCH_DIR")
+            else None
+        ),
+        help="Directory containing prepared SPEED-Bench JSONL files",
     )
     parser.add_argument(
         "--runs",
@@ -908,12 +1040,28 @@ def run_connected_benchmark(
                 f"'{expected_path}'. Stop the current Server and try again."
             )
     tokenizer = load_tokenizer(model_path)
+    if arguments.speed_bench_dir is None:
+        raise BenchmarkError(
+            "Use --speed-bench-dir DIRECTORY or set SPEED_BENCH_DIR."
+        )
+    speed_bench_dir = arguments.speed_bench_dir.expanduser().resolve()
+    speed_bench_samples = {}
+    dataset_files = {}
+    for target_tokens in arguments.sizes:
+        path, samples = load_speed_bench_samples(
+            speed_bench_dir,
+            tokenizer,
+            target_tokens,
+            arguments.runs,
+        )
+        speed_bench_samples[target_tokens] = samples
+        with path.open("rb") as source:
+            dataset_files[path.name] = hashlib.file_digest(source, "sha256").hexdigest()
     output_path = (
         arguments.output.expanduser().resolve()
         if arguments.output
         else default_output_path(project_root, model)
     )
-    session_id = uuid.uuid4().hex
     artifact: dict[str, Any] = {
         "schema_version": 1,
         "evidence_kind": "exploratory API benchmark",
@@ -936,8 +1084,15 @@ def run_connected_benchmark(
             "temperature": 0,
             "top_p": 1,
             "poll_interval_seconds": arguments.poll_interval,
-            "prompt": "unique prefix followed by repeated ' test' tokens",
-            "prompt_cache_state": "fresh unique input; prompt cache not cleared",
+            "dataset": "nvidia/SPEED-Bench",
+            "dataset_category": "mixed",
+            "dataset_directory": str(speed_bench_dir),
+            "dataset_file_sha256": dataset_files,
+            "prompt": (
+                "first user message shortened before the installed model chat "
+                "template is applied; exact total input token count"
+            ),
+            "prompt_cache_state": "different input per run; prompt cache not cleared",
             "filesystem_cache_state": "not purged",
             "memory_metric": (
                 "maximum performance.active_memory_bytes observed during each request"
@@ -960,19 +1115,16 @@ def run_connected_benchmark(
     print(f"Requests: {total_requests}; output limit: {arguments.max_output_tokens} tokens")
     print(f"Result file: {output_path}")
     if arguments.runs < 20:
-        print("Note: nearest-rank P95 equals Peak when fewer than 20 runs are used.")
+        print("Note: nearest-rank P95 equals Maximum when fewer than 20 runs are used.")
 
     request_index = 0
     try:
         for target_tokens in arguments.sizes:
             for run_index in range(1, arguments.runs + 1):
                 request_index += 1
-                marker = f"{session_id}-{target_tokens}-{run_index}"
-                prompt, prompt_tokens = build_exact_prompt(
-                    tokenizer,
-                    target_tokens,
-                    marker,
-                )
+                sample = speed_bench_samples[target_tokens][run_index - 1]
+                prompt = sample["prompt"]
+                prompt_tokens = sample["tokens"]
                 print(
                     f"[{request_index}/{total_requests}] "
                     f"{input_label(target_tokens)} run {run_index}/{arguments.runs}...",
@@ -998,6 +1150,10 @@ def run_connected_benchmark(
                     {
                         "target_input_tokens": target_tokens,
                         "run": run_index,
+                        "speed_bench_question_id": sample["question_id"],
+                        "speed_bench_sub_category": sample["sub_category"],
+                        "speed_bench_source": sample["source"],
+                        "speed_bench_source_id": sample["src_id"],
                         "prompt_text_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
                         "prompt_token_sha256": token_sha256(prompt_tokens),
                         "output_text_sha256": hashlib.sha256(
@@ -1010,6 +1166,7 @@ def run_connected_benchmark(
                 save_artifact(output_path, artifact)
                 print(
                     "  "
+                    f"Total time {result['wall_seconds']:.2f}s; "
                     f"TTFT {result['ttft_seconds']:.2f}s; "
                     f"Prefill {result['prefill_tokens_per_second']:.1f} tok/s; "
                     f"Decode {result['decode_tokens_per_second']:.1f} tok/s; "

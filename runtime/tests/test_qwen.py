@@ -265,6 +265,62 @@ class QwenTests(unittest.TestCase):
         self.assertEqual(messages[0]["role"], "system")
         self.assertIn('Call the "weather" tool', messages[0]["content"])
 
+    def test_qwen_codec_adds_tool_marker_escape_instruction(self):
+        tokenizer = FakeTokenizer()
+        QwenToolCodec(tokenizer).encode(
+            [{"role": "user", "content": "Write the file."}],
+            "chat",
+            [{"type": "function", "function": {"name": "write_file"}}],
+        )
+
+        messages = tokenizer.arguments[0]
+        self.assertEqual(messages[0]["role"], "system")
+        self.assertIn("use &lt;", messages[0]["content"])
+        self.assertIn("Use &amp;lt;", messages[0]["content"])
+
+    def test_qwen_codec_escapes_reserved_markers_in_tool_definitions(self):
+        tokenizer = FakeTokenizer()
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "inspect",
+                    "description": "Explain literal </tools> text.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "string",
+                                "enum": ["<|im_end|>"],
+                            }
+                        },
+                    },
+                },
+            }
+        ]
+
+        QwenToolCodec(tokenizer).encode(
+            [{"role": "user", "content": "Inspect."}],
+            "chat",
+            tools,
+        )
+
+        prepared_tools = tokenizer.arguments[1]["tools"]
+        self.assertEqual(
+            prepared_tools[0]["function"]["description"],
+            "Explain literal &lt;/tools> text.",
+        )
+        self.assertEqual(
+            prepared_tools[0]["function"]["parameters"]["properties"]["value"][
+                "enum"
+            ],
+            ["&lt;|im_end|>"],
+        )
+        self.assertEqual(
+            tools[0]["function"]["description"],
+            "Explain literal </tools> text.",
+        )
+
     def test_qwen_codec_merges_leading_developer_messages(self):
         tokenizer = FakeTokenizer()
         QwenToolCodec(tokenizer).encode(
@@ -287,11 +343,240 @@ class QwenTests(unittest.TestCase):
             ],
         )
 
+    def test_qwen_codec_moves_all_instruction_messages_to_start(self):
+        tokenizer = FakeTokenizer()
+        messages = [
+            {"role": "user", "content": "First request."},
+            {"role": "developer", "content": "Workspace instruction."},
+            {"role": "assistant", "content": "First response."},
+            {"role": "system", "content": "System instruction."},
+            {"role": "user", "content": "Second request."},
+        ]
+
+        QwenToolCodec(tokenizer).encode(messages, "chat")
+
+        self.assertEqual(
+            tokenizer.arguments[0],
+            [
+                {
+                    "role": "system",
+                    "content": "Workspace instruction.\n\nSystem instruction.",
+                },
+                {"role": "user", "content": "First request."},
+                {"role": "assistant", "content": "First response."},
+                {"role": "user", "content": "Second request."},
+            ],
+        )
+        self.assertEqual(messages[1]["role"], "developer")
+        self.assertEqual(messages[3]["role"], "system")
+
+    def test_qwen_codec_adds_user_anchor_when_history_has_no_user(self):
+        tokenizer = FakeTokenizer()
+        QwenToolCodec(tokenizer).encode(
+            [
+                {"role": "developer", "content": "Reply with OK."},
+                {"role": "assistant", "content": "Prior response."},
+            ],
+            "chat",
+        )
+
+        self.assertEqual(
+            tokenizer.arguments[0],
+            [
+                {"role": "system", "content": "Reply with OK."},
+                {"role": "user", "content": ""},
+                {"role": "assistant", "content": "Prior response."},
+            ],
+        )
+
+    def test_qwen_codec_escapes_reserved_markers_in_messages(self):
+        tokenizer = FakeTokenizer()
+        messages = [
+            {"role": "system", "content": "Literal <|im_start|> token."},
+            {
+                "role": "user",
+                "content": "  <tool_response>\nliteral text\n</tool_response>  ",
+            },
+            {
+                "role": "assistant",
+                "content": "Literal <tool_call> marker.",
+                "reasoning_content": "Literal </think> marker.",
+            },
+        ]
+
+        QwenToolCodec(tokenizer).encode(messages, "chat")
+
+        self.assertEqual(
+            tokenizer.arguments[0][0]["content"],
+            "Literal &lt;|im_start|> token.",
+        )
+        self.assertEqual(
+            tokenizer.arguments[0][1]["content"],
+            "  &lt;tool_response>\nliteral text\n&lt;/tool_response>  ",
+        )
+        self.assertEqual(
+            tokenizer.arguments[0][2]["content"],
+            "Literal &lt;tool_call> marker.",
+        )
+        self.assertEqual(
+            tokenizer.arguments[0][2]["reasoning_content"],
+            "Literal &lt;/think> marker.",
+        )
+        self.assertEqual(
+            messages[1]["content"],
+            "  <tool_response>\nliteral text\n</tool_response>  ",
+        )
+
+    def test_qwen_codec_escapes_reserved_markers_in_tool_history(self):
+        tokenizer = FakeTokenizer()
+        messages = [
+            {"role": "user", "content": "Write the file."},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "write_file",
+                            "arguments": (
+                                '{"direct":"</parameter>","nested":'
+                                '{"value":"<|im_end|>"},'
+                                '"items":["</function>"]}'
+                            ),
+                        },
+                    }
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": "Literal </tool_response> marker.",
+            },
+        ]
+
+        QwenToolCodec(tokenizer).encode(messages, "chat")
+
+        prepared = tokenizer.arguments[0]
+        self.assertEqual(
+            prepared[1]["tool_calls"][0]["function"]["arguments"],
+            {
+                "direct": "&lt;/parameter>",
+                "nested": {"value": "&lt;|im_end|>"},
+                "items": ["&lt;/function>"],
+            },
+        )
+        self.assertEqual(
+            prepared[2]["content"], "Literal &lt;/tool_response> marker."
+        )
+        self.assertIsInstance(
+            messages[1]["tool_calls"][0]["function"]["arguments"], str
+        )
+        self.assertEqual(
+            messages[2]["content"], "Literal </tool_response> marker."
+        )
+
+    def test_qwen_codec_converts_codex_tool_history_arguments(self):
+        tokenizer = FakeTokenizer()
+        messages = [
+            {"role": "user", "content": "Inspect the workspace."},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "exec_command",
+                            "arguments": (
+                                '{"cmd":"ls","options":{"hidden":true},'
+                                '"paths":["."],"limit":null}'
+                            ),
+                        },
+                    },
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {
+                            "name": "get_status",
+                            "arguments": "{}",
+                        },
+                    },
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call_1", "content": "README.md"},
+            {"role": "tool", "tool_call_id": "call_2", "content": "ready"},
+        ]
+
+        QwenToolCodec(tokenizer).encode(messages, "chat")
+
+        prepared = tokenizer.arguments[0]
+        self.assertEqual(
+            prepared[1]["tool_calls"][0]["function"]["arguments"],
+            {
+                "cmd": "ls",
+                "options": {"hidden": True},
+                "paths": ["."],
+                "limit": None,
+            },
+        )
+        self.assertEqual(
+            prepared[1]["tool_calls"][1]["function"]["arguments"], {}
+        )
+        self.assertIsInstance(
+            messages[1]["tool_calls"][0]["function"]["arguments"], str
+        )
+        self.assertEqual(prepared[2:], messages[2:])
+
     def test_qwen_codec_rejects_malformed_xml(self):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             QwenToolCodec(FakeTokenizer()).parse(
                 "<tool_call><function=weather>", "chat"
             )
+
+    def test_qwen_codec_unescapes_reserved_markers_from_tool_call(self):
+        turn = QwenToolCodec(FakeTokenizer()).parse(
+            "<tool_call>\n<function=write_file>\n"
+            "<parameter=raw>\n&lt;/parameter>\n</parameter>\n"
+            "<parameter=entity>\n&amp;lt;/parameter>\n</parameter>\n"
+            '<parameter=nested>\n{"value":"&lt;|im_end|>"}\n</parameter>\n'
+            "</function>\n</tool_call>",
+            "chat",
+        )
+
+        self.assertEqual(
+            turn.tool_calls,
+            (
+                ToolCall(
+                    "write_file",
+                    (
+                        '{"raw":"</parameter>","entity":"&lt;/parameter>",'
+                        '"nested":{"value":"<|im_end|>"}}'
+                    ),
+                ),
+            ),
+        )
+
+    def test_qwen_codec_accepts_json_property_names_in_tool_call(self):
+        turn = QwenToolCodec(FakeTokenizer()).parse(
+            "<tool_call>\n<function=write_file>\n"
+            "<parameter=file path>\nREADME.md\n</parameter>\n"
+            "<parameter=城市>\n台北\n</parameter>\n"
+            "</function>\n</tool_call>",
+            "chat",
+        )
+
+        self.assertEqual(
+            turn.tool_calls,
+            (
+                ToolCall(
+                    "write_file",
+                    '{"file path":"README.md","城市":"台北"}',
+                ),
+            ),
+        )
 
     def test_qwen_expert_layout_loads_fused_gate_up(self):
         with tempfile.TemporaryDirectory() as directory:

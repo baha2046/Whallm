@@ -369,9 +369,84 @@ class ToolCodec:
 def _qwen_parameter_value(value: str) -> Any:
     value = value.strip()
     try:
-        return json.loads(value)
+        decoded = json.loads(value)
     except json.JSONDecodeError:
-        return value
+        decoded = value
+    return _unescape_qwen_value(decoded)
+
+
+_QWEN_RESERVED_MARKERS = (
+    "<|im_start|>",
+    "<|im_end|>",
+    "<|endoftext|>",
+    "<|audio_start|>",
+    "<|audio_end|>",
+    "<|audio_pad|>",
+    "<|image_pad|>",
+    "<|video_pad|>",
+    "<|vision_start|>",
+    "<|vision_end|>",
+    "<think>",
+    "</think>",
+    "<tools>",
+    "</tools>",
+    "<tool_call>",
+    "</tool_call>",
+    "<function=",
+    "</function>",
+    "<parameter=",
+    "</parameter>",
+    "<tool_response>",
+    "</tool_response>",
+)
+_QWEN_TOOL_ESCAPE_INSTRUCTION = (
+    "Inside tool parameter values, use &lt; instead of the opening angle bracket "
+    "of Qwen control markers. Use &amp;lt; when the intended value already contains "
+    "&lt;."
+)
+
+
+def _escape_qwen_text(text: str) -> str:
+    if not any(
+        marker in text or f"&lt;{marker[1:]}" in text
+        for marker in _QWEN_RESERVED_MARKERS
+    ):
+        return text
+    text = text.replace("&", "&amp;")
+    for marker in _QWEN_RESERVED_MARKERS:
+        text = text.replace(marker, f"&lt;{marker[1:]}")
+    return text
+
+
+def _escape_qwen_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return _escape_qwen_text(value)
+    if isinstance(value, list):
+        return [_escape_qwen_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _escape_qwen_value(item) for key, item in value.items()}
+    return value
+
+
+def _unescape_qwen_text(text: str) -> str:
+    if not any(
+        f"&lt;{marker[1:]}" in text or f"&amp;lt;{marker[1:]}" in text
+        for marker in _QWEN_RESERVED_MARKERS
+    ):
+        return text
+    for marker in _QWEN_RESERVED_MARKERS:
+        text = text.replace(f"&lt;{marker[1:]}", marker)
+    return text.replace("&amp;", "&")
+
+
+def _unescape_qwen_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return _unescape_qwen_text(value)
+    if isinstance(value, list):
+        return [_unescape_qwen_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _unescape_qwen_value(item) for key, item in value.items()}
+    return value
 
 
 def _parse_qwen_call(text: str) -> ToolCall:
@@ -386,7 +461,7 @@ def _parse_qwen_call(text: str) -> ToolCall:
     arguments: dict[str, Any] = {}
     position = 0
     pattern = re.compile(
-        r"\s*<parameter=([A-Za-z0-9_.-]{1,128})>\s*\n?(.*?)\n?\s*</parameter>",
+        r"\s*<parameter=([^<>\r\n]*)>\s*\n?(.*?)\n?\s*</parameter>",
         re.DOTALL,
     )
     while position < len(body):
@@ -451,18 +526,56 @@ class QwenToolCodec(ToolCodec):
         reasoning_effort: str = "low",
     ) -> str:
         prepared = copy.deepcopy(messages)
+        instruction_contents = []
+        conversation = []
         for message in prepared:
-            if message.get("role") == "developer":
-                message["role"] = "system"
-        if prepared and prepared[0].get("role") == "system":
-            while len(prepared) > 1 and prepared[1].get("role") == "system":
-                content = prepared.pop(1).get("content")
+            content = message.get("content")
+            if isinstance(content, str):
+                content = _escape_qwen_text(content)
+                message["content"] = content
+            reasoning = message.get("reasoning_content")
+            if isinstance(reasoning, str):
+                message["reasoning_content"] = _escape_qwen_text(reasoning)
+            if message.get("role") in {"system", "developer"}:
                 if content:
-                    prepared[0]["content"] = "\n\n".join(
-                        part for part in (prepared[0].get("content"), content) if part
-                    )
-        active_tools = [] if tool_choice.mode == "none" else list(tools or [])
-        instruction = self._choice_instruction(tool_choice) if active_tools else ""
+                    instruction_contents.append(content)
+                continue
+            for tool_call in message.get("tool_calls") or []:
+                function = tool_call.get("function", tool_call)
+                arguments = function.get("arguments")
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                    if not isinstance(arguments, dict):
+                        raise ValueError(
+                            "Qwen tool call arguments must contain a JSON object"
+                        )
+                if isinstance(arguments, dict):
+                    function["arguments"] = _escape_qwen_value(arguments)
+            conversation.append(message)
+        prepared = conversation
+        if instruction_contents:
+            prepared.insert(
+                0,
+                {"role": "system", "content": "\n\n".join(instruction_contents)},
+            )
+        if not any(message.get("role") == "user" for message in prepared):
+            index = 1 if prepared and prepared[0].get("role") == "system" else 0
+            prepared.insert(index, {"role": "user", "content": ""})
+        active_tools = (
+            []
+            if tool_choice.mode == "none"
+            else _escape_qwen_value(list(tools or []))
+        )
+        instruction = ""
+        if active_tools:
+            instruction = "\n\n".join(
+                part
+                for part in (
+                    self._choice_instruction(tool_choice),
+                    _QWEN_TOOL_ESCAPE_INSTRUCTION,
+                )
+                if part
+            )
         if instruction:
             system = next(
                 (message for message in prepared if message.get("role") == "system"),

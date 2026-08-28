@@ -14,14 +14,43 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Iterator
 from urllib.parse import urlsplit
 
-from .generation import GenerationOptions, GeneratedPiece, ModelRuntime, THINK_END
+from .generation import GenerationOptions, GeneratedPiece, THINK_END
 from .manifest import InstalledModel
+from .model_manager import (
+    MODEL_IDS,
+    ModelCatalogError,
+    ModelDefaults,
+    ModelLoadFailed,
+    ModelManager,
+    ModelNotFound,
+    ModelRequest,
+    load_model_catalog,
+    parse_model_catalog,
+    validate_runtime_config,
+)
 from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
 MAX_REQUEST_BYTES = 1_048_576
 MAX_GENERATION_TOKENS = 272_000
-PUBLIC_MODEL = "deepseek-v4-flash-0731"
+_QWEN_SAMPLING_DEFAULTS = {
+    "chat": {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "repetition_penalty": 1.0,
+    },
+    "thinking": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repetition_penalty": 1.0,
+    },
+}
 
 
 class APIError(Exception):
@@ -106,16 +135,12 @@ class OpenAIServer(ThreadingHTTPServer):
     def __init__(
         self,
         address: tuple[str, int],
-        runtime: ModelRuntime,
+        model_manager: ModelManager,
         *,
-        public_model: str = PUBLIC_MODEL,
         api_key: str | None = None,
-        defaults: ServerDefaults = ServerDefaults(),
     ):
-        self.runtime = runtime
-        self.public_model = public_model
+        self.model_manager = model_manager
         self.api_key = api_key
-        self.defaults = defaults
         self.metrics = GenerationMetrics()
         super().__init__(address, OpenAIHandler)
 
@@ -177,6 +202,27 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             action()
         except APIError as error:
             self._json(error.status, error.body())
+        except ModelNotFound as error:
+            self._json(
+                400,
+                APIError(
+                    f"The model '{error}' does not exist.",
+                    param="model",
+                    code="model_not_found",
+                ).body(),
+            )
+        except ModelLoadFailed as error:
+            sys.stderr.write(f"model load failed for {error.model}: {error.cause}\n")
+            self._json(
+                500,
+                APIError(
+                    f"Unable to load model '{error.model}'. Check the server log and try again.",
+                    status=500,
+                    param="model",
+                    code="model_load_failed",
+                    error_type="server_error",
+                ).body(),
+            )
         except (BrokenPipeError, ConnectionResetError):
             self.close_connection = True
         except Exception as error:
@@ -210,23 +256,13 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             self._json(200, {"status": "ok"})
         elif path == "/api/status":
             self._json(200, self._status())
-        elif path == "/api/settings":
-            self._authorize()
-            self._json(200, asdict(self.app.defaults))
         elif path == "/v1/models":
             self._authorize()
             self._json(
                 200,
                 {
                     "object": "list",
-                    "data": [
-                        {
-                            "id": self.app.public_model,
-                            "object": "model",
-                            "created": 0,
-                            "owned_by": self.app.runtime.model_id.split("/", 1)[0],
-                        }
-                    ],
+                    "data": self.app.model_manager.models(),
                 },
             )
         else:
@@ -237,47 +273,40 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         if path == "/v1/chat/completions":
             self._authorize()
             payload = self._request_json()
-            self._chat(payload)
+            with self.app.model_manager.request(payload.get("model")) as model:
+                self._chat(payload, model)
         elif path == "/v1/responses":
             self._authorize()
             payload = self._request_json()
-            self._responses(payload)
+            with self.app.model_manager.request(payload.get("model")) as model:
+                self._responses(payload, model)
         elif path == "/v1/completions":
             self._authorize()
             payload = self._request_json()
-            self._completion(payload)
+            with self.app.model_manager.request(payload.get("model")) as model:
+                self._completion(payload, model)
         else:
             raise APIError("Route not found.", status=404, code="not_found")
 
     def _put(self) -> None:
-        if urlsplit(self.path).path != "/api/settings":
-            raise APIError("Route not found.", status=404, code="not_found")
-        self._authorize()
-        payload = self._request_json()
-        unknown = set(payload).difference(
-            {"max_tokens", "temperature", "top_p", "top_k"}
-        )
-        if unknown:
-            name = sorted(unknown)[0]
-            raise APIError(f"Unknown setting: {name}.", param=name)
-        options = _options(payload, self.app.defaults)
-        self.app.defaults = ServerDefaults(
-            max_tokens=options.max_tokens,
-            temperature=options.temperature,
-            top_p=options.top_p,
-            top_k=options.top_k,
-        )
-        self._json(200, asdict(self.app.defaults))
+        raise APIError("Route not found.", status=404, code="not_found")
 
-    def _chat(self, payload: dict[str, Any]) -> None:
-        options, stream = self._common(payload)
+    def _chat(self, payload: dict[str, Any], model: ModelRequest) -> None:
+        runtime = model.runtime
         tools, tool_choice = _tool_request(payload)
         messages = _messages(payload.get("messages"))
+        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
-            qwen=getattr(getattr(self.app.runtime, "installed", None), "is_qwen", False),
+            qwen=qwen,
         )
-        prompt = self.app.runtime.encode_chat(
+        options, stream = self._common(
+            payload,
+            model.defaults,
+            qwen=qwen,
+            thinking_mode=thinking_mode,
+        )
+        prompt = runtime.encode_chat(
             messages,
             thinking_mode,
             tools,
@@ -285,7 +314,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             reasoning_effort,
         )
         request_id = "chatcmpl-" + uuid.uuid4().hex
-        pieces = self.app.track(self.app.runtime.stream(prompt, options))
+        pieces = self.app.track(runtime.stream(prompt, options))
         tool_calling = bool(tools) and tool_choice.mode != "none"
         if stream:
             stream_options = payload.get("stream_options") or {}
@@ -295,6 +324,8 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     request_id,
                     thinking_mode,
                     bool(stream_options.get("include_usage", False)),
+                    model.name,
+                    runtime,
                 )
                 return
             self._stream_chat(
@@ -302,13 +333,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 request_id,
                 thinking_mode == "thinking",
                 bool(stream_options.get("include_usage", False)),
+                model.name,
             )
             return
 
         if tool_calling:
             raw, prompt_tokens, generated, finish = _collect_raw(pieces)
             try:
-                turn = self.app.runtime.parse_chat(raw, thinking_mode)
+                turn = runtime.parse_chat(raw, thinking_mode)
             except Exception as error:
                 raise APIError(
                     "The model returned an invalid tool call.",
@@ -331,7 +363,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "id": request_id,
                     "object": "chat.completion",
                     "created": int(time.time()),
-                    "model": self.app.public_model,
+                    "model": model.name,
                     "choices": [
                         {
                             "index": 0,
@@ -357,7 +389,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "id": request_id,
                 "object": "chat.completion",
                 "created": int(time.time()),
-                "model": self.app.public_model,
+                "model": model.name,
                 "choices": [
                     {
                         "index": 0,
@@ -369,20 +401,27 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             },
         )
 
-    def _responses(self, payload: dict[str, Any]) -> None:
+    def _responses(self, payload: dict[str, Any], model: ModelRequest) -> None:
+        runtime = model.runtime
         request = dict(payload)
         if "max_output_tokens" in request:
             request["max_tokens"] = request["max_output_tokens"]
-        options, stream = self._common(request)
         messages = _response_messages(payload)
         tools, tool_choice, response_tools = _response_tool_request(payload)
+        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
             responses_api=True,
-            qwen=getattr(getattr(self.app.runtime, "installed", None), "is_qwen", False),
+            qwen=qwen,
+        )
+        options, stream = self._common(
+            request,
+            model.defaults,
+            qwen=qwen,
+            thinking_mode=thinking_mode,
         )
         _validate_response_request(payload)
-        prompt = self.app.runtime.encode_chat(
+        prompt = runtime.encode_chat(
             messages,
             thinking_mode,
             tools,
@@ -390,7 +429,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             reasoning_effort,
         )
         request_id = "resp_" + uuid.uuid4().hex
-        pieces = self.app.track(self.app.runtime.stream(prompt, options))
+        pieces = self.app.track(runtime.stream(prompt, options))
         tool_calling = bool(tools) and tool_choice.mode != "none"
         if stream:
             self._stream_response(
@@ -401,13 +440,15 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 thinking_mode,
                 tool_calling,
                 response_tools,
+                model.name,
+                runtime,
             )
             return
 
         if tool_calling:
             raw, prompt_tokens, generated, _ = _collect_raw(pieces)
             try:
-                turn = self.app.runtime.parse_chat(raw, thinking_mode)
+                turn = runtime.parse_chat(raw, thinking_mode)
             except Exception as error:
                 raise APIError(
                     "The model returned an invalid tool call.",
@@ -429,7 +470,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             output = _response_output(text, reasoning)
         response = _response_object(
             request_id,
-            self.app.public_model,
+            model.name,
             payload,
             options,
             output,
@@ -446,6 +487,8 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         thinking_mode: str,
         tool_calling: bool,
         response_tools: dict[str, dict[str, str]],
+        model_name: str,
+        runtime: Any,
     ) -> None:
         self._start_sse()
         output: list[dict[str, Any]] = []
@@ -615,9 +658,30 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     delta=delta.arguments,
                 )
 
+        def fail(message: str) -> None:
+            notice = f"Whallm could not complete the request: {message}"
+            if message_text:
+                notice = "\n\n" + notice
+            send_delta(ToolStreamDelta(content=notice))
+            finish_reasoning()
+            finish_message()
+            error = {"code": "invalid_tool_call", "message": message}
+            send("error", **error, param=None)
+            failed = _response_object(
+                request_id,
+                model_name,
+                payload,
+                options,
+                output,
+                _response_usage(prompt_tokens, generated),
+                status="failed",
+            )
+            failed["error"] = error
+            send("response.completed", response=failed)
+
         created = _response_object(
             request_id,
-            self.app.public_model,
+            model_name,
             payload,
             options,
             [],
@@ -627,7 +691,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         send("response.created", response=created)
         raw_parts: list[str] = []
         if tool_calling:
-            factory = getattr(self.app.runtime, "make_tool_stream_parser", None)
+            factory = getattr(runtime, "make_tool_stream_parser", None)
             parser = (
                 factory(thinking_mode)
                 if callable(factory)
@@ -642,22 +706,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             for delta in parser.finish():
                 send_delta(delta)
             try:
-                turn = self.app.runtime.parse_chat("".join(raw_parts), thinking_mode)
+                turn = runtime.parse_chat("".join(raw_parts), thinking_mode)
             except Exception:
-                send(
-                    "error",
-                    code="invalid_tool_call",
-                    message="The model returned an invalid tool call.",
-                    param=None,
-                )
+                fail("The model returned an invalid tool call.")
                 return
             if not parser.matches(turn.tool_calls):
-                send(
-                    "error",
-                    code="invalid_tool_call",
-                    message="The streamed tool call failed validation.",
-                    param=None,
-                )
+                fail("The streamed tool call failed validation.")
                 return
             for index, call in enumerate(turn.tool_calls):
                 if index not in calls:
@@ -692,7 +746,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             )
         completed = _response_object(
             request_id,
-            self.app.public_model,
+            model_name,
             payload,
             options,
             output,
@@ -700,8 +754,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         )
         send("response.completed", response=completed)
 
-    def _completion(self, payload: dict[str, Any]) -> None:
-        options, stream = self._common(payload)
+    def _completion(self, payload: dict[str, Any], model: ModelRequest) -> None:
+        runtime = model.runtime
+        options, stream = self._common(
+            payload,
+            model.defaults,
+            qwen=getattr(getattr(runtime, "installed", None), "is_qwen", False),
+            thinking_mode="chat",
+        )
         if payload.get("tools") not in (None, []):
             raise APIError("tools are only supported for chat completions.", param="tools")
         if payload.get("tool_choice") not in (None, "none"):
@@ -713,9 +773,9 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         if not isinstance(prompt, str):
             raise APIError("prompt must be a string.", param="prompt")
         request_id = "cmpl-" + uuid.uuid4().hex
-        pieces = self.app.track(self.app.runtime.stream(prompt, options))
+        pieces = self.app.track(runtime.stream(prompt, options))
         if stream:
-            self._stream_completion(pieces, request_id)
+            self._stream_completion(pieces, request_id, model.name)
             return
         text, _, prompt_tokens, generated, finish = _collect(pieces, False)
         self._json(
@@ -724,7 +784,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "id": request_id,
                 "object": "text_completion",
                 "created": int(time.time()),
-                "model": self.app.public_model,
+                "model": model.name,
                 "choices": [
                     {
                         "index": 0,
@@ -737,14 +797,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             },
         )
 
-    def _common(self, payload: dict[str, Any]) -> tuple[GenerationOptions, bool]:
-        model = payload.get("model")
-        if model != self.app.public_model:
-            raise APIError(
-                f"model must be '{self.app.public_model}'.",
-                param="model",
-                code="model_not_found",
-            )
+    def _common(
+        self,
+        payload: dict[str, Any],
+        defaults: ServerDefaults | ModelDefaults,
+        *,
+        qwen: bool = False,
+        thinking_mode: str = "chat",
+    ) -> tuple[GenerationOptions, bool]:
         unsupported = {
             "response_format": payload.get("response_format"),
             "stop": payload.get("stop"),
@@ -777,7 +837,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "stream_options.include_usage must be a boolean.",
                     param="stream_options.include_usage",
                 )
-        return _options(payload, self.app.defaults), stream
+        return _options(
+            payload,
+            defaults,
+            qwen=qwen,
+            thinking_mode=thinking_mode,
+        ), stream
 
     def _stream_chat(
         self,
@@ -785,6 +850,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         request_id: str,
         thinking: bool,
         include_usage: bool,
+        model_name: str,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -792,7 +858,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "id": request_id,
             "object": "chat.completion.chunk",
             "created": created,
-            "model": self.app.public_model,
+            "model": model_name,
         }
         self._sse({**base, "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]})
         parser = ReasoningParser(thinking)
@@ -823,6 +889,8 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         request_id: str,
         thinking_mode: str,
         include_usage: bool,
+        model_name: str,
+        runtime: Any,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -830,7 +898,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "id": request_id,
             "object": "chat.completion.chunk",
             "created": created,
-            "model": self.app.public_model,
+            "model": model_name,
         }
         self._sse(
             {
@@ -844,7 +912,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 ],
             }
         )
-        factory = getattr(self.app.runtime, "make_tool_stream_parser", None)
+        factory = getattr(runtime, "make_tool_stream_parser", None)
         parser = (
             factory(thinking_mode)
             if callable(factory)
@@ -894,7 +962,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
 
         raw = "".join(raw_parts)
         try:
-            turn = self.app.runtime.parse_chat(raw, thinking_mode)
+            turn = runtime.parse_chat(raw, thinking_mode)
         except Exception:
             self._sse(
                 {
@@ -961,6 +1029,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         self,
         pieces: Iterator[GeneratedPiece],
         request_id: str,
+        model_name: str,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -972,7 +1041,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "id": request_id,
                     "object": "text_completion",
                     "created": created,
-                    "model": self.app.public_model,
+                    "model": model_name,
                     "choices": [
                         {
                             "index": 0,
@@ -988,7 +1057,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "id": request_id,
                 "object": "text_completion",
                 "created": created,
-                "model": self.app.public_model,
+                "model": model_name,
                 "choices": [
                     {
                         "index": 0,
@@ -1002,67 +1071,16 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         self._sse_done()
 
     def _status(self) -> dict[str, Any]:
-        config = self.app.runtime.config
-        installed = self.app.runtime.installed
-        cache = self.app.runtime.expert_cache
-        cache_metrics = cache.metrics
+        snapshot = self.app.model_manager.status_snapshot()
+        if snapshot["loaded_model"] is not None:
+            snapshot["performance"] = {
+                **snapshot["performance"],
+                **self.app.metrics.snapshot(),
+            }
         return {
             "status": "ready",
-            "model": self.app.public_model,
-            "source_model": self.app.runtime.model_id,
-            "model_path": str(installed.root),
             "requires_api_key": self.app.api_key is not None,
-            "runtime": {
-                "slots": config.slots,
-                "read_workers": config.read_workers,
-                "prefetch_read_workers": getattr(
-                    config, "prefetch_read_workers", 1
-                ),
-                "power_saving_limit_gbps": getattr(
-                    config, "power_saving_limit_gbps", None
-                ),
-                "prefill_step_size": config.prefill_step_size,
-                "moe_prefill_step_size": getattr(
-                    config, "moe_prefill_step_size", 0
-                ),
-                "layer_major_prefill": getattr(config, "layer_major_prefill", False),
-                "batched_expert_prefill": getattr(
-                    config, "batched_expert_prefill", False
-                ),
-                "prompt_cache_entries": getattr(config, "prompt_cache_entries", 1),
-                "prompt_cache_memory_gib": getattr(
-                    config, "prompt_cache_memory_gib", 0
-                ),
-                "persistent_prompt_cache": getattr(
-                    config, "persistent_prompt_cache", False
-                ),
-                "fp4_index_cache": getattr(config, "fp4_index_cache", False),
-                "dspark_available": getattr(installed, "has_dspark", False),
-                "dspark_enabled": bool(
-                    getattr(getattr(self.app.runtime, "model", None), "dspark", None)
-                ),
-                "dspark_confidence_threshold": getattr(
-                    config, "dspark_confidence_threshold", 0.6
-                ),
-                "dspark_slots": getattr(config, "dspark_slots", 768),
-                "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
-            },
-            "performance": {
-                **self.app.metrics.snapshot(),
-                **self.app.runtime.metrics.snapshot(),
-                "ssd_bytes_read": cache_metrics.bytes_read,
-                "ssd_read_seconds": cache_metrics.read_seconds,
-                "expert_pack_seconds": cache_metrics.pack_seconds,
-                "expert_eviction_seconds": cache_metrics.eviction_seconds,
-                "routing_sync_seconds": cache_metrics.routing_sync_seconds,
-                "active_parameters_cache": {
-                    "hit_rate": cache_metrics.hit_rate,
-                    "hits": cache_metrics.hits,
-                    "misses": cache_metrics.misses,
-                    "resident_slots": cache.resident_count,
-                    "capacity_slots": config.slots,
-                },
-            },
+            **snapshot,
         }
 
     def _authorize(self) -> None:
@@ -1129,6 +1147,8 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def log_message(self, format: str, *args: object) -> None:
+        if urlsplit(self.path).path == "/api/status":
+            return
         sys.stderr.write(f"{self.client_address[0]} - {format % args}\n")
 
 
@@ -1191,7 +1211,13 @@ def _reasoning_settings(
         raise APIError(f"{param} must be a string.", param=param)
     if effort not in {None, "none", *_REASONING_EFFORT_MAP}:
         raise APIError(f"{param} is invalid.", param=param)
-    if thinking_mode is None:
+    if qwen:
+        thinking_mode = (
+            "thinking"
+            if thinking_mode == "thinking" or effort not in {None, "none"}
+            else "chat"
+        )
+    elif thinking_mode is None:
         thinking_mode = "chat" if effort in {None, "none"} else "thinking"
     native_effort = (
         {
@@ -1498,7 +1524,13 @@ def _number(
     return result
 
 
-def _options(payload: dict[str, Any], defaults: ServerDefaults) -> GenerationOptions:
+def _options(
+    payload: dict[str, Any],
+    defaults: ServerDefaults | ModelDefaults,
+    *,
+    qwen: bool = False,
+    thinking_mode: str = "chat",
+) -> GenerationOptions:
     max_tokens = payload.get(
         "max_completion_tokens",
         payload.get("max_output_tokens", payload.get("max_tokens", defaults.max_tokens)),
@@ -1510,22 +1542,44 @@ def _options(payload: dict[str, Any], defaults: ServerDefaults) -> GenerationOpt
             f"max_tokens must be between 1 and {MAX_GENERATION_TOKENS}.",
             param="max_tokens",
         )
+    sampling_defaults = (
+        _QWEN_SAMPLING_DEFAULTS[
+            "thinking" if thinking_mode == "thinking" else "chat"
+        ]
+        if qwen
+        else {
+            "temperature": defaults.temperature,
+            "top_p": defaults.top_p,
+            "top_k": defaults.top_k,
+            "min_p": 0.0,
+            "presence_penalty": 0.0,
+            "repetition_penalty": 1.0,
+        }
+    )
     temperature = _number(
-        payload.get("temperature", defaults.temperature),
+        payload.get("temperature", sampling_defaults["temperature"]),
         "temperature",
         minimum=0,
         maximum=2,
     )
     top_p = _number(
-        payload.get("top_p", defaults.top_p),
+        payload.get("top_p", sampling_defaults["top_p"]),
         "top_p",
         minimum=0.000001,
         maximum=1,
     )
-    top_k = payload.get("top_k", defaults.top_k)
+    top_k = payload.get("top_k", sampling_defaults["top_k"])
     if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= 248_320:
         raise APIError("top_k must be between 0 and 248320.", param="top_k")
-    return GenerationOptions(max_tokens, temperature, top_p, top_k)
+    return GenerationOptions(
+        max_tokens=max_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        top_k=top_k,
+        min_p=sampling_defaults["min_p"],
+        presence_penalty=sampling_defaults["presence_penalty"],
+        repetition_penalty=sampling_defaults["repetition_penalty"],
+    )
 
 
 def _tool_request(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], ToolChoice]:
@@ -1814,7 +1868,9 @@ def _usage(prompt_tokens: int, completion_tokens: int) -> dict[str, int]:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Serve the installed model with an OpenAI-compatible API")
-    parser.add_argument("--model", required=True)
+    models = parser.add_mutually_exclusive_group()
+    models.add_argument("--model")
+    models.add_argument("--model-catalog")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
@@ -1867,62 +1923,6 @@ def main() -> None:
         parser.error("--api-key is required when --host is not local")
     if not 1 <= arguments.port <= 65535:
         parser.error("--port must be between 1 and 65535")
-    if arguments.slots < 6:
-        parser.error("--slots must be at least 6")
-    if arguments.read_workers < 1:
-        parser.error("--read-workers must be greater than zero")
-    if arguments.prefetch_read_workers < 1:
-        parser.error("--prefetch-read-workers must be greater than zero")
-    if arguments.memory_limit_gib < 0:
-        parser.error("--memory-limit-gib must be zero or greater")
-    if arguments.prefill_step_size < 0:
-        parser.error("--prefill-step-size must be zero or greater")
-    if arguments.moe_prefill_step_size < 0:
-        parser.error("--moe-prefill-step-size must be zero or greater")
-    if arguments.prompt_cache_entries < 1:
-        parser.error("--prompt-cache-entries must be greater than zero")
-    if arguments.prompt_cache_memory_gib < 1:
-        parser.error("--prompt-cache-memory-gib must be greater than zero")
-    if not 0 <= arguments.dspark_confidence_threshold <= 1:
-        parser.error("--dspark-confidence-threshold must be between zero and one")
-    if arguments.dspark_slots < 30:
-        parser.error("--dspark-slots must be at least 30")
-    try:
-        installed = InstalledModel.open(arguments.model)
-    except (OSError, ValueError, json.JSONDecodeError) as error:
-        parser.error(str(error))
-    if installed.is_qwen and arguments.dspark:
-        parser.error("Qwen3.8-Flash-Next does not support --dspark")
-    public_model = arguments.public_model or installed.model_id
-    if not public_model:
-        parser.error("--public-model must not be empty")
-    default_temperature = arguments.default_temperature
-    default_top_p = arguments.default_top_p
-    default_top_k = arguments.default_top_k
-    if default_temperature is None:
-        default_temperature = 1.0 if installed.is_qwen else 0.2
-    if default_top_p is None:
-        default_top_p = 0.95 if installed.is_qwen else 0.98
-    if default_top_k is None:
-        default_top_k = 20 if installed.is_qwen else 0
-    try:
-        options = _options(
-            {
-                "max_tokens": arguments.default_max_tokens,
-                "temperature": default_temperature,
-                "top_p": default_top_p,
-                "top_k": default_top_k,
-            },
-            ServerDefaults(),
-        )
-        defaults = ServerDefaults(
-            options.max_tokens,
-            options.temperature,
-            options.top_p,
-            options.top_k,
-        )
-    except APIError as error:
-        parser.error(str(error))
     config = RuntimeConfig(
         slots=arguments.slots,
         read_workers=arguments.read_workers,
@@ -1944,25 +1944,85 @@ def main() -> None:
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
-    print(f"Loading {arguments.model}...", flush=True)
-    runtime = ModelRuntime.open(arguments.model, config)
+    try:
+        validate_runtime_config(config)
+    except ValueError as error:
+        parser.error(str(error))
+
+    if arguments.model_catalog and (
+        arguments.public_model is not None or arguments.warmup_prompt_file is not None
+    ):
+        parser.error("--public-model and --warmup-prompt-file require --model")
+    if arguments.public_model is not None and arguments.model is None:
+        parser.error("--public-model requires --model")
+
+    if arguments.model_catalog:
+        try:
+            model_specs = load_model_catalog(arguments.model_catalog)
+        except ModelCatalogError as error:
+            parser.error(str(error))
+    elif arguments.model:
+        try:
+            installed = InstalledModel.open(arguments.model)
+        except (OSError, ValueError, json.JSONDecodeError) as error:
+            parser.error(str(error))
+        if installed.model_kind not in MODEL_IDS:
+            parser.error(f"unsupported model kind: {installed.model_kind}")
+        if installed.is_qwen and arguments.dspark:
+            parser.error("Qwen3.8-Flash-Next does not support --dspark")
+
+        default_temperature = arguments.default_temperature
+        default_top_p = arguments.default_top_p
+        default_top_k = arguments.default_top_k
+        if default_temperature is None:
+            default_temperature = 0.7 if installed.is_qwen else 0.2
+        if default_top_p is None:
+            default_top_p = 0.8 if installed.is_qwen else 0.98
+        if default_top_k is None:
+            default_top_k = 20 if installed.is_qwen else 0
+        try:
+            options = _options(
+                {
+                    "max_tokens": arguments.default_max_tokens,
+                    "temperature": default_temperature,
+                    "top_p": default_top_p,
+                    "top_k": default_top_k,
+                },
+                ServerDefaults(),
+            )
+            model_specs = parse_model_catalog(
+                {
+                    "version": 1,
+                    "models": [
+                        {
+                            "id": MODEL_IDS[installed.model_kind],
+                            "alias": arguments.public_model,
+                            "path": arguments.model,
+                            "model_kind": installed.model_kind,
+                            "runtime": asdict(config),
+                            "defaults": {
+                                "max_tokens": options.max_tokens,
+                                "temperature": options.temperature,
+                                "top_p": options.top_p,
+                                "top_k": options.top_k,
+                            },
+                            "warmup_prompt_path": arguments.warmup_prompt_file,
+                        }
+                    ],
+                }
+            )
+        except (APIError, ModelCatalogError) as error:
+            parser.error(str(error))
+    else:
+        model_specs = ()
+
+    model_manager = ModelManager(model_specs)
     server = None
     try:
-        if arguments.warmup_prompt_file:
-            try:
-                with open(arguments.warmup_prompt_file, encoding="utf-8") as file:
-                    warmup_prompt = file.read()
-            except OSError as error:
-                parser.error(f"cannot read --warmup-prompt-file: {error}")
-            print("Warming prompt cache...", flush=True)
-            warmed = runtime.warm_prompt(warmup_prompt)
-            print(f"Warmed {warmed} prompt tokens.", flush=True)
         server = OpenAIServer(
             (arguments.host, arguments.port),
-            runtime,
-            public_model=public_model,
+            model_manager,
             api_key=arguments.api_key,
-            defaults=defaults,
         )
         print(f"Ready: http://{arguments.host}:{server.server_port}", flush=True)
         server.serve_forever()
@@ -1971,7 +2031,7 @@ def main() -> None:
     finally:
         if server is not None:
             server.server_close()
-        runtime.close()
+        model_manager.close()
 
 
 if __name__ == "__main__":
