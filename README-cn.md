@@ -22,39 +22,61 @@ Whallm 也支持 `Qwen3.8-Flash-Next-FP8` text checkpoint。
 
 ## 峰值内存参考
 
-| 模型 | 一般对话 | Codex Agent |
-| --- | ---: | ---: |
-| `DeepSeek-V4-Flash-0731` | 约 20 GB | 约 30 GB |
-| `Qwen3.8-Flash-Next-FP8` | 约 15 GB | 约 25 GB |
+| 模型 | 测量到的峰值内存 |
+| --- | ---: |
+| `DeepSeek-V4-Flash-0731` | 23.03–35.64 GiB |
+| `Qwen3.8-Flash-Next-FP8` | 15.19–18.92 GiB |
 
-这些数字用于容量规划，不是性能保证。prompt 长度、tool、cache 状态和
-runtime 设置会改变峰值内存。[完整验证记录](docs/VALIDATION.md)包含特定
-workload 的测量结果。
+v1.1.0 测试使用 1,024 到 16,384 个 input token 的对话 prompt。
+这些结果是测量值，不是最低内存要求或性能保证。prompt 长度、tool、cache
+状态和 runtime 设置会改变峰值内存。请参阅[完整 Benchmark](BENCHMARK.md)和
+[完整验证记录](docs/VALIDATION.md)。
 
 ## Benchmark
 
-测试机器是 MacBook Pro。MacBook Pro 配备 Apple M5 Pro、18 核 CPU、20 核
-GPU 和 64 GiB 统一内存。测试已禁用 DSpark。
+v1.1.0 测试在配备 Apple M5 Pro、64 GB 统一内存和 1 TB 存储空间的
+MacBook Pro 上运行。两个模型都使用 `reasoning_effort: low` 和
+`thinking_mode: chat`。TTFT 表示第一个 token 的等待时间。
 
-| 测试 | Prefill | Decode | 峰值内存 |
-| --- | ---: | ---: | ---: |
-| Codex request，14,000 个 input token | 180 Tok/s | 6.5 Tok/s | 30 GB |
-| 4,096-token prompt，生成 1 个 token | 144.53 Tok/s | — | 15.56 GiB |
-| 短 prompt，在同一 runtime 中第二次运行 | — | 6.41 Tok/s | 15.05 GiB |
+### DeepSeek V4 Flash 0731
 
-前两项测试分别使用 `v1.0.3` 和 `v1.0.2` runtime。prompt 内容、SSD 速度
-和 cache 状态会改变性能。[完整验证记录](docs/VALIDATION.md)包含详细测试数据。
+| Input token | P95 总时间 | P95 TTFT | P95 Prefill | P95 Decode | 峰值内存 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 46.72 s | 37.26 s | 20.7 tok/s | 6.7 tok/s | 23.03 GiB |
+| 2,048 | 27.08 s | 16.91 s | 108.1 tok/s | 6.6 tok/s | 33.19 GiB |
+| 8,192 | 47.66 s | 37.96 s | 209.5 tok/s | 6.7 tok/s | 34.74 GiB |
+| 16,384 | 86.01 s | 76.34 s | 212.3 tok/s | 6.7 tok/s | 35.64 GiB |
+
+### Qwen3.8 Next Flash FP8
+
+| Input token | P95 总时间 | P95 TTFT | P95 Prefill | P95 Decode | 峰值内存 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 24.45 s | 17.20 s | 59.8 tok/s | 9.3 tok/s | 15.19 GiB |
+| 2,048 | 40.45 s | 32.63 s | 65.0 tok/s | 8.3 tok/s | 16.41 GiB |
+| 8,192 | 142.39 s | 134.44 s | 61.7 tok/s | 8.3 tok/s | 17.90 GiB |
+| 16,384 | 276.41 s | 267.88 s | 61.8 tok/s | 7.8 tok/s | 18.92 GiB |
+
+prompt、SSD 速度和 cache 状态会改变性能。请参阅
+[完整 Benchmark](BENCHMARK.md)和[完整验证记录](docs/VALIDATION.md)。
 
 ## 如何使用
 
 **下载 APP → 打开 APP → 选择并下载模型 → 启动 server →
 在 APP 中对话或连接 Codex**
 
+> [!IMPORTANT]
+> 1.0.3 版无法通过自动更新安装 1.0.4 版，因为旧的 Sparkle signing key
+> 已无法使用。请退出 APP，从
+> [1.0.4 release](https://github.com/yanun0323/deepseek_ssd/releases/tag/v1.0.4)
+> 下载 `DeepSeekV4SSD-macOS-arm64.zip`，然后手动替换现有 APP。
+> 安装 1.0.4 版后，自动更新会恢复正常。
+
 1. 从 [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest)
    下载最新的 `Whallm-macOS-arm64.zip`。
 2. 解压 ZIP。打开 `Whallm.app`。
 3. 打开“模型”页面。选择 DeepSeek 或 Qwen，然后选择“下载模型”。APP 会检查
-   所需存储空间。你可以停止下载，以后再继续下载。
+   所需存储空间。Qwen 会下载已发布的 MXFP4 installed model。你可以停止下载，
+   以后再继续下载。
 4. 打开“Server”页面，然后选择“启动 server”。server 可以在没有 installed model
    时启动，但 generation request 需要 installed model。
 5. 打开对话页面并选择模型。你也可以使用下方配置连接 Codex。
@@ -113,6 +135,9 @@ requires_openai_auth = false
   request 会加载指定模型。
 - server 一次只保留一个已加载模型。request 指定另一个模型时，server 会先关闭
   旧 runtime，然后加载新 runtime。
+- 你可以在“模型”页面加载或卸载模型。已加载的模型会移到“已加载”区域。
+- 你可以调整 DeepSeek layer-major Prefill 阈值。默认值是 1,024 个未缓存的
+  prompt token。
 
 ### 模型存储空间与 DSpark
 
@@ -122,6 +147,8 @@ requires_openai_auth = false
   测试 speculative decoding。
 - 你可以移除 DSpark。移除 DSpark 不需要重新安装 main model。
 - Qwen installed weight 文件使用 125,268,506,112 bytes。Qwen 不支持 DSpark。
+- Qwen 会下载已验证的 MXFP4 installed model。模型安装程序不会在用户的 Mac
+  上量化 Qwen checkpoint。
 
 ### OpenAI 兼容 server
 
@@ -132,11 +159,14 @@ server 支持以下 endpoint：
 - `POST /v1/responses`
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
+- `POST /api/models/load`
+- `POST /api/models/unload`
 
 固定 API model ID 是 `deepseek-v4-flash-0731` 和
 `qwen3.8-flash-next-fp8`。每个模型的“进阶设置”页面可设置可选 Alias。
 有效更改会自动保存。generation request 接受 API model ID 或 Alias。
-如果下载在 server 运行期间完成，请重新启动 server。
+对话模型选择器只显示 server 启动时可用的 installed model。如果下载在 server
+运行期间完成，请重新启动 server。
 
 Responses API 支持 Codex tool 和 OpenAI function tool。API client 必须执行 tool，
 然后将结果发回 server。[API 指南](docs/API.md)包含 request 字段、示例和当前限制。
@@ -154,7 +184,12 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 ### 当前限制
 
 - runtime 只支持当前文档中两个固定的 checkpoint revision。
+- Qwen 只支持文本。Qwen 不支持 vision、video、MTP 和 DSpark。
+- Qwen 已在记录的 M5 Pro 环境中通过完整模型 SHA-256、文本、thinking、tool call、
+  greedy 4K、prompt cache 和 packaged APP 验证。请参阅
+  [Qwen 支持状态](docs/QWEN.md)。
 - server 一次只保留一个已加载模型，并且一次只处理一个 generation request。
+  其他 generation request 会等待当前 request stream 完全结束。
 - API 不支持图片、音频、logprobs、`response_format` 和 `stop`。
 - server 将 request body 限制为 1 MiB。
 - 很长的 input 和 output 需要更多 KV cache 内存。

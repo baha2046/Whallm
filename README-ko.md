@@ -22,42 +22,65 @@ SSD에서 routed expert를 스트리밍합니다. M 시리즈 Mac에서
 
 ## 최대 메모리 가이드
 
-| 모델 | 일반 대화 | Codex Agent |
-| --- | ---: | ---: |
-| `DeepSeek-V4-Flash-0731` | 약 20 GB | 약 30 GB |
-| `Qwen3.8-Flash-Next-FP8` | 약 15 GB | 약 25 GB |
+| 모델 | 측정된 최대 메모리 |
+| --- | ---: |
+| `DeepSeek-V4-Flash-0731` | 23.03–35.64 GiB |
+| `Qwen3.8-Flash-Next-FP8` | 15.19–18.92 GiB |
 
-이 수치는 용량 계획을 위한 가이드이며 성능을 보장하지 않습니다. prompt 길이,
+v1.1.0에서는 input token 1,024개에서 16,384개인 chat prompt를 측정했습니다.
+이 값은 측정값이며 최소 메모리 요구 사항이나 성능을 보장하지 않습니다. prompt 길이,
 tool, cache 상태, runtime 설정에 따라 최대 메모리가 달라질 수 있습니다.
-특정 workload의 측정 결과는 [검증 기록](docs/VALIDATION.md)을 확인하세요.
+[전체 벤치마크](BENCHMARK.md)와 [검증 기록](docs/VALIDATION.md)을 확인하세요.
 
 ## 벤치마크
 
-측정 장치는 Apple M5 Pro, 18코어 CPU, 20코어 GPU, 64 GiB 통합 메모리를 탑재한
-MacBook Pro입니다. DSpark는 비활성화했습니다.
+v1.1.0은 Apple M5 Pro, 64 GB 통합 메모리, 1 TB 저장 공간을 탑재한
+MacBook Pro에서 측정했습니다. 두 모델 모두 `reasoning_effort: low`와
+`thinking_mode: chat`을 사용했습니다. TTFT는 첫 token까지의 대기 시간입니다.
 
-| 테스트 | Prefill | Decode | 최대 메모리 |
-| --- | ---: | ---: | ---: |
-| input token 14,000개의 Codex request | 180 Tok/s | 6.5 Tok/s | 30 GB |
-| 4,096-token prompt에서 token 1개 생성 | 144.53 Tok/s | — | 15.56 GiB |
-| 짧은 prompt, 같은 runtime의 두 번째 실행 | — | 6.41 Tok/s | 15.05 GiB |
+### DeepSeek V4 Flash 0731
 
-첫 두 행은 각각 `v1.0.3` 및 `v1.0.2` runtime으로 측정했습니다. 성능은 prompt,
-SSD 속도, cache 상태에 따라 달라집니다. 자세한 내용은
-[검증 기록](docs/VALIDATION.md)을 확인하세요.
+| Input token | P95 총 시간 | P95 TTFT | P95 Prefill | P95 Decode | 최대 메모리 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 46.72 s | 37.26 s | 20.7 tok/s | 6.7 tok/s | 23.03 GiB |
+| 2,048 | 27.08 s | 16.91 s | 108.1 tok/s | 6.6 tok/s | 33.19 GiB |
+| 8,192 | 47.66 s | 37.96 s | 209.5 tok/s | 6.7 tok/s | 34.74 GiB |
+| 16,384 | 86.01 s | 76.34 s | 212.3 tok/s | 6.7 tok/s | 35.64 GiB |
+
+### Qwen3.8 Next Flash FP8
+
+| Input token | P95 총 시간 | P95 TTFT | P95 Prefill | P95 Decode | 최대 메모리 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 24.45 s | 17.20 s | 59.8 tok/s | 9.3 tok/s | 15.19 GiB |
+| 2,048 | 40.45 s | 32.63 s | 65.0 tok/s | 8.3 tok/s | 16.41 GiB |
+| 8,192 | 142.39 s | 134.44 s | 61.7 tok/s | 8.3 tok/s | 17.90 GiB |
+| 16,384 | 276.41 s | 267.88 s | 61.8 tok/s | 7.8 tok/s | 18.92 GiB |
+
+성능은 prompt, SSD 속도, cache 상태에 따라 달라집니다.
+[전체 벤치마크](BENCHMARK.md)와 [검증 기록](docs/VALIDATION.md)을 확인하세요.
 
 ## 사용 방법
 
-**앱 다운로드 → 앱 열기 → 167 GB 전체 파라미터 모델 다운로드 → server 시작 →
+**앱 다운로드 → 앱 열기 → 모델 선택 및 다운로드 → server 시작 →
 앱에서 대화하거나 Codex 연결**
+
+> [!IMPORTANT]
+> 이전 Sparkle signing key를 더 이상 사용할 수 없으므로 버전 1.0.3에서
+> 1.0.4로 자동 업데이트할 수 없습니다. 앱을 종료하고
+> [1.0.4 release](https://github.com/yanun0323/deepseek_ssd/releases/tag/v1.0.4)에서
+> `DeepSeekV4SSD-macOS-arm64.zip`을 다운로드한 후 기존 앱을 직접 교체하세요.
+> 1.0.4를 설치하면 자동 업데이트를 다시 사용할 수 있습니다.
 
 1. [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest)에서 최신
    `Whallm-macOS-arm64.zip`을 다운로드합니다.
 2. ZIP 파일의 압축을 풀고 `Whallm.app`을 엽니다.
-3. **Download Model**을 선택합니다. DeepSeek 설치에는 항상 DSpark가 포함되며 약 167 GB를
-   사용합니다. 다운로드를 중지한 뒤 나중에 다시 시작할 수 있습니다.
-4. 모델 준비가 끝나면 **Start Server**를 선택합니다.
-5. 앱에서 대화하거나 아래 설정으로 Codex를 연결합니다.
+3. **Model** 페이지를 엽니다. DeepSeek 또는 Qwen을 선택한 다음
+   **Download Model**을 선택합니다. 앱이 필요한 저장 공간을 확인합니다. Qwen은
+   배포된 MXFP4 installed model을 다운로드합니다. 다운로드를 중지한 뒤 나중에
+   다시 시작할 수 있습니다.
+4. **Server** 페이지를 열고 **Start Server**를 선택합니다. server는 installed model이
+   없어도 시작할 수 있지만, 생성하려면 installed model이 필요합니다.
+5. chat을 열고 모델을 선택합니다. 아래 설정으로 Codex를 연결할 수도 있습니다.
 
 기본 로컬 server 주소는 `http://127.0.0.1:11434`입니다.
 
@@ -70,7 +93,7 @@ SSD 속도, cache 상태에 따라 달라집니다. 자세한 내용은
 | Mac | Apple Silicon M 시리즈 Mac |
 | macOS | macOS 15 이상 |
 | 통합 메모리 | 64 GiB 이상 |
-| 여유 저장 공간 | 약 172 GB(160 GiB) |
+| 여유 저장 공간 | 앱이 선택한 모델과 기존 부분 데이터를 확인 |
 | 모델 저장 장치 | 고속 내장, Thunderbolt 또는 USB4 SSD |
 | 인터넷 | 모델 및 앱 업데이트 다운로드에 필요 |
 
@@ -108,6 +131,14 @@ provider 설정은 사용자 수준 설정 파일에 넣어야 합니다. 다른
   SSD에서 읽습니다.
 - runtime은 FP8 KV cache와 용량이 제한된 expert cache로 메모리 사용량을 제어합니다.
 - installed model은 고정된 checkpoint revision에 대해 검증됩니다.
+- server를 시작할 때 installed model 목록만 읽고 모델 가중치는 로드하지 않습니다.
+  첫 generation request가 지정한 모델을 로드합니다.
+- server는 로드된 모델 하나만 유지합니다. request가 다른 모델을 지정하면 이전
+  runtime을 종료한 후 새 runtime을 로드합니다.
+- **Model** 페이지에서 모델을 로드하거나 언로드할 수 있습니다. 로드된 모델은
+  **Loaded** 섹션으로 이동합니다.
+- DeepSeek layer-major prefill 임계값을 변경할 수 있습니다. 기본값은 cache에 없는
+  prompt token 1,024개입니다.
 
 ### 모델 저장 공간과 DSpark
 
@@ -116,6 +147,10 @@ provider 설정은 사용자 수준 설정 파일에 넣어야 합니다. 다른
 - DSpark를 설치해도 자동으로 활성화되지 않습니다. speculative decoding을 테스트하려면
   runtime 설정에서 **Use DSpark**를 활성화하세요.
 - main model을 다시 설치하지 않고 DSpark를 제거할 수 있습니다.
+- Qwen installed weight 파일은 125,268,506,112 bytes를 사용합니다.
+  Qwen은 DSpark를 지원하지 않습니다.
+- Qwen은 검증된 MXFP4 installed model을 다운로드합니다. 모델을 설치할 때 사용자의
+  Mac에서 Qwen checkpoint를 양자화하지 않습니다.
 
 ### OpenAI 호환 server
 
@@ -126,22 +161,40 @@ server는 다음 endpoint를 지원합니다.
 - `POST /v1/responses`
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
+- `POST /api/models/load`
+- `POST /api/models/unload`
 
-Responses API는 Codex tool과 OpenAI function tool을 지원합니다. API client가 tool을 실행하고
-결과를 server에 보내야 합니다. 자세한 필드, 예제, 제한 사항은 [API 가이드](docs/API.md)를 확인하세요.
+고정 API model ID는 `deepseek-v4-flash-0731` 및
+`qwen3.8-flash-next-fp8`입니다. 각 모델의 **Advanced Settings**에서 선택 사항인
+Alias를 설정할 수 있습니다. 유효한 변경 사항은 자동으로 저장됩니다. generation request는
+API model ID 또는 Alias를 받습니다. chat 모델 선택기에는 server를 시작할 때 사용할 수
+있었던 installed model만 표시됩니다. server 실행 중에 다운로드가 끝나면 server를
+다시 시작하세요.
+
+Responses API는 Codex tool과 OpenAI function tool을 지원합니다. API client가 각 tool을
+실행하고 결과를 server에 보내야 합니다. field, 예제, 현재 제한 사항은
+[API 가이드](docs/API.md)를 확인하세요.
 
 ### 지표와 개인정보 보호
 
 앱은 prefill 속도, decode 속도, token 수, 메모리 사용량, SSD 읽기 속도, cache hit rate,
-첫 token 대기 시간, 완료 시간을 표시합니다.
+첫 token 대기 시간, 완료 시간을 표시합니다. 로드된 모델이 바뀌면 앱이 metric 기록을
+지웁니다.
 
-추론은 Mac에서 실행됩니다. prompt와 생성된 텍스트는 로컬 runtime에 남습니다. 연결된
-API client가 데이터를 다른 위치로 전송할 수는 있습니다.
+추론은 Mac에서 실행됩니다. 연결된 client가 다른 위치로 보내지 않는 한 prompt와
+생성된 텍스트는 로컬 runtime에 남습니다. 앱은 모델 다운로드, 업데이트 확인,
+설정된 API request 수신에 네트워크를 사용합니다.
 
 ### 현재 제한 사항
 
-- runtime은 고정된 `DeepSeek-V4-Flash-0731` checkpoint만 지원합니다.
-- runtime은 한 번에 하나의 생성 request만 처리합니다.
+- runtime은 현재 문서에 있는 고정된 checkpoint revision 두 개만 지원합니다.
+- Qwen은 text만 지원합니다. Qwen vision, video, MTP, DSpark는 지원하지 않습니다.
+- 기록된 M5 Pro 환경에서 Qwen full-model SHA-256, text, thinking, tool call,
+  greedy 4K, prompt cache, packaged App 검증을 통과했습니다. 자세한 내용은
+  [Qwen 지원 상태](docs/QWEN.md)를 확인하세요.
+- server는 로드된 모델 하나만 유지하며 한 번에 하나의 generation request를
+  처리합니다. 다른 generation request는 현재 request stream이 모두 끝날 때까지
+  기다립니다.
 - 이미지, 오디오, logprobs, `response_format`, `stop`은 지원하지 않습니다.
 - request body의 최대 크기는 1 MiB입니다.
 - 매우 긴 input과 output에는 더 많은 KV cache 메모리가 필요합니다.

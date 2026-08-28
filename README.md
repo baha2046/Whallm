@@ -23,29 +23,45 @@ also supports the pinned `Qwen3.8-Flash-Next-FP8` text checkpoint.
 
 ## Memory guidance
 
-| Model | Chat | Codex agent |
-| --- | ---: | ---: |
-| `DeepSeek-V4-Flash-0731` | About 20 GB | About 30 GB |
-| `Qwen3.8-Flash-Next-FP8` | About 15 GB | About 25 GB |
+| Model | Recorded peak memory |
+| --- | ---: |
+| `DeepSeek-V4-Flash-0731` | 23.03–35.64 GiB |
+| `Qwen3.8-Flash-Next-FP8` | 15.19–18.92 GiB |
 
-These figures are peak memory planning values, not performance guarantees.
+These v1.1.0 results cover chat prompts with 1,024 to 16,384 input tokens. They
+are measurements, not minimum memory requirements or performance guarantees.
 Prompt length, tools, cache state, and runtime settings can change peak memory.
-See the [validation record](docs/VALIDATION.md) for measured workloads.
+See the [benchmark](BENCHMARK.md) and
+[validation record](docs/VALIDATION.md) for the measured workloads.
 
 ## Benchmark
 
-These DeepSeek results were measured on a MacBook Pro with an Apple M5 Pro, 18 CPU
-cores, 20 GPU cores, and 64 GiB of unified memory. DSpark was disabled.
+These v1.1.0 results were measured on a MacBook Pro with an Apple M5 Pro,
+64 GB of unified memory, and 1 TB of storage. Both models used
+`reasoning_effort: low` and `thinking_mode: chat`. TTFT means time to first
+token.
 
-| Test | Prefill | Decode | Peak memory |
-| --- | ---: | ---: | ---: |
-| Codex request with 14,000 input tokens | 180 Tok/s | 6.5 Tok/s | 30 GB |
-| 4,096-token prompt with one output token | 144.53 Tok/s | — | 15.56 GiB |
-| Short prompt, second run in one runtime | — | 6.41 Tok/s | 15.05 GiB |
+### DeepSeek V4 Flash 0731
 
-The first two rows were measured with runtime versions `v1.0.3` and `v1.0.2`,
-respectively. Performance changes with the prompt, SSD speed, and cache state.
-See the [validation record](docs/VALIDATION.md) for the full test details.
+| Input tokens | P95 total time | P95 TTFT | P95 prefill | P95 decode | Peak memory |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 46.72 s | 37.26 s | 20.7 tok/s | 6.7 tok/s | 23.03 GiB |
+| 2,048 | 27.08 s | 16.91 s | 108.1 tok/s | 6.6 tok/s | 33.19 GiB |
+| 8,192 | 47.66 s | 37.96 s | 209.5 tok/s | 6.7 tok/s | 34.74 GiB |
+| 16,384 | 86.01 s | 76.34 s | 212.3 tok/s | 6.7 tok/s | 35.64 GiB |
+
+### Qwen3.8 Next Flash FP8
+
+| Input tokens | P95 total time | P95 TTFT | P95 prefill | P95 decode | Peak memory |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1,024 | 24.45 s | 17.20 s | 59.8 tok/s | 9.3 tok/s | 15.19 GiB |
+| 2,048 | 40.45 s | 32.63 s | 65.0 tok/s | 8.3 tok/s | 16.41 GiB |
+| 8,192 | 142.39 s | 134.44 s | 61.7 tok/s | 8.3 tok/s | 17.90 GiB |
+| 16,384 | 276.41 s | 267.88 s | 61.8 tok/s | 7.8 tok/s | 18.92 GiB |
+
+Performance changes with the prompt, SSD speed, and cache state. See the
+[full benchmark](BENCHMARK.md) and [validation record](docs/VALIDATION.md) for
+more details.
 
 ## How to use it
 
