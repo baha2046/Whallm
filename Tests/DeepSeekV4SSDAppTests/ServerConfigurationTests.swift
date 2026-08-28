@@ -27,6 +27,14 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(modelDownloadProgressExtraHeight(hasProgressFraction: true), 72)
   }
 
+  @MainActor
+  func testLoadedModelIDMapsToItsModelKind() {
+    XCTAssertEqual(modelKind(withAPIModelID: "deepseek-v4-flash-0731"), .deepSeekV4)
+    XCTAssertEqual(modelKind(withAPIModelID: "qwen3.8-flash-next-fp8"), .qwen3_8FlashNext)
+    XCTAssertNil(modelKind(withAPIModelID: "unknown"))
+    XCTAssertNil(modelKind(withAPIModelID: nil))
+  }
+
   func testServerAndModelControlsRemainIndependent() {
     XCTAssertFalse(
       modelDownloadIsDisabled(
@@ -149,6 +157,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restoredDeepSeek.slots, 700)
     XCTAssertTrue(restoredDeepSeek.bf16KVCache)
     XCTAssertTrue(restoredDeepSeek.dsparkEnabled)
+    XCTAssertEqual(restoredDeepSeek.layerMajorPrefillThreshold, 1_024)
     XCTAssertEqual(restoredQwen.slots, 900)
     XCTAssertEqual(restoredQwen.defaultMaxTokens, 262_144)
     XCTAssertEqual(restoredQwen.defaultTemperature, 0.7)
@@ -156,6 +165,28 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restoredQwen.defaultTopK, 20)
     XCTAssertFalse(restoredQwen.bf16KVCache)
     XCTAssertFalse(restoredQwen.dsparkEnabled)
+    XCTAssertEqual(restoredQwen.layerMajorPrefillThreshold, 1_024)
+  }
+
+  func testSavedAdvancedSettingsWithoutPrefillThresholdUseTheNewDefault() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    let encoded = try JSONEncoder().encode(
+      ModelAdvancedSettings.defaults(for: .deepSeekV4))
+    var object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+    object.removeValue(forKey: "layerMajorPrefillThreshold")
+    isolated.defaults.set(
+      try JSONSerialization.data(withJSONObject: object),
+      forKey: "modelAdvancedSettings.deepseek-v4"
+    )
+
+    let restored = ModelAdvancedSettings.loadOrDefault(
+      for: .deepSeekV4,
+      defaults: isolated.defaults
+    )
+
+    XCTAssertEqual(restored.layerMajorPrefillThreshold, 1_024)
   }
 
   func testLegacyAdvancedSettingsMigrateOnlyToTheCurrentModel() throws {
@@ -175,6 +206,7 @@ final class ServerConfigurationTests: XCTestCase {
 
     XCTAssertEqual(deepSeek.slots, 640)
     XCTAssertEqual(deepSeek.defaultTemperature, 0.7)
+    XCTAssertEqual(deepSeek.layerMajorPrefillThreshold, 1_024)
     XCTAssertEqual(qwen.slots, 1_152)
     XCTAssertEqual(qwen.defaultTemperature, 0.7)
   }
@@ -287,6 +319,7 @@ final class ServerConfigurationTests: XCTestCase {
       [
         "slots", "read_workers", "prefetch_read_workers", "prefill_step_size",
         "fp8_kv_cache", "memory_limit_gib", "layer_major_prefill",
+        "layer_major_prefill_threshold",
         "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
         "persistent_prompt_cache_entries", "prompt_cache_directory",
         "moe_prefill_step_size", "batched_expert_prefill", "fp4_index_cache",
@@ -298,6 +331,7 @@ final class ServerConfigurationTests: XCTestCase {
         "adaptive_expert_prefill_threshold", "power_saving_limit_gbps",
       ]
     )
+    XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
     XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)
   }

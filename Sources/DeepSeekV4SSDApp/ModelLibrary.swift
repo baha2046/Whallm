@@ -376,6 +376,7 @@ final class ModelLibrary: ObservableObject {
           fp8KVCache: !settings.bf16KVCache,
           memoryLimitGiB: settings.memoryLimitGiB,
           layerMajorPrefill: settings.layerMajorPrefill,
+          layerMajorPrefillThreshold: settings.layerMajorPrefillThreshold ?? 1_024,
           promptCacheEntries: settings.promptCacheEntries,
           promptCacheMemoryGiB: settings.promptCacheMemoryGiB,
           persistentPromptCache: true,

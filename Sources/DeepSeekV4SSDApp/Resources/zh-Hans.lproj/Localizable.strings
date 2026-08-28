@@ -250,6 +250,17 @@
 "Downloading the Qwen MXFP4 installed model" = "正在下载 Qwen MXFP4 installed model";
 "The model installation information could not be loaded. Check the network and try again.\n%@" = "无法载入模型安装信息。请检查网络后再试。\n%@";
 "Loading model installation information." = "正在载入模型安装信息。";
+"Loaded" = "已加载";
+"Loading" = "正在加载";
+"Load %@" = "加载 %@";
+"Unload %@" = "卸载 %@";
+"Install the model first." = "请先安装模型。";
+"Wait for the current response to finish." = "请等待当前响应完成。";
+"Another model action is in progress." = "另一个模型操作正在执行。";
+"The model is not available to this server. Restart the server." = "此 server 无法使用此模型。请重新启动 server。";
+"Layer-major prefill threshold" = "layer-major Prefill 阈值";
+"Minimum uncached prompt tokens required for layer-major prefill. The default is 1024." = "启用 layer-major Prefill 所需的最少未缓存 prompt token 数。默认值是 1024。";
+"Layer-major prefill threshold must be greater than 0." = "layer-major Prefill 阈值必须大于 0。";
 "Model to install" = "要安装的模型";
 "Select the model that the app will download and install." = "选择 APP 要下载和安装的模型。";
 "Select a model. You can select it before it is installed." = "选择模型。即使模型尚未安装，也可以选择。";

@@ -250,6 +250,17 @@
 "Downloading the Qwen MXFP4 installed model" = "Downloading the Qwen MXFP4 installed model";
 "The model installation information could not be loaded. Check the network and try again.\n%@" = "The model installation information could not be loaded. Check the network and try again.\n%@";
 "Loading model installation information." = "Loading model installation information.";
+"Loaded" = "Loaded";
+"Loading" = "Loading";
+"Load %@" = "Load %@";
+"Unload %@" = "Unload %@";
+"Install the model first." = "Install the model first.";
+"Wait for the current response to finish." = "Wait for the current response to finish.";
+"Another model action is in progress." = "Another model action is in progress.";
+"The model is not available to this server. Restart the server." = "The model is not available to this server. Restart the server.";
+"Layer-major prefill threshold" = "Layer-major prefill threshold";
+"Minimum uncached prompt tokens required for layer-major prefill. The default is 1024." = "Minimum uncached prompt tokens required for layer-major prefill. The default is 1024.";
+"Layer-major prefill threshold must be greater than 0." = "Layer-major prefill threshold must be greater than 0.";
 "Model to install" = "Model to install";
 "Select the model that the app will download and install." = "Select the model that the app will download and install.";
 "Select a model. You can select it before it is installed." = "Select a model. You can select it before it is installed.";

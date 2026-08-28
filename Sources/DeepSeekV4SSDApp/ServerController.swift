@@ -210,6 +210,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var memoryLimitGiB = 0
   var prefillStepSize = 0
   var layerMajorPrefill = true
+  var layerMajorPrefillThreshold: Int? = 1_024
   var promptCacheEntries = 2
   var promptCacheMemoryGiB = 8
   var warmupPromptPath = ""
@@ -237,6 +238,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
 
   func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = self
+    settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     if modelKind == .qwen3_8FlashNext {
       settings.bf16KVCache = false
       settings.dsparkEnabled = false
@@ -281,6 +283,10 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
         L10n.string(
           "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater."
         ))
+    }
+    guard (layerMajorPrefillThreshold ?? 1_024) >= 1 else {
+      throw ConfigurationError(
+        L10n.string("Layer-major prefill threshold must be greater than 0."))
     }
     guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
       throw ConfigurationError(
@@ -504,6 +510,7 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let fp8KVCache: Bool
       let memoryLimitGiB: Int
       let layerMajorPrefill: Bool
+      let layerMajorPrefillThreshold: Int
       let promptCacheEntries: Int
       let promptCacheMemoryGiB: Int
       let persistentPromptCache: Bool
@@ -537,6 +544,7 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case fp8KVCache = "fp8_kv_cache"
         case memoryLimitGiB = "memory_limit_gib"
         case layerMajorPrefill = "layer_major_prefill"
+        case layerMajorPrefillThreshold = "layer_major_prefill_threshold"
         case promptCacheEntries = "prompt_cache_entries"
         case promptCacheMemoryGiB = "prompt_cache_memory_gib"
         case persistentPromptCache = "persistent_prompt_cache"
@@ -572,6 +580,10 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(fp8KVCache, forKey: .fp8KVCache)
         try values.encode(memoryLimitGiB, forKey: .memoryLimitGiB)
         try values.encode(layerMajorPrefill, forKey: .layerMajorPrefill)
+        try values.encode(
+          layerMajorPrefillThreshold,
+          forKey: .layerMajorPrefillThreshold
+        )
         try values.encode(promptCacheEntries, forKey: .promptCacheEntries)
         try values.encode(promptCacheMemoryGiB, forKey: .promptCacheMemoryGiB)
         try values.encode(persistentPromptCache, forKey: .persistentPromptCache)
@@ -768,6 +780,17 @@ private struct ConfigurationError: LocalizedError {
 
 @MainActor
 final class ServerController: ObservableObject {
+  enum ModelAction: Equatable {
+    case load(String)
+    case unload(String)
+
+    var modelID: String {
+      switch self {
+      case .load(let modelID), .unload(let modelID): modelID
+      }
+    }
+  }
+
   enum State: Equatable {
     case stopped
     case starting
@@ -800,6 +823,8 @@ final class ServerController: ObservableObject {
   @Published private(set) var performance = LivePerformance()
   @Published private(set) var performanceHistory = PerformanceHistory()
   @Published private(set) var catalogModels: [CatalogModel] = []
+  @Published private(set) var modelAction: ModelAction?
+  @Published private(set) var modelActionError: String?
 
   private var process: Process?
   private var outputTask: Task<Void, Never>?
@@ -817,6 +842,8 @@ final class ServerController: ObservableObject {
     case .stopped, .failed: false
     }
   }
+
+  var canManageModels: Bool { state == .running }
 
   func start(_ configuration: ServerConfiguration, catalog: ModelCatalog) {
     guard !isActive else { return }
@@ -853,6 +880,7 @@ final class ServerController: ObservableObject {
       }
 
       log = ""
+      modelActionError = nil
       state = .starting
       try process.run()
       self.process = process
@@ -884,6 +912,50 @@ final class ServerController: ObservableObject {
   func clearPerformanceHistory() {
     performanceHistory.clear()
     lastRecordedCompletedRequestCount = performance.completedRequestCount
+  }
+
+  func loadModel(_ modelID: String) async {
+    await changeLoadedModel(.load(modelID), path: "api/models/load")
+  }
+
+  func unloadModel(_ modelID: String) async {
+    await changeLoadedModel(.unload(modelID), path: "api/models/unload")
+  }
+
+  private func changeLoadedModel(_ action: ModelAction, path: String) async {
+    guard modelAction == nil, case .running = state,
+      let configuration = monitorConfiguration,
+      let baseURL = configuration.baseURL
+    else { return }
+
+    modelAction = action
+    modelActionError = nil
+    defer { modelAction = nil }
+
+    var request = URLRequest(url: baseURL.appending(path: path))
+    request.httpMethod = "POST"
+    request.timeoutInterval = 1_800
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if !configuration.apiKey.isEmpty {
+      request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+    }
+
+    do {
+      request.httpBody = try JSONSerialization.data(
+        withJSONObject: ["model": action.modelID]
+      )
+      let (_, response) = try await URLSession.shared.data(for: request)
+      guard let http = response as? HTTPURLResponse else {
+        throw ConfigurationError(L10n.string("The server did not return an HTTP response."))
+      }
+      guard (200..<300).contains(http.statusCode) else {
+        throw ConfigurationError(
+          L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
+      }
+      await refreshPerformance()
+    } catch {
+      modelActionError = error.localizedDescription
+    }
   }
 
   private func readOutput(_ handle: FileHandle) {
@@ -1007,12 +1079,13 @@ final class ServerController: ObservableObject {
   }
 
   func updateLoadedModel(_ model: String?, completedRequestCount: Int) {
-    guard let model, model != lastLoadedModel else { return }
+    guard model != lastLoadedModel else { return }
+    lastLoadedModel = model
+    guard model != nil else { return }
     performanceHistory.clear()
     lastRecordedCompletedRequestCount = completedRequestCount
     previousSSDBytes = nil
     previousSSDTime = nil
-    lastLoadedModel = model
   }
 
   private func residentMemoryBytes(_ processID: Int32) -> UInt64 {
@@ -1043,6 +1116,8 @@ final class ServerController: ObservableObject {
     temporaryModelCatalog?.remove()
     temporaryModelCatalog = nil
     catalogModels = []
+    modelAction = nil
+    modelActionError = nil
     previousSSDBytes = nil
     previousSSDTime = nil
     performance = LivePerformance()

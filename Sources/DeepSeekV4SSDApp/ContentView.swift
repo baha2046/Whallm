@@ -6,6 +6,7 @@ struct ContentView: View {
   @ObservedObject var server: ServerController
   let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
+  @StateObject private var chatSession = ChatSession()
   @State private var configuration = ServerConfiguration.localDefault
   @State private var advancedSettings = ModelAdvancedSettings.defaults(for: .deepSeekV4)
   @State private var advancedSettingsModelKind: ModelKind?
@@ -67,6 +68,7 @@ struct ContentView: View {
     .background(AppTheme.pageBackground)
     .preferredColorScheme(.dark)
     .environment(\.locale, selectedLanguage.locale)
+    .onDisappear { chatSession.stopGenerating() }
     .task {
       await modelLibrary.scan()
       activateSelectedModel()
@@ -135,6 +137,7 @@ struct ContentView: View {
       ChatView(
         configuration: configuration,
         server: server,
+        session: chatSession,
         language: selectedLanguage
       )
     case .metric:
@@ -415,6 +418,11 @@ private struct ServerView: View {
             .padding(.top, 10)
           serverPanel
         } else {
+          if let loadedModelKind {
+            SectionHeader(title: L10n.string("Loaded", language: language))
+            loadedModelPanel(loadedModelKind)
+          }
+
           HStack(spacing: 16) {
             SectionHeader(title: L10n.string("Model", language: language))
             Spacer()
@@ -434,6 +442,15 @@ private struct ServerView: View {
           }
 
           modelPanel
+
+          if let modelActionError = server.modelActionError {
+            Label(modelActionError, systemImage: "exclamationmark.triangle.fill")
+              .font(.callout)
+              .foregroundStyle(.red)
+              .textSelection(.enabled)
+              .accessibilityLabel(
+                L10n.string("Error: %@", language: language, modelActionError))
+          }
 
           if modelLibrary.isBusy && modelLibrary.downloadModelKind == nil {
             operationPanel
@@ -668,7 +685,7 @@ private struct ServerView: View {
   private var modelPanel: some View {
     VStack(alignment: .leading, spacing: 14) {
       List(selection: selectedModelKind) {
-        ForEach(ModelLibrary.supportedModelKinds, id: \.rawValue) { modelKind in
+        ForEach(selectableModelKinds, id: \.rawValue) { modelKind in
           modelRow(modelKind)
           .contentShape(Rectangle())
           .tag(modelKind.rawValue)
@@ -684,7 +701,7 @@ private struct ServerView: View {
         L10n.string(
           "Select a model. You can select it before it is installed.", language: language))
 
-      if let selectedModel {
+      if let selectedModel, selectableModelKinds.contains(selectedModel.modelKind) {
         Divider()
 
         HStack(spacing: 10) {
@@ -731,6 +748,12 @@ private struct ServerView: View {
     .appCard()
   }
 
+  private func loadedModelPanel(_ modelKind: ModelKind) -> some View {
+    modelRow(modelKind)
+      .task { await modelLibrary.refreshInstallationPlan(for: modelKind) }
+      .appCard()
+  }
+
   private func modelRow(_ modelKind: ModelKind) -> some View {
     let model = modelLibrary.usableModel(for: modelKind)
     let downloadBlock = modelLibrary.downloadBlock(for: modelKind)
@@ -746,8 +769,13 @@ private struct ServerView: View {
             .controlSize(.small)
             .accessibilityHidden(true)
         } else {
-          Image(systemName: model == nil ? "arrow.down.circle" : "checkmark.circle.fill")
-            .foregroundStyle(model == nil ? Color.orange : Color.green)
+          Image(
+            systemName: isModelLoading(modelKind)
+              ? "clock.fill" : (model == nil ? "arrow.down.circle" : "checkmark.circle.fill")
+          )
+            .foregroundStyle(
+              isModelLoading(modelKind) ? Color.orange : (model == nil ? Color.orange : Color.green)
+            )
             .accessibilityHidden(true)
         }
 
@@ -768,6 +796,8 @@ private struct ServerView: View {
         } else if model == nil {
           modelDownloadButton(modelKind, block: downloadBlock)
         }
+
+        modelLifecycleButton(modelKind, model: model)
 
         Button {
           showAdvancedSettings(modelKind)
@@ -823,7 +853,11 @@ private struct ServerView: View {
         L10n.string(
           "%@ · %@",
           language: language,
-          L10n.string("Installed", language: language),
+          L10n.string(
+            isModelLoading(modelKind)
+              ? "Loading" : (isModelLoaded(modelKind) ? "Loaded" : "Installed"),
+            language: language
+          ),
           formattedBytes(model.size)
         )
       )
@@ -854,6 +888,73 @@ private struct ServerView: View {
         .font(.callout)
         .foregroundStyle(.secondary)
     }
+  }
+
+  private func modelLifecycleButton(
+    _ modelKind: ModelKind,
+    model: InstalledModelInfo?
+  ) -> some View {
+    let isLoaded = isModelLoaded(modelKind)
+    let label = L10n.string(
+      isLoaded ? "Unload %@" : "Load %@",
+      language: language,
+      modelKind.displayName
+    )
+    let disabledReason = modelLifecycleDisabledReason(modelKind, model: model)
+
+    return Button {
+      Task {
+        if isLoaded {
+          await server.unloadModel(modelKind.apiModelID)
+        } else {
+          await server.loadModel(modelKind.apiModelID)
+        }
+      }
+    } label: {
+      Label(
+        label,
+        systemImage: isLoaded ? "eject.fill" : "play.fill"
+      )
+    }
+    .fontWeight(isLoaded ? .thin : .regular)
+    .buttonStyle(TertiaryIconButtonStyle(color: isLoaded ? .secondary : .accentColor))
+    .accessibilityLabel(label)
+    .accessibilityHint(disabledReason ?? "")
+    .help(disabledReason ?? label)
+    .disabled(disabledReason != nil)
+    .overlay {
+      if let disabledReason {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(disabledReason)
+          .accessibilityHidden(true)
+      }
+    }
+  }
+
+  private func modelLifecycleDisabledReason(
+    _ modelKind: ModelKind,
+    model: InstalledModelInfo?
+  ) -> String? {
+    if model == nil {
+      return L10n.string("Install the model first.", language: language)
+    }
+    if !server.canManageModels {
+      return L10n.string("Start the server first", language: language)
+    }
+    if server.performance.generating {
+      return L10n.string("Wait for the current response to finish.", language: language)
+    }
+    if server.modelAction != nil || server.performance.loadingModel != nil {
+      return L10n.string("Another model action is in progress.", language: language)
+    }
+    if !server.catalogModels.contains(where: { $0.id == modelKind.apiModelID }) {
+      return L10n.string(
+        "The model is not available to this server. Restart the server.",
+        language: language
+      )
+    }
+    return nil
   }
 
   @ViewBuilder
@@ -939,12 +1040,12 @@ private struct ServerView: View {
   }
 
   private var modelListHeight: CGFloat {
-    var height = CGFloat(ModelLibrary.supportedModelKinds.count) * 62
+    var height = CGFloat(selectableModelKinds.count) * 62
     if modelLibrary.downloadModelKind != nil {
       height += modelDownloadProgressExtraHeight(
         hasProgressFraction: modelLibrary.operationProgress?.fraction != nil)
     }
-    let visibleDownloadReasonCount = ModelLibrary.supportedModelKinds.filter {
+    let visibleDownloadReasonCount = selectableModelKinds.filter {
       shouldShowModelDownloadReason(
         modelIsInstalled: modelLibrary.usableModel(for: $0) != nil,
         modelIsDownloading: modelLibrary.downloadModelKind == $0,
@@ -1037,6 +1138,23 @@ private struct ServerView: View {
 
   private var selectedModel: InstalledModelInfo? {
     modelLibrary.usableModel(for: modelLibrary.selectedModelKind)
+  }
+
+  private var loadedModelKind: ModelKind? {
+    modelKind(withAPIModelID: server.performance.loadedModel)
+  }
+
+  private var selectableModelKinds: [ModelKind] {
+    ModelLibrary.supportedModelKinds.filter { $0 != loadedModelKind }
+  }
+
+  private func isModelLoaded(_ modelKind: ModelKind) -> Bool {
+    server.performance.loadedModel == modelKind.apiModelID
+  }
+
+  private func isModelLoading(_ modelKind: ModelKind) -> Bool {
+    server.performance.loadingModel == modelKind.apiModelID
+      || server.modelAction == .load(modelKind.apiModelID)
   }
 
   private var summaryStatusLabel: String {
@@ -1301,6 +1419,12 @@ func modelSelectionIsLocked(
   operationIsBusy && !downloadIsActive
 }
 
+@MainActor
+func modelKind(withAPIModelID modelID: String?) -> ModelKind? {
+  guard let modelID else { return nil }
+  return ModelLibrary.supportedModelKinds.first { $0.apiModelID == modelID }
+}
+
 private struct AdvancedView: View {
   @Binding var configuration: ServerConfiguration
   let serverActive: Bool
@@ -1518,6 +1642,16 @@ private struct ModelAdvancedView: View {
             hint: "Loads routed experts by layer during prefill.",
             value: $settings.layerMajorPrefill
           )
+          if modelKind == .deepSeekV4 {
+            Divider()
+            integerField(
+              "Layer-major prefill threshold",
+              hint:
+                "Minimum uncached prompt tokens required for layer-major prefill. The default is 1024.",
+              value: layerMajorPrefillThreshold
+            )
+            .disabled(!settings.layerMajorPrefill)
+          }
           Divider()
           integerField(
             "Prompt cache entries",
@@ -1584,6 +1718,13 @@ private struct ModelAdvancedView: View {
     }
     .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
+  }
+
+  private var layerMajorPrefillThreshold: Binding<Int> {
+    Binding(
+      get: { settings.layerMajorPrefillThreshold ?? 1_024 },
+      set: { settings.layerMajorPrefillThreshold = $0 }
+    )
   }
 
   private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
@@ -2213,17 +2354,135 @@ func resolvedChatModelName(savedName: String, models: [CatalogModel]) -> String?
   }?.requestName ?? models.first?.requestName
 }
 
-private struct ChatView: View {
+@MainActor
+final class ChatSession: ObservableObject {
+  typealias Stream = (
+    _ messages: [ChatMessage],
+    _ baseURL: URL,
+    _ apiKey: String,
+    _ model: String,
+    _ thinkingMode: String,
+    _ receive: @MainActor @escaping (ChatDelta) -> Void
+  ) async throws -> Void
+
+  @Published private(set) var messages: [ChatMessage]
+  @Published private(set) var isSending = false
+  @Published private(set) var errorMessage: String?
+
+  private let defaults: UserDefaults
+  private let stream: Stream
+  private var generationTask: Task<Void, Never>?
+
+  init(
+    defaults: UserDefaults = .standard,
+    stream: @escaping Stream = { messages, baseURL, apiKey, model, thinkingMode, receive in
+      _ = try await ChatClient.stream(
+        messages: messages,
+        baseURL: baseURL,
+        apiKey: apiKey,
+        model: model,
+        thinkingMode: thinkingMode,
+        enableTestTool: false,
+        receive: receive
+      )
+    }
+  ) {
+    self.defaults = defaults
+    self.stream = stream
+    messages = ChatHistory.load(defaults: defaults)
+  }
+
+  @discardableResult
+  func send(
+    text: String,
+    configuration: ServerConfiguration,
+    model: String,
+    thinkingMode: String,
+    language: AppLanguage
+  ) -> Bool {
+    let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty, !isSending, let baseURL = configuration.baseURL else { return false }
+
+    let userMessage = ChatMessage(role: "user", content: text)
+    messages.append(userMessage)
+    errorMessage = nil
+    isSending = true
+    let requestMessages = messages
+    let assistantID = UUID()
+    messages.append(
+      ChatMessage(id: assistantID, role: "assistant", content: "", modelName: model))
+    save()
+
+    generationTask = Task {
+      defer {
+        save()
+        isSending = false
+        generationTask = nil
+      }
+      do {
+        try await stream(
+          requestMessages,
+          baseURL,
+          configuration.apiKey,
+          model,
+          thinkingMode
+        ) { delta in
+          guard let index = self.messages.firstIndex(where: { $0.id == assistantID }) else {
+            return
+          }
+          self.messages[index].append(delta)
+        }
+      } catch {
+        if Task.isCancelled {
+          removeEmptyAssistantMessage(id: assistantID)
+          return
+        }
+        if let index = messages.firstIndex(where: { $0.id == assistantID }),
+          messages[index].content.isEmpty,
+          messages[index].reasoningContent.isEmpty,
+          messages[index].toolCalls.isEmpty
+        {
+          messages.remove(at: index)
+        }
+        errorMessage = L10n.string(
+          "Could not get a response. %@", language: language, error.localizedDescription)
+      }
+    }
+    return true
+  }
+
+  func stopGenerating() {
+    generationTask?.cancel()
+  }
+
+  func clear() {
+    guard !isSending else { return }
+    messages.removeAll()
+    errorMessage = nil
+    save()
+  }
+
+  private func save() {
+    ChatHistory.save(messages, defaults: defaults)
+  }
+
+  private func removeEmptyAssistantMessage(id: UUID) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    let message = messages[index]
+    if message.content.isEmpty && message.reasoningContent.isEmpty && message.toolCalls.isEmpty {
+      messages.remove(at: index)
+    }
+  }
+}
+
+struct ChatView: View {
   let configuration: ServerConfiguration
   @ObservedObject var server: ServerController
+  @ObservedObject var session: ChatSession
   let language: AppLanguage
-  @State private var messages = ChatHistory.load()
   @AppStorage("chatDraft") private var input = ""
   @AppStorage("chatThinkingMode") private var thinkingMode = "chat"
   @AppStorage("chatModel") private var selectedModelName = ""
-  @State private var isSending = false
-  @State private var generationTask: Task<Void, Never>?
-  @State private var errorMessage: String?
   @State private var showingClearConfirmation = false
 
   var body: some View {
@@ -2415,7 +2674,6 @@ private struct ChatView: View {
     .padding(.vertical, 24)
     .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
-    .onDisappear { generationTask?.cancel() }
     .onChange(of: server.catalogModels) { selectAvailableModel() }
     .onAppear { selectAvailableModel() }
     .confirmationDialog(
@@ -2424,10 +2682,8 @@ private struct ChatView: View {
       titleVisibility: .visible
     ) {
       Button(localized("Clear Chat"), role: .destructive) {
-        messages.removeAll()
-        ChatHistory.save(messages)
+        session.clear()
         input = ""
-        errorMessage = nil
       }
       Button(localized("Cancel"), role: .cancel) {}
     } message: {
@@ -2456,6 +2712,12 @@ private struct ChatView: View {
     L10n.string(key, language: language)
   }
 
+  private var messages: [ChatMessage] { session.messages }
+
+  private var isSending: Bool { session.isSending }
+
+  private var errorMessage: String? { session.errorMessage }
+
   private var selectedCatalogModel: CatalogModel? {
     server.catalogModels.first {
       $0.requestName == selectedModelName || $0.id == selectedModelName
@@ -2476,65 +2738,19 @@ private struct ChatView: View {
   }
 
   private func send() {
-    let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty, let baseURL = configuration.baseURL,
-      let model = selectedCatalogModel?.requestName
-    else { return }
-    let userMessage = ChatMessage(role: "user", content: text)
-    messages.append(userMessage)
-    input = ""
-    errorMessage = nil
-    isSending = true
-    let requestMessages = messages
-    let assistantID = UUID()
-    messages.append(
-      ChatMessage(id: assistantID, role: "assistant", content: "", modelName: model))
-    ChatHistory.save(messages)
-    generationTask = Task {
-      defer {
-        ChatHistory.save(messages)
-        isSending = false
-        generationTask = nil
-      }
-      do {
-        _ = try await ChatClient.stream(
-          messages: requestMessages,
-          baseURL: baseURL,
-          apiKey: configuration.apiKey,
-          model: model,
-          thinkingMode: thinkingMode,
-          enableTestTool: false
-        ) { delta in
-          guard let index = messages.firstIndex(where: { $0.id == assistantID }) else { return }
-          messages[index].append(delta)
-        }
-      } catch {
-        if Task.isCancelled {
-          removeEmptyAssistantMessage(id: assistantID)
-          return
-        }
-        if let index = messages.firstIndex(where: { $0.id == assistantID }),
-          messages[index].content.isEmpty,
-          messages[index].reasoningContent.isEmpty,
-          messages[index].toolCalls.isEmpty
-        {
-          messages.remove(at: index)
-        }
-        errorMessage = L10n.string(
-          "Could not get a response. %@", language: language, error.localizedDescription)
-      }
+    guard let model = selectedCatalogModel?.requestName else { return }
+    if session.send(
+      text: input,
+      configuration: configuration,
+      model: model,
+      thinkingMode: thinkingMode,
+      language: language
+    ) {
+      input = ""
     }
   }
 
   private func stopGenerating() {
-    generationTask?.cancel()
-  }
-
-  private func removeEmptyAssistantMessage(id: UUID) {
-    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    let message = messages[index]
-    if message.content.isEmpty && message.reasoningContent.isEmpty && message.toolCalls.isEmpty {
-      messages.remove(at: index)
-    }
+    session.stopGenerating()
   }
 }

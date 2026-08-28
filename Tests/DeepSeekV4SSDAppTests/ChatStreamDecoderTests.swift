@@ -1,3 +1,5 @@
+import AppKit
+import SwiftUI
 import XCTest
 
 @testable import DeepSeekV4SSDApp
@@ -163,5 +165,78 @@ final class ChatStreamDecoderTests: XCTestCase {
 
     XCTAssertEqual(message.id, id)
     XCTAssertNil(message.modelName)
+  }
+
+  @MainActor
+  func testGenerationContinuesAfterLeavingAndReturningToChat() async throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let session = ChatSession(
+      defaults: defaults,
+      stream: { _, _, _, _, _, receive in
+        receive(ChatDelta(content: "first", reasoningContent: ""))
+        try await Task.sleep(for: .milliseconds(500))
+        receive(ChatDelta(content: " second", reasoningContent: ""))
+      }
+    )
+    let visibility = ChatVisibility()
+    let hostingView = NSHostingView(
+      rootView: ChatNavigationHarness(
+        visibility: visibility,
+        server: ServerController(),
+        session: session
+      ))
+    hostingView.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
+    hostingView.layoutSubtreeIfNeeded()
+
+    XCTAssertTrue(
+      session.send(
+        text: "Hello",
+        configuration: .localDefault,
+        model: "test-model",
+        thinkingMode: "chat",
+        language: .english
+      ))
+    try await Task.sleep(for: .milliseconds(100))
+    XCTAssertEqual(session.messages.last?.content, "first")
+
+    visibility.showsChat = false
+    try await Task.sleep(for: .milliseconds(100))
+    hostingView.layoutSubtreeIfNeeded()
+    visibility.showsChat = true
+    try await Task.sleep(for: .milliseconds(100))
+    hostingView.layoutSubtreeIfNeeded()
+    XCTAssertTrue(session.isSending)
+    try await Task.sleep(for: .milliseconds(400))
+
+    XCTAssertEqual(session.messages.last?.content, "first second")
+    XCTAssertFalse(session.isSending)
+  }
+}
+
+@MainActor
+private final class ChatVisibility: ObservableObject {
+  @Published var showsChat = true
+}
+
+private struct ChatNavigationHarness: View {
+  @ObservedObject var visibility: ChatVisibility
+  @ObservedObject var server: ServerController
+  @ObservedObject var session: ChatSession
+
+  var body: some View {
+    Group {
+      if visibility.showsChat {
+        ChatView(
+          configuration: .localDefault,
+          server: server,
+          session: session,
+          language: .english
+        )
+      } else {
+        Text("Other")
+      }
+    }
   }
 }
