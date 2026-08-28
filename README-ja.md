@@ -67,11 +67,11 @@ server を起動 → アプリで対話または Codex に接続**
 > [!IMPORTANT]
 > 以前の Sparkle signing key が使用できないため、バージョン 1.0.3 から
 > 1.0.4 へ自動更新できません。アプリを終了し、
-> [1.0.4 release](https://github.com/yanun0323/Wallm/releases/tag/v1.0.4)から
+> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4)から
 > `DeepSeekV4SSD-macOS-arm64.zip` をダウンロードして、既存のアプリを手動で
 > 置き換えてください。1.0.4 のインストール後は自動更新を使用できます。
 
-1. [GitHub Releases](https://github.com/yanun0323/Wallm/releases/latest) から
+1. [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest) から
    最新の `Whallm-macOS-arm64.zip` をダウンロードします。
 2. ZIP を展開して `Whallm.app` を開きます。
 3. **Model** ページを開きます。DeepSeek または Qwen を選択し、

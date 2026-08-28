@@ -72,12 +72,12 @@ server → Chat in the app or connect Codex**
 > Version 1.0.3 cannot install version 1.0.4 through automatic update because
 > the previous Sparkle signing key is no longer available. Quit the app,
 > download `DeepSeekV4SSD-macOS-arm64.zip` from the
-> [1.0.4 release](https://github.com/yanun0323/Wallm/releases/tag/v1.0.4),
+> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4),
 > and replace the existing app manually. Automatic updates work again after
 > you install version 1.0.4.
 
 1. Download the latest `Whallm-macOS-arm64.zip` from
-   [GitHub Releases](https://github.com/yanun0323/Wallm/releases/latest).
+   [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest).
 2. Extract the ZIP and open `Whallm.app`.
 3. Open the **Model** page. Select DeepSeek or Qwen, and then select
    **Download Model**. The app checks the required storage. Qwen downloads the

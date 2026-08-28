@@ -4,7 +4,7 @@ set -euo pipefail
 project_root=${0:A:h:h}
 version=${VERSION:?Set VERSION, for example: make release VERSION=1.1.0}
 tag=${TAG:-v$version}
-repository=${GITHUB_REPOSITORY:-yanun0323/Wallm}
+repository=${GITHUB_REPOSITORY:-yanun0323/Whallm}
 archive_name=Whallm-macOS-arm64.zip
 archive_path=$project_root/dist/$archive_name
 sparkle_tools=$project_root/.build/artifacts/sparkle/Sparkle/bin

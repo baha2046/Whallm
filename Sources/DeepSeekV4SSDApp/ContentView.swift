@@ -1879,28 +1879,28 @@ private struct SettingsView: View {
             title: "GitHub Repository",
             note: "Source, issues, and roadmap",
             icon: "chevron.left.forwardslash.chevron.right",
-            url: "https://github.com/yanun0323/Wallm"
+            url: "https://github.com/yanun0323/Whallm"
           )
           Divider()
           projectLink(
             title: "Releases",
             note: "Download the latest macOS app",
             icon: "shippingbox",
-            url: "https://github.com/yanun0323/Wallm/releases"
+            url: "https://github.com/yanun0323/Whallm/releases"
           )
           Divider()
           projectLink(
             title: "Documentation",
             note: "Setup, model management, and API usage",
             icon: "book.closed",
-            url: "https://github.com/yanun0323/Wallm#readme"
+            url: "https://github.com/yanun0323/Whallm#readme"
           )
           Divider()
           projectLink(
             title: "Report an Issue",
             note: "Report bugs and request features on GitHub",
             icon: "exclamationmark.bubble",
-            url: "https://github.com/yanun0323/Wallm/issues"
+            url: "https://github.com/yanun0323/Whallm/issues"
           )
         }
         .appCard()

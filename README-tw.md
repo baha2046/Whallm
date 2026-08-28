@@ -67,11 +67,11 @@ prompt、SSD 速度和 cache 狀態會改變效能。請參閱
 > [!IMPORTANT]
 > 1.0.3 版無法透過自動更新安裝 1.0.4 版，因為舊的 Sparkle signing key
 > 已無法使用。請結束 APP，從
-> [1.0.4 release](https://github.com/yanun0323/Wallm/releases/tag/v1.0.4)
+> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4)
 > 下載 `DeepSeekV4SSD-macOS-arm64.zip`，然後手動取代現有 APP。
 > 安裝 1.0.4 版後，自動更新會恢復正常。
 
-1. 從 [GitHub Releases](https://github.com/yanun0323/Wallm/releases/latest)
+1. 從 [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest)
    下載最新的 `Whallm-macOS-arm64.zip`。
 2. 解壓縮 ZIP。開啟 `Whallm.app`。
 3. 開啟「模型」頁面。選擇 DeepSeek 或 Qwen，然後選擇「下載模型」。APP 會檢查

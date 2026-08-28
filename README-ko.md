@@ -67,11 +67,11 @@ MacBook Pro에서 측정했습니다. 두 모델 모두 `reasoning_effort: low`�
 > [!IMPORTANT]
 > 이전 Sparkle signing key를 더 이상 사용할 수 없으므로 버전 1.0.3에서
 > 1.0.4로 자동 업데이트할 수 없습니다. 앱을 종료하고
-> [1.0.4 release](https://github.com/yanun0323/Wallm/releases/tag/v1.0.4)에서
+> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4)에서
 > `DeepSeekV4SSD-macOS-arm64.zip`을 다운로드한 후 기존 앱을 직접 교체하세요.
 > 1.0.4를 설치하면 자동 업데이트를 다시 사용할 수 있습니다.
 
-1. [GitHub Releases](https://github.com/yanun0323/Wallm/releases/latest)에서 최신
+1. [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest)에서 최신
    `Whallm-macOS-arm64.zip`을 다운로드합니다.
 2. ZIP 파일의 압축을 풀고 `Whallm.app`을 엽니다.
 3. **Model** 페이지를 엽니다. DeepSeek 또는 Qwen을 선택한 다음
