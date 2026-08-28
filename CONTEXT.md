@@ -12,6 +12,9 @@ This project builds a memory-bounded Apple Silicon runtime for
 - **expert blob**: The canonical packed bytes for one routed expert.
 - **repack plan**: The complete mapping from checkpoint byte ranges to installed model byte ranges.
 - **installed model**: A verified local directory produced from a repack plan.
+- **API model ID**: The fixed, case-sensitive API name for one model kind.
+- **Alias**: An optional, case-sensitive request name for an API model ID. An Alias does not
+  change the API model ID.
 - **manifest**: The JSON file that defines an installed model and its integrity metadata.
 - **slot**: A fixed Metal-visible memory region that can hold one expert blob.
 - **main model**: The 43 target-model layers. It excludes DSpark.

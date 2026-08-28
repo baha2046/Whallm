@@ -63,11 +63,14 @@ server → Chat in the app or connect Codex**
 1. Download the latest `Whallm-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest).
 2. Extract the ZIP and open `Whallm.app`.
-3. Select DeepSeek or Qwen. Then select **Download Model**. The app checks the
-   required storage. Qwen downloads the published MXFP4 installed model. You
-   can stop the download and resume it later.
-4. Select **Start Server** after the model is ready.
-5. Use the chat in the app, or connect Codex with the configuration below.
+3. Open the **Model** page. Select DeepSeek or Qwen, and then select
+   **Download Model**. The app checks the required storage. Qwen downloads the
+   published MXFP4 installed model. You can stop the download and resume it
+   later.
+4. Open the **Server** page and select **Start Server**. The server can start
+   with no installed model, but generation needs an installed model.
+5. Open the chat and select a model. You can also connect Codex with the
+   configuration below.
 
 The local server starts at `http://127.0.0.1:11434` by default.
 
@@ -122,6 +125,10 @@ for more options.
 - The runtime uses an FP8 KV cache and a bounded expert cache to control memory
   use.
 - The installed model is verified against the pinned checkpoint revision.
+- Server startup reads the installed model list but does not load model
+  weights. The first generation request loads its selected model.
+- The server keeps one model loaded. A request for another model closes the old
+  runtime before it loads the new runtime.
 
 ### Model storage and DSpark
 
@@ -145,6 +152,13 @@ The server supports these endpoints:
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
 
+The fixed API model IDs are `deepseek-v4-flash-0731` and
+`qwen3.8-flash-next-fp8`. Each model's **Advanced Settings** view lets you set an
+optional Alias. Valid changes are saved automatically. Generation requests
+accept the API model ID or its Alias. The chat model picker shows only the
+installed models that were available when the server started. Restart the
+server after a download finishes while it is running.
+
 The Responses API supports Codex tools and OpenAI function tools. The client
 must run each tool and send the result back to the server. Read the
 [API guide](docs/API.md) for fields, examples, and current limits.
@@ -152,7 +166,8 @@ must run each tool and send the result back to the server. Read the
 ### Metrics and privacy
 
 The app shows prefill speed, decode speed, token counts, memory use, SSD read
-speed, cache hit rate, first-token wait time, and completion time.
+speed, cache hit rate, first-token wait time, and completion time. The app
+clears metric history when the loaded model changes.
 
 Inference runs on your Mac. Prompts and generated text stay in the local
 runtime unless the connected client sends them elsewhere. The app uses the
@@ -167,7 +182,8 @@ requests.
 - Qwen full-model SHA-256, text, thinking, tool call, greedy 4K, prompt cache,
   and packaged App validation passed on the recorded M5 Pro environment. See
   the [Qwen support status](docs/QWEN.md).
-- The runtime processes one generation request at a time.
+- The server keeps one model loaded and processes one generation request at a
+  time. Other generation requests wait until the full request stream ends.
 - Images, audio, logprobs, `response_format`, and `stop` are not supported.
 - Request bodies are limited to 1 MiB.
 - Very long input and output need more KV cache memory.

@@ -6,6 +6,7 @@ export
 MODEL ?= scratch/deepseek-v4-flash-0731.dsv4
 HOST ?= 127.0.0.1
 PORT ?= 11434
+SPEED_BENCH_DIR ?= scratch/speed-bench
 SPARKLE_FRAMEWORK_PATH := $(CURDIR)/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64
 
 ARGS := $(word 2,$(MAKECMDGOALS))
@@ -45,13 +46,15 @@ server:
 	PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.server \
 		--model "$(MODEL)" --host "$(HOST)" --port "$(PORT)" $(ARGS)
 
-## benchmark-dsv4: benchmark an API model with 1K, 4K, 16K, and 32K inputs
+## benchmark-dsv4: benchmark DeepSeek with SPEED-Bench mixed inputs
 benchmark-dsv4:
-	.venv/bin/python Scripts/benchmark_api.py $(ARGS) --model deepseek-v4-flash-0731 --runs 3
+	.venv/bin/python Scripts/benchmark_api.py --model deepseek-v4-flash-0731 \
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 5 $(ARGS)
 
-## benchmark-qwen: benchmark an API model with 1K, 4K, 16K, and 32K inputs
+## benchmark-qwen: benchmark Qwen with SPEED-Bench mixed inputs
 benchmark-qwen:
-	.venv/bin/python Scripts/benchmark_api.py $(ARGS) --model Qwen/Qwen3.8-Flash-Next-FP8 --runs 3
+	.venv/bin/python Scripts/benchmark_api.py --model qwen3.8-flash-next-fp8 \
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 5 $(ARGS)
 
 %:
 	@:

@@ -885,9 +885,32 @@ xcrun xctrace record \
 ## API input size benchmark
 
 `Scripts/benchmark_api.py` 透過 Whallm API 執行 input size benchmark。
-預設 input size 是 1K、4K、16K 和 32K token。
-腳本使用 installed model 的 tokenizer 建立精確 token 數的 raw completion prompt。
+預設 input size 是 1K、2K、8K、16K 和 32K token。
+腳本使用 SPEED-Bench throughput subset 的 `mixed` category。
+腳本先縮短每筆資料的第一個 user message。
+腳本再套用 installed model 的完整 chat template。
+產生的 prompt 會保留 chat template 尾端，並符合指定的 input token 數。
 腳本也會確認 server 回報相同的 input token 數。
+
+[SPEED-Bench](https://huggingface.co/datasets/nvidia/SPEED-Bench)
+使用 NVIDIA Evaluation Dataset License Agreement。
+使用者必須先確認該授權適合測試用途。
+使用者必須使用 NVIDIA 的官方
+[`prepare.py`](https://github.com/NVIDIA-NeMo/Skills/blob/e06c9b900177be3f60d6a3f99135bb5de9af9bed/nemo_skills/dataset/speed-bench/prepare.py)
+建立 JSONL。
+下列命令固定目前核對的 NVIDIA-NeMo/Skills commit：
+
+```sh
+python3 -m venv scratch/speed-bench-venv
+scratch/speed-bench-venv/bin/python -m pip install datasets pandas numpy tiktoken
+curl -fsSLo scratch/prepare-speed-bench.py \
+  https://raw.githubusercontent.com/NVIDIA-NeMo/Skills/e06c9b900177be3f60d6a3f99135bb5de9af9bed/nemo_skills/dataset/speed-bench/prepare.py
+scratch/speed-bench-venv/bin/python scratch/prepare-speed-bench.py \
+  --config all \
+  --output_dir scratch/speed-bench
+```
+
+`SPEED_BENCH_DIR` 可以指定另一個已準備的資料夾。
 
 ```sh
 make benchmark-dsv4
@@ -913,27 +936,32 @@ OPENAI_API_KEY='<local-key>' \
   .venv/bin/python Scripts/benchmark_api.py \
   --model-path /Volumes/Models/deepseek-v4-flash-0731.dsv4 \
   --model deepseek-v4-flash-0731 \
+  --speed-bench-dir scratch/speed-bench \
   --runs 5
 ```
 
 ```sh
 .venv/bin/python Scripts/benchmark_api.py \
-  --model Qwen/Qwen3.8-Flash-Next-FP8 \
+  --model qwen3.8-flash-next-fp8 \
+  --speed-bench-dir scratch/speed-bench \
   --runs 5 \
   --max-output-tokens 64
 ```
 
-每個 run 記錄最終 TTFT、Prefill tok/s、Decode tok/s 和 request 期間最高的
-`performance.active_memory_bytes`。
-每個 input size 的 Peak 和 P95 使用個別 run 的結果計算。
+每個 run 記錄總花費時間、最終 TTFT、Prefill tok/s、Decode tok/s 和 request
+期間最高的 `performance.active_memory_bytes`。
+每個 input size 的 Maximum 和 P95 使用個別 run 的結果計算。
 P95 使用 nearest-rank 方法。
-少於 20 個 run 時，nearest-rank P95 會等於 Peak。
+少於 20 個 run 時，nearest-rank P95 會等於 Maximum。
 
 腳本會在終端顯示 ASCII 表格。
+表格會並排顯示 P95 和 Maximum。
+兩組欄位都包含 `Total time (s)`、TTFT、Prefill、Decode 和 Memory。
 腳本也會把每個 run、source、environment、runtime configuration、cache state
 和 output text hash 寫入 `docs/benchmarks/`。
 artifact 的 `server.started_by_benchmark` 會記錄 Server 是否由腳本啟動。
-每個 run 使用不同的 prompt prefix。
+每個 run 使用不同的 SPEED-Bench input。
+artifact 會記錄 SPEED-Bench question ID、來源、subset file SHA-256 和 `mixed` category。
 腳本不會清除 prompt cache 或作業系統 page cache。
 Memory 是 MLX active memory，不是 process RSS。
 API 不提供生成 token ID，所以 artifact 不宣稱具有正式 output token hash。

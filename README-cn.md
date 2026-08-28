@@ -47,16 +47,17 @@ GPU 和 64 GiB 统一内存。测试已禁用 DSpark。
 
 ## 如何使用
 
-**下载 APP → 打开 APP → 下载 167 GB 全参数模型 → 启动 server →
+**下载 APP → 打开 APP → 选择并下载模型 → 启动 server →
 在 APP 中对话或连接 Codex**
 
 1. 从 [GitHub Releases](https://github.com/yanun0323/deepseek_ssd/releases/latest)
    下载最新的 `Whallm-macOS-arm64.zip`。
 2. 解压 ZIP。打开 `Whallm.app`。
-3. 选择“下载模型”。DeepSeek 安装始终包含 DSpark。installed model 约使用 167 GB。
-   你可以停止下载，以后再继续下载。
-4. 模型 ready 后，选择“启动 server”。
-5. 使用 APP 的对话功能，或使用下方配置连接 Codex。
+3. 打开“模型”页面。选择 DeepSeek 或 Qwen，然后选择“下载模型”。APP 会检查
+   所需存储空间。你可以停止下载，以后再继续下载。
+4. 打开“Server”页面，然后选择“启动 server”。server 可以在没有 installed model
+   时启动，但 generation request 需要 installed model。
+5. 打开对话页面并选择模型。你也可以使用下方配置连接 Codex。
 
 默认本机 server 地址是 `http://127.0.0.1:11434`。
 
@@ -69,7 +70,7 @@ GPU 和 64 GiB 统一内存。测试已禁用 DSpark。
 | Mac | Apple Silicon M 系列 Mac |
 | macOS | macOS 15 或更高版本 |
 | 统一内存 | 64 GiB 或更多 |
-| 可用存储空间 | 约 172 GB（160 GiB） |
+| 可用存储空间 | APP 会检查所选模型和现有的部分下载 |
 | 模型存储设备 | 高速内置、Thunderbolt 或 USB4 SSD |
 | 网络 | 下载模型和 APP 更新时需要网络 |
 
@@ -108,6 +109,10 @@ requires_openai_auth = false
   routed expert。
 - runtime 使用 FP8 KV cache 和有容量上限的 expert cache 控制内存用量。
 - installed model 必须通过固定 checkpoint revision 的验证。
+- server 启动时只读取 installed model 清单，不会加载模型权重。第一个 generation
+  request 会加载指定模型。
+- server 一次只保留一个已加载模型。request 指定另一个模型时，server 会先关闭
+  旧 runtime，然后加载新 runtime。
 
 ### 模型存储空间与 DSpark
 
@@ -116,6 +121,7 @@ requires_openai_auth = false
 - 安装 DSpark 不会启用 DSpark。你可以在 runtime 设置中启用“使用 DSpark”来
   测试 speculative decoding。
 - 你可以移除 DSpark。移除 DSpark 不需要重新安装 main model。
+- Qwen installed weight 文件使用 125,268,506,112 bytes。Qwen 不支持 DSpark。
 
 ### OpenAI 兼容 server
 
@@ -127,13 +133,19 @@ server 支持以下 endpoint：
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
 
+固定 API model ID 是 `deepseek-v4-flash-0731` 和
+`qwen3.8-flash-next-fp8`。每个模型的“进阶设置”页面可设置可选 Alias。
+有效更改会自动保存。generation request 接受 API model ID 或 Alias。
+如果下载在 server 运行期间完成，请重新启动 server。
+
 Responses API 支持 Codex tool 和 OpenAI function tool。API client 必须执行 tool，
 然后将结果发回 server。[API 指南](docs/API.md)包含 request 字段、示例和当前限制。
 
 ### 指标与隐私
 
 APP 会显示 prefill 速度、decode 速度、token 数量、内存用量、SSD 读取速度、
-cache hit rate、第一个 token 等待时间和完成时间。
+cache hit rate、第一个 token 等待时间和完成时间。加载的模型切换时，APP 会清除
+指标历史。
 
 runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 runtime 中。
 连接的 API client 仍可能将数据发送到其他位置。APP 会使用网络下载模型、
@@ -141,8 +153,8 @@ runtime 会在 Mac 上执行推理。prompt 和生成文本会保留在本机 ru
 
 ### 当前限制
 
-- runtime 只支持固定 checkpoint revision 的 `DeepSeek-V4-Flash-0731`。
-- runtime 一次只处理一个生成 request。
+- runtime 只支持当前文档中两个固定的 checkpoint revision。
+- server 一次只保留一个已加载模型，并且一次只处理一个 generation request。
 - API 不支持图片、音频、logprobs、`response_format` 和 `stop`。
 - server 将 request body 限制为 1 MiB。
 - 很长的 input 和 output 需要更多 KV cache 内存。

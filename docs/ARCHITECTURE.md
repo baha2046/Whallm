@@ -23,7 +23,9 @@ Published Qwen installed model artifact
   -> installed model + manifest
 
 installed model
-  -> Python MLX runtime
+  -> model catalog
+  -> ModelManager
+  -> Python MLX runtime on first generation request
   -> OpenAI-compatible server
   -> SwiftUI APP or API client
 ```
@@ -33,6 +35,7 @@ installed model
 | `DeepSeekRepack` | 檢查 checkpoint、建立 repack plan、下載 published installed model、安裝、驗證和 repair。 |
 | `dsv4-repack` | 提供 `inspect`、`plan`、`repack`、`verify`、`install-dspark` 和 `benchmark`。 |
 | `deepseek_v4_ssd` | 載入 installed model、執行推論、管理 cache 和記錄指標。 |
+| `deepseek_v4_ssd.model_manager` | 驗證 model catalog、延遲載入一個 runtime、切換模型並序列化 generation request。 |
 | `deepseek_v4_ssd.server` | 提供 OpenAI 相容 API 和 APP 專用 API。 |
 | `DeepSeekV4SSDApp` | 管理模型、啟動 server、顯示對話和效能。 |
 
@@ -48,7 +51,8 @@ Qwen 的完整合約和資料路徑請見 [Qwen 支援](QWEN.md)。
 
 | 欄位 | 值 |
 | --- | ---: |
-| Model ID | `deepseek-ai/DeepSeek-V4-Flash-0731` |
+| checkpoint model ID | `deepseek-ai/DeepSeek-V4-Flash-0731` |
+| API model ID | `deepseek-v4-flash-0731` |
 | Revision | `7872f01b1d1fe23eabc4c98b48bffcef5a386062` |
 | main model layers | 43 |
 | routed experts per layer | 256 |
@@ -179,7 +183,7 @@ Qwen repair 直接重新下載失敗的 installed file。
 | `dsv4-repack verify` | manifest 合約、file size 和每個 file 的 SHA-256。 |
 | Python runtime 載入 | 固定合約、必要 file、safe path、file size 和 expert layout。 |
 
-Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
+Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 使用者應在安裝後或懷疑損壞時執行完整驗證。
 
 ## Runtime 預設值
@@ -205,9 +209,9 @@ Python runtime 啟動時不重新計算 155 GiB 的 SHA-256。
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |
 
 APP 的省電模式 Slider 支援 500 MB/s、1、2、3、5、10、25 GB/s 和無限制。
-選擇速度上限時，APP 會傳送 `--power-saving-limit-gbps`。
-server 只接受 0.5、1、2、3、5、10 或 25 GB/s。
-選擇無限制時，APP 不會傳送這個參數。
+APP 會把選定值寫入 model catalog 的每個 `runtime` object。
+server 只接受 0.5、1、2、3、5、10、25 GB/s 或 `null`。
+`null` 代表無限制。
 限速器會序列化 routed expert 的 `preadv` 呼叫，並在每次讀取後等待。
 此限速不包含啟動時讀取的 common tensor。
 專案尚未量測各速度上限的耗電量與 generation 效能。
@@ -328,23 +332,58 @@ DSpark path 不使用一般 prompt cache reuse。
 
 ## Server 與 APP
 
-server 讓一個 installed model 保持載入。
-`ModelRuntime` 使用 lock 序列化 generation。
-因此 server 一次只執行一個 generation request。
+APP 在啟動 server 前建立 version 1 model catalog。
+model catalog 只包含啟動時可用的 installed model。
+damaged model 不會進入 model catalog。
+APP 使用權限 `0600` 的暫存檔把 model catalog 傳給 server。
+APP 在 server 停止或啟動失敗後刪除暫存檔。
 
-`ThreadingHTTPServer` 仍可在 generation 期間回應 `/api/status`。
-其他 generation request 會等待 runtime lock。
+server 啟動時只驗證 model catalog。
+server 啟動時不建立 `ModelRuntime`。
+`GET /v1/models` 也不建立 `ModelRuntime`。
+第一個 generation request 會載入 request 指定的 installed model。
+server 讓該 installed model 保持載入。
+API model ID 和該模型的 Alias 共用同一個 runtime。
+
+`ModelManager` 持有 generation lock。
+generation lock 涵蓋模型切換、模型載入、warmup 和完整 streaming request。
+其他 generation request 會依序等待。
+切換模型時，`ModelManager` 先關閉舊 runtime。
+`ModelManager` 接著釋放引用、執行 Python GC、清除 MLX cache，然後載入新 runtime。
+server 一次只保留一個載入的 runtime。
+模型載入失敗後，下一個 request 可以再次嘗試載入。
+
+`ThreadingHTTPServer` 可在載入或 generation 期間回應 `/healthz`、
+`/v1/models` 和 `/api/status`。
 
 APP 使用獨立 Python process 啟動 server。
 APP 每秒讀取 `/api/status`。
+server 不會把 APP 的 `/api/status` polling 寫入 access log。
 APP 使用 process RSS 顯示記憶體。
-Server 的 Model list 使用 `NavigationStack` 顯示每個 model kind 的獨立進階設定頁。
-獨立進階設定頁不會新增 sidebar 項目。
-使用者選擇進階設定圖示時，APP 從右側推入頁面。
-頁面標頭顯示 model 名稱和返回指示。
+APP 只建立目前顯示的頁面。未顯示的頁面不會參與 SwiftUI layout。
+Server 頁面只包含 server 狀態、系統檢查和 server 設定。
+Server 可以使用空 model catalog 啟動。
+Model 頁面包含模型清單、模型資料夾、下載、驗證、repair、DSpark 和模型進階設定。
+Model 頁面的選擇只控制模型管理和進階設定。
+該選擇不控制 server 載入的模型。
+每個模型的進階設定頁提供選用的 Alias。
+APP 會驗證 Alias，並自動儲存有效的變更。
+server 執行期間，APP 會停用 Alias 和模型進階設定。
+server 執行期間完成下載後，使用者必須重新啟動 server。
+
 APP 將 Generate 和 Runtime 設定依 model kind 分開儲存。
-使用者選擇模型時，APP 將該模型的設定載入 `ServerConfiguration`。
 Power Saving Mode 是所有模型共用的設定。
+`ServerConfiguration` 只保存 server 設定。
+`ServerConfiguration` 不保存 installed model path 或 Alias。
+升級時，APP 會把舊的自訂 `publicModel` 遷移到當時所選模型的 Alias。
+舊的 Qwen 預設名稱不會遷移成 Alias。
+Chat 頁面只列出目前 server model catalog 內的模型。
+Chat 頁面對每個 installed model 只顯示一個選項。
+Alias 存在時，Chat 頁面使用 Alias 作為 request 名稱，並同時顯示 API model ID。
+切換 Chat 模型不會清除對話。
+每個 assistant 訊息會保存該 request 使用的模型名稱。
+Metric 頁面顯示載入中或已載入的 API model ID。
+APP 偵測到模型切換時會清除效能歷史。
 APP 使用 bundle domain `com.deepseekv4ssd.app` 的 `UserDefaults` 保留 Server、各模型的進階設定、Power Saving Mode、模型、語言、目前頁面與測試對話設定。
 APP 使用 macOS Keychain 的 `com.deepseekv4ssd.app` service 與 `server-api-key` account 保留 API key。
 APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
@@ -370,3 +409,4 @@ APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 - Generation 與 prompt cache：[`runtime/deepseek_v4_ssd/generation.py`](../runtime/deepseek_v4_ssd/generation.py)
 - DSpark：[`runtime/deepseek_v4_ssd/dspark.py`](../runtime/deepseek_v4_ssd/dspark.py)
 - Server：[`runtime/deepseek_v4_ssd/server.py`](../runtime/deepseek_v4_ssd/server.py)
+- Model manager：[`runtime/deepseek_v4_ssd/model_manager.py`](../runtime/deepseek_v4_ssd/model_manager.py)

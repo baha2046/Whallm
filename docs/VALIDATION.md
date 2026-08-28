@@ -1,7 +1,8 @@
 # 驗證紀錄
 
 本文件分開記錄目前驗證和歷史量測。
-目前自動測試使用 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`。
+目前自動測試使用 base commit `9e7f2f377662e59a44275ff632f5c434adc2d5c4`
+和本文件描述的未提交工作樹變更。
 完整 installed model 驗證和正式量測使用 commit
 `57e440e48b79fb0399beae7e9965481f74b35b25`。
 每個探索性 artifact 另行記錄 working tree source hash。
@@ -61,28 +62,34 @@
 
 ## 自動測試
 
-2026-08-26 使用 commit `b4cb3d3b044a69c02dd8ac067d14398c7983f0a3`
-執行：
+2026-08-27 使用當時的工作樹執行 Swift 測試。
+2026-08-28 在 Codex 和 Qwen request 格式修正後，重新執行 Python 測試。
 
 ```sh
 make test
 PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 ```
 
+下表合併每個 suite 的最近一次結果。
+
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
-| Swift `DeepSeekRepackTests` | 8 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 17 | 0 | 3 |
-| Python runtime 與 server | 70 | 0 | 0 |
-| 合計 | 95 | 0 | 3 |
+| Swift `DeepSeekRepackTests` | 16 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 39 | 0 | 3 |
+| Python runtime 與 server | 124 | 0 | 0 |
+| 合計 | 179 | 0 | 3 |
 
 三個 App 測試因本機沒有完整 installed model 而略過。
-目前 checkout 比 clean checkout benchmark artifact 多九個 Python 測試。
-九個新測試都已通過。
-clean checkout benchmark artifact 保留 commit `57e440e` 當時的 61 個 Python 測試。
-
-同一個 commit 也執行 `make package`。
-本機 App 和解壓後的 ZIP 都通過完整簽章檢查。
+2026-08-28 的目前工作樹已執行 `make package`。
+該 package 包含 2026-08-28 的 `QwenToolCodec` 修正。
+App 版本是 `1.1.0`，build 是 `1.1.1`。
+Apple notary submission `1994e20c-5298-46c5-bca6-852e8cfdb1cc`
+的狀態是 `Accepted`。
+本機 App 和解壓後的 ZIP 都通過 Developer ID、stapled ticket 和
+Gatekeeper 檢查。
+ZIP SHA-256 是
+`da6a638ad738da811f2ab5a62c1b7c0e7d1d99f29475ed59664c9e1c06e0fd50`。
+本次驗證沒有建立 Git tag 或 GitHub Release。
 兩個 App 都包含英文、簡體中文和繁體中文 localization。
 隔離啟動檢查禁止 App 讀取專案 `.build` 目錄。
 隔離啟動檢查也禁止 App 讀取 Swift resource bundle。
@@ -104,9 +111,29 @@ App 在每種語言下都持續執行，且沒有在 `L10n` 初始化時停止�
 - Output token 的 process 累計值。
 - DSpark greedy、sampling、verification、replay 和 fallback 邏輯。
 - Chat Completions、Responses、Text Completions、tool 和 SSE。
+- SPEED-Bench prompt 的精確 input token 數和完整 chat template 尾端。
+- Codex Responses request 到 Qwen chat template 的完整 codec 格式轉換。
+- 空 model catalog、API model ID、Alias、未知模型和模型載入失敗重試。
+- 延遲載入、runtime 重用、關閉後切換、generation request 排隊和累計計數。
+- 模型載入期間的 `/healthz` 和 `/api/status` 回應。
+- APP Alias 儲存與遷移、model catalog、Chat 模型選擇和訊息模型名稱。
+- 未載入、載入中與已載入的 status decoding，以及模型切換後清除 Metric 歷史。
 
 這些測試多數使用 fixture 或 mock model。
 這些測試不取代 full-model benchmark。
+多模型生命週期測試使用 fake runtime。
+目前工作區沒有兩個完整 installed model。
+本次驗證沒有執行真實雙模型切換或 RSS 量測。
+
+2026-08-28 也使用目前 installed Qwen tokenizer 驗證完整格式轉換路徑。
+驗證路徑是 Codex Responses request、server normalization、`QwenToolCodec` 和
+Qwen `chat_template.jinja`。
+驗證內容包含 `instructions`、`developer` message、text content item array、
+後置 instruction、沒有 user 的 history、namespace tool、`web_search`、
+巢狀 arguments、`function_call_output` 和 Qwen 保留標記。
+role sequence 矩陣涵蓋 255 組 server 接受的非 tool history。
+installed tokenizer 也通過含 tool history 的 prompt boundary 檢查。
+這次驗證沒有載入完整模型權重，也沒有執行 generation。
 
 ## Installed model 完整驗證
 
@@ -979,14 +1006,14 @@ Swift 輕量測試已覆蓋 format 2 planner、vision/MTP 排除、MXFP4 固定�
 Qwen expert 轉換、installed artifact file 續傳與損壞 layer repair。Python 輕量測試已覆蓋 QSA、N-gram、PLE 資料路徑、
 Qwen expert layout、layer-major prefill 和 XML tool parser。
 
-目前 Qwen 工作樹的自動測試結果如下：
+2026-08-27 Qwen 第一版工作樹的自動測試結果如下：
 
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
 | Swift `DeepSeekRepackTests` | 16 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 26 | 0 | 3 |
-| Python runtime 與 server | 93 | 0 | 0 |
-| 合計 | 135 | 0 | 3 |
+| Swift `DeepSeekV4SSDAppTests` | 39 | 0 | 3 |
+| Python runtime 與 server | 113 | 0 | 0 |
+| 合計 | 168 | 0 | 3 |
 
 三個 Swift App 測試需要現有的完整 DeepSeek installed model。
 使用者已把該模型移到外接硬碟。
@@ -999,6 +1026,7 @@ Swift App 測試確認 First Token wait time 會在 Prefill 期間即時更新�
 Python 測試使用 fake API server 驗證 API benchmark 的精確 input token、
 指標收集、Peak、P95 和 ASCII 表格。
 Python 測試也驗證 installed model discovery、Server 自動啟動和 Server 清理。
+Python 測試確認 APP 的 `/api/status` polling 不會寫入 access log。
 本機 Qwen installed model 已通過 Server 自動啟動、API ready 和自動清理檢查。
 Swift repack 測試確認 direct installed artifact file 可以從現有 file size 續傳，
 並在完成時驗證 SHA-256。
@@ -1068,7 +1096,7 @@ runtime memory limit 是 48 GiB。
 | MXFP8 cache | 通過 | 單元測試、8K 歷史 greedy token。 |
 | Persistent prompt cache | 通過 | Restart 和 quantized round-trip 測試。 |
 | Ready expert decode | 通過 | 五組歷史 hash 和目前單元測試。 |
-| API、tool、SSE | 通過 | Python server tests。 |
+| API、tool、SSE | 通過 | Python server tests，包括無效 tool call 的 Codex 終止 event。 |
 | DSpark 邏輯 | 通過 | Fixture greedy、sampling、replay 和 fallback tests。 |
 | DSpark 淨加速 | 未通過 | 目前 checkout 的 R3 探索性 ABBA 已觸發停止條件。 |
 | 14K context | 歷史通過 | Tool-like prompt，greedy，1 output token。 |

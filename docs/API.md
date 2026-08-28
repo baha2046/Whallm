@@ -1,7 +1,10 @@
 # OpenAI 相容 API
 
 server 預設監聽 `http://127.0.0.1:11434`。
-server 載入一個 installed model。
+server 啟動時只讀取 model catalog。
+server 啟動時不載入模型權重。
+第一個 generation request 會載入指定的 installed model。
+server 一次只保留一個載入的 installed model。
 server 一次只執行一個 generation request。
 
 本 API 是相容子集。
@@ -27,6 +30,48 @@ DEEPSEEK_API_KEY=local-key make server
 MODEL=/path/to/model.dsv4 HOST=127.0.0.1 PORT=11434 make server
 ```
 
+`--model` 是選用參數。
+`--model-catalog` 也是選用參數。
+兩個參數不能同時使用。
+server 可以在沒有 installed model 的狀態下啟動。
+
+APP 使用版本化 JSON model catalog 啟動 server。
+下列範例包含一個 installed model：
+
+```json
+{
+  "version": 1,
+  "models": [{
+    "id": "deepseek-v4-flash-0731",
+    "alias": "work-model",
+    "path": "/path/to/model.dsv4",
+    "model_kind": "deepseek-v4",
+    "runtime": {},
+    "defaults": {
+      "max_tokens": 272000,
+      "temperature": 0.2,
+      "top_p": 0.98,
+      "top_k": 0
+    },
+    "warmup_prompt_path": null
+  }]
+}
+```
+
+實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
+`--public-model` 只適用於舊的 `--model` 流程。
+該參數會設定該 installed model 的 Alias。
+
+固定的 API model ID 如下：
+
+- `deepseek-v4-flash-0731`
+- `qwen3.8-flash-next-fp8`
+
+server 會移除 Alias 前後的空白。
+空字串代表沒有 Alias。
+Alias 可以等於自己的 API model ID。
+Alias 不可等於其他模型的 API model ID 或 Alias。
+
 ## 驗證與網路邊界
 
 本機 host 可以不設定 API key。
@@ -41,8 +86,6 @@ Authorization: Bearer local-key
 | Endpoint | 設定 key 後是否驗證 |
 | --- | --- |
 | `/v1/*` | 是 |
-| `GET /api/settings` | 是 |
-| `PUT /api/settings` | 是 |
 | `GET /` | 否 |
 | `GET /healthz` | 否 |
 | `GET /api/status` | 否 |
@@ -58,31 +101,75 @@ server 不提供 TLS、CORS 或 rate limit。
 | `GET` | `/` | 回傳 server 名稱和 API base。 |
 | `GET` | `/favicon.ico` | 回傳空的 `204` response。 |
 | `GET` | `/healthz` | 回傳基本存活狀態。 |
-| `GET` | `/v1/models` | 回傳目前公開 model ID。 |
+| `GET` | `/v1/models` | 回傳啟動時 model catalog 內的 API model ID 和 Alias。 |
 | `POST` | `/v1/chat/completions` | Chat Completions 相容子集。 |
 | `POST` | `/v1/responses` | Responses 相容子集。 |
 | `POST` | `/v1/completions` | Text Completions 相容子集。 |
 | `GET` | `/api/status` | 回傳 APP 和 profiling 使用的 runtime 狀態。 |
-| `GET` | `/api/settings` | 讀取目前 generation 預設值。 |
-| `PUT` | `/api/settings` | 修改目前 process 的 generation 預設值。 |
 
 未知 route 回傳 `404`。
+`GET /api/settings` 和 `PUT /api/settings` 也回傳 `404`。
+
+`GET /v1/models` 不會載入模型權重。
+每個 installed model 先列出 API model ID。
+如果 Alias 與 API model ID 不同，server 接著列出 Alias。
+兩個項目使用相同的 `owned_by`。
 
 ## 共用 request 欄位
 
 | 欄位 | 規則 |
 | --- | --- |
-| `model` | 必須等於 server 的公開 model ID。未指定 `--public-model` 時，server 使用 manifest model ID。 |
+| `model` | 必須是啟動時 model catalog 內的 API model ID 或 Alias。名稱比對區分大小寫。 |
 | `max_tokens` | 1 至 272,000。預設值是 272,000。 |
-| `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 預設 1.0。 |
-| `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 預設 0.95。 |
-| `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 預設 20。 |
+| `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 依模式使用 0.7 或 1.0。 |
+| `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 依模式使用 0.8 或 0.95。 |
+| `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 兩種模式都使用 20。 |
 | `stream` | 必須是 boolean。 |
 | `stream_options.include_usage` | 必須是 boolean。只影響 streaming response。 |
 | `n` | 只接受 `1`。 |
 
 `max_completion_tokens` 可以取代 Chat Completions 的 `max_tokens`。
 `max_output_tokens` 可以取代 Responses 的 `max_tokens`。
+
+### Qwen 模式取樣
+
+Whallm 只對 Qwen 套用模式取樣配置。
+參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
+
+| 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 思考 | 1.0 | 0.95 | 20 | 0.0 | 0.0 | 1.0 |
+| 非思考 | 0.7 | 0.8 | 20 | 0.0 | 1.5 | 1.0 |
+
+Qwen 使用 OR 規則判定模式。
+
+- `thinking_mode` 是 `thinking` 時，server 使用思考模式。
+- Chat Completions 的 `reasoning_effort` 不是 `none` 時，server 使用思考模式。
+- Responses 的 `reasoning.effort` 不是 `none` 時，server 使用思考模式。
+- 其他 request 使用非思考模式。
+- Text Completions 固定使用非思考模式。
+
+`thinking_mode: "chat"` 不會抵銷非 `none` 的 reasoning effort。
+
+明確的 `temperature`、`top_p` 和 `top_k` 會覆寫模式配置。
+`max_tokens` 的優先序不變。
+DeepSeek 仍使用 model catalog 預設值。
+
+正數 `temperature` 會使用 categorical sampling。
+明確的 `temperature: 0` 會使用 greedy sampling。
+
+`min_p`、`presence_penalty` 和 `repetition_penalty` 是 Qwen 內部配置。
+API 不支援公開的 `min_p` 或 `repetition_penalty` request 欄位。
+API 仍會拒絕非零的 `presence_penalty` request 欄位。
+Request 內的 `presence_penalty: 0` 不會停用 Qwen 內部配置。
+
+目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+只檢查 generation call
+可見的最近 20 個 token。
+processor 不會檢查 prompt cache 已重用的 prefix。
+因此，這個 processor 不會檢查完整 prompt。
+`repetition_penalty=1.0` 是中性值。
+Whallm 不會為這個值建立 processor。
 
 server 明確拒絕下列 request：
 
@@ -97,6 +184,12 @@ server 明確拒絕下列 request：
 
 未列出的未知欄位可能被忽略。
 client 不應依賴未知欄位。
+
+所有一般 response 和 streaming event 的 `model` 欄位會回傳 request 使用的名稱。
+API model ID 和 Alias 會共用同一個 runtime。
+切換 API model ID 時，server 會先關閉舊 runtime，然後載入新 runtime。
+其他 generation request 會等待目前的完整 streaming request 結束。
+`GET /healthz`、`GET /v1/models` 和 `GET /api/status` 不會等待 generation lock。
 
 ## Chat Completions
 
@@ -178,6 +271,20 @@ thinking mode 完成後，assistant message 可以包含 `reasoning_content`。
 - `function_call_output`
 - `reasoning`
 
+`message.content` 可以是 string。
+`message.content` 也可以是 `text`、`input_text` 或 `output_text` item array。
+server 會依原順序合併 array 中的文字。
+server 會拒絕 image、file 和其他非文字 content item。
+
+text `message` 支援 `system`、`developer`、`user` 和 `assistant` role。
+Qwen codec 會把所有 `system` 和 `developer` message 合併成一個開頭的
+`system` message。
+
+`function_call.arguments` 必須是 JSON string。
+該 JSON string 必須包含一個 object。
+`function_call_output.output` 必須是 string。
+`function_call` 和對應的 `function_call_output` 必須使用相同的 `call_id`。
+
 server 接受 replay 的 `reasoning` item，但不把該 item 加入 prompt。
 client 必須在後續 `input` 中重送需要的歷史 message 和 tool item。
 `input` 可以用 `assistant` message 作為最後一個 item。
@@ -223,6 +330,8 @@ response 使用 `text_completion` shape。
 
 Text Completions 不支援 `tools`。
 Text Completions 只接受 `tool_choice: none` 或省略該欄位。
+Qwen Text Completions 固定使用非思考模式取樣配置。
+`thinking_mode` 和 reasoning effort 不會變更這項行為。
 
 ## Reasoning effort
 
@@ -238,8 +347,16 @@ Responses 使用 `reasoning.effort`。
 | `xhigh`、`max` | `thinking` | `max` | `xhigh` |
 
 `thinking_mode` 可以是 `chat` 或 `thinking`。
-明確的 `thinking_mode` 只覆寫 mode。
+Qwen 使用前述 OR 規則。
+DeepSeek 保留既有行為。
+DeepSeek 的明確 `thinking_mode` 會覆寫 mode。
 server 仍會驗證並傳送 encoder effort。
+
+Codex 的 `model_reasoning_effort` 是 Responses API 設定。
+Codex client 會把該設定傳成 Responses 的 `reasoning.effort`。
+Whallm 不新增 `model_reasoning_effort` HTTP 欄位。
+格式請見 [OpenAI Codex 設定參考](https://developers.openai.com/codex/config-reference/)
+和 [Responses API](https://developers.openai.com/api/reference/cli/resources/responses/methods/create)。
 
 ## Tool
 
@@ -301,32 +418,18 @@ Responses 會傳送 typed event。
 - `response.completed`
 
 Responses 不傳送 `[DONE]`。
-server 會在 `response.completed` 或 `error` 後關閉連線。
+server 會在 `response.completed` 後關閉連線。
 
 tool streaming 會在 generation 過程中傳送 function name 和 arguments fragment。
 server 會在 generation 結束時驗證完整 tool block。
 DeepSeek 使用 DSML。Qwen 使用官方 XML tool-call 格式。
 兩個 model kind 都會比較 streaming parser 和完整 parser 的 tool call。
 Chat Completions 驗證失敗時會傳送 error object，然後傳送 `[DONE]`。
-Responses 驗證失敗時會傳送 `error` event，然後關閉連線。
-
-## APP 設定 API
-
-`GET /api/settings` 回傳：
-
-```json
-{
-  "max_tokens": 272000,
-  "temperature": 0.2,
-  "top_p": 0.98,
-  "top_k": 0
-}
-```
-
-`PUT /api/settings` 可以更新一個或多個欄位。
-server 會拒絕未知設定。
-設定只存在目前 process 的記憶體。
-server restart 會還原 command-line 預設值。
+Responses 驗證失敗時會傳送 `error` event。
+接著，server 會傳送一段可見的錯誤文字和 `response.completed`，然後關閉連線。
+最後一個 response 的 `status` 是 `failed`。
+`error.code` 是 `invalid_tool_call`。
+這個終止方式用於目前 Codex client 相容性。
 
 ## Status API
 
@@ -334,13 +437,20 @@ server restart 會還原 command-line 預設值。
 
 | 區域 | 內容 |
 | --- | --- |
-| root | model ID、checkpoint model ID、installed model path 和 key 狀態。 |
+| root | 載入中與已載入的 API model ID、checkpoint model ID、installed model path 和 key 狀態。 |
 | `runtime` | slot、worker、省電模式、prefill、cache 和 DSpark 設定。 |
 | `performance` | generation、時間、記憶體、SSD 和 expert cache 指標。 |
 
 `performance` 同時包含累計值和最近一次 request 值。
 `accumulated_generation_tokens` 是目前 server process 產生的 output token 總數。
+`completed_request_count` 和 `accumulated_generation_tokens` 不會因模型切換而歸零。
 欄位語意請見[效能與瓶頸](PERFORMANCE.md)。
+
+`loaded_model` 是已載入的 API model ID。
+`loading_model` 是載入中的 API model ID。
+兩個欄位都是 nullable。
+沒有載入模型時，`model`、`source_model`、`model_path` 和 `runtime` 是 `null`。
+此時 `performance` 保留固定 shape，並使用零值。
 
 `runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
 `null` 代表 routed expert SSD 讀取速度沒有限制。
@@ -352,7 +462,7 @@ server restart 會還原 command-line 預設值。
 ```json
 {
   "error": {
-    "message": "model must be 'deepseek-v4-flash-0731'.",
+    "message": "The model 'unknown-model' does not exist.",
     "type": "invalid_request_error",
     "param": "model",
     "code": "model_not_found"
@@ -369,7 +479,11 @@ server restart 會還原 command-line 預設值。
 | 404 | route 不存在。 |
 | 411 | 缺少 `Content-Length`。 |
 | 413 | request body 超過限制。 |
-| 500 | runtime 或 model output 發生內部錯誤。 |
+| 500 | 模型載入、runtime 或 model output 發生內部錯誤。 |
+
+未知模型使用 `model_not_found`。
+模型載入失敗使用 `model_load_failed`。
+載入失敗後，下一個 request 可以再次嘗試載入模型。
 
 ## 限制
 

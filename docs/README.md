@@ -3,7 +3,7 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-08-27。
+最後核對日期是 2026-08-28。
 Qwen 支援核對版本是目前工作樹。這些變更尚未建立 commit。
 DeepSeek checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
@@ -43,13 +43,18 @@ greedy 4K、prompt cache 和舊安裝路徑的 packaged App 驗證都已通過�
 目前 direct published installed model 下載路徑已通過 file 續傳單元測試。
 目前尚未重新執行完整 125 GB 的 App direct download。
 
-App 的模型選單固定顯示 DeepSeek 與 Qwen。
-使用者可以選擇尚未安裝的模型。
-Server 頁面上方會先顯示所選模型的設定狀態與下一步。
-模型尚未安裝時，App 不會顯示無法使用的啟動按鈕。
-Server 頁面的「模型」標題列提供模型資料夾按鈕。
+App 的 Model 頁面固定顯示 DeepSeek 與 Qwen。
+使用者可以管理尚未安裝的模型。
+Server 頁面只顯示 server 狀態、系統檢查和 server 設定。
+啟動按鈕不依賴 Model 頁面的選擇。
+server 可以使用空 model catalog 啟動。
+Model 頁面的標題列提供模型資料夾按鈕。
 模型卡片會顯示模型資料夾路徑與可用空間。
 每個未安裝模型的列提供下載按鈕。
+每個模型的進階設定頁提供 Alias 欄位。
+有效的 Alias 變更會自動儲存。
+使用者可以在安裝模型前設定 Alias。
+server 執行期間，App 會停用 Alias 和模型進階設定。
 DeepSeek 下載固定包含 DSpark。模型列不提供排除 DSpark 的選項。
 App 使用 pinned revision 的固定 installed model 大小執行下載前空間檢查。
 App 啟動時不會為了取得下載大小連線到 Hugging Face。
@@ -61,9 +66,15 @@ App 會在模型列顯示停用原因、所需空間與可用空間。
 下載期間，模型列會依序顯示目前階段、百分比、完成容量、下載速度與剩餘時間。
 下載模型時，使用者可以選擇另一個已安裝模型並啟動 Server。
 Server 執行時，App 可以下載另一個尚未安裝的模型。
-Server 執行時，App 會鎖定 Server 使用的模型。
 App 一次只執行一個模型下載。
-「系統檢查」固定顯示為單列區塊，不受所選模型的安裝狀態影響。
+server 啟動時只讀取 installed model 清單。
+第一個 generation request 會載入指定模型。
+server 一次只保留一個載入的模型。
+Chat 頁面的模型選單只顯示 server 啟動時可用的 installed model。
+使用者切換 Chat 模型時，App 會保留對話。
+Metric 頁面顯示目前載入或載入中的 API model ID。
+模型切換時，App 會清除舊模型的效能歷史。
+「系統檢查」固定顯示在 Server 頁面。
 該列使用硬體 SF Symbol 和狀態圖示顯示 Apple Silicon、記憶體和高速 SSD 檢查。
 
 ## 可信度規則
@@ -101,6 +112,8 @@ App 一次只執行一個模型下載。
 - **expert blob**：一個 routed expert 的標準封裝 bytes。
 - **repack plan**：checkpoint byte range 到 installed model byte range 的完整對應。
 - **installed model**：由 repack plan 產生並驗證的本機目錄。
+- **API model ID**：一個 model kind 的固定且區分大小寫的 API 名稱。
+- **Alias**：API model ID 的選用 request 名稱。Alias 區分大小寫。
 - **manifest**：定義 installed model 與完整性資料的 JSON 檔案。
 - **slot**：可放置一個 expert blob 的固定 Metal 可見記憶體區域。
 - **main model**：43 個目標模型層。main model 不包含 DSpark。

@@ -7,7 +7,8 @@
 
 | 欄位 | 值 |
 | --- | ---: |
-| Model ID | `Qwen/Qwen3.8-Flash-Next-FP8` |
+| checkpoint model ID | `Qwen/Qwen3.8-Flash-Next-FP8` |
+| API model ID | `qwen3.8-flash-next-fp8` |
 | Revision | `bcd9f01ddc9cff2316eb84281bebcd5b058bddce` |
 | manifest format | 2 |
 | `modelKind` | `qwen3.8-flash-next` |
@@ -137,16 +138,71 @@ Qwen 使用 installed tokenizer 的官方 `chat_template.jinja`。
 Qwen tool call 使用官方 XML 格式。
 完整 parser 和 streaming parser 會驗證相同的 function name 和 arguments。
 
+Codex Responses request 會先轉成 Qwen prompt 所需的格式。
+
+| Codex Responses 格式 | Qwen prompt 格式 |
+| --- | --- |
+| 非空的 `instructions`、`system` 和 `developer` message | 保留 instruction 順序。合併成唯一的開頭 `system` message。 |
+| 沒有 `user` message 的 history | 在 `system` message 後加入空的 `user` anchor。 |
+| text content item array | 合併成 string。 |
+| top-level function tool | 轉成 OpenAI function tool shape。 |
+| namespace tool | 使用 `namespace__name` 作為 prompt 內的 function name。 |
+| `web_search` tool | 不加入 prompt。 |
+| `function_call.arguments` JSON string | server 驗證 JSON object。`QwenToolCodec` 在 message 深層複本中解碼成 `dict`。 |
+| `function_call_output.output` string | 轉成 `tool` message content。server 使用 `call_id` 驗證順序。 |
+| message、reasoning、tool definition 和 tool history 中的 Qwen 保留標記 | 把開頭的 `<` 轉成 `&lt;`。tool call parser 會還原 parameter value。 |
+| replay 的 `reasoning` item | 接受該 item，但不加入 prompt。 |
+
+`QwenToolCodec` 不會修改原始 request message。
+同一個 assistant message 可以包含多個 function call。
+空參數使用 JSON string `"{}"`，並轉成空 `dict`。
+request 有 tools 時，codec 會要求 model 使用相同的保留標記跳脫規則。
+Qwen parameter name 可以包含空白和 Unicode。
+Qwen XML 無法表示含有 `<`、`>`、CR 或 LF 的 parameter name。
+
+Qwen `chat_template.jinja` 會移除每個 message content 外側的空白。
+codec 不會偽造被 Responses normalization 移除的 reasoning item。
+目前 text-only API 會拒絕 image、file 和其他 structured content。
+`client_metadata`、`include` 和 `prompt_cache_key` 不會加入 Qwen prompt。
+
 Qwen reasoning effort 使用 `low`、`medium` 和 `xhigh`。
 API 的 `high` 與 `max` 會對應到 `xhigh`。
 
-| 設定 | Qwen 預設值 |
-| --- | ---: |
-| temperature | 1.0 |
-| top-p | 0.95 |
-| top-k | 20 |
+取樣參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
 
-明確 request 欄位會覆寫預設值。
+| 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 思考 | 1.0 | 0.95 | 20 | 0.0 | 0.0 | 1.0 |
+| 非思考 | 0.7 | 0.8 | 20 | 0.0 | 1.5 | 1.0 |
+
+Qwen 使用 OR 規則判定模式。
+`thinking_mode == "thinking"` 會選取思考模式。
+Chat Completions 的非 `none` `reasoning_effort` 也會選取思考模式。
+Responses 的非 `none` `reasoning.effort` 也會選取思考模式。
+`thinking_mode: "chat"` 不會抵銷非 `none` effort。
+其他 request 使用非思考模式。
+Text Completions 固定使用非思考模式。
+
+明確的 `temperature`、`top_p` 和 `top_k` 會覆寫模式配置。
+明確的 `temperature: 0` 會使用 greedy sampling。
+正數 `temperature` 會使用 categorical sampling。
+`max_tokens` 行為不變。
+
+`min_p`、`presence_penalty` 和 `repetition_penalty` 不是公開 request 欄位。
+非思考模式會建立 `presence_penalty=1.5` processor。
+思考模式不會建立 presence processor。
+`repetition_penalty=1.0` 不會建立 processor。
+
+目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+只檢查 generation call 可見的最近 20 個 token。
+processor 不會檢查 prompt cache 已重用的 prefix。
+因此，這項配置不是完整 prompt 的重複偵測器。
+
+App 的 Qwen 進階設定只顯示 Max tokens。
+App 不顯示 Temperature、Top P 或 Top K。
+Qwen 儲存設定會在 normalization 時更新為 `0.7 / 0.8 / 20`。
+DeepSeek 仍顯示並使用三個欄位。
+
 Qwen 不支援 `--dspark`。
 
 `memory_limit_gib=0` 會選擇模型安全自動上限。
@@ -168,6 +224,11 @@ DeepSeek 的既有規則不變。
 上述 packaged App 驗證早於 direct installed artifact 下載路徑。
 目前 direct 下載路徑已通過 file 續傳和 SHA-256 單元測試。
 目前尚未重新執行完整 125 GB 的 App direct download。
+
+Qwen 模式取樣測試已加入工作樹。
+目前限制禁止執行程式與測試。
+因此，這些測試尚未執行。
+目前沒有實際 generation 證據可證明這項配置已解決重複輸出。
 
 CLI 使用預設 `memory_limit_gib=0` 啟動完整模型時，runtime 套用 48 GiB
 自動上限。5-token prompt 產生 ` Paris`。runtime 從 SSD 讀取
