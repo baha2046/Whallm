@@ -236,9 +236,16 @@ closure、最小 eligible k selection 與 zero-recall stop。
 - Codex Responses request 到 Qwen chat template 的完整 codec 格式轉換。
 - 空 model catalog、API model ID、Alias、未知模型和模型載入失敗重試。
 - 延遲載入、runtime 重用、關閉後切換、generation request 排隊和累計計數。
+- 手動模型載入與卸載、Bearer 驗證，以及卸載後的 status。
+- DeepSeek layer-major Prefill 門檻預設值、邊界、catalog 編碼、舊設定遷移和正整數驗證。
 - 模型載入期間的 `/healthz` 和 `/api/status` 回應。
-- APP Alias 儲存與遷移、model catalog、Chat 模型選擇和訊息模型名稱。
+- APP Alias 儲存與遷移、model catalog、Loaded 模型辨識、Chat 模型選擇、訊息模型名稱，以及切換頁面期間持續接收 Chat 回覆。
 - 未載入、載入中與已載入的 status decoding，以及模型切換後清除 Metric 歷史。
+
+2026-08-28 使用目前合併工作樹重跑下列測試：
+
+- `swift test`：61 項通過。
+- `PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests`：239 項通過。
 
 這些測試多數使用 fixture 或 mock model。
 這些測試不取代 full-model benchmark。

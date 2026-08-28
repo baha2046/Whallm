@@ -76,6 +76,7 @@ DeepSeek 下載固定包含 DSpark。模型列不提供排除 DSpark 的選項�
 App 使用 pinned revision 的固定 installed model 大小執行下載前空間檢查。
 App 啟動時不會為了取得下載大小連線到 Hugging Face。
 每個模型列的「進階設定」動作使用 Tertiary icon button。
+每個模型列在「進階設定」左側提供 Load 或 Unload icon button。
 按鈕提供 40 pt 點擊區域、Tooltip 和 VoiceOver 名稱。
 模型資料夾可用空間不足時，App 會停用下載按鈕。
 App 會在模型列顯示停用原因、所需空間與可用空間。
@@ -86,11 +87,16 @@ Server 執行時，App 可以下載另一個尚未安裝的模型。
 App 一次只執行一個模型下載。
 server 啟動時只讀取 installed model 清單。
 第一個 generation request 會載入指定模型。
+使用者也可以在 Model 頁面手動載入或卸載模型。
 server 一次只保留一個載入的模型。
+已載入模型會移到 Model 區塊上方的 Loaded 區塊。
 Chat 頁面的模型選單只顯示 server 啟動時可用的 installed model。
 使用者切換 Chat 模型時，App 會保留對話。
+使用者在回覆期間切換頁面時，App 會繼續接收 Chat 回覆。
 Metric 頁面顯示目前載入或載入中的 API model ID。
 模型切換時，App 會清除舊模型的效能歷史。
+DeepSeek 的 layer-major Prefill 門檻可以在模型進階設定中調整。
+預設門檻是 1,024 個未快取 token。
 「系統檢查」固定顯示在 Server 頁面。
 該列使用硬體 SF Symbol 和狀態圖示顯示 Apple Silicon、記憶體和高速 SSD 檢查。
 

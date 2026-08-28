@@ -49,12 +49,12 @@ server:
 ## benchmark-dsv4: benchmark DeepSeek with SPEED-Bench mixed inputs
 benchmark-dsv4:
 	.venv/bin/python Scripts/benchmark_api.py --model deepseek-v4-flash-0731 \
-		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 5 $(ARGS)
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 2 $(ARGS)
 
 ## benchmark-qwen: benchmark Qwen with SPEED-Bench mixed inputs
 benchmark-qwen:
 	.venv/bin/python Scripts/benchmark_api.py --model qwen3.8-flash-next-fp8 \
-		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 5 $(ARGS)
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 2 $(ARGS)
 
 %:
 	@:

@@ -59,6 +59,8 @@ prefill_tokens_per_second = uncached_prompt_tokens / time_to_first_token_seconds
 `request_prefill_step_size` 是本次 request 實際使用的 step。
 `layer_major_prefill` 表示本次 request 是否進入 layer-major path。
 `layer_major_prefill_tokens` 是 layer-major kernel 實際處理的 token 數。
+DeepSeek 使用可設定的 `layer_major_prefill_threshold` 判斷是否進入此 path。
+預設門檻是 1,024 個未快取 token。
 
 `request_batched_expert_layers` 記錄 full-layer batched MoE 次數。
 `request_gather_qmm_calls` 記錄 batched `gather_qmm` call 次數。
@@ -1564,8 +1566,10 @@ xcrun xctrace record \
 預設 input size 是 1K、2K、8K、16K 和 32K token。
 腳本使用 SPEED-Bench throughput subset 的 `mixed` category。
 腳本先縮短每筆資料的第一個 user message。
-腳本再套用 installed model 的完整 chat template。
-產生的 prompt 會保留 chat template 尾端，並符合指定的 input token 數。
+腳本使用 installed model 的對話編碼。
+DeepSeek 使用 pinned `encoding/encoding_dsv4.py`。
+Qwen 使用 installed `chat_template.jinja`。
+產生的 prompt 會保留對話編碼尾端，並符合指定的 input token 數。
 腳本也會確認 server 回報相同的 input token 數。
 
 [SPEED-Bench](https://huggingface.co/datasets/nvidia/SPEED-Bench)

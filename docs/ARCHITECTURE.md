@@ -196,7 +196,8 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `power_saving_limit_gbps` | `null` | routed expert SSD 聚合讀取速度上限。`null` 代表無限制。 |
 | `prefill_step_size` | 0 | 由 prompt 長度自動選擇。 |
 | `moe_prefill_step_size` | 0 | 4K 以上自動使用 4,096-token tile。 |
-| `layer_major_prefill` | `true` | 只在至少 4,096 個未快取 token 時啟用。 |
+| `layer_major_prefill` | `true` | 控制 DeepSeek layer-major Prefill。 |
+| `layer_major_prefill_threshold` | 1,024 | DeepSeek 啟用 layer-major Prefill 所需的最少未快取 token 數。APP 可設定此值。 |
 | `batched_expert_prefill` | `true` | full-layer prefill 使用 `gather_qmm`。 |
 | `fp8_kv_cache` | `true` | 已完成的 compressed cache chunk 使用 MXFP8。 |
 | `fp4_index_cache` | `true` | indexer cache 使用 MXFP4 view。 |
@@ -253,9 +254,10 @@ adaptive candidates 都未達 request-time／throughput 門檻，因此預設沒
 
 ## Prefill 資料路徑
 
-少於 4,096 個未快取 token 時，runtime 使用 mlx-lm 的 chunk-major path。
+未快取 token 數少於 `layer_major_prefill_threshold` 時，DeepSeek runtime 使用 mlx-lm 的 chunk-major path。
 
-4,096 個或更多未快取 token 時，runtime 使用 layer-major path。
+未快取 token 數達到 `layer_major_prefill_threshold` 時，DeepSeek runtime 使用 layer-major path。
+預設門檻是 1,024。
 
 layer-major path 執行下列工作。
 
@@ -542,11 +544,14 @@ server 啟動時只驗證 model catalog。
 server 啟動時不建立 `ModelRuntime`。
 `GET /v1/models` 也不建立 `ModelRuntime`。
 第一個 generation request 會載入 request 指定的 installed model。
+`POST /api/models/load` 也可以明確載入指定的 installed model。
+`POST /api/models/unload` 可以明確卸載指定的 installed model。
 server 讓該 installed model 保持載入。
 API model ID 和該模型的 Alias 共用同一個 runtime。
 
 `ModelManager` 持有 generation lock。
 generation lock 涵蓋模型切換、模型載入、warmup 和完整 streaming request。
+手動載入和卸載也使用 generation lock。
 其他 generation request 會依序等待。
 切換模型時，`ModelManager` 先關閉舊 runtime。
 `ModelManager` 接著釋放引用、執行 Python GC、清除 MLX cache，然後載入新 runtime。
@@ -563,7 +568,10 @@ APP 使用 process RSS 顯示記憶體。
 APP 只建立目前顯示的頁面。未顯示的頁面不會參與 SwiftUI layout。
 Server 頁面只包含 server 狀態、系統檢查和 server 設定。
 Server 可以使用空 model catalog 啟動。
-Model 頁面包含模型清單、模型資料夾、下載、驗證、repair、DSpark 和模型進階設定。
+Model 頁面包含 Loaded 區塊、模型清單、模型資料夾、下載、驗證、repair、DSpark 和模型進階設定。
+Loaded 區塊位於 Model 區塊上方。
+已載入模型只顯示在 Loaded 區塊。
+每個模型列可以手動載入或卸載模型。
 Model 頁面的選擇只控制模型管理和進階設定。
 該選擇不控制 server 載入的模型。
 每個模型的進階設定頁提供選用的 Alias。
@@ -581,6 +589,8 @@ Chat 頁面只列出目前 server model catalog 內的模型。
 Chat 頁面對每個 installed model 只顯示一個選項。
 Alias 存在時，Chat 頁面使用 Alias 作為 request 名稱，並同時顯示 API model ID。
 切換 Chat 模型不會清除對話。
+`ContentView` 持有 Chat 回覆任務。切換頁面不會中止正在進行的回覆。
+使用者按下 Stop Generating 或關閉 `ContentView` 時，APP 會取消回覆任務。
 每個 assistant 訊息會保存該 request 使用的模型名稱。
 Metric 頁面顯示載入中或已載入的 API model ID。
 APP 偵測到模型切換時會清除效能歷史。

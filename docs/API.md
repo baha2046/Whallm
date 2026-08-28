@@ -4,6 +4,7 @@ server 預設監聽 `http://127.0.0.1:11434`。
 server 啟動時只讀取 model catalog。
 server 啟動時不載入模型權重。
 第一個 generation request 會載入指定的 installed model。
+client 也可以明確載入或卸載 installed model。
 server 一次只保留一個載入的 installed model。
 server 一次只執行一個 generation request。
 
@@ -96,6 +97,8 @@ Authorization: Bearer local-key
 | Endpoint | 設定 key 後是否驗證 |
 | --- | --- |
 | `/v1/*` | 是 |
+| `POST /api/models/load` | 是 |
+| `POST /api/models/unload` | 是 |
 | `GET /` | 否 |
 | `GET /healthz` | 否 |
 | `GET /api/status` | 否 |
@@ -115,6 +118,8 @@ server 不提供 TLS、CORS 或 rate limit。
 | `POST` | `/v1/chat/completions` | Chat Completions 相容子集。 |
 | `POST` | `/v1/responses` | Responses 相容子集。 |
 | `POST` | `/v1/completions` | Text Completions 相容子集。 |
+| `POST` | `/api/models/load` | 載入指定模型。必要時先卸載目前模型。 |
+| `POST` | `/api/models/unload` | 卸載指定模型。 |
 | `GET` | `/api/status` | 回傳 APP 和 profiling 使用的 runtime 狀態。 |
 
 未知 route 回傳 `404`。
@@ -124,6 +129,22 @@ server 不提供 TLS、CORS 或 rate limit。
 每個 installed model 先列出 API model ID。
 如果 Alias 與 API model ID 不同，server 接著列出 Alias。
 兩個項目使用相同的 `owned_by`。
+
+## 模型載入與卸載
+
+`POST /api/models/load` 和 `POST /api/models/unload` 使用下列 JSON body：
+
+```json
+{
+  "model": "deepseek-v4-flash-0731"
+}
+```
+
+`model` 可以是 API model ID 或 Alias。
+兩個 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。
+載入另一個模型時，server 會先關閉目前的 runtime。
+卸載不是目前已載入的模型時，server 不會變更目前的 runtime。
+載入和卸載會等待目前的完整 streaming request 結束。
 
 ## 共用 request 欄位
 
@@ -463,6 +484,8 @@ Responses 驗證失敗時會傳送 `error` event。
 此時 `performance` 保留固定 shape，並使用零值。
 
 `runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
+`runtime.layer_major_prefill_threshold` 是 DeepSeek 啟用 layer-major Prefill 所需的最少未快取 token 數。
+預設值是 1,024。
 `null` 代表 routed expert SSD 讀取速度沒有限制。
 `runtime.expert_page_cache_probe` 表示 research-only pre-read `mincore` probe 是否啟用；
 預設為 `false`。`performance.request_expert_page_cache_*` 將本次 logical expert reads

@@ -129,6 +129,10 @@ for more options.
   weights. The first generation request loads its selected model.
 - The server keeps one model loaded. A request for another model closes the old
   runtime before it loads the new runtime.
+- The Model page can load or unload a model. A loaded model moves to the
+  **Loaded** section.
+- The DeepSeek layer-major prefill threshold is configurable. Its default is
+  1,024 uncached prompt tokens.
 
 ### Model storage and DSpark
 
@@ -151,6 +155,8 @@ The server supports these endpoints:
 - `POST /v1/responses`
 - `POST /v1/chat/completions`
 - `POST /v1/completions`
+- `POST /api/models/load`
+- `POST /api/models/unload`
 
 The fixed API model IDs are `deepseek-v4-flash-0731` and
 `qwen3.8-flash-next-fp8`. Each model's **Advanced Settings** view lets you set an

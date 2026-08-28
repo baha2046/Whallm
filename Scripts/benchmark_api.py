@@ -22,8 +22,12 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
-
-DEFAULT_INPUT_TOKENS = (1_024, 2_048, 8_192, 16_384, 32_768)
+DEFAULT_INPUT_TOKENS = (
+    1_024,
+    2_048,
+    8_192,
+    16_384,
+)  # (1_024, 2_048, 8_192, 16_384, 32_768)
 SPEED_BENCH_SUBSETS = {
     1_024: "throughput_1k",
     2_048: "throughput_2k",
@@ -65,8 +69,7 @@ def api_endpoint(base_url: str, path: str) -> str:
 def status_endpoint(base_url: str) -> str:
     parts = urlsplit(base_url)
     path = parts.path.rstrip("/")
-    if path.endswith("/v1"):
-        path = path[:-3]
+    path = path.removesuffix("/v1")
     return urlunsplit((parts.scheme, parts.netloc, f"{path}/api/status", "", ""))
 
 
@@ -121,7 +124,9 @@ def select_model(models: list[str], requested: str | None) -> str:
     if requested:
         if requested not in models:
             names = ", ".join(models)
-            raise BenchmarkError(f"Model '{requested}' is unavailable. Available: {names}")
+            raise BenchmarkError(
+                f"Model '{requested}' is unavailable. Available: {names}"
+            )
         return requested
     if not sys.stdin.isatty():
         if len(models) == 1:
@@ -292,9 +297,11 @@ def launch_configuration(
         except BenchmarkError:
             pass
     if raw_path is None and requested_model:
-        model_root = Path(
-            preferences.get("modelLibraryRoot") or Path.home() / ".dsmodel"
-        ).expanduser().resolve()
+        model_root = (
+            Path(preferences.get("modelLibraryRoot") or Path.home() / ".dsmodel")
+            .expanduser()
+            .resolve()
+        )
         raw_path = find_installed_model(model_root, requested_model)
     if raw_path is None:
         raw_path = saved_path
@@ -444,7 +451,9 @@ def wait_for_server(
         time.sleep(0.25)
     detail = server_log_tail(log) or last_error
     suffix = f"\n{detail}" if detail else ""
-    raise BenchmarkError(f"Server did not become ready within {timeout:g} seconds.{suffix}")
+    raise BenchmarkError(
+        f"Server did not become ready within {timeout:g} seconds.{suffix}"
+    )
 
 
 def stop_local_server(process: subprocess.Popen[str], log: TextIO) -> None:
@@ -579,16 +588,14 @@ def load_speed_bench_samples(
                     f"Unable to apply the chat template to {path}:{line_number}: "
                     f"{error}"
                 ) from error
-            samples.append(
-                {
-                    "prompt": prompt,
-                    "tokens": tokens,
-                    "question_id": row.get("question_id"),
-                    "sub_category": row.get("sub_category"),
-                    "source": row.get("source"),
-                    "src_id": row.get("src_id"),
-                }
-            )
+            samples.append({
+                "prompt": prompt,
+                "tokens": tokens,
+                "question_id": row.get("question_id"),
+                "sub_category": row.get("sub_category"),
+                "source": row.get("source"),
+                "src_id": row.get("src_id"),
+            })
             if len(samples) == count:
                 return path, samples
     raise BenchmarkError(
@@ -612,13 +619,38 @@ def load_tokenizer(model_path: str) -> Any:
     if not tokenizer_path.is_dir():
         raise BenchmarkError(f"Tokenizer directory is missing: {tokenizer_path}")
     try:
-        return AutoTokenizer.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             tokenizer_path,
             trust_remote_code=True,
             local_files_only=True,
         )
     except Exception as error:
         raise BenchmarkError(f"Unable to load tokenizer: {error}") from error
+    if tokenizer.chat_template is None:
+        try:
+            runtime_path = str(Path(__file__).resolve().parents[1] / "runtime")
+            if runtime_path not in sys.path:
+                sys.path.insert(0, runtime_path)
+            from deepseek_v4_ssd.tool_codec import ToolCodec
+
+            codec = ToolCodec.open(Path(model_path).expanduser(), tokenizer)
+        except Exception as error:
+            raise BenchmarkError(
+                f"Unable to load the DeepSeek chat encoder: {error}"
+            ) from error
+
+        def apply_chat_template(
+            messages: list[dict[str, Any]],
+            *,
+            add_generation_prompt: bool,
+            tokenize: bool,
+        ) -> str:
+            if not add_generation_prompt or tokenize:
+                raise ValueError("The benchmark requires a text generation prompt")
+            return codec.encode(messages, "chat")
+
+        tokenizer.apply_chat_template = apply_chat_template
+    return tokenizer
 
 
 def stream_completion(
@@ -631,16 +663,14 @@ def stream_completion(
     result: dict[str, Any],
     done: threading.Event,
 ) -> None:
-    payload = json.dumps(
-        {
-            "model": model,
-            "prompt": prompt,
-            "max_tokens": max_output_tokens,
-            "temperature": 0,
-            "top_p": 1,
-            "stream": True,
-        }
-    ).encode()
+    payload = json.dumps({
+        "model": model,
+        "prompt": prompt,
+        "max_tokens": max_output_tokens,
+        "temperature": 0,
+        "top_p": 1,
+        "stream": True,
+    }).encode()
     request = Request(
         url,
         data=payload,
@@ -666,15 +696,13 @@ def stream_completion(
                         if first_output_at is None:
                             first_output_at = time.perf_counter()
                         output.append(text)
-        result.update(
-            {
-                "output_text": "".join(output),
-                "wall_seconds": time.perf_counter() - started,
-                "client_first_output_seconds": (
-                    first_output_at - started if first_output_at is not None else 0.0
-                ),
-            }
-        )
+        result.update({
+            "output_text": "".join(output),
+            "wall_seconds": time.perf_counter() - started,
+            "client_first_output_seconds": (
+                first_output_at - started if first_output_at is not None else 0.0
+            ),
+        })
     except Exception as error:
         result["error"] = error_message(error)
     finally:
@@ -693,7 +721,9 @@ def run_request(
 ) -> dict[str, Any]:
     initial = get_json(status_url, api_key, timeout)
     if initial.get("performance", {}).get("generating"):
-        raise BenchmarkError("The server is busy. Wait for the current request to finish.")
+        raise BenchmarkError(
+            "The server is busy. Wait for the current request to finish."
+        )
 
     result: dict[str, Any] = {}
     done = threading.Event()
@@ -737,25 +767,21 @@ def run_request(
     final = get_json(status_url, api_key, timeout)
     performance = final.get("performance", {})
     active_memory_samples.append(int(performance.get("active_memory_bytes", 0)))
-    result.update(
-        {
-            "input_tokens": int(performance.get("runtime_prompt_tokens", 0)),
-            "output_tokens": int(performance.get("runtime_generation_tokens", 0)),
-            "prompt_cache_reused_tokens": int(
-                performance.get("prompt_cache_reused_tokens", 0)
-            ),
-            "ttft_seconds": float(
-                performance.get("time_to_first_token_seconds", 0)
-            ),
-            "prefill_tokens_per_second": float(
-                performance.get("prefill_tokens_per_second", 0)
-            ),
-            "decode_tokens_per_second": float(
-                performance.get("decode_tokens_per_second", 0)
-            ),
-            "peak_active_memory_bytes": max(active_memory_samples, default=0),
-        }
-    )
+    result.update({
+        "input_tokens": int(performance.get("runtime_prompt_tokens", 0)),
+        "output_tokens": int(performance.get("runtime_generation_tokens", 0)),
+        "prompt_cache_reused_tokens": int(
+            performance.get("prompt_cache_reused_tokens", 0)
+        ),
+        "ttft_seconds": float(performance.get("time_to_first_token_seconds", 0)),
+        "prefill_tokens_per_second": float(
+            performance.get("prefill_tokens_per_second", 0)
+        ),
+        "decode_tokens_per_second": float(
+            performance.get("decode_tokens_per_second", 0)
+        ),
+        "peak_active_memory_bytes": max(active_memory_samples, default=0),
+    })
     return result
 
 
@@ -781,15 +807,13 @@ def summarize(runs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             values = [float(run[key]) for run in group]
             metrics[key] = {"peak": max(values), "p95": nearest_rank_p95(values)}
         actual = [int(run["input_tokens"]) for run in group]
-        summaries.append(
-            {
-                "target_input_tokens": target,
-                "actual_input_tokens_min": min(actual),
-                "actual_input_tokens_max": max(actual),
-                "run_count": len(group),
-                "metrics": metrics,
-            }
-        )
+        summaries.append({
+            "target_input_tokens": target,
+            "actual_input_tokens_min": min(actual),
+            "actual_input_tokens_max": max(actual),
+            "run_count": len(group),
+            "metrics": metrics,
+        })
     return summaries
 
 
@@ -819,23 +843,21 @@ def render_ascii_table(summaries: list[dict[str, Any]]) -> str:
         maximum = summary["actual_input_tokens_max"]
         actual = f"{minimum:,}" if minimum == maximum else f"{minimum:,}-{maximum:,}"
         metrics = summary["metrics"]
-        rows.append(
-            (
-                actual,
-                "",
-                f"{metrics['wall_seconds']['p95']:.2f}",
-                f"{metrics['ttft_seconds']['p95']:.2f}",
-                f"{metrics['prefill_tokens_per_second']['p95']:.1f}",
-                f"{metrics['decode_tokens_per_second']['p95']:.1f}",
-                f"{metrics['peak_active_memory_bytes']['p95'] / GIB:.2f}",
-                "",
-                f"{metrics['wall_seconds']['peak']:.2f}",
-                f"{metrics['ttft_seconds']['peak']:.2f}",
-                f"{metrics['prefill_tokens_per_second']['peak']:.1f}",
-                f"{metrics['decode_tokens_per_second']['peak']:.1f}",
-                f"{metrics['peak_active_memory_bytes']['peak'] / GIB:.2f}",
-            )
-        )
+        rows.append((
+            actual,
+            "",
+            f"{metrics['wall_seconds']['p95']:.2f}",
+            f"{metrics['ttft_seconds']['p95']:.2f}",
+            f"{metrics['prefill_tokens_per_second']['p95']:.1f}",
+            f"{metrics['decode_tokens_per_second']['p95']:.1f}",
+            f"{metrics['peak_active_memory_bytes']['p95'] / GIB:.2f}",
+            "",
+            f"{metrics['wall_seconds']['peak']:.2f}",
+            f"{metrics['ttft_seconds']['peak']:.2f}",
+            f"{metrics['prefill_tokens_per_second']['peak']:.1f}",
+            f"{metrics['decode_tokens_per_second']['peak']:.1f}",
+            f"{metrics['peak_active_memory_bytes']['peak'] / GIB:.2f}",
+        ))
     widths = [
         max(len(headers[index]), *(len(row[index]) for row in rows))
         for index in range(len(headers))
@@ -843,11 +865,19 @@ def render_ascii_table(summaries: list[dict[str, Any]]) -> str:
     border = "+" + "+".join("-" * (width + 2) for width in widths) + "+"
 
     def line(values: tuple[str, ...]) -> str:
-        return "|" + "|".join(
-            f" {value:<{width}} " for value, width in zip(values, widths)
-        ) + "|"
+        return (
+            "|"
+            + "|".join(f" {value:<{width}} " for value, width in zip(values, widths))
+            + "|"
+        )
 
-    return "\n".join([border, line(headers), border, *(line(row) for row in rows), border])
+    return "\n".join([
+        border,
+        line(headers),
+        border,
+        *(line(row) for row in rows),
+        border,
+    ])
 
 
 def command_output(project_root: Path, *command: str) -> str | None:
@@ -1041,9 +1071,7 @@ def run_connected_benchmark(
             )
     tokenizer = load_tokenizer(model_path)
     if arguments.speed_bench_dir is None:
-        raise BenchmarkError(
-            "Use --speed-bench-dir DIRECTORY or set SPEED_BENCH_DIR."
-        )
+        raise BenchmarkError("Use --speed-bench-dir DIRECTORY or set SPEED_BENCH_DIR.")
     speed_bench_dir = arguments.speed_bench_dir.expanduser().resolve()
     speed_bench_samples = {}
     dataset_files = {}
@@ -1112,7 +1140,9 @@ def run_connected_benchmark(
     total_requests = len(arguments.sizes) * arguments.runs
     print(f"Model: {model}")
     print(f"Plan: {len(arguments.sizes)} input sizes x {arguments.runs} runs")
-    print(f"Requests: {total_requests}; output limit: {arguments.max_output_tokens} tokens")
+    print(
+        f"Requests: {total_requests}; output limit: {arguments.max_output_tokens} tokens"
+    )
     print(f"Result file: {output_path}")
     if arguments.runs < 20:
         print("Note: nearest-rank P95 equals Maximum when fewer than 20 runs are used.")
@@ -1146,21 +1176,19 @@ def run_connected_benchmark(
                         f"requested {target_tokens}, server reported {result['input_tokens']}"
                     )
                 output_text = result.pop("output_text")
-                result.update(
-                    {
-                        "target_input_tokens": target_tokens,
-                        "run": run_index,
-                        "speed_bench_question_id": sample["question_id"],
-                        "speed_bench_sub_category": sample["sub_category"],
-                        "speed_bench_source": sample["source"],
-                        "speed_bench_source_id": sample["src_id"],
-                        "prompt_text_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
-                        "prompt_token_sha256": token_sha256(prompt_tokens),
-                        "output_text_sha256": hashlib.sha256(
-                            output_text.encode()
-                        ).hexdigest(),
-                    }
-                )
+                result.update({
+                    "target_input_tokens": target_tokens,
+                    "run": run_index,
+                    "speed_bench_question_id": sample["question_id"],
+                    "speed_bench_sub_category": sample["sub_category"],
+                    "speed_bench_source": sample["source"],
+                    "speed_bench_source_id": sample["src_id"],
+                    "prompt_text_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+                    "prompt_token_sha256": token_sha256(prompt_tokens),
+                    "output_text_sha256": hashlib.sha256(
+                        output_text.encode()
+                    ).hexdigest(),
+                })
                 artifact["runs"].append(result)
                 artifact["summary"] = summarize(artifact["runs"])
                 save_artifact(output_path, artifact)
@@ -1173,7 +1201,9 @@ def run_connected_benchmark(
                     f"Memory {result['peak_active_memory_bytes'] / GIB:.2f} GiB"
                 )
     except BaseException as error:
-        artifact["status"] = "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
+        artifact["status"] = (
+            "interrupted" if isinstance(error, KeyboardInterrupt) else "failed"
+        )
         artifact["error"] = str(error)
         save_artifact(output_path, artifact)
         raise
