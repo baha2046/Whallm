@@ -780,6 +780,8 @@ def load(
         route_trace_path=config.expert_route_trace,
         ready_expert_decode=config.ready_expert_decode,
         read_limiter=read_limiter,
+        page_cache_probe=getattr(config, "expert_page_cache_probe", False),
+        file_cache_policy=getattr(config, "expert_file_cache_policy", "cached"),
     )
     try:
         scale_name = (

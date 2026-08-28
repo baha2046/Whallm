@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T22:58:31.405014+08:00",
+  "evidence_kind": "exploratory_adaptive_block_decision_survey",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_run": "1fe8a3d572837e2ef364ad6f7ee5a6894a6034d872e442c84f8db4a0ebdbd245",
+    "runtime_python_tree_sha256": "0262595fa736e3f7b5b752dd680f2e549ba11de18b42cc2f9ff922c7e2fbef72",
+    "benchmark_script_sha256": "92d8e833207e98e62e4fe45a4449a87e1f5a4509a966e975f6bcf8734ec51f68"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "mac_model": "Mac14,13",
+    "chip": "Apple M2 Max",
+    "memory_bytes": 68719476736,
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1"
+  },
+  "checkpoint": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "layer_count": 43,
+    "expert_count": 256,
+    "selected_expert_count": 6,
+    "expert_blob_bytes": 13369344,
+    "dspark_block_size": 5
+  },
+  "experiment": {
+    "objective": "Measure fixed five-token hash prefetch and/or the default-off storage-aware adaptive selector on selected R0 domains",
+    "control": "fixed five-token DSpark with hash exact prefetch",
+    "candidate": "adaptive DSpark prefix with hash exact prefetch",
+    "workload_order": [
+      "storage_sentence"
+    ],
+    "run_pattern_per_workload": [
+      "adaptive"
+    ],
+    "warmup_per_workload": false,
+    "fresh_process_per_run": true,
+    "os_page_cache": "not purged",
+    "prompt_cache": "persistent cache disabled",
+    "prompt_tokens": [
+      4096
+    ],
+    "max_output_tokens": 16,
+    "batch_size": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "dspark_confidence_threshold": 0,
+    "adaptive_full_block_commit_fraction_floor": 0.9,
+    "main_expert_slots": 1152,
+    "dspark_expert_slots": 768,
+    "hash_prefetch_scratch_slots": 108
+  },
+  "prompt_manifest_sha256": "15e09c2c6f82c74385efb3cf250b4ff370d6096f5bb49b902f687cb71e8c345d",
+  "workloads": [
+    {
+      "name": "storage_sentence",
+      "target_tokens": 4096,
+      "file": "storage_sentence-4096.txt",
+      "suffix": "\n\nWrite one short sentence about storage.",
+      "separator_padding": " \n\n",
+      "text_sha256": "46092169bd8c41d520cf8b284344149d997f5f7172b0e0f498ebbc558c508633",
+      "prompt_token_sha256": "af84f5ac5fbdebc1fe09c568b5c58fd64245e10079d5320d67ee1e21b67327e1"
+    }
+  ],
+  "runs": [
+    {
+      "id": "storage_sentence-01-adaptive",
+      "workload": "storage_sentence",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "fb60679062f982915a6d60eb5d35ff713e8e6e59dd2a6147983cf5506e9ce511",
+      "metrics": {
+        "prompt_token_sha256": "af84f5ac5fbdebc1fe09c568b5c58fd64245e10079d5320d67ee1e21b67327e1",
+        "token_sha256": "b1ed28d8f00b800d83b7b193e8e902a82292db26d328a63d37856cd7c651fbfb",
+        "prompt_tokens": 4096,
+        "generated_tokens": 16,
+        "request_seconds": 87.43603312500636,
+        "time_to_first_token_seconds": 82.81793312501395,
+        "decode_tokens_per_second": 3.2491257125851067,
+        "peak_memory_bytes": 29116990146,
+        "request_expert_bytes_read": 335182823424,
+        "request_process_disk_bytes_read": 306722787328,
+        "request_expert_evictions": 23886,
+        "dspark_rounds": 1,
+        "dspark_proposed_tokens": 1,
+        "dspark_accepted_tokens": 1,
+        "dspark_committed_tokens": 2,
+        "dspark_output_budget_trimmed_tokens": 0,
+        "dspark_fallback": true,
+        "dspark_fallback_triggered_rounds": 1,
+        "dspark_fallback_cost_ratios": [
+          1.3009110119619258
+        ],
+        "dspark_last_fallback_target_step_seconds": 0.32165704198996536,
+        "dspark_last_fallback_speculative_seconds": 0.836894375999691,
+        "dspark_last_fallback_break_even_seconds": 0.6433140839799307,
+        "dspark_last_fallback_cost_ratio": 1.3009110119619258,
+        "dspark_draft_seconds": 0.24735570899792947,
+        "dspark_verification_seconds": 0.5895386670017615,
+        "dspark_target_expert_bytes_read": 4706009088,
+        "dspark_replay_expert_bytes_read": 0,
+        "dspark_hash_prefetch_requested_experts": 35,
+        "dspark_hash_prefetch_cache_resident_experts": 2,
+        "dspark_hash_prefetch_experts_read": 33,
+        "dspark_hash_prefetch_bytes_read": 441188352,
+        "dspark_hash_prefetch_useful_bytes": 441188352,
+        "dspark_hash_prefetch_wasted_bytes": 0,
+        "dspark_hash_prefetch_useful_rate": 1.0,
+        "dspark_hash_prefetch_wait_seconds": 0.04573062501731329,
+        "dspark_adaptive_block_decisions": 1,
+        "dspark_adaptive_block_original_tokens": 5,
+        "dspark_adaptive_block_selected_tokens": 1,
+        "dspark_adaptive_block_trimmed_tokens": 4,
+        "dspark_adaptive_block_expected_committed": 1.6544932126998901,
+        "dspark_adaptive_block_requested_hash_experts": 35,
+        "dspark_adaptive_block_resident_hash_experts": 2,
+        "dspark_adaptive_block_missing_hash_experts": 33,
+        "dspark_adaptive_block_predicted_hash_bytes": 441188352,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 220594176.0,
+        "dspark_adaptive_block_high_confidence_full_decisions": 0,
+        "dspark_adaptive_block_storage_score_decisions": 1,
+        "dspark_adaptive_block_full_block_decisions": 0,
+        "dspark_adaptive_block_selected_length_counts": [
+          [
+            1,
+            1
+          ]
+        ],
+        "dspark_adaptive_block_plan_seconds": 0.0009447910124436021,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2,
+          4,
+          5
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.6544932126998901,
+          1.9672498879003903,
+          2.0721389344280925,
+          2.0768641336444906
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          35,
+          53,
+          86,
+          103
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          2,
+          3,
+          5,
+          9
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          33,
+          50,
+          81,
+          94
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          441188352,
+          668467200,
+          1082916864,
+          1256718336
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.05013615796060273,
+          0.03934499775800781,
+          0.02558196215343324,
+          0.022094299294090326
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.05013615796060273,
+        "dspark_last_adaptive_block_selection_reason": "storage_score",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.34614402227408175,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          11,
+          12,
+          12
+        ]
+      },
+      "sequence": 1
+    }
+  ],
+  "workload_summaries": [
+    {
+      "name": "storage_sentence",
+      "greedy_parity": null,
+      "within_run_set_output_consistency": true,
+      "prompt_token_sha256": [
+        "af84f5ac5fbdebc1fe09c568b5c58fd64245e10079d5320d67ee1e21b67327e1"
+      ],
+      "output_token_sha256": [
+        "b1ed28d8f00b800d83b7b193e8e902a82292db26d328a63d37856cd7c651fbfb"
+      ],
+      "generated_token_counts": [
+        16
+      ],
+      "mode_medians": {
+        "adaptive": {
+          "request_seconds": 87.43603312500636,
+          "time_to_first_token_seconds": 82.81793312501395,
+          "decode_tokens_per_second": 3.2491257125851067,
+          "peak_memory_bytes": 29116990146.0,
+          "request_expert_bytes_read": 335182823424.0,
+          "request_process_disk_bytes_read": 306722787328.0,
+          "request_expert_evictions": 23886.0,
+          "dspark_rounds": 1.0,
+          "dspark_proposed_tokens": 1.0,
+          "dspark_accepted_tokens": 1.0,
+          "dspark_committed_tokens": 2.0,
+          "dspark_output_budget_trimmed_tokens": 0.0,
+          "dspark_last_fallback_cost_ratio": 1.3009110119619258,
+          "dspark_draft_seconds": 0.24735570899792947,
+          "dspark_verification_seconds": 0.5895386670017615,
+          "dspark_target_expert_bytes_read": 4706009088.0,
+          "dspark_replay_expert_bytes_read": 0.0,
+          "dspark_hash_prefetch_requested_experts": 35.0,
+          "dspark_hash_prefetch_experts_read": 33.0,
+          "dspark_hash_prefetch_bytes_read": 441188352.0,
+          "dspark_hash_prefetch_useful_bytes": 441188352.0,
+          "dspark_hash_prefetch_wasted_bytes": 0.0,
+          "dspark_hash_prefetch_useful_rate": 1.0,
+          "dspark_hash_prefetch_wait_seconds": 0.04573062501731329,
+          "dspark_adaptive_block_decisions": 1.0,
+          "dspark_adaptive_block_original_tokens": 5.0,
+          "dspark_adaptive_block_selected_tokens": 1.0,
+          "dspark_adaptive_block_trimmed_tokens": 4.0,
+          "dspark_adaptive_block_predicted_hash_bytes": 441188352.0,
+          "dspark_adaptive_block_high_confidence_full_decisions": 0.0,
+          "dspark_adaptive_block_storage_score_decisions": 1.0,
+          "dspark_adaptive_block_full_block_decisions": 0.0,
+          "dspark_adaptive_block_plan_seconds": 0.0009447910124436021
+        }
+      },
+      "adaptive_decision_summary": {
+        "runs": 1,
+        "fallback_runs": 1,
+        "decisions": 1,
+        "high_confidence_full_decisions": 0,
+        "storage_score_decisions": 1,
+        "full_block_decisions": 0,
+        "selected_length_counts": [
+          [
+            1,
+            1
+          ]
+        ],
+        "mean_selected_tokens_per_decision": 1.0,
+        "output_budget_trimmed_tokens": 0
+      }
+    }
+  ],
+  "aggregate_summary": {
+    "all_workloads_greedy_parity": null,
+    "all_workloads_within_run_set_output_consistency": true,
+    "workloads_measured": 1,
+    "adaptive_decisions": 1,
+    "adaptive_high_confidence_full_decisions": 0,
+    "adaptive_storage_score_decisions": 1,
+    "adaptive_full_block_decisions": 0,
+    "adaptive_selected_length_counts": [
+      [
+        1,
+        1
+      ]
+    ],
+    "adaptive_fallback_runs": 1
+  },
+  "post_run_audit": {
+    "status": "repeatable_storage_score_then_normal_fallback",
+    "output_matches_initial_discovery": true,
+    "output_token_sha256": "b1ed28d8f00b800d83b7b193e8e902a82292db26d328a63d37856cd7c651fbfb",
+    "fallback_cost_ratio": 1.3009110119619258,
+    "decision": "Keep normal fallback enabled; speculative cost exceeded break-even by 30.09 percent."
+  },
+  "evidence_limits": [
+    "This is a decision survey, not a paired fixed/adaptive performance result.",
+    "Prompt and output lengths are recorded in experiment; a survey run is behavioral evidence, not a paired timing result.",
+    "No same-prompt warmup was run, and the operating-system page cache is not controlled or purged.",
+    "Process disk counters include all reads attributed to the process and do not isolate physical expert-file SSD traffic.",
+    "Adaptive selection only models the three exact target hash layers and still computes the complete five-position DSpark draft.",
+    "Timing, process-disk, and peak-memory changes remain exploratory until repeated waves establish stable paired results."
+  ]
+}

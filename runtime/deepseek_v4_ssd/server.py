@@ -15,6 +15,7 @@ from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from .generation import GenerationOptions, GeneratedPiece, THINK_END
+from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .manifest import InstalledModel
 from .model_manager import (
     MODEL_IDS,
@@ -1906,7 +1907,57 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--no-ready-expert-decode", action="store_true")
+    parser.add_argument(
+        "--expert-page-cache-probe",
+        action="store_true",
+        help=(
+            "research-only pre-read mincore classification for expert-file "
+            "page residency; not a physical SSD byte counter"
+        ),
+    )
+    parser.add_argument(
+        "--expert-file-cache-policy",
+        choices=EXPERT_FILE_CACHE_POLICIES,
+        default="cached",
+        help=(
+            "research-only expert descriptor policy; bypass uses Darwin "
+            "F_NOCACHE with read-ahead disabled"
+        ),
+    )
     parser.add_argument("--dspark", action="store_true")
+    parser.add_argument(
+        "--dspark-prompt-cache",
+        action="store_true",
+        help="experimentally reuse an atomic target and DSpark prompt snapshot",
+    )
+    parser.add_argument(
+        "--dspark-hash-prefetch",
+        action="store_true",
+        help="experimentally prefetch exact target hash-layer experts",
+    )
+    parser.add_argument(
+        "--dspark-adaptive-block",
+        action="store_true",
+        help="experimentally select a storage-aware DSpark draft prefix",
+    )
+    parser.add_argument(
+        "--no-dspark-fallback",
+        action="store_true",
+        help="research only: continue DSpark after its wall-time stop gate",
+    )
+    parser.add_argument(
+        "--dspark-sequential-verification",
+        action="store_true",
+        help="research oracle: verify each DSpark target position sequentially",
+    )
+    parser.add_argument(
+        "--dspark-hybrid-verification",
+        action="store_true",
+        help=(
+            "experimental verifier: token-shaped target math with one expert "
+            "union acquisition per layer"
+        ),
+    )
     parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
     parser.add_argument("--default-max-tokens", type=int, default=272_000)
@@ -1938,8 +1989,18 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        expert_page_cache_probe=arguments.expert_page_cache_probe,
+        expert_file_cache_policy=arguments.expert_file_cache_policy,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         dspark_enabled=arguments.dspark,
+        dspark_prompt_cache=arguments.dspark_prompt_cache,
+        dspark_hash_prefetch=arguments.dspark_hash_prefetch,
+        dspark_adaptive_block=arguments.dspark_adaptive_block,
+        dspark_fallback_enabled=not arguments.no_dspark_fallback,
+        dspark_sequential_verification=(
+            arguments.dspark_sequential_verification
+        ),
+        dspark_hybrid_verification=arguments.dspark_hybrid_verification,
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,

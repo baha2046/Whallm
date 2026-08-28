@@ -140,6 +140,20 @@ class ModelCatalogTests(unittest.TestCase):
             with self.subTest(models=models), self.assertRaises(ModelCatalogError):
                 parse_model_catalog({"version": 1, "models": models})
 
+    def test_merged_runtime_fields_are_validated(self):
+        cases = (
+            ("deepseek-v4", "dspark_prompt_cache", True),
+            ("deepseek-v4", "dspark_fallback_enabled", False),
+            ("deepseek-v4", "expert_file_cache_policy", "cold"),
+            ("qwen3.8-flash-next", "staged_expert_streaming", True),
+            ("qwen3.8-flash-next", "adaptive_expert_prefill_threshold", 0.8),
+        )
+        for model_kind, name, value in cases:
+            model = raw_model(model_kind)
+            model["runtime"][name] = value
+            with self.subTest(name=name), self.assertRaises(ModelCatalogError):
+                parse_model_catalog({"version": 1, "models": [model]})
+
 
 class ModelManagerTests(unittest.TestCase):
     def test_listing_and_status_do_not_load_a_runtime(self):

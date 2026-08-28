@@ -290,8 +290,12 @@ final class ServerConfigurationTests: XCTestCase {
         "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
         "persistent_prompt_cache_entries", "prompt_cache_directory",
         "moe_prefill_step_size", "batched_expert_prefill", "fp4_index_cache",
-        "dspark_enabled", "dspark_confidence_threshold", "dspark_slots",
-        "expert_route_trace", "ready_expert_decode", "power_saving_limit_gbps",
+        "dspark_enabled", "dspark_prompt_cache", "dspark_confidence_threshold",
+        "dspark_slots", "dspark_hash_prefetch", "dspark_adaptive_block",
+        "dspark_fallback_enabled", "dspark_sequential_verification",
+        "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
+        "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
+        "adaptive_expert_prefill_threshold", "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")

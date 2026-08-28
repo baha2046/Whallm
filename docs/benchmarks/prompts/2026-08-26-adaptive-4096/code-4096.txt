@@ -1,0 +1,723 @@
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if item]
+
+def parse(items):
+    return [item.strip() for item in items if

@@ -1,0 +1,357 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-27T04:08:59.909337+08:00",
+  "evidence_kind": "expert_file_cache_bypass_contract",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_run": "3503d2ea2e292ca85b6032c1e361fef52848214e3d984f461fbdc51d152a1a7d",
+    "runtime_python_tree_sha256": "de66be84427897bf82a95fb6e880701eada6fbbaa89aa636952289c332df2c94",
+    "benchmark_script_sha256": "7730df3c9647930eca1214a1f505c62d28db3277af49a8b1b7912d9e3aa4256d",
+    "benchmark_helper_sha256": "c5d7fe3137483066a3a50975bd83c9acd689b1d10689c2359434e1b6838b798d",
+    "xnu_contract_revision": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "mac_model": "Mac14,13",
+    "chip": "Apple M2 Max",
+    "memory_bytes": 68719476736,
+    "page_size_bytes": 16384,
+    "filesystem_block_size_bytes": 4096,
+    "filesystem_preferred_transfer_size_bytes": 1048576,
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1"
+  },
+  "checkpoint": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "manifest_sha256": "61b102940075f311a6cfb0dfa3b5ae06c6386bb92365c98046b99f5b3e8fce64",
+    "expert_blob_bytes": 13369344,
+    "expert_layout_aligned": true
+  },
+  "experiment": {
+    "cache_bypass": "F_NOCACHE=1 and F_RDAHEAD=0",
+    "cached_control": "default descriptor flags",
+    "selection": "just-in-time fully nonresident ranges in reverse layer order; recheck after every cached control read",
+    "sample_count": 6,
+    "ranges_scanned": 25,
+    "same_range_order": [
+      "bypass",
+      "cached"
+    ]
+  },
+  "ranges": [
+    {
+      "layer": 42,
+      "expert": 12,
+      "file": "layer_42.bin",
+      "offset": 160432128,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "0d19fb9c91c41507ca1f2eeee4eb1623ad743dbf40d09bde9441b5c8ce1f9474",
+        "seconds": 0.0031748750479891896,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "0d19fb9c91c41507ca1f2eeee4eb1623ad743dbf40d09bde9441b5c8ce1f9474",
+        "seconds": 0.0023316669976338744,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    },
+    {
+      "layer": 42,
+      "expert": 15,
+      "file": "layer_42.bin",
+      "offset": 200540160,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "00df1a456d2d377b8ab41c77f5dd89b6d773811f85dd96e29beaa982ae6bce5b",
+        "seconds": 0.002608375041745603,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "00df1a456d2d377b8ab41c77f5dd89b6d773811f85dd96e29beaa982ae6bce5b",
+        "seconds": 0.0023844160023145378,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    },
+    {
+      "layer": 42,
+      "expert": 16,
+      "file": "layer_42.bin",
+      "offset": 213909504,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "e86191a2c768bb579519134510e399357ef51386c5a6077e7f0d567788330517",
+        "seconds": 0.002635209006257355,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "e86191a2c768bb579519134510e399357ef51386c5a6077e7f0d567788330517",
+        "seconds": 0.0024354580091312528,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 26738688,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    },
+    {
+      "layer": 42,
+      "expert": 19,
+      "file": "layer_42.bin",
+      "offset": 254017536,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "eef8fa548457fc929e95ac9c70fa4474274d5182dfa4ecc01cd903ea0d8ef480",
+        "seconds": 0.002588749979622662,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "eef8fa548457fc929e95ac9c70fa4474274d5182dfa4ecc01cd903ea0d8ef480",
+        "seconds": 0.0023550839978270233,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    },
+    {
+      "layer": 42,
+      "expert": 20,
+      "file": "layer_42.bin",
+      "offset": 267386880,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "af36d8e75ef8e47378dc7c3d8bdfe74027c7a2b0e14765671ab39deaa0b75ebb",
+        "seconds": 0.0026078749797306955,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "af36d8e75ef8e47378dc7c3d8bdfe74027c7a2b0e14765671ab39deaa0b75ebb",
+        "seconds": 0.0023747499799355865,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    },
+    {
+      "layer": 42,
+      "expert": 24,
+      "file": "layer_42.bin",
+      "offset": 320864256,
+      "length": 13369344,
+      "before": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "bypass_read": {
+        "bytes_read": 13369344,
+        "sha256": "90ef6aee060b8062dc979b476c48859f9341cbd2e77f48dafdf633037461170f",
+        "seconds": 0.002593583019915968,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_bypass": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 0,
+        "nonresident_bytes": 13369344,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "cached_read": {
+        "bytes_read": 13369344,
+        "sha256": "90ef6aee060b8062dc979b476c48859f9341cbd2e77f48dafdf633037461170f",
+        "seconds": 0.002436666050925851,
+        "destination_address_alignment_bytes": 4096,
+        "process_disk_bytes_read": 13369344,
+        "process_disk_bytes_written": 0
+      },
+      "after_cached": {
+        "classified_bytes": 13369344,
+        "resident_bytes": 13369344,
+        "nonresident_bytes": 0,
+        "unclassified_bytes": 0,
+        "probe_calls": 1,
+        "probe_failures": 0
+      },
+      "contract_passed": true
+    }
+  ],
+  "summary": {
+    "ranges_passed": 6,
+    "ranges_measured": 6,
+    "all_byte_hashes_exact": true,
+    "all_bypass_reads_left_nonresident": true,
+    "all_cached_reads_became_resident": true,
+    "contract_passed": true
+  },
+  "decision": {
+    "status": "cache_bypass_contract_passed",
+    "run_full_model_wave": true,
+    "adopt_as_default": false
+  },
+  "evidence_limits": [
+    "F_NOCACHE does not purge pages resident before descriptor configuration.",
+    "mincore reports VM page residency, not storage-controller or device-cache state.",
+    "Process disk counters remain process-wide rather than expert-file-specific.",
+    "This contract validates aligned installed expert ranges, not full-model speed."
+  ]
+}

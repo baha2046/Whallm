@@ -1,0 +1,450 @@
+{
+  "checkpoint": {
+    "expert_blob_bytes": 13369344,
+    "expert_count": 256,
+    "installed_manifest_sha256": "61b102940075f311a6cfb0dfa3b5ae06c6386bb92365c98046b99f5b3e8fce64",
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "layer_count": 43,
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "selected_expert_count": 6
+  },
+  "environment": {
+    "chip": "Apple M2 Max",
+    "mac_model": "Mac14,13",
+    "machine": "arm64",
+    "memory_bytes": 68719476736,
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "transformers": "5.12.1"
+  },
+  "evidence_kind": "adaptive_expert_prefill_repeated_4k_two_pair_gate",
+  "experiment": {
+    "cache_state": "Darwin expert-file bypass descriptor; no OS-wide cache purge",
+    "candidate_threshold": 0.9,
+    "defaults_changed": false,
+    "dspark": false,
+    "eligibility_artifact": "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/2026-08-27-adaptive-expert-prefill-route-union-4k-m2-max.json",
+    "eligibility_artifact_sha256": "bbd003adf9ba24df977e88de79ce5e616902a7496289b6d5743efaf808ae79f4",
+    "expert_file_cache_policy": "bypass",
+    "fresh_process_per_run": true,
+    "max_tokens": 2,
+    "objective": "Stop or continue the adaptive prefill runtime before the full five-workload threshold matrix",
+    "orders": [
+      [
+        "adaptive",
+        "control"
+      ],
+      [
+        "control",
+        "adaptive"
+      ]
+    ],
+    "persistent_prompt_cache": false,
+    "prompt_file": "repeated-4096.txt",
+    "prompt_manifest": "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/prompts/2026-08-26-adaptive-4096/manifest.json",
+    "prompt_manifest_sha256": "dd330840d23490935fc4246512f9bfe95c08c6334fdab78ad746d631367f3e95",
+    "prompt_model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "prompt_revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "prompt_text_sha256": "e921dd670f902e3dd48e1d30eaa839a864eaa57fa2912fbd4bee8ad7b3190ff9",
+    "prompt_token_sha256": "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+    "prompt_tokens": 4096,
+    "temperature": 0,
+    "thresholds_share_repeated_decisions": true,
+    "top_p": 1,
+    "waves": 2,
+    "workload": "repeated"
+  },
+  "formal_performance_result": false,
+  "gate": {
+    "correctness": {
+      "criteria": {
+        "adaptive_avoided_bytes_close": true,
+        "adaptive_batched_bytes_close": true,
+        "adaptive_decisions_cover_all_expert_layers": true,
+        "adaptive_read_set_covers_union_within_capacity": true,
+        "all_actual_expert_bytes_close_by_blob": true,
+        "all_output_token_ids_and_hashes_exact": true,
+        "all_prompt_token_hashes_exact": true,
+        "all_runs_reached_output_budget": true,
+        "configuration_exact": true,
+        "control_has_no_adaptive_decisions": true,
+        "repeated_decisions_identical_at_all_three_thresholds": true,
+        "two_complete_reversed_pairs": true
+      },
+      "passed": true
+    },
+    "decision": "stop_runtime_candidate_keep_default_off",
+    "paired_runs": [
+      {
+        "change_fraction": {
+          "external_wall_seconds": 0.17006657005904588,
+          "peak_memory_bytes": -0.15784640724480292,
+          "request_expert_bytes_read": -0.6678331090174966,
+          "request_seconds": 0.1700851843508678,
+          "time_to_first_token_seconds": 0.1708553362125732
+        },
+        "order": [
+          "adaptive",
+          "control"
+        ],
+        "token_hash_exact": true,
+        "wave": 1
+      },
+      {
+        "change_fraction": {
+          "external_wall_seconds": 0.16558596005180404,
+          "peak_memory_bytes": -0.15784640724480292,
+          "request_expert_bytes_read": -0.6678331090174966,
+          "request_seconds": 0.16560590328192032,
+          "time_to_first_token_seconds": 0.16647897613932205
+        },
+        "order": [
+          "control",
+          "adaptive"
+        ],
+        "token_hash_exact": true,
+        "wave": 2
+      }
+    ],
+    "performance": {
+      "adaptive_ttft_p95_seconds": 51.72070475208166,
+      "control_ttft_p95_seconds": 44.199889637765594,
+      "criteria": {
+        "median_expert_bytes_fall_at_least_10_percent": true,
+        "median_peak_memory_increases_no_more_than_5_percent": true,
+        "median_ttft_improves_at_least_5_percent": false,
+        "repeated_ttft_p95_regresses_no_more_than_5_percent": false
+      },
+      "paired_median_change_fraction": {
+        "external_wall_seconds": 0.16782626505542497,
+        "peak_memory_bytes": -0.15784640724480292,
+        "request_expert_bytes_read": -0.6678331090174966,
+        "request_seconds": 0.16784554381639405,
+        "time_to_first_token_seconds": 0.16866715617594763
+      },
+      "passed": false,
+      "ttft_p95_change_fraction": 0.17015461296288112
+    }
+  },
+  "limitations": [
+    "one workload and two pairs are exploratory, not a formal result",
+    "the full threshold-by-workload screen stops if this guard fails",
+    "F_NOCACHE behavior is not a physical SSD byte counter",
+    "no power, ANE, multi-request, or long-context measurement"
+  ],
+  "recorded_at": "2026-08-27T06:51:00.869215+08:00",
+  "runs": [
+    {
+      "configuration": {
+        "adaptive_expert_prefill_threshold": 0.9,
+        "batched_expert_prefill": true,
+        "dspark_enabled": false,
+        "expert_file_cache_policy": "bypass",
+        "layer_major_prefill": true,
+        "persistent_prompt_cache": false,
+        "staged_expert_streaming": false
+      },
+      "expert_file_direct_io_alignment_bytes": 4096,
+      "expert_resident_slots": 393,
+      "generated_token_ids": [
+        1950,
+        1950
+      ],
+      "generated_tokens": 2,
+      "id": "repeated-4k-w01-01-adaptive",
+      "metrics": {
+        "external_wall_seconds": 51.96318900003098,
+        "peak_memory_bytes": 18028148784,
+        "request_adaptive_prefill_avoided_bytes": 99508027392,
+        "request_adaptive_prefill_bytes_read": 44239159296,
+        "request_adaptive_prefill_full_layers": 0,
+        "request_adaptive_prefill_plan_seconds": 2.54877058416605,
+        "request_adaptive_prefill_planned_layers": 42,
+        "request_adaptive_prefill_read_experts": 3309,
+        "request_adaptive_prefill_selective_layers": 42,
+        "request_adaptive_prefill_union_experts": 3309,
+        "request_batched_expert_layers": 42,
+        "request_expert_bytes_read": 49493311488,
+        "request_expert_cache_hits": 381,
+        "request_expert_cache_misses": 393,
+        "request_expert_evictions": 0,
+        "request_expert_read_seconds": 7.344865251914598,
+        "request_gather_qmm_calls": 84,
+        "request_prefetched_layer_hits": 0,
+        "request_routing_sync_seconds": 2.0627168834325857,
+        "request_seconds": 51.95831720798742,
+        "time_to_first_token_seconds": 51.72919337498024
+      },
+      "mode": "adaptive",
+      "prompt_token_sha256": "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+      "prompt_tokens": 4096,
+      "raw_process": {
+        "command": [
+          "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+          "/Users/Shared/Project/product/llm-ssd/Scripts/benchmark_adaptive_expert_prefill_runtime.py",
+          "worker",
+          "--model",
+          "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+          "--prompt-file",
+          "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+          "--expected-prompt-tokens",
+          "4096",
+          "--expected-prompt-token-sha256",
+          "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+          "--mode",
+          "adaptive",
+          "--max-tokens",
+          "2",
+          "--worker-output",
+          "/Users/Shared/Project/product/llm-ssd/scratch/2026-08-27-adaptive-expert-prefill-runtime-repeated-4k-v2-raw/repeated-4k-w01-01-adaptive.json"
+        ],
+        "result_sha256": "cffe4fee798324756c3153bdd3a9aef702aa5b1a9a1e712ad0de9ebed5196295",
+        "returncode": 0,
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sequence": 1,
+      "token_sha256": "dd22c238773ee5642280c221b7a7a51094e6dcec6882cce0f749378ee01e4891",
+      "wave": 1
+    },
+    {
+      "configuration": {
+        "adaptive_expert_prefill_threshold": null,
+        "batched_expert_prefill": true,
+        "dspark_enabled": false,
+        "expert_file_cache_policy": "bypass",
+        "layer_major_prefill": true,
+        "persistent_prompt_cache": false,
+        "staged_expert_streaming": false
+      },
+      "expert_file_direct_io_alignment_bytes": 4096,
+      "expert_resident_slots": 393,
+      "generated_token_ids": [
+        1950,
+        1950
+      ],
+      "generated_tokens": 2,
+      "id": "repeated-4k-w01-02-control",
+      "metrics": {
+        "external_wall_seconds": 44.41045520803891,
+        "peak_memory_bytes": 21407198092,
+        "request_adaptive_prefill_avoided_bytes": 0,
+        "request_adaptive_prefill_bytes_read": 0,
+        "request_adaptive_prefill_full_layers": 0,
+        "request_adaptive_prefill_plan_seconds": 0.0,
+        "request_adaptive_prefill_planned_layers": 0,
+        "request_adaptive_prefill_read_experts": 0,
+        "request_adaptive_prefill_selective_layers": 0,
+        "request_adaptive_prefill_union_experts": 0,
+        "request_batched_expert_layers": 42,
+        "request_expert_bytes_read": 149001338880,
+        "request_expert_cache_hits": 381,
+        "request_expert_cache_misses": 393,
+        "request_expert_evictions": 0,
+        "request_expert_read_seconds": 22.74774192390032,
+        "request_gather_qmm_calls": 84,
+        "request_prefetched_layer_hits": 41,
+        "request_routing_sync_seconds": 0.12043915875256062,
+        "request_seconds": 44.405585082946345,
+        "time_to_first_token_seconds": 44.180687207961455
+      },
+      "mode": "control",
+      "prompt_token_sha256": "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+      "prompt_tokens": 4096,
+      "raw_process": {
+        "command": [
+          "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+          "/Users/Shared/Project/product/llm-ssd/Scripts/benchmark_adaptive_expert_prefill_runtime.py",
+          "worker",
+          "--model",
+          "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+          "--prompt-file",
+          "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+          "--expected-prompt-tokens",
+          "4096",
+          "--expected-prompt-token-sha256",
+          "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+          "--mode",
+          "control",
+          "--max-tokens",
+          "2",
+          "--worker-output",
+          "/Users/Shared/Project/product/llm-ssd/scratch/2026-08-27-adaptive-expert-prefill-runtime-repeated-4k-v2-raw/repeated-4k-w01-02-control.json"
+        ],
+        "result_sha256": "5a8f18f750e1e1a926e1acc6b7bf536fe14baafcbbff04767957dacf6d662197",
+        "returncode": 0,
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sequence": 2,
+      "token_sha256": "dd22c238773ee5642280c221b7a7a51094e6dcec6882cce0f749378ee01e4891",
+      "wave": 1
+    },
+    {
+      "configuration": {
+        "adaptive_expert_prefill_threshold": null,
+        "batched_expert_prefill": true,
+        "dspark_enabled": false,
+        "expert_file_cache_policy": "bypass",
+        "layer_major_prefill": true,
+        "persistent_prompt_cache": false,
+        "staged_expert_streaming": false
+      },
+      "expert_file_direct_io_alignment_bytes": 4096,
+      "expert_resident_slots": 393,
+      "generated_token_ids": [
+        1950,
+        1950
+      ],
+      "generated_tokens": 2,
+      "id": "repeated-4k-w02-01-control",
+      "metrics": {
+        "external_wall_seconds": 44.430889790994115,
+        "peak_memory_bytes": 21407198092,
+        "request_adaptive_prefill_avoided_bytes": 0,
+        "request_adaptive_prefill_bytes_read": 0,
+        "request_adaptive_prefill_full_layers": 0,
+        "request_adaptive_prefill_plan_seconds": 0.0,
+        "request_adaptive_prefill_planned_layers": 0,
+        "request_adaptive_prefill_read_experts": 0,
+        "request_adaptive_prefill_selective_layers": 0,
+        "request_adaptive_prefill_union_experts": 0,
+        "request_batched_expert_layers": 42,
+        "request_expert_bytes_read": 149001338880,
+        "request_expert_cache_hits": 381,
+        "request_expert_cache_misses": 393,
+        "request_expert_evictions": 0,
+        "request_expert_read_seconds": 22.87260871194303,
+        "request_gather_qmm_calls": 84,
+        "request_prefetched_layer_hits": 41,
+        "request_routing_sync_seconds": 0.12070361321093515,
+        "request_seconds": 44.42581466701813,
+        "time_to_first_token_seconds": 44.20090029196581
+      },
+      "mode": "control",
+      "prompt_token_sha256": "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+      "prompt_tokens": 4096,
+      "raw_process": {
+        "command": [
+          "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+          "/Users/Shared/Project/product/llm-ssd/Scripts/benchmark_adaptive_expert_prefill_runtime.py",
+          "worker",
+          "--model",
+          "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+          "--prompt-file",
+          "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+          "--expected-prompt-tokens",
+          "4096",
+          "--expected-prompt-token-sha256",
+          "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+          "--mode",
+          "control",
+          "--max-tokens",
+          "2",
+          "--worker-output",
+          "/Users/Shared/Project/product/llm-ssd/scratch/2026-08-27-adaptive-expert-prefill-runtime-repeated-4k-v2-raw/repeated-4k-w02-01-control.json"
+        ],
+        "result_sha256": "bb61d518c3ebad74a4eede82ba1b6e7b2f39e486de2c572dd473e67aa334bd9e",
+        "returncode": 0,
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sequence": 1,
+      "token_sha256": "dd22c238773ee5642280c221b7a7a51094e6dcec6882cce0f749378ee01e4891",
+      "wave": 2
+    },
+    {
+      "configuration": {
+        "adaptive_expert_prefill_threshold": 0.9,
+        "batched_expert_prefill": true,
+        "dspark_enabled": false,
+        "expert_file_cache_policy": "bypass",
+        "layer_major_prefill": true,
+        "persistent_prompt_cache": false,
+        "staged_expert_streaming": false
+      },
+      "expert_file_direct_io_alignment_bytes": 4096,
+      "expert_resident_slots": 393,
+      "generated_token_ids": [
+        1950,
+        1950
+      ],
+      "generated_tokens": 2,
+      "id": "repeated-4k-w02-02-adaptive",
+      "metrics": {
+        "external_wall_seconds": 51.788021332991775,
+        "peak_memory_bytes": 18028148784,
+        "request_adaptive_prefill_avoided_bytes": 99508027392,
+        "request_adaptive_prefill_bytes_read": 44239159296,
+        "request_adaptive_prefill_full_layers": 0,
+        "request_adaptive_prefill_plan_seconds": 2.545452247315552,
+        "request_adaptive_prefill_planned_layers": 42,
+        "request_adaptive_prefill_read_experts": 3309,
+        "request_adaptive_prefill_selective_layers": 42,
+        "request_adaptive_prefill_union_experts": 3309,
+        "request_batched_expert_layers": 42,
+        "request_expert_bytes_read": 49493311488,
+        "request_expert_cache_hits": 381,
+        "request_expert_cache_misses": 393,
+        "request_expert_evictions": 0,
+        "request_expert_read_seconds": 7.277750085107982,
+        "request_gather_qmm_calls": 84,
+        "request_prefetched_layer_hits": 0,
+        "request_routing_sync_seconds": 2.059947588655632,
+        "request_seconds": 51.78299183398485,
+        "time_to_first_token_seconds": 51.55942091700854
+      },
+      "mode": "adaptive",
+      "prompt_token_sha256": "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+      "prompt_tokens": 4096,
+      "raw_process": {
+        "command": [
+          "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+          "/Users/Shared/Project/product/llm-ssd/Scripts/benchmark_adaptive_expert_prefill_runtime.py",
+          "worker",
+          "--model",
+          "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+          "--prompt-file",
+          "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+          "--expected-prompt-tokens",
+          "4096",
+          "--expected-prompt-token-sha256",
+          "e30c9eda9c30f12a47502594b3834aa97ef02ef8d5b56fd3580ab6cc09c2e039",
+          "--mode",
+          "adaptive",
+          "--max-tokens",
+          "2",
+          "--worker-output",
+          "/Users/Shared/Project/product/llm-ssd/scratch/2026-08-27-adaptive-expert-prefill-runtime-repeated-4k-v2-raw/repeated-4k-w02-02-adaptive.json"
+        ],
+        "result_sha256": "befbb110d91911a7f4e39f106c41108b97360d7e5b83d838c8a91912590eeca3",
+        "returncode": 0,
+        "stderr": "",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout": "",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sequence": 2,
+      "token_sha256": "dd22c238773ee5642280c221b7a7a51094e6dcec6882cce0f749378ee01e4891",
+      "wave": 2
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "benchmark_script_sha256": "b8249154ddb763e699a41d28df6a2d93c24879fe6c60744882e0261d4da07c8e",
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "predeclared_protocol_sha256": "698eb3831840a9d48e6a66b70fe62fb1e00ac6c59b560b74be889a345b70ebc9",
+    "runtime_python_tree_sha256": "b4668a95af9fc563aca57d45dab416498f97ef5a72fbb5e7b03cc43e32e18bba",
+    "tracked_diff_sha256_at_run": "1e30e91d62dd816567a53f0324d549283cd58ed71c4875d3a3686eb1b53d8316",
+    "working_tree_dirty": true
+  }
+}

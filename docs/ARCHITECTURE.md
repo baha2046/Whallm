@@ -201,12 +201,22 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `fp8_kv_cache` | `true` | 已完成的 compressed cache chunk 使用 MXFP8。 |
 | `fp4_index_cache` | `true` | indexer cache 使用 MXFP4 view。 |
 | `ready_expert_decode` | `true` | decode 依 expert ready 時間提交運算。 |
+| `staged_expert_streaming` | `false` | Internal research-only split `w13`／`w2` slot prototype；需要 ready-expert decode，拒絕 DSpark，且不提供 CLI／server／APP opt-in。 |
+| `adaptive_expert_prefill_threshold` | `null` | Internal stopped research prototype；只接受 0.7／0.8／0.9，需要 layer-major batched prefill，拒絕 DSpark／staged composition，且沒有 CLI／server／APP opt-in。 |
+| `expert_page_cache_probe` | `false` | Research-only `mincore` pre-read page-residency classification；不是 physical SSD counter。 |
+| `expert_file_cache_policy` | `cached` | Expert descriptor policy；research-only `bypass` 使用 Darwin `F_NOCACHE` 並停用 read-ahead。 |
 | `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
-| persistent cache entries | 8 | revision 專用的磁碟 cache 上限。 |
+| persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 4 依 reuse count 和 access recency 執行 eviction。 |
 | `memory_limit_gib` | 0 | 0 使用模型安全自動上限。Qwen 自動上限不超過 48 GiB。DeepSeek 使用 Metal 建議上限。正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
 | `dspark_enabled` | `false` | DSpark 預設停用。 |
+| `dspark_prompt_cache` | `false` | 實驗性原子 target KV + DSpark context prefix reuse；需要 DSpark。 |
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |
+| `dspark_hash_prefetch` | `false` | 實驗性 target hash-layer exact prefetch；需要 DSpark。 |
+| `dspark_adaptive_block` | `false` | 實驗性 storage-aware verification prefix selector；需要 DSpark 與 target hash layers。 |
+| `dspark_fallback_enabled` | `true` | speculative wall-time 超過 autoregressive break-even 時停止 DSpark；研究控制才可停用。 |
+| `dspark_sequential_verification` | `false` | 逐 token target verification correctness oracle；需要 DSpark，且不能與 hash prefetch 同時啟用。 |
+| `dspark_hybrid_verification` | `false` | 逐 token target math、每層一次 expert-union acquisition 的 correctness candidate；需要 DSpark，且與 sequential oracle 互斥。 |
 
 APP 的省電模式 Slider 支援 500 MB/s、1、2、3、5、10、25 GB/s 和無限制。
 APP 會把選定值寫入 model catalog 的每個 `runtime` object。
@@ -215,6 +225,23 @@ server 只接受 0.5、1、2、3、5、10、25 GB/s 或 `null`。
 限速器會序列化 routed expert 的 `preadv` 呼叫，並在每次讀取後等待。
 此限速不包含啟動時讀取的 common tensor。
 專案尚未量測各速度上限的耗電量與 generation 效能。
+
+`--expert-page-cache-probe` 在每次 expert `preadv` 前用 `mincore` 以 OS VM page
+粒度分類實際 read range（本次 M2 Max 是 16 KiB）。Partial boundary pages 以 byte
+overlap 計算，並保存
+resident、nonresident、unclassified bytes 與 failure count。Main cache、DSpark cache
+及 exact hash-prefetch useful/wasted partition 都使用同一套 accounting。Probe 會增加
+`mmap`／`mincore`／`munmap` observer overhead，預設關閉。Nonresident 只表示讀取前頁面
+不在 VM core；APFS、storage-controller cache 與實體 device bytes 不在此合約內。
+
+`--expert-file-cache-policy cached|bypass` 同時套用到 main 與 DSpark expert
+descriptors。預設 `cached` 不改 descriptor flags。Darwin research-only `bypass` 設定
+`F_NOCACHE=1`、`F_RDAHEAD=0`，並在每次 read 前驗證 destination address、file offset
+與 iovec length 都符合 filesystem allocation-block alignment；目前 APFS installed model
+是 4,096 bytes。CLI metrics 與 `/api/status` 回報 policy 及 alignment。Bypass 不會清除
+設定前已 resident 的 pages，也不構成 system-wide cold-cache 宣告。六個 installed
+expert ranges 的 byte／residency contract 通過，但 4K／32 repeated gate 的 fixed 與
+adaptive candidates 都未達 request-time／throughput 門檻，因此預設沒有改變。
 
 自動 prefill step 如下。
 
@@ -252,6 +279,13 @@ Qwen 使用不同門檻。
 短 prompt 不會建立 48 個完整 expert layer buffer。
 128 個或更多未快取 token 時，Qwen 使用 layer-major path。
 該 path 每次只保留一個完整 expert layer buffer。
+
+Stopped adaptive prefill prototype 在當層 attention 完成後只計算一次 router／shared
+expert，形成每層 union，再依 0.7／0.8／0.9 threshold 選 full 或 selective read。
+Selective read 仍配置完整 256-row fixed Metal-visible buffer，把六個 canonical regions
+寫入原 expert row offset，並執行相同 batched `gather_qmm`。這條 path 明確失去目前的
+next-layer prefetch overlap。`repeated` 4K runtime gate 雖把 request expert bytes 降低
+66.78%，TTFT paired median 卻回退 16.87%，所以預設仍執行 full-layer path。
 
 ## Decode 資料路徑
 
@@ -298,8 +332,27 @@ runtime 預設把最多八個完成 entry 寫到：
 ~/.dsmodel/prompt-cache/<checkpoint-revision>/
 ```
 
-persistent cache format 2 直接儲存 quantized cache arrays。
-runtime 會忽略無法載入的 cache entry。
+一般 target-only persistent cache 使用 format 4。每個 identity 從完整 cache contract
+開始，依 128-token blocks 建立 SHA-256 parent chain；terminal block key 同時命名 immutable
+metadata 與 quantized safetensors payload。Contract 包含 model ID、checkpoint revision、
+完整 canonical `config.json` SHA-256、顯式 RoPE 欄位、KV／index format、attention
+implementation／window／compression settings、state schema 與 block size。Scanner 會重算
+contract、所有 block descriptors 與 terminal key；任一欄位不符即忽略。舊 normal format
+1／2 因缺少足以證明相容性的 contract，不再載入。
+
+非 layer-major prefill 會額外保留最多兩個 bounded disk checkpoints：第一個完成的 prefill
+chunk 與最後一個 `prompt[:-1]` checkpoint；完成 request timeline 仍照常保存。新 prompt
+即使在後段 suffix 分岔，也能選擇最長的已保存安全 prefix。相同 contract／tokens 只建立
+一組 immutable data／metadata；reuse count 與 last-access time 寫在獨立 sidecar，不改寫
+content-addressed payload。Normal eviction 先保留 reuse count 較高者，再比較 access
+recency，因此重複的 system／tool prefix 優先於一次性 suffix。Payload 是 cumulative cache
+checkpoint；目前沒有把每層 KV 切成可獨立 dedupe 的 delta objects。
+
+當 `dspark_prompt_cache=true` 時，runtime 使用獨立的 format 3 namespace；同一 entry 原子
+保存 target cache、三個 DSpark context states、token prefix、revision 與 target layers。
+Format 4 scanner 忽略 DSpark bundle，format 3 scanner 也忽略一般 entry。Runtime 會忽略
+無法載入、缺少任一 context、revision／target layers 不符或只有半份檔案的 cache entry。
+兩個 namespace 各自套用 entry 上限與 eviction，不會互相 prune。
 
 ## DSpark
 
@@ -318,15 +371,162 @@ runtime 預設不啟用 DSpark。
 | noise token ID | 128,799 |
 | expert slots | 768 |
 
+一次 DSpark backbone 會產生五個固定 position logits；每個 position 再由前一個候選
+token 經 rank-256 Markov embedding／projection 加上 conditional bias。現行 runtime
+逐位置取 argmax 或 sample，因此 `DraftResult` 仍只有一條路徑。Research-only
+branch-4／beam-8 script 已證明可由同一次 backbone 組成 coherent Markov paths，但五組
+first-round gate 有 0/5 acceptance-preserving storage improvements，candidate 已停止。
+Runtime、CLI、server 與 App 都沒有 multi-candidate path setting。Sampling path selection
+也未實作，因 arbitrary selector 會改變 proposal probability。
+
+Layers 3--42 learned-router prefetch 也沒有 runtime path。Research baseline 曾把三個
+DSpark layer heads 與 final norm 直接送入各 target layer 的 frozen `ffn_norm`／router；
+6,000-label gate 的最佳 top-24 只有 17.15% assignment recall 與 11.15% useful union
+rate，所以 direct transfer 已停止。Runtime 不建立 learned-layer scratch、probation 或
+deadline pinning；未來若有 trained predictor，必須使用獨立 namespace／artifact contract
+並先通過 executed useful／wasted bytes 與 exact output gate。
+
+Transformers `config.json` 的 `num_nextn_predict_layers=1` 不會被 pinned official
+inference graph 使用。該 graph 依 `inference/config.json` 建立三個 `mtp.*` stages，
+從 `mtp.0` 的 target-hidden adapter 進入，依序執行三層，再由 `mtp.2` 的 norm、
+HyperHead、Markov head 與 confidence head 輸出。Checkpoint index 與 installed
+manifest 都沒有同時擁有 input adapter 與 output head 的 self-contained stage。
+因此目前 runtime 沒有 faithful native MTP-1 模式，也不把裁層視為
+checkpoint-equivalent。完整證據見
+[`MTP-1 contract audit`](benchmarks/2026-08-27-mtp1-checkpoint-contract-audit.json)。
+
 DSpark 使用獨立 expert cache。
 768 個 DSpark slot 的 expert payload 容量是 9.56 GiB。
+Main 與 DSpark expert cache 目前都以 `(layer, expert)` 作 key，但相同數字指向不同目錄與
+不同 checkpoint weights；在沒有 model namespace、slot ownership 與 fence 測試前，
+不能直接共用同一個 expert cache。普通 prompt cache 不保存 layers 40–42 hidden taps 或
+三個 DSpark attention contexts，因此仍不能只恢復 target KV。Default-off
+`dspark_prompt_cache` 另以一個 atomic entry 保存 target KV 與三個 context states，且只在
+兩者已消耗相同 `prompt[:-1]` prefix 後 admission。128-token installed-model gate 已通過
+同程序 memory hit 與重啟後 persistent hit；這不改變獨立 768-slot expert cache。
 
-目前 verifier 一次處理完整 verification block。
+96-slot reduced-cache research candidate 可容納一個完整 draft 的最壞 90 assignments。
+三組 4K／32 pilot 保持 exact tokens 且降低 observed peak memory；4K／128
+`random_hex` 也保持 exact，但 draft expert bytes/committed token 增加 83.17%，超過
+預先宣告的 +50% 停止線。96-slot candidate 已停止，768-slot 預設不變。詳見
+[`state ownership audit`](../research/DSPARK_STATE_OWNERSHIP_2026-08-27.md)。
+
+預設 block verifier 一次處理完整 verification block。
 verifier 在每個 round 建立一次 cache fork。
+每層把 block 內 routed expert assignments 合併成 unique expert union；
+每個 expert blob 最多取得一次，且同 expert 的 token rows 集中計算。
 若 draft 被拒絕，runtime 只 replay committed prefix。
 runtime 會在 speculative cost 高於 target baseline 時 fallback。
+`--no-dspark-fallback` 可在隔離研究中繼續執行，但不改變 would-trigger 診斷；
+正式 runtime 預設與建議值都維持 fallback 啟用。
 
-DSpark path 不使用一般 prompt cache reuse。
+`--dspark-sequential-verification` 會保留單一 round-level cache fork，但依 target
+autoregressive shape 一次只執行一個 verification token；若 draft 被拒絕，committed
+prefix 也逐 token replay。它是 correctness oracle，不做 block attention／MoE union
+加速。此模式明確禁止 hash exact prefetch，因目前 speculative scratch 會切換
+ready-expert execution path，無法再把結果只歸因於 verifier shape。2026-08-26 的
+`random_hex` 4K／32 fixed 與 adaptive oracle 都逐 token 精確匹配 sequential-prefill
+reference；這把該 workload 的既有分歧縮小到 block-shaped verification boundary，
+但不代表 oracle 是效能候選。
+
+2026-08-27 的 layer-wise diagnostic 進一步比較同一 common prefix 下的 sequential 與
+two-token block。Input embeddings 完全相同，但第 0 層 `LocalAttention` 後已出現
+非 exact hidden states；第 0 層 router 選擇仍完全相同，learned router 到第 12／16 層
+才依 position 首次改變 expert set。這是目前最早觀測到的 correctness boundary，尚未
+證明 `LocalAttention` 內某個子算子是唯一原因。逐層資料位於
+[`layer parity diagnostic`](benchmarks/2026-08-27-dspark-layer-parity-diagnostic-m2-max.json)。
+
+Layer 0 component diagnostic 再拆開 HyperConnection、Q／KV projection、RoPE、rotating
+cache、attention output 與 output projection。兩個位置的 input hidden、collapsed
+attention input、attention norm、`wq_a`、`q_norm`、`wkv`、KV norm 與新 KV RoPE 都
+exact。嚴格逐值比較最先在 HyperConnection `post`／`combine` 看到極小 shape-dependent
+差異；`wq_b` 也在 exact `q_norm` input 下非 exact，因此不是只有 cache state 的差異。
+Sequential 使用兩次 one-token in-place cache update 且沒有 mask；block 使用一次
+two-token concatenate update 與 2x129 mask。兩者 raw fetched cache 長度不同，但
+temporal-order cache 的共同 128-token suffix 完全一致。這些同時改變的 execution shapes
+仍無法證明單一 causal kernel。Component 資料位於
+[`layer 0 attention component diagnostic`](benchmarks/2026-08-27-dspark-layer0-attention-component-diagnostic-m2-max.json)。
+
+FFN component follow-up 又顯示 layer 0 router IDs／scores、routed selected outputs、
+routed reduction 與最終 MoE output exact；FFN HyperConnection `post`／`combine` 先出現
+shape-dependent 差異。Shared expert output 各有一個值不同，但在 MoE target dtype
+邊界被消除。資料位於
+[`layer 0 FFN component diagnostic`](benchmarks/2026-08-27-dspark-layer0-ffn-component-diagnostic-m2-max.json)。
+
+`--dspark-hybrid-verification` 是預設關閉的 verifier candidate。它保留每 round 一次
+cache fork；每層的 attention、FFN HyperConnection、router、shared expert、routed
+expert math 與 final expand 都依 autoregressive one-token shape 執行。Runtime 會先收集
+該層所有 token 的 selected expert IDs，以一次 `get_many` acquire expert union，再用
+同一批 resident weights 逐 token 計算 routed experts。因此它保留 union I/O 去重，
+但不保留原 block verifier 的 grouped multi-row QMM。Rejected committed prefix 也走
+相同 hybrid path。Hybrid 與 sequential oracle 互斥；hybrid 可與 hash exact prefetch
+及 adaptive selector 組合。
+
+候選分三步收斂。V1 只讓 attention token-shaped；單一 exact cache state 恢復 near-tie
+top token，但 `random_hex` 4K／32 多 round 在 index 15 再次分歧。V2 再讓 FFN
+HyperConnection token-shaped；五組 discovery workloads 中 3 組 exact，
+`storage_sentence` 與 `multilingual_choice` 仍分別在 index 16／6 分歧。V3 把 MoE math
+也改為 token-shaped、仍每層只 acquire 一次 union；五組 4K workloads 的 normal／fixed
+greedy tokens 全部 exact。V3 correctness artifact 位於
+[`hybrid v3 five-workload gate`](benchmarks/2026-08-27-dspark-hybrid-v3-discovery-4k32-m2-max.json)。
+這是 32-output-token decision survey（`balanced_choice` 在 5 tokens EOS），不是 sampling
+proof、長 decode proof 或 performance adoption evidence。
+
+Metrics 以 `dspark_verification_expert_union_calls` 累計 target verification／replay
+實際執行的 `get_many` 次數，並以 assignments、union experts、reuse、misses、bytes 與
+read time 分開描述 acquisition。128-token `repeated` 的四波 gate 在相同 accepted
+5-token block 上量到 sequential／grouped／hybrid calls 為 258／43／43。Hybrid 相對
+sequential target bytes -12.31%，但 verification time +17.34%；相對 grouped
+verification time +87.59%。這確認 one-per-layer acquisition，卻也顯示目前所有
+token-shaped target execution 的 aggregate cost 是 material。Grouped 與 hybrid 還會
+產生不同內部 union，因此 timing 不能單獨歸因於 QMM。Grouped 仍因既有 low-margin
+correctness failure 停止，hybrid 仍只是 default-off correctness implementation。
+
+`--dspark-hash-prefetch` 啟用實驗性 exact prefetch。前三個 main model
+router 直接以 checkpoint 的 `tid2eid[token_id]` 查表；draft block 完成後，runtime
+會依 block 內第一次使用的位置建立 per-layer expert union。主 LFU cache 已 resident
+的 expert 在 transaction 期間暫時 pin；其餘 expert 讀入獨立 verification scratch，
+不做 LFU admission。scratch 在目前固定 5-token DSpark block 下最多配置 108 個
+expert blob slots，並在 initial verification 與 rejected-prefix replay 之間重用。
+此功能預設關閉。2026-08-26 的單一 full-model greedy smoke 已通過 output token
+hash parity 與 logical-byte accounting，但不是正式速度結果。
+2026-08-27 與 hybrid v3 組合後，五組 4K normal／fixed outputs 仍全部 exact；每組
+`useful + wasted = hash_prefetch_bytes_read`，useful rate 範圍是 23.53% 至 56.23%。
+Artifact 位於
+[`hybrid v3 + hash`](benchmarks/2026-08-27-dspark-hybrid-v3-hash-discovery-4k32-m2-max.json)。
+
+`--dspark-adaptive-block` 會在 DSpark 產生完整草稿後，對 1、2、4 與 checkpoint
+最大 block size（目前為 5）建立候選 prefix。runtime 將 confidence 當成 conditional
+survival probability，計算預期 committed tokens；再以 checkpoint hash routes 與主 LFU
+cache 的即時 resident snapshot，計算每個候選的 missing hash experts。第一版 score 是：
+
+```text
+expected committed tokens / max(1, missing hash experts)
+```
+
+送入 selector 前，runtime 會先把 draft 限制為最多
+`remaining output tokens - 1`；保留的一個位置供 bonus 或 correction token 使用。
+這個 output-budget truncation 與 adaptive score truncation 分開計量。
+若完整候選的預期 committed tokens 除以 `draft tokens + 1` 至少為 0.90，校準後的
+護欄會直接保留完整 block；否則才使用上述 storage score。
+
+selector 只使用前三個可 exact lookup 的 hash layers，不估計其餘 40 個 learned-router
+layers。選擇 prefix 不會省下 DSpark 本身的完整 5-position forward，只改變 target
+verification、exact prefetch 與可能的 round 數。既有 confidence threshold 會先做
+hard prefix truncation，output budget 再限制可驗證長度，adaptive selector 最後從
+留下的長度建立候選。此功能同樣預設關閉。
+
+2026-08-27 的 hybrid v3 + hash + adaptive 五組 survey 共有 63 個 adaptive decisions：
+selected length 1／2／3／4／5 分別出現 56／4／1／1／1 次。Normal、fixed 與 adaptive
+的完整 output token 序列逐組 exact；adaptive hash-prefetch useful rate 是 65.22% 至
+91.31%，但每層 union assignment reuse rate 降到 15.59% 至 23.98%。這顯示縮短 block
+可減少 rejected-only prefetch，同時犧牲 block 內 expert reuse。Artifact 位於
+[`hybrid v3 + hash + adaptive`](benchmarks/2026-08-27-dspark-hybrid-v3-hash-adaptive-discovery-4k32-m2-max.json)。
+本 survey 沒有 warmup、沒有控制 OS page cache、每模式只有一 run；不得用 request
+time、process disk bytes 或 peak memory 宣稱採用。
+
+DSpark path 不讀取一般 prompt cache；只有明確啟用 `--dspark-prompt-cache` 時才讀取獨立
+atomic DSpark namespace。預設仍每次執行完整 prompt prefill。
 目前量測沒有證明 DSpark 具有淨加速。
 詳細決策請見[研究結論](RESEARCH.md)。
 
@@ -396,7 +596,17 @@ APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 - server 一次只執行一個 generation request。
 - full-model sampling parity 尚未記錄在目前驗證 artifact。
 - 本專案沒有驗證 1M context。
-- MTLIO、custom Metal expert kernel 和 learned prefetch predictor 尚未整合。
+- MTLIO、custom Metal expert kernel 和 learned prefetch predictor 尚未整合；native
+  MTLIO bytes/shared/private、shared-event 與 cancellation gate 已通過，但 installed
+  MLX 0.32.0 沒有支援 external `MTLSharedEvent` dependency handoff，因此停止 runtime
+  integration。Hash-layer exact prefetch 只有預設關閉的 prototype；4K／32 explicit
+  bypass-policy repeated gate 已拒絕目前 fixed hybrid + hash 候選。
+- Internal staged `w13`／`w2` split-slot prototype 的 byte／token correctness gate 通過，
+  但 128／32 四波 request +2.17%、Decode -4.26%，因此 candidate 停止、預設維持
+  `false`，且不暴露在 CLI、server 或 APP。
+- Internal adaptive expert prefill prototype 的 route、selected-row、batched-byte 與
+  output correctness 通過，但 `repeated` 4K TTFT paired median +16.87%、p95 +17.02%；
+  70%／80%／90% 在此 workload 的決策相同且都失敗，因此維持 full-layer 預設。
 - DSpark 可執行，但 DSpark 預設停用。
 
 ## 主要程式碼
@@ -406,6 +616,7 @@ APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 - Repacker 與完整驗證：[`Sources/DeepSeekRepack/Repacker.swift`](../Sources/DeepSeekRepack/Repacker.swift)
 - Runtime 設定與 model path：[`runtime/deepseek_v4_ssd/model.py`](../runtime/deepseek_v4_ssd/model.py)
 - Expert cache：[`runtime/deepseek_v4_ssd/expert_cache.py`](../runtime/deepseek_v4_ssd/expert_cache.py)
+- Process disk-I/O metrics：[`runtime/deepseek_v4_ssd/io_metrics.py`](../runtime/deepseek_v4_ssd/io_metrics.py)
 - Generation 與 prompt cache：[`runtime/deepseek_v4_ssd/generation.py`](../runtime/deepseek_v4_ssd/generation.py)
 - DSpark：[`runtime/deepseek_v4_ssd/dspark.py`](../runtime/deepseek_v4_ssd/dspark.py)
 - Server：[`runtime/deepseek_v4_ssd/server.py`](../runtime/deepseek_v4_ssd/server.py)

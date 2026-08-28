@@ -46,11 +46,41 @@ class RuntimeConfig:
     batched_expert_prefill: bool = True
     fp4_index_cache: bool = True
     dspark_enabled: bool = False
+    dspark_prompt_cache: bool = False
     dspark_confidence_threshold: float = 0.6
     dspark_slots: int = 768
+    dspark_hash_prefetch: bool = False
+    dspark_adaptive_block: bool = False
+    dspark_fallback_enabled: bool = True
+    dspark_sequential_verification: bool = False
+    dspark_hybrid_verification: bool = False
     expert_route_trace: str | None = None
+    expert_page_cache_probe: bool = False
+    expert_file_cache_policy: str = "cached"
     ready_expert_decode: bool = True
+    staged_expert_streaming: bool = False
+    adaptive_expert_prefill_threshold: float | None = None
     power_saving_limit_gbps: float | None = None
+
+
+def _validate_adaptive_expert_prefill_config(config: RuntimeConfig) -> None:
+    threshold = getattr(config, "adaptive_expert_prefill_threshold", None)
+    if threshold is None:
+        return
+    if threshold not in (0.7, 0.8, 0.9):
+        raise ValueError(
+            "adaptive expert prefill threshold must be 0.7, 0.8, or 0.9"
+        )
+    if not getattr(config, "layer_major_prefill", True):
+        raise ValueError("adaptive expert prefill requires layer-major prefill")
+    if not getattr(config, "batched_expert_prefill", True):
+        raise ValueError("adaptive expert prefill requires batched experts")
+    if getattr(config, "dspark_enabled", False):
+        raise ValueError("adaptive expert prefill prototype does not support DSpark")
+    if getattr(config, "staged_expert_streaming", False):
+        raise ValueError(
+            "adaptive expert prefill and staged expert streaming are mutually exclusive"
+        )
 
 
 def _configure_memory_limits(
@@ -87,6 +117,96 @@ def _select_moe_step_size(configured: int, prompt_tokens: int) -> int:
     return 4_096 if prompt_tokens >= 4_096 else max(1, prompt_tokens)
 
 
+@dataclass(frozen=True)
+class _AdaptivePrefillTile:
+    residual: mx.array
+    value: mx.array
+    post: mx.array
+    combine: mx.array
+    indices: mx.array
+    scores: mx.array
+    shared: mx.array
+
+
+def _adaptive_prefill_read_set(
+    expert_union: tuple[int, ...],
+    expert_count: int,
+    threshold: float,
+) -> tuple[tuple[int, ...] | None, bool, int]:
+    if not expert_union:
+        raise ValueError("adaptive prefill expert union cannot be empty")
+    if any(not 0 <= expert < expert_count for expert in expert_union):
+        raise ValueError("adaptive prefill expert union contains an invalid ID")
+    full_layer = len(expert_union) / expert_count > threshold
+    return (
+        None if full_layer else expert_union,
+        full_layer,
+        expert_count if full_layer else len(expert_union),
+    )
+
+
+def _plan_adaptive_prefill_layer(
+    layer,
+    layer_index: int,
+    attention_output: mx.array,
+    input_ids: mx.array,
+    moe_step_size: int,
+) -> tuple[list[_AdaptivePrefillTile], tuple[int, ...], float]:
+    moe = layer.ffn
+    if getattr(moe, "sharding_group", None) is not None:
+        raise ValueError("adaptive expert prefill supports one Apple Silicon device")
+    switch = moe.switch_mlp
+    if not isinstance(switch, _StreamingSwitchGLU):
+        raise TypeError("adaptive expert prefill requires streaming routed experts")
+    cache = switch.cache
+    union: set[int] = set()
+    tiles = []
+    started = time.perf_counter()
+    for start in range(0, attention_output.shape[1], moe_step_size):
+        end = min(start + moe_step_size, attention_output.shape[1])
+        residual = attention_output[:, start:end]
+        value, post, combine = layer.ffn_hc(residual)
+        value = layer.ffn_norm(value)
+        indices, scores = moe.gate(value, input_ids[:, start:end])
+        shared = moe.shared_experts(value)
+        mx.async_eval(shared)
+        sync_started = time.perf_counter()
+        mx.eval(indices)
+        cache.record_routing_sync(time.perf_counter() - sync_started)
+        selected = np.asarray(indices, dtype=np.int32)
+        if getattr(cache, "route_trace_enabled", False):
+            cache.record_routes(layer_index, selected)
+        union.update(int(expert) for expert in selected.reshape(-1))
+        tiles.append(
+            _AdaptivePrefillTile(
+                residual,
+                value,
+                post,
+                combine,
+                indices,
+                scores,
+                shared,
+            )
+        )
+    return tiles, tuple(sorted(union)), time.perf_counter() - started
+
+
+def _finish_adaptive_prefill_tile(
+    layer,
+    tile: _AdaptivePrefillTile,
+    batched: BatchedExperts,
+) -> mx.array:
+    switch = layer.ffn.switch_mlp
+    routed = switch._gather_qmm(tile.value, tile.indices, batched)
+    value = _route_reduce(routed, tile.scores) + tile.shared
+    return deepseek_v4.hc_expand(
+        value,
+        tile.residual,
+        tile.post,
+        tile.combine,
+    )
+
+
 def layer_major_prefill(
     model,
     token_ids: list[int],
@@ -95,6 +215,7 @@ def layer_major_prefill(
     expert_cache: ExpertCache,
     moe_step_size: int = 0,
     batched_experts: bool = True,
+    adaptive_expert_threshold: float | None = None,
 ) -> None:
     """Populate the prompt cache while keeping one layer's experts resident."""
     if not token_ids:
@@ -104,6 +225,11 @@ def layer_major_prefill(
         raise ValueError("prompt cache does not match the main model layers")
     if getattr(core, "pipeline_size", 1) != 1:
         raise ValueError("layer-major prefill supports one Apple Silicon device")
+    if adaptive_expert_threshold is not None:
+        if adaptive_expert_threshold not in (0.7, 0.8, 0.9):
+            raise ValueError("adaptive expert prefill threshold must be 0.7, 0.8, or 0.9")
+        if not batched_experts:
+            raise ValueError("adaptive expert prefill requires batched experts")
 
     inputs = mx.array(token_ids)[None]
     hidden = core.embed_tokens(inputs)
@@ -158,7 +284,7 @@ def layer_major_prefill(
             and hasattr(expert_cache, "batched_layer")
             and layer_index != last_layer
         )
-        if use_batched:
+        if use_batched and adaptive_expert_threshold is None:
             prefetch(layer_index)
 
         outputs = []
@@ -190,6 +316,48 @@ def layer_major_prefill(
         )
         mx.eval(attention_output)
         _clear_memory_cache()
+        if adaptive_expert_threshold is not None and use_batched:
+            tiles, expert_union, plan_seconds = _plan_adaptive_prefill_layer(
+                layer,
+                layer_index,
+                attention_output,
+                inputs,
+                moe_step_size,
+            )
+            selected, full_layer, read_experts = _adaptive_prefill_read_set(
+                expert_union,
+                expert_cache.model.expert_count,
+                adaptive_expert_threshold,
+            )
+            expert_cache.record_adaptive_prefill_decision(
+                union_experts=len(expert_union),
+                read_experts=read_experts,
+                full_layer=full_layer,
+                plan_seconds=plan_seconds,
+            )
+            outputs = []
+            with (
+                expert_cache.pin_layer(layer_index),
+                expert_cache.batched_layer(
+                    layer_index,
+                    experts=selected,
+                    adaptive=True,
+                ) as batched,
+            ):
+                if batched is None:
+                    raise RuntimeError("adaptive expert prefill has no batched weights")
+                for tile in tiles:
+                    output = _finish_adaptive_prefill_tile(layer, tile, batched)
+                    mx.eval(output)
+                    outputs.append(output)
+            hidden = (
+                outputs[0]
+                if len(outputs) == 1
+                else mx.concatenate(outputs, axis=1)
+            )
+            mx.eval(hidden)
+            _clear_memory_cache()
+            continue
         batch_context = (
             expert_cache.batched_layer(layer_index)
             if use_batched
@@ -246,21 +414,69 @@ class _StreamingSwitchGLU(nn.Module):
             x.shape[0] == 1
             and x.shape[1] == 1
             and getattr(self.cache, "ready_expert_decode", False)
+            and not getattr(
+                self.cache,
+                "speculative_prefetch_active",
+                lambda _layer: False,
+            )(self.layer)
         ):
             outputs = {}
-            for expert, weights in self.cache.iter_ready(
-                self.layer,
-                selected.reshape(-1).tolist(),
-            ):
-                hidden = _mxfp4_swiglu(x, weights, self.activation)
-                output = _mxfp4(hidden, weights.w2, weights.w2_scales)
-                mx.async_eval(output)
-                outputs[expert] = output
+            selected_experts = selected.reshape(-1).tolist()
+            if getattr(self.cache, "staged_expert_streaming", False):
+                for ready in self.cache.iter_staged_ready(
+                    self.layer,
+                    selected_experts,
+                ):
+                    submit_started = time.perf_counter()
+                    hidden = _mxfp4_swiglu(
+                        x,
+                        ready.weights,
+                        self.activation,
+                    )
+                    mx.async_eval(hidden)
+                    self.cache.record_staged_first_stage_submit(
+                        time.perf_counter() - submit_started
+                    )
+                    ready.finish_w2()
+                    output = _mxfp4(
+                        hidden,
+                        ready.weights.w2,
+                        ready.weights.w2_scales,
+                    )
+                    mx.async_eval(output)
+                    outputs[ready.expert] = output
+            else:
+                for expert, weights in self.cache.iter_ready(
+                    self.layer,
+                    selected_experts,
+                ):
+                    hidden = _mxfp4_swiglu(x, weights, self.activation)
+                    output = _mxfp4(hidden, weights.w2, weights.w2_scales)
+                    mx.async_eval(output)
+                    outputs[expert] = output
             return mx.stack(
                 [outputs[int(expert)] for expert in selected.reshape(-1)],
                 axis=-2,
             )
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
+        return self._forward_with_resident(x, selected, resident)
+
+    def forward_with_resident(
+        self,
+        x: mx.array,
+        indices: mx.array,
+        resident,
+    ) -> mx.array:
+        """Run token-shaped expert math from one pre-acquired layer union."""
+        selected = np.asarray(indices, dtype=np.int32)
+        return self._forward_with_resident(x, selected, resident)
+
+    def _forward_with_resident(
+        self,
+        x: mx.array,
+        selected: np.ndarray,
+        resident,
+    ) -> mx.array:
         if x.shape[0] == 1 and x.shape[1] == 1:
             outputs = []
             for expert in selected.reshape(-1):
@@ -394,6 +610,49 @@ def _streaming_moe(self, x: mx.array, input_ids: mx.array) -> mx.array:
     routed = self.switch_mlp(x, indices)
     routed = _route_reduce(routed, scores)
     return routed + shared
+
+
+def _tokenwise_moe_with_expert_union(
+    moe,
+    values: list[mx.array],
+    input_ids: mx.array,
+) -> list[mx.array]:
+    """Run token-shaped MoE math after one union acquisition for the layer."""
+    switch_mlp = getattr(moe, "switch_mlp", None)
+    if not isinstance(switch_mlp, _StreamingSwitchGLU):
+        return [
+            moe(value, input_ids[:, position : position + 1])
+            for position, value in enumerate(values)
+        ]
+
+    cache = switch_mlp.cache
+    current_batched = getattr(cache, "current_batched", None)
+    batched = current_batched(switch_mlp.layer) if callable(current_batched) else None
+    if batched is not None:
+        raise ValueError("hybrid token-shaped MoE cannot use batched prefill weights")
+
+    token_parts = []
+    all_selected: list[int] = []
+    for position, value in enumerate(values):
+        token_ids = input_ids[:, position : position + 1]
+        indices, scores = moe.gate(value, token_ids)
+        shared = moe.shared_experts(value)
+        mx.async_eval(shared)
+        started = time.perf_counter()
+        mx.eval(indices)
+        cache.record_routing_sync(time.perf_counter() - started)
+        selected = np.asarray(indices, dtype=np.int32)
+        if getattr(cache, "route_trace_enabled", False):
+            cache.record_routes(switch_mlp.layer, selected)
+        all_selected.extend(selected.reshape(-1).tolist())
+        token_parts.append((value, indices, scores, shared))
+
+    resident = cache.get_many(switch_mlp.layer, all_selected)
+    outputs = []
+    for value, indices, scores, shared in token_parts:
+        routed = switch_mlp.forward_with_resident(value, indices, resident)
+        outputs.append(_route_reduce(routed, scores) + shared)
+    return outputs
 
 
 @mx.compile
@@ -545,6 +804,7 @@ def load_model(
     installed_model: InstalledModel,
     config: RuntimeConfig = RuntimeConfig(),
 ):
+    _validate_adaptive_expert_prefill_config(config)
     if (
         config.power_saving_limit_gbps is not None
         and config.power_saving_limit_gbps not in _POWER_SAVING_LIMITS_GBPS
@@ -566,6 +826,14 @@ def load_model(
         else None
     )
     if installed_model.is_qwen:
+        if config.staged_expert_streaming:
+            raise ValueError(
+                "Qwen3.8-Flash-Next does not support staged expert streaming"
+            )
+        if config.adaptive_expert_prefill_threshold is not None:
+            raise ValueError(
+                "Qwen3.8-Flash-Next does not support adaptive expert prefill"
+            )
         from .qwen4_exp import load as load_qwen
 
         return load_qwen(
@@ -594,8 +862,66 @@ def load_model(
         route_trace_path=config.expert_route_trace,
         ready_expert_decode=config.ready_expert_decode,
         read_limiter=read_limiter,
+        page_cache_probe=config.expert_page_cache_probe,
+        file_cache_policy=config.expert_file_cache_policy,
+        staged_expert_streaming=config.staged_expert_streaming,
     )
     try:
+        if config.staged_expert_streaming:
+            if not config.ready_expert_decode:
+                raise ValueError(
+                    "staged expert streaming requires ready expert decode"
+                )
+            if config.dspark_enabled:
+                raise ValueError(
+                    "staged expert streaming prototype does not support DSpark"
+                )
+        if getattr(config, "dspark_prompt_cache", False):
+            if not config.dspark_enabled:
+                raise ValueError("DSpark prompt cache requires DSpark")
+            if not installed_model.has_dspark:
+                raise ValueError("installed model does not contain DSpark")
+        if not config.dspark_fallback_enabled and not config.dspark_enabled:
+            raise ValueError("disabling DSpark fallback requires DSpark")
+        if config.dspark_sequential_verification:
+            if not config.dspark_enabled:
+                raise ValueError("DSpark sequential verification requires DSpark")
+            if not installed_model.has_dspark:
+                raise ValueError("installed model does not contain DSpark")
+            if config.dspark_hash_prefetch:
+                raise ValueError(
+                    "DSpark sequential verification cannot use hash prefetch"
+                )
+        if config.dspark_hybrid_verification:
+            if not config.dspark_enabled:
+                raise ValueError("DSpark hybrid verification requires DSpark")
+            if not installed_model.has_dspark:
+                raise ValueError("installed model does not contain DSpark")
+            if config.dspark_sequential_verification:
+                raise ValueError(
+                    "DSpark hybrid and sequential verification are mutually exclusive"
+                )
+        if config.dspark_adaptive_block:
+            if not config.dspark_enabled:
+                raise ValueError("DSpark adaptive block scheduling requires DSpark")
+            if not installed_model.has_dspark:
+                raise ValueError("installed model does not contain DSpark")
+            if int(getattr(args, "num_hash_layers", 0)) < 1:
+                raise ValueError(
+                    "DSpark adaptive block scheduling requires target hash layers"
+                )
+        if config.dspark_hash_prefetch:
+            if not config.dspark_enabled:
+                raise ValueError("DSpark hash prefetch requires DSpark to be enabled")
+            if not installed_model.has_dspark:
+                raise ValueError("installed model does not contain DSpark")
+            hash_layers = min(args.num_hash_layers, installed_model.layer_count)
+            scratch_slots = (
+                hash_layers
+                * installed_model.selected_expert_count
+                * (installed_model.dspark_block_size + 1)
+            )
+            cache.configure_speculative_scratch(scratch_slots)
         for layer_index, layer in enumerate(model.layers):
             layer.ffn.switch_mlp = _StreamingSwitchGLU(
                 layer_index,
@@ -725,6 +1051,7 @@ def verification_forward_with_hidden(
         raise ValueError("DSpark target layers do not match the main model")
     output = core.norm(core.hc_head(hidden))
     metrics = VerificationMetrics(
+        verification_mode="block",
         cache_fork_seconds=fork_seconds,
         layer_seconds=tuple(layer_seconds),
         cache_eval_count=len(layer_seconds),
@@ -733,6 +1060,247 @@ def verification_forward_with_hidden(
         block_attention_layers=len(layer_seconds),
     )
     return model.lm_head(output), mx.concatenate(captured, axis=-1), fork, metrics
+
+
+def _hybrid_forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array, tuple[float, ...], int, int]:
+    """Advance token-shaped target math with one expert union per layer."""
+    core = model.model
+    if inputs.shape[0] != 1 or inputs.shape[1] < 1:
+        raise ValueError("hybrid target verification requires non-empty batch one")
+    if getattr(core, "pipeline_size", 1) != 1:
+        raise ValueError("DSpark supports one Apple Silicon device")
+    if len(cache) != len(core.pipeline_layers):
+        raise ValueError("prompt cache does not match the main model layers")
+
+    hidden = core.embed_tokens(inputs)
+    hidden = mx.broadcast_to(
+        hidden[:, :, None, :],
+        (*hidden.shape[:2], core.args.hc_mult, hidden.shape[-1]),
+    )
+    hidden = mx.contiguous(hidden)
+    captured = []
+    target_set = set(target_layers)
+    layer_seconds = []
+    cache_eval_count = 0
+    cache_eval_bytes = 0
+
+    for index, (layer, layer_cache) in enumerate(zip(core.pipeline_layers, cache)):
+        layer_started = time.perf_counter()
+        attention_outputs = []
+        for position in range(inputs.shape[1]):
+            token_hidden = hidden[:, position : position + 1]
+            residual = token_hidden
+            value, post, combine = layer.attn_hc(token_hidden)
+            value = layer.attn_norm(value)
+            mask_cache = (
+                layer_cache[0]
+                if isinstance(layer_cache, CacheList)
+                else layer_cache
+            )
+            mask = deepseek_v4.create_attention_mask(
+                token_hidden[:, :, 0, :],
+                mask_cache,
+                window_size=core.args.sliding_window,
+                return_array=True,
+            )
+            value = layer.attn(value, mask=mask, cache=layer_cache)
+            token_hidden = deepseek_v4.hc_expand(
+                value,
+                residual,
+                post,
+                combine,
+            )
+            evaluated_count, evaluated_bytes = eval_prompt_cache(
+                [layer_cache],
+                token_hidden,
+            )
+            cache_eval_count += evaluated_count
+            cache_eval_bytes += evaluated_bytes
+            attention_outputs.append(token_hidden)
+
+        hidden = (
+            attention_outputs[0]
+            if inputs.shape[1] == 1
+            else mx.concatenate(attention_outputs, axis=1)
+        )
+        ffn_inputs = []
+        ffn_residuals = []
+        ffn_posts = []
+        ffn_combines = []
+        for position in range(inputs.shape[1]):
+            residual = hidden[:, position : position + 1]
+            value, post, combine = layer.ffn_hc(residual)
+            value = layer.ffn_norm(value)
+            mx.eval(value, post, combine)
+            ffn_inputs.append(value)
+            ffn_residuals.append(residual)
+            ffn_posts.append(post)
+            ffn_combines.append(combine)
+        moe_outputs = _tokenwise_moe_with_expert_union(
+            layer.ffn,
+            ffn_inputs,
+            inputs,
+        )
+        ffn_outputs = []
+        for position in range(inputs.shape[1]):
+            token_hidden = deepseek_v4.hc_expand(
+                moe_outputs[position],
+                ffn_residuals[position],
+                ffn_posts[position],
+                ffn_combines[position],
+            )
+            mx.eval(token_hidden)
+            ffn_outputs.append(token_hidden)
+        hidden = (
+            ffn_outputs[0]
+            if inputs.shape[1] == 1
+            else mx.concatenate(ffn_outputs, axis=1)
+        )
+        evaluated_count, evaluated_bytes = eval_prompt_cache(
+            [layer_cache],
+            hidden,
+        )
+        cache_eval_count += evaluated_count
+        cache_eval_bytes += evaluated_bytes
+        layer_seconds.append(time.perf_counter() - layer_started)
+        if index in target_set:
+            captured.append(hidden.mean(axis=2))
+
+    if len(captured) != len(target_layers):
+        raise ValueError("DSpark target layers do not match the main model")
+    output = core.norm(core.hc_head(hidden))
+    return (
+        model.lm_head(output),
+        mx.concatenate(captured, axis=-1),
+        tuple(layer_seconds),
+        cache_eval_count,
+        cache_eval_bytes,
+    )
+
+
+def hybrid_verification_forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array, list, VerificationMetrics]:
+    """Verify token-shaped target math with one MoE expert union per layer."""
+    if inputs.shape[0] != 1 or inputs.shape[1] < 1:
+        raise ValueError("hybrid target verification requires non-empty batch one")
+    if len(cache) != len(model.model.pipeline_layers):
+        raise ValueError("prompt cache does not match the main model layers")
+
+    fork_started = time.perf_counter()
+    fork, fork_arrays = _fork_prompt_cache(cache)
+    if fork_arrays:
+        mx.eval(*fork_arrays)
+    fork_seconds = time.perf_counter() - fork_started
+    logits, hidden, layer_seconds, cache_eval_count, cache_eval_bytes = (
+        _hybrid_forward_with_hidden(
+            model,
+            inputs,
+            fork,
+            target_layers,
+        )
+    )
+    layer_count = len(fork)
+    metrics = VerificationMetrics(
+        verification_mode="hybrid",
+        hybrid_verification_positions=inputs.shape[1],
+        hybrid_attention_layers=layer_count,
+        hybrid_attention_token_calls=layer_count * inputs.shape[1],
+        hybrid_ffn_token_calls=layer_count * inputs.shape[1],
+        hybrid_moe_token_calls=layer_count * inputs.shape[1],
+        cache_fork_seconds=fork_seconds,
+        layer_seconds=layer_seconds,
+        cache_eval_count=cache_eval_count,
+        cache_eval_bytes=cache_eval_bytes,
+        cache_fork_layers=layer_count,
+    )
+    return logits, hidden, fork, metrics
+
+
+def _sequential_forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array, tuple[float, ...], int, int]:
+    """Advance an existing cache one token at a time and evaluate every step."""
+    if inputs.shape[0] != 1 or inputs.shape[1] < 1:
+        raise ValueError("sequential target verification requires non-empty batch one")
+    logits_by_position = []
+    hidden_by_position = []
+    position_seconds = []
+    cache_eval_count = 0
+    cache_eval_bytes = 0
+    for position in range(inputs.shape[1]):
+        started = time.perf_counter()
+        logits, hidden = forward_with_hidden(
+            model,
+            inputs[:, position : position + 1],
+            cache,
+            target_layers,
+        )
+        evaluated_count, evaluated_bytes = eval_prompt_cache(
+            cache,
+            logits,
+            hidden,
+        )
+        cache_eval_count += evaluated_count
+        cache_eval_bytes += evaluated_bytes
+        position_seconds.append(time.perf_counter() - started)
+        logits_by_position.append(logits)
+        hidden_by_position.append(hidden)
+    return (
+        mx.concatenate(logits_by_position, axis=1),
+        mx.concatenate(hidden_by_position, axis=1),
+        tuple(position_seconds),
+        cache_eval_count,
+        cache_eval_bytes,
+    )
+
+
+def sequential_verification_forward_with_hidden(
+    model,
+    inputs: mx.array,
+    cache,
+    target_layers: tuple[int, ...],
+) -> tuple[mx.array, mx.array, list, VerificationMetrics]:
+    """Verify a draft on one cache fork using sequential target-shaped steps."""
+    if inputs.shape[0] != 1 or inputs.shape[1] < 1:
+        raise ValueError("sequential target verification requires non-empty batch one")
+    if len(cache) != len(model.model.pipeline_layers):
+        raise ValueError("prompt cache does not match the main model layers")
+
+    fork_started = time.perf_counter()
+    fork, fork_arrays = _fork_prompt_cache(cache)
+    if fork_arrays:
+        mx.eval(*fork_arrays)
+    fork_seconds = time.perf_counter() - fork_started
+    logits, hidden, position_seconds, cache_eval_count, cache_eval_bytes = (
+        _sequential_forward_with_hidden(
+            model,
+            inputs,
+            fork,
+            target_layers,
+        )
+    )
+    metrics = VerificationMetrics(
+        verification_mode="sequential",
+        sequential_verification_positions=inputs.shape[1],
+        sequential_position_seconds=position_seconds,
+        cache_fork_seconds=fork_seconds,
+        cache_eval_count=cache_eval_count,
+        cache_eval_bytes=cache_eval_bytes,
+        cache_fork_layers=len(fork),
+    )
+    return logits, hidden, fork, metrics
 
 
 def eval_prompt_cache(cache, *dependencies: mx.array) -> tuple[int, int]:
@@ -833,6 +1401,8 @@ def _load_dspark(
         layer_count=installed_model.dspark_layer_count,
         expert_directory=installed_model.root / "dspark/experts",
         read_limiter=read_limiter,
+        page_cache_probe=config.expert_page_cache_probe,
+        file_cache_policy=config.expert_file_cache_policy,
     )
     try:
         dspark = load_dspark_model(

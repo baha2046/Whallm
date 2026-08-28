@@ -1,0 +1,408 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-26T23:06:42.061012+08:00",
+  "evidence_kind": "exploratory_adaptive_block_decision_survey",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256_at_run": "3f8b661138ad61b2c5ab30b3852f97cc0d566c8e4fee45e40211a1cc9c746e49",
+    "runtime_python_tree_sha256": "817053808e132e2762daffcff5e7285095fcecb5d3b1bbf22f96652f08a40bfa",
+    "benchmark_script_sha256": "b2b119b98108ca9ccd55b0ad718a2b080ed48c9fc7a5c83cea6c1a8b6107e233"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "mac_model": "Mac14,13",
+    "chip": "Apple M2 Max",
+    "memory_bytes": 68719476736,
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1"
+  },
+  "checkpoint": {
+    "installed_model": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+    "layer_count": 43,
+    "expert_count": 256,
+    "selected_expert_count": 6,
+    "expert_blob_bytes": 13369344,
+    "dspark_block_size": 5
+  },
+  "experiment": {
+    "objective": "Measure fixed five-token hash prefetch and/or the default-off storage-aware adaptive selector on selected R0 domains",
+    "control": "fixed five-token DSpark with hash exact prefetch",
+    "candidate": "adaptive DSpark prefix with hash exact prefetch",
+    "workload_order": [
+      "random_hex"
+    ],
+    "run_pattern_per_workload": [
+      "adaptive"
+    ],
+    "warmup_per_workload": false,
+    "fresh_process_per_run": true,
+    "os_page_cache": "not purged",
+    "prompt_cache": "persistent cache disabled",
+    "prompt_tokens": [
+      4096
+    ],
+    "max_output_tokens": 256,
+    "batch_size": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "dspark_confidence_threshold": 0,
+    "dspark_fallback_enabled": false,
+    "adaptive_full_block_commit_fraction_floor": 0.9,
+    "main_expert_slots": 1152,
+    "dspark_expert_slots": 768,
+    "hash_prefetch_scratch_slots": 108
+  },
+  "prompt_manifest_sha256": "15e09c2c6f82c74385efb3cf250b4ff370d6096f5bb49b902f687cb71e8c345d",
+  "workloads": [
+    {
+      "name": "random_hex",
+      "target_tokens": 4096,
+      "file": "random_hex-4096.txt",
+      "suffix": "\n\nReturn exactly 32 different eight-digit hexadecimal strings, one per line, with no explanation.\n",
+      "separator_padding": "\n ",
+      "text_sha256": "8115abf46ca721976f97d1a677db34f44aeb0a1d403a6d874a4379381d778ac8",
+      "prompt_token_sha256": "73200813d08029033cc1e9c4db7132589895c2844b18e65f308a63633bd73118"
+    }
+  ],
+  "runs": [
+    {
+      "id": "random_hex-01-adaptive",
+      "workload": "random_hex",
+      "mode": "adaptive",
+      "raw_metrics_sha256": "f44137d7cfcf995dfc1846fac2729d31ba2b9833d8117075d26e314d27e27b6d",
+      "metrics": {
+        "prompt_token_sha256": "73200813d08029033cc1e9c4db7132589895c2844b18e65f308a63633bd73118",
+        "token_sha256": "f98d91bc5c04461b7db31e9cb2144eefa58902caba07c01a9f45352c53e16e71",
+        "prompt_tokens": 4096,
+        "generated_tokens": 256,
+        "request_seconds": 139.67919674998848,
+        "time_to_first_token_seconds": 83.48829920799471,
+        "decode_tokens_per_second": 4.53895693611301,
+        "peak_memory_bytes": 31534000982,
+        "request_expert_bytes_read": 834514452480,
+        "request_process_disk_bytes_read": 448897486848,
+        "request_expert_evictions": 57564,
+        "dspark_rounds": 86,
+        "dspark_proposed_tokens": 191,
+        "dspark_accepted_tokens": 168,
+        "dspark_committed_tokens": 254,
+        "dspark_output_budget_trimmed_tokens": 3,
+        "dspark_fallback": false,
+        "dspark_fallback_would_trigger_rounds": 19,
+        "dspark_fallback_triggered_rounds": 0,
+        "dspark_fallback_cost_ratios": [
+          1.0603910222980262,
+          0.8043205358853667,
+          3.4048144448993223,
+          2.090504258799775,
+          0.635440448031335,
+          0.656311768457745,
+          0.6259665675027848,
+          0.7113891826415167,
+          2.1305866950654258,
+          1.9269349331783374,
+          0.8818183755520701,
+          0.7173630286973794,
+          0.6152103980950846,
+          0.6594794297884587,
+          0.6963282726067033,
+          0.854418079360828,
+          0.5830096510205666,
+          0.7705014380962927,
+          0.7058667846930478,
+          0.6571562675796676,
+          0.6213325414011392,
+          0.4953798343840812,
+          0.7067301933880308,
+          0.6717403985404616,
+          0.6443396101023727,
+          0.7077557401233038,
+          0.6231027332266728,
+          1.9531062048362962,
+          0.684443548254114,
+          0.6714871176623345,
+          1.9487315133210397,
+          0.6328895864152688,
+          0.637892815606808,
+          0.6934744469757501,
+          2.1914962053911164,
+          0.6856393300047496,
+          1.8665856213445782,
+          0.6670455699615571,
+          0.7015916415891184,
+          2.4352211260827237,
+          2.2046732881676463,
+          0.6675402071296646,
+          1.9399386339693743,
+          2.3169686904260547,
+          2.195388676875383,
+          0.6934387307444138,
+          1.9065096241320916,
+          0.6383139840518393,
+          1.0891835830311047,
+          0.7044462072088647,
+          0.7323575764767828,
+          0.5957897479585185,
+          0.5834306949040546,
+          1.929143967664371,
+          0.7545906487095757,
+          0.7938901284056773,
+          0.8635252912341265,
+          2.1460117407883104,
+          0.5200503216998276,
+          0.7826099083003997,
+          0.5145979934606828,
+          0.8039588099840729,
+          0.5312808212337028,
+          0.560344925578421,
+          2.2859433572037684,
+          0.8056830292343251,
+          0.5749819097801965,
+          0.4874070877412005,
+          0.851425102085127,
+          0.6048017647413991,
+          0.5082261728859686,
+          0.42988721236522415,
+          0.4036826777398353,
+          0.3263829820244385,
+          0.26967209761638716,
+          0.277170453348556,
+          0.3466667714617978,
+          0.3318046821367791,
+          0.3115399461268195,
+          0.32403807076308505,
+          0.337986248247782,
+          0.3782488650875177,
+          0.3387560008333759,
+          0.333819547606156,
+          0.34491769097631075,
+          0.4168022992032434
+        ],
+        "dspark_last_fallback_target_step_seconds": 0.3371572500036564,
+        "dspark_last_fallback_speculative_seconds": 0.42158375098370016,
+        "dspark_last_fallback_break_even_seconds": 1.0114717500109691,
+        "dspark_last_fallback_cost_ratio": 0.4168022992032434,
+        "dspark_draft_seconds": 3.204970125982072,
+        "dspark_verification_seconds": 52.6330467130465,
+        "dspark_target_expert_bytes_read": 531725549568,
+        "dspark_replay_expert_bytes_read": 49586896896,
+        "dspark_hash_prefetch_requested_experts": 4033,
+        "dspark_hash_prefetch_cache_resident_experts": 329,
+        "dspark_hash_prefetch_experts_read": 3704,
+        "dspark_hash_prefetch_bytes_read": 49520050176,
+        "dspark_hash_prefetch_useful_bytes": 45375553536,
+        "dspark_hash_prefetch_wasted_bytes": 4144496640,
+        "dspark_hash_prefetch_useful_rate": 0.9163066954643628,
+        "dspark_hash_prefetch_wait_seconds": 2.1731705371348653,
+        "dspark_adaptive_block_decisions": 86,
+        "dspark_adaptive_block_original_tokens": 427,
+        "dspark_adaptive_block_selected_tokens": 191,
+        "dspark_adaptive_block_trimmed_tokens": 236,
+        "dspark_adaptive_block_expected_committed": 245.67428601698856,
+        "dspark_adaptive_block_requested_hash_experts": 4033,
+        "dspark_adaptive_block_resident_hash_experts": 329,
+        "dspark_adaptive_block_missing_hash_experts": 3704,
+        "dspark_adaptive_block_predicted_hash_bytes": 49520050176,
+        "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": 194960827.46456692,
+        "dspark_adaptive_block_high_confidence_full_decisions": 20,
+        "dspark_adaptive_block_storage_score_decisions": 66,
+        "dspark_adaptive_block_full_block_decisions": 25,
+        "dspark_adaptive_block_selected_length_counts": [
+          [
+            1,
+            55
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            24
+          ]
+        ],
+        "dspark_adaptive_block_plan_seconds": 0.059602287132292986,
+        "dspark_last_adaptive_block_candidate_tokens": [
+          1,
+          2
+        ],
+        "dspark_last_adaptive_block_expected_committed": [
+          1.9851772785186768,
+          2.9697400402891816
+        ],
+        "dspark_last_adaptive_block_requested_hash_experts": [
+          36,
+          53
+        ],
+        "dspark_last_adaptive_block_resident_hash_experts": [
+          3,
+          4
+        ],
+        "dspark_last_adaptive_block_missing_hash_experts": [
+          33,
+          49
+        ],
+        "dspark_last_adaptive_block_predicted_hash_bytes": [
+          441188352,
+          655097856
+        ],
+        "dspark_last_adaptive_block_scores": [
+          0.06015688722783869,
+          0.0606069395977384
+        ],
+        "dspark_last_adaptive_block_selected_score": 0.0606069395977384,
+        "dspark_last_adaptive_block_selection_reason": "high_confidence_full",
+        "dspark_last_adaptive_block_full_commit_fraction": 0.9899133467630605,
+        "dspark_last_hash_prefetch_union_by_layer": [
+          17,
+          18,
+          18
+        ]
+      },
+      "sequence": 1
+    }
+  ],
+  "workload_summaries": [
+    {
+      "name": "random_hex",
+      "greedy_parity": null,
+      "within_run_set_output_consistency": true,
+      "prompt_token_sha256": [
+        "73200813d08029033cc1e9c4db7132589895c2844b18e65f308a63633bd73118"
+      ],
+      "output_token_sha256": [
+        "f98d91bc5c04461b7db31e9cb2144eefa58902caba07c01a9f45352c53e16e71"
+      ],
+      "generated_token_counts": [
+        256
+      ],
+      "mode_medians": {
+        "adaptive": {
+          "request_seconds": 139.67919674998848,
+          "time_to_first_token_seconds": 83.48829920799471,
+          "decode_tokens_per_second": 4.53895693611301,
+          "peak_memory_bytes": 31534000982.0,
+          "request_expert_bytes_read": 834514452480.0,
+          "request_process_disk_bytes_read": 448897486848.0,
+          "request_expert_evictions": 57564.0,
+          "dspark_rounds": 86.0,
+          "dspark_proposed_tokens": 191.0,
+          "dspark_accepted_tokens": 168.0,
+          "dspark_committed_tokens": 254.0,
+          "dspark_output_budget_trimmed_tokens": 3.0,
+          "dspark_last_fallback_cost_ratio": 0.4168022992032434,
+          "dspark_draft_seconds": 3.204970125982072,
+          "dspark_verification_seconds": 52.6330467130465,
+          "dspark_target_expert_bytes_read": 531725549568.0,
+          "dspark_replay_expert_bytes_read": 49586896896.0,
+          "dspark_hash_prefetch_requested_experts": 4033.0,
+          "dspark_hash_prefetch_experts_read": 3704.0,
+          "dspark_hash_prefetch_bytes_read": 49520050176.0,
+          "dspark_hash_prefetch_useful_bytes": 45375553536.0,
+          "dspark_hash_prefetch_wasted_bytes": 4144496640.0,
+          "dspark_hash_prefetch_useful_rate": 0.9163066954643628,
+          "dspark_hash_prefetch_wait_seconds": 2.1731705371348653,
+          "dspark_adaptive_block_decisions": 86.0,
+          "dspark_adaptive_block_original_tokens": 427.0,
+          "dspark_adaptive_block_selected_tokens": 191.0,
+          "dspark_adaptive_block_trimmed_tokens": 236.0,
+          "dspark_adaptive_block_predicted_hash_bytes": 49520050176.0,
+          "dspark_adaptive_block_high_confidence_full_decisions": 20.0,
+          "dspark_adaptive_block_storage_score_decisions": 66.0,
+          "dspark_adaptive_block_full_block_decisions": 25.0,
+          "dspark_adaptive_block_plan_seconds": 0.059602287132292986
+        }
+      },
+      "adaptive_decision_summary": {
+        "runs": 1,
+        "fallback_runs": 0,
+        "decisions": 86,
+        "high_confidence_full_decisions": 20,
+        "storage_score_decisions": 66,
+        "full_block_decisions": 25,
+        "selected_length_counts": [
+          [
+            1,
+            55
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            4,
+            1
+          ],
+          [
+            5,
+            24
+          ]
+        ],
+        "mean_selected_tokens_per_decision": 2.2209302325581395,
+        "output_budget_trimmed_tokens": 3
+      }
+    }
+  ],
+  "aggregate_summary": {
+    "all_workloads_greedy_parity": null,
+    "all_workloads_within_run_set_output_consistency": true,
+    "workloads_measured": 1,
+    "adaptive_decisions": 86,
+    "adaptive_high_confidence_full_decisions": 20,
+    "adaptive_storage_score_decisions": 66,
+    "adaptive_full_block_decisions": 25,
+    "adaptive_selected_length_counts": [
+      [
+        1,
+        55
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        4,
+        1
+      ],
+      [
+        5,
+        24
+      ]
+    ],
+    "adaptive_fallback_runs": 0
+  },
+  "post_run_audit": {
+    "status": "failed_output_parity",
+    "paired_control_artifact": "docs/benchmarks/2026-08-26-fixed-block-random-hex-4k256-no-fallback-m2-max.json",
+    "prompt_token_hash_match": true,
+    "generated_token_count_match": true,
+    "output_token_hash_match": false,
+    "adaptive_output_token_sha256": "f98d91bc5c04461b7db31e9cb2144eefa58902caba07c01a9f45352c53e16e71",
+    "fixed_output_token_sha256": "b0419c394b78987e8e36c84f3737656a2e808491e52324d3ff937933bf400eda",
+    "adaptive_decisions": 86,
+    "adaptive_storage_score_decisions": 66,
+    "normal_policy_would_trigger_rounds": 19,
+    "performance_comparison_valid": false,
+    "decision": "Reject this run as performance evidence and investigate target block numerical parity with an exact-token short reproduction."
+  },
+  "evidence_limits": [
+    "This is a decision survey, not a paired fixed/adaptive performance result.",
+    "Prompt and output lengths are recorded in experiment; a survey run is behavioral evidence, not a paired timing result.",
+    "No same-prompt warmup was run, and the operating-system page cache is not controlled or purged.",
+    "Process disk counters include all reads attributed to the process and do not isolate physical expert-file SSD traffic.",
+    "Adaptive selection only models the three exact target hash layers and still computes the complete five-position DSpark draft.",
+    "DSpark fallback was disabled as an explicit research control; would-trigger counters must not be interpreted as production performance.",
+    "Timing, process-disk, and peak-memory changes remain exploratory until repeated waves establish stable paired results."
+  ]
+}

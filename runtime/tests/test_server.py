@@ -43,6 +43,14 @@ class FakeRuntime:
         prompt_cache_memory_gib=8,
         persistent_prompt_cache=True,
         fp4_index_cache=True,
+        expert_page_cache_probe=False,
+        expert_file_cache_policy="cached",
+        dspark_prompt_cache=False,
+        dspark_hash_prefetch=False,
+        dspark_adaptive_block=False,
+        dspark_fallback_enabled=True,
+        dspark_sequential_verification=False,
+        dspark_hybrid_verification=False,
         dspark_confidence_threshold=0.6,
         dspark_slots=768,
         power_saving_limit_gbps=None,
@@ -65,6 +73,7 @@ class FakeRuntime:
             evictions=0,
         ),
         resident_count=3,
+        direct_io_alignment=0,
     )
     metrics = SimpleNamespace(
         snapshot=lambda: {
@@ -361,6 +370,38 @@ class ServerArgumentTests(unittest.TestCase):
             _parser().parse_args(
                 ["--model", "/tmp/model", "--model-catalog", "/tmp/catalog.json"]
             )
+
+    def test_dspark_prompt_cache_is_research_opt_in(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertFalse(arguments.dspark_prompt_cache)
+
+        arguments = _parser().parse_args(
+            ["--model", "/tmp/model", "--dspark", "--dspark-prompt-cache"]
+        )
+        self.assertTrue(arguments.dspark_prompt_cache)
+
+    def test_expert_page_cache_probe_is_research_opt_in(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertFalse(arguments.expert_page_cache_probe)
+
+        arguments = _parser().parse_args(
+            ["--model", "/tmp/model", "--expert-page-cache-probe"]
+        )
+        self.assertTrue(arguments.expert_page_cache_probe)
+
+    def test_expert_file_cache_policy_defaults_to_cached(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertEqual(arguments.expert_file_cache_policy, "cached")
+
+        arguments = _parser().parse_args(
+            [
+                "--model",
+                "/tmp/model",
+                "--expert-file-cache-policy",
+                "bypass",
+            ]
+        )
+        self.assertEqual(arguments.expert_file_cache_policy, "bypass")
 
     def test_power_saving_limit_uses_fixed_values(self):
         self.assertIsNone(
@@ -1111,6 +1152,13 @@ class ServerTests(unittest.TestCase):
         performance = payload["performance"]
         self.assertEqual(status, 200)
         self.assertIsNone(payload["runtime"]["power_saving_limit_gbps"])
+        self.assertFalse(payload["runtime"]["expert_page_cache_probe"])
+        self.assertFalse(payload["runtime"]["dspark_prompt_cache"])
+        self.assertEqual(payload["runtime"]["expert_file_cache_policy"], "cached")
+        self.assertEqual(
+            payload["runtime"]["expert_file_direct_io_alignment_bytes"],
+            0,
+        )
         self.assertFalse(performance["generating"])
         self.assertEqual(performance["generation_tokens"], 2)
         self.assertGreaterEqual(performance["tokens_per_second"], 0)

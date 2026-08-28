@@ -1,0 +1,333 @@
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant: Compare the measured phases and state the evidence limit.
+User: Inspect the runtime metrics.
+Tool: {"ttft": 24.7, "unit": "s"}
+Assistant

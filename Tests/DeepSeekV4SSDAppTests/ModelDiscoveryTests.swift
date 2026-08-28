@@ -4,10 +4,22 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ModelDiscoveryTests: XCTestCase {
+  private func availableInstalledModel() -> URL? {
+    let fileManager = FileManager.default
+    let project = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+    let candidates = [
+      fileManager.homeDirectoryForCurrentUser
+        .appending(path: ".dsmodel", directoryHint: .isDirectory)
+        .appending(path: "deepseek-v4-flash-0731.dsv4", directoryHint: .isDirectory),
+      project.appending(path: "scratch/deepseek-v4-flash-0731.dsv4"),
+    ]
+    return candidates.first {
+      fileManager.fileExists(atPath: $0.appending(path: "manifest.json").path)
+    }
+  }
+
   func testDiscoveryAcceptsCompleteInstalledModelAndRejectsMissingModel() throws {
-    let project = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    let model = project.appending(path: "scratch/deepseek-v4-flash-0731.dsv4")
-    guard FileManager.default.fileExists(atPath: model.appending(path: "manifest.json").path) else {
+    guard let model = availableInstalledModel() else {
       throw XCTSkip("The complete installed model is not available.")
     }
 
@@ -20,9 +32,7 @@ final class ModelDiscoveryTests: XCTestCase {
   }
 
   func testDiscoveryKeepsModelWithMissingFilesForRepair() throws {
-    let project = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    let source = project.appending(path: "scratch/deepseek-v4-flash-0731.dsv4/manifest.json")
-    guard FileManager.default.fileExists(atPath: source.path) else {
+    guard let source = availableInstalledModel()?.appending(path: "manifest.json") else {
       throw XCTSkip("The installed model manifest is not available.")
     }
     let model = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
@@ -64,9 +74,9 @@ final class ModelDiscoveryTests: XCTestCase {
   }
 
   func testDiscoveryRejectsModelWithoutOfficialEncoder() throws {
-    let project = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-    let source = project.appending(path: "scratch/deepseek-v4-flash-0731.dsv4/manifest.json")
-    guard let data = try? Data(contentsOf: source) else {
+    guard let source = availableInstalledModel()?.appending(path: "manifest.json"),
+      let data = try? Data(contentsOf: source)
+    else {
       throw XCTSkip("The installed model manifest is not available.")
     }
     var manifest = try XCTUnwrap(

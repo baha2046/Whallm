@@ -3,7 +3,7 @@ export
 
 .PHONY: $(wildcard *)
 
-MODEL ?= scratch/deepseek-v4-flash-0731.dsv4
+MODEL ?= $(HOME)/.dsmodel/deepseek-v4-flash-0731.dsv4
 HOST ?= 127.0.0.1
 PORT ?= 11434
 SPEED_BENCH_DIR ?= scratch/speed-bench

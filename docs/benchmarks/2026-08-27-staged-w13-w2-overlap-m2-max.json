@@ -1,0 +1,3588 @@
+{
+  "correctness_gate": {
+    "criteria": {
+      "all_bypass_ranges_remain_nonresident": true,
+      "all_direct_io_alignment_contracts_exact": true,
+      "all_float32_output_hashes_exact": true,
+      "all_full_and_staged_bytes_exact": true,
+      "all_six_region_hashes_exact": true,
+      "fixed_candidate_arena_bytes_equal_full_slot": true
+    },
+    "passed": true
+  },
+  "decision": {
+    "continue_to_runtime_token_hash_prototype": true,
+    "outcome": "continue_to_isolated_runtime_token_hash_prototype",
+    "shape_candidates": [
+      {
+        "criteria": {
+          "complete_median_improves_at_least_5_percent": true,
+          "complete_p95_regression_at_most_5_percent": true,
+          "w2_read_hidden_at_least_20_percent": true
+        },
+        "passed": true,
+        "rows": 4
+      },
+      {
+        "criteria": {
+          "complete_median_improves_at_least_5_percent": true,
+          "complete_p95_regression_at_most_5_percent": true,
+          "w2_read_hidden_at_least_20_percent": true
+        },
+        "passed": true,
+        "rows": 8
+      }
+    ]
+  },
+  "environment": {
+    "chip": "Apple M2 Max",
+    "mac_model": "Mac14,13",
+    "machine": "arm64",
+    "memory_bytes": 68719476736,
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "os_page_cache": "fully nonresident just-in-time selections; bypass descriptor",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "storage_cache_limit": "F_NOCACHE does not prove device-controller cache state"
+  },
+  "evidence_kind": "fixed_arena_staged_w13_w2_overlap_gate",
+  "evidence_limits": [
+    "isolated single-expert compute, not a complete routed MoE layer",
+    "4/8 rows intentionally over-concentrate routes on one expert",
+    "no attention, route reduction, cache eviction, or full-model token hash",
+    "mincore plus F_NOCACHE is not a physical-device byte counter",
+    "no MTLIO, ANE concurrency, energy, or end-to-end decode throughput"
+  ],
+  "fixed_arenas": {
+    "alignment": {
+      "addresses": {
+        "full": 4658757632,
+        "w13": 4649844736,
+        "w2": 4643127296
+      },
+      "alignment_bytes": 4096,
+      "all_arena_addresses_aligned": true,
+      "all_destination_regions_aligned": true,
+      "all_source_regions_aligned": true
+    },
+    "candidate_total_bytes": 13369344,
+    "full_slot_bytes": 13369344,
+    "w13_bytes": 8912896,
+    "w2_bytes": 4456448
+  },
+  "formal_performance_result": false,
+  "installed_model": {
+    "expert_blob_size": 13369344,
+    "expert_regions": [
+      {
+        "dtype": "I8",
+        "length": 4194304,
+        "name": "w1.weight",
+        "offset": 0,
+        "shape": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "dtype": "F8_E8M0",
+        "length": 262144,
+        "name": "w1.scale",
+        "offset": 4194304,
+        "shape": [
+          2048,
+          128
+        ]
+      },
+      {
+        "dtype": "I8",
+        "length": 4194304,
+        "name": "w2.weight",
+        "offset": 4456448,
+        "shape": [
+          4096,
+          1024
+        ]
+      },
+      {
+        "dtype": "F8_E8M0",
+        "length": 262144,
+        "name": "w2.scale",
+        "offset": 8650752,
+        "shape": [
+          4096,
+          64
+        ]
+      },
+      {
+        "dtype": "I8",
+        "length": 4194304,
+        "name": "w3.weight",
+        "offset": 8912896,
+        "shape": [
+          2048,
+          2048
+        ]
+      },
+      {
+        "dtype": "F8_E8M0",
+        "length": 262144,
+        "name": "w3.scale",
+        "offset": 13107200,
+        "shape": [
+          2048,
+          128
+        ]
+      }
+    ],
+    "manifest_sha256": "61b102940075f311a6cfb0dfa3b5ae06c6386bb92365c98046b99f5b3e8fce64",
+    "path": "/Users/yanun/.dsmodel/deepseek-v4-flash-0731.dsv4",
+    "revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
+  },
+  "pairs": [
+    {
+      "complete_change_fraction": -0.06070027206647799,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0031802500016056,
+        "down_compute_seconds": 0.00023245898773893714,
+        "method": "full_slot_control",
+        "output_sha256": "fc5a9ec620b97a3ac5c67ae73e5a36a8d32a0f0ddb886738bdacd8b7a04551ba",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023170410422608256,
+        "w13_compute_seconds": 0.000624750042334199
+      },
+      "expert": 3,
+      "expert_offset": 40108032,
+      "full_region_sha256": {
+        "w1.scale": "1f8bb502b16143e5fa1c1011bd5cc3396cc47a262c80d25f49dd5e372cd45d3d",
+        "w1.weight": "ef9a866d1bb71d2b1d9e12d1058a2e3d8fcae8edc9aa6deb2fdfffa6308c4027",
+        "w2.scale": "75c7c0607ad86065a9363b7566b3958b217a7c8d061c1d8c185786341f7caacb",
+        "w2.weight": "e3d0f378400ff4fa37bd565d93aefd94fc0f365ca77baa80462cd52123eaf8fd",
+        "w3.scale": "46588ea9c844509295eb10ee443181402570ba5a145bc03165fd4be942edc38e",
+        "w3.weight": "640737f078efb543096195e943c07ffa36156660b033ebbe4d6e90ebbc083859"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 0,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002987207961268723,
+        "down_compute_seconds": 0.00021416699746623635,
+        "method": "staged_overlap",
+        "output_sha256": "fc5a9ec620b97a3ac5c67ae73e5a36a8d32a0f0ddb886738bdacd8b7a04551ba",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0002550000208429992,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001789791975170374,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.29287289821157325,
+        "w2_read_seconds": 0.000850624986924231,
+        "w2_w13_overlap_seconds": 0.00024912500521168113,
+        "w2_wait_seconds": 0.0006108750239945948
+      },
+      "staged_region_sha256": {
+        "w1.scale": "1f8bb502b16143e5fa1c1011bd5cc3396cc47a262c80d25f49dd5e372cd45d3d",
+        "w1.weight": "ef9a866d1bb71d2b1d9e12d1058a2e3d8fcae8edc9aa6deb2fdfffa6308c4027",
+        "w2.scale": "75c7c0607ad86065a9363b7566b3958b217a7c8d061c1d8c185786341f7caacb",
+        "w2.weight": "e3d0f378400ff4fa37bd565d93aefd94fc0f365ca77baa80462cd52123eaf8fd",
+        "w3.scale": "46588ea9c844509295eb10ee443181402570ba5a145bc03165fd4be942edc38e",
+        "w3.weight": "640737f078efb543096195e943c07ffa36156660b033ebbe4d6e90ebbc083859"
+      }
+    },
+    {
+      "complete_change_fraction": -0.060493270335950755,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0031119170016609132,
+        "down_compute_seconds": 0.0002251669648103416,
+        "method": "full_slot_control",
+        "output_sha256": "1fad0b74d17bd0e56160d4218bca613d269ad058964913c6811c39c8ed4eb0cc",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022671250044368207,
+        "w13_compute_seconds": 0.0006149999680928886
+      },
+      "expert": 4,
+      "expert_offset": 53477376,
+      "full_region_sha256": {
+        "w1.scale": "d47e62cb1112530f99a2c324dde1c947396a560031e5396d3d79cb716fbd901f",
+        "w1.weight": "13870e2e7c51a4b0c05738e6852fbcaee1953c6a2c4b0afd608701547d82aea6",
+        "w2.scale": "16b4d6a0418c263db24cc2ed0e56bcd3e2bc0b0b26f3b38b04b004b139974674",
+        "w2.weight": "68f0c38880e07bf9b778c455fb3f485e744f055e3f2ac284e9a971474b398ce2",
+        "w3.scale": "7115afb35cf8510f3752f1d5715e583f6fdb87d09d8eae62d6399ab570c5f077",
+        "w3.weight": "e57d2d3f7ae1c8bf8deef10d3d145625ba68839ecfd2408d8739c6d42551ced3"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 1,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029236669652163982,
+        "down_compute_seconds": 0.000266042014118284,
+        "method": "staged_overlap",
+        "output_sha256": "1fad0b74d17bd0e56160d4218bca613d269ad058964913c6811c39c8ed4eb0cc",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006672920426353812,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017335829907096922,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7563235612917444,
+        "w2_read_seconds": 0.0008747909450903535,
+        "w2_w13_overlap_seconds": 0.000661625002976507,
+        "w2_wait_seconds": 0.0002209170488640666
+      },
+      "staged_region_sha256": {
+        "w1.scale": "d47e62cb1112530f99a2c324dde1c947396a560031e5396d3d79cb716fbd901f",
+        "w1.weight": "13870e2e7c51a4b0c05738e6852fbcaee1953c6a2c4b0afd608701547d82aea6",
+        "w2.scale": "16b4d6a0418c263db24cc2ed0e56bcd3e2bc0b0b26f3b38b04b004b139974674",
+        "w2.weight": "68f0c38880e07bf9b778c455fb3f485e744f055e3f2ac284e9a971474b398ce2",
+        "w3.scale": "7115afb35cf8510f3752f1d5715e583f6fdb87d09d8eae62d6399ab570c5f077",
+        "w3.weight": "e57d2d3f7ae1c8bf8deef10d3d145625ba68839ecfd2408d8739c6d42551ced3"
+      }
+    },
+    {
+      "complete_change_fraction": -0.09440517744716193,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.00322545797098428,
+        "down_compute_seconds": 0.00022950000129640102,
+        "method": "full_slot_control",
+        "output_sha256": "05a7d78756915ce6f326aca10e56c2eba0377648cbd430392c6db4491b777129",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023059159866534173,
+        "w13_compute_seconds": 0.0006868749624118209
+      },
+      "expert": 5,
+      "expert_offset": 66846720,
+      "full_region_sha256": {
+        "w1.scale": "884624768778783764d6d73b4bb8e8a761657229f5717129c08b9b4236615e1b",
+        "w1.weight": "19cc86a1dbc7fcaeeaed6ea206b5299f4c5d684353bb82feb30883bbf0747b0b",
+        "w2.scale": "3979493832bf81826061964d3cd9653eb544fa43c4ab809198be16f25f598dce",
+        "w2.weight": "54f100035d0e12b32249356130b7c33f3a37996a613c90028a61337d8f860b2e",
+        "w3.scale": "5499962dd85d2317afe64af48d9369460e4613199f82e487c80bec748bb27143",
+        "w3.weight": "efa3bfc90b0db734a1a292aadd34b3b8d686d60aefabd25cffe962970ebfee7f"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 2,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029209580388851464,
+        "down_compute_seconds": 0.00023066700669005513,
+        "method": "staged_overlap",
+        "output_sha256": "05a7d78756915ce6f326aca10e56c2eba0377648cbd430392c6db4491b777129",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.000238874985370785,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017912499606609344,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.2696139362097424,
+        "w2_read_seconds": 0.0008614169782958925,
+        "w2_w13_overlap_seconds": 0.0002322500222362578,
+        "w2_wait_seconds": 0.0006287909927777946
+      },
+      "staged_region_sha256": {
+        "w1.scale": "884624768778783764d6d73b4bb8e8a761657229f5717129c08b9b4236615e1b",
+        "w1.weight": "19cc86a1dbc7fcaeeaed6ea206b5299f4c5d684353bb82feb30883bbf0747b0b",
+        "w2.scale": "3979493832bf81826061964d3cd9653eb544fa43c4ab809198be16f25f598dce",
+        "w2.weight": "54f100035d0e12b32249356130b7c33f3a37996a613c90028a61337d8f860b2e",
+        "w3.scale": "5499962dd85d2317afe64af48d9369460e4613199f82e487c80bec748bb27143",
+        "w3.weight": "efa3bfc90b0db734a1a292aadd34b3b8d686d60aefabd25cffe962970ebfee7f"
+      }
+    },
+    {
+      "complete_change_fraction": -0.08924092946090512,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003140374959912151,
+        "down_compute_seconds": 0.00021808402379974723,
+        "method": "full_slot_control",
+        "output_sha256": "39b2e3b116413e23bf58b75ce4838c2f6a6c985300edb120a8c98c75777ad3c5",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002273791003972292,
+        "w13_compute_seconds": 0.0006448749918490648
+      },
+      "expert": 6,
+      "expert_offset": 80216064,
+      "full_region_sha256": {
+        "w1.scale": "00e29345136d8114a9d8d1ec5f335712db81e394d4d342ee4ebcc6029ef39c83",
+        "w1.weight": "a777c99ff45701ce5cf002d5b19745264ec60c2e08e4a36d6db1b8be9032450e",
+        "w2.scale": "7bd1e2a2c9c561f9d7adad31d8636a4056d2250c41d19e2fbd9e9dbb78035ab4",
+        "w2.weight": "d112142281d3f91fddc96cc8562b642f5fc1f3c84b204cecf02530e96a18ee85",
+        "w3.scale": "d720e01bcfbea7336a1fb590bf7d92db6697c93a4275e74433525cdc5f8539c9",
+        "w3.weight": "41e5a93a0e36b0919dc7cf35c4863a09810f0924708fa321835ad42ea2eac7d4"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 3,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002860124979633838,
+        "down_compute_seconds": 0.0002145000034943223,
+        "method": "staged_overlap",
+        "output_sha256": "39b2e3b116413e23bf58b75ce4838c2f6a6c985300edb120a8c98c75777ad3c5",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006229589926078916,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001721791981253773,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.6918633706485944,
+        "w2_read_seconds": 0.0008929999894462526,
+        "w2_w13_overlap_seconds": 0.0006178339826874435,
+        "w2_wait_seconds": 0.00027312495512887836
+      },
+      "staged_region_sha256": {
+        "w1.scale": "00e29345136d8114a9d8d1ec5f335712db81e394d4d342ee4ebcc6029ef39c83",
+        "w1.weight": "a777c99ff45701ce5cf002d5b19745264ec60c2e08e4a36d6db1b8be9032450e",
+        "w2.scale": "7bd1e2a2c9c561f9d7adad31d8636a4056d2250c41d19e2fbd9e9dbb78035ab4",
+        "w2.weight": "d112142281d3f91fddc96cc8562b642f5fc1f3c84b204cecf02530e96a18ee85",
+        "w3.scale": "d720e01bcfbea7336a1fb590bf7d92db6697c93a4275e74433525cdc5f8539c9",
+        "w3.weight": "41e5a93a0e36b0919dc7cf35c4863a09810f0924708fa321835ad42ea2eac7d4"
+      }
+    },
+    {
+      "complete_change_fraction": -0.11160617272757367,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032357079908251762,
+        "down_compute_seconds": 0.00022570800501853228,
+        "method": "full_slot_control",
+        "output_sha256": "8e1aa2b8677a4ffb7dcb7188fd3153f34d942cb1521c777c70fe2b666eb1213d",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002334207994863391,
+        "w13_compute_seconds": 0.0006727919680997729
+      },
+      "expert": 7,
+      "expert_offset": 93585408,
+      "full_region_sha256": {
+        "w1.scale": "5b950a20eb147a37d8211a273ceea117c1ad767c1e7b464ccb9b3623984ce3b8",
+        "w1.weight": "fcf214ca6bd12303ca7758edc9d31c36c4b27992eb79e8e4270002dfc57db35b",
+        "w2.scale": "6cc90e54ff2bb7e371decfe522c369e1e92cf5f572f8226867d5b015c99a0007",
+        "w2.weight": "49c04265e66a7b465efd4a00ec7ccd008c1213e2d52a750e9348826c6e7e906d",
+        "w3.scale": "b15a6e4e23b3d5310ffc6ccf6013ee50efe9494db4ca8c9b1d1d59c1fc471593",
+        "w3.weight": "e0fac2d97f87d1ba1a9219dee39ef7ef56639e2e698e2278c982fe10cc0a35d7"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 4,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0028745830059051514,
+        "down_compute_seconds": 0.0002127499901689589,
+        "method": "staged_overlap",
+        "output_sha256": "8e1aa2b8677a4ffb7dcb7188fd3153f34d942cb1521c777c70fe2b666eb1213d",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0002437079674564302,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017800829955376685,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.2784164286578985,
+        "w2_read_seconds": 0.0008515410008840263,
+        "w2_w13_overlap_seconds": 0.000237083004321903,
+        "w2_wait_seconds": 0.0006090410170145333
+      },
+      "staged_region_sha256": {
+        "w1.scale": "5b950a20eb147a37d8211a273ceea117c1ad767c1e7b464ccb9b3623984ce3b8",
+        "w1.weight": "fcf214ca6bd12303ca7758edc9d31c36c4b27992eb79e8e4270002dfc57db35b",
+        "w2.scale": "6cc90e54ff2bb7e371decfe522c369e1e92cf5f572f8226867d5b015c99a0007",
+        "w2.weight": "49c04265e66a7b465efd4a00ec7ccd008c1213e2d52a750e9348826c6e7e906d",
+        "w3.scale": "b15a6e4e23b3d5310ffc6ccf6013ee50efe9494db4ca8c9b1d1d59c1fc471593",
+        "w3.weight": "e0fac2d97f87d1ba1a9219dee39ef7ef56639e2e698e2278c982fe10cc0a35d7"
+      }
+    },
+    {
+      "complete_change_fraction": -0.0865148994122249,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0030702920048497617,
+        "down_compute_seconds": 0.00020933302585035563,
+        "method": "full_slot_control",
+        "output_sha256": "81b41f77dbe90697f2fb7863e380967bb900b7f1b59c509b8ace582ac02ef94e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022393750259652734,
+        "w13_compute_seconds": 0.000618541962467134
+      },
+      "expert": 8,
+      "expert_offset": 106954752,
+      "full_region_sha256": {
+        "w1.scale": "86a7903d331b8fbdfc63db92cc325bc493f70e1d540bdc5d9d416f4d55581e43",
+        "w1.weight": "5db90f4a1151558db7c61c202104b1f318f9990e20c4ef6b9608e97c15d10a93",
+        "w2.scale": "854b4f1d8ab57a2fee39156779b8b8733473038b4b6c8ab7dcc6931c68ff8547",
+        "w2.weight": "8da2cdb03e18c0dd7c3728e432d47b62778295bade2b30727649885862bdac5c",
+        "w3.scale": "9cb6bb789ceabf21c27ec5f69672a741b7857b0ad944d8b1be3eccaa70ec6766",
+        "w3.weight": "bb458b8f67cd8f6868ed34f2a71c62c9b755d2f28e8594543f347e87d08f0310"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 5,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0028046660008840263,
+        "down_compute_seconds": 0.0002104580053128302,
+        "method": "staged_overlap",
+        "output_sha256": "81b41f77dbe90697f2fb7863e380967bb900b7f1b59c509b8ace582ac02ef94e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006603749934583902,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017194999963976443,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7690952074165998,
+        "w2_read_seconds": 0.0008510000188834965,
+        "w2_w13_overlap_seconds": 0.0006545000360347331,
+        "w2_wait_seconds": 0.0001925830147229135
+      },
+      "staged_region_sha256": {
+        "w1.scale": "86a7903d331b8fbdfc63db92cc325bc493f70e1d540bdc5d9d416f4d55581e43",
+        "w1.weight": "5db90f4a1151558db7c61c202104b1f318f9990e20c4ef6b9608e97c15d10a93",
+        "w2.scale": "854b4f1d8ab57a2fee39156779b8b8733473038b4b6c8ab7dcc6931c68ff8547",
+        "w2.weight": "8da2cdb03e18c0dd7c3728e432d47b62778295bade2b30727649885862bdac5c",
+        "w3.scale": "9cb6bb789ceabf21c27ec5f69672a741b7857b0ad944d8b1be3eccaa70ec6766",
+        "w3.weight": "bb458b8f67cd8f6868ed34f2a71c62c9b755d2f28e8594543f347e87d08f0310"
+      }
+    },
+    {
+      "complete_change_fraction": 0.3494057964693049,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0031774170347489417,
+        "down_compute_seconds": 0.00022204098058864474,
+        "method": "full_slot_control",
+        "output_sha256": "bbaf0c79845d0c5c2924ac76c48f8e9f7fc2176bc89356555169bf6d4a5b0594",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002287000010255724,
+        "w13_compute_seconds": 0.0006644169916398823
+      },
+      "expert": 9,
+      "expert_offset": 120324096,
+      "full_region_sha256": {
+        "w1.scale": "4f8a7d6418b7883004a999a5f8873949d3178443b1a83fd27a87afe59b359269",
+        "w1.weight": "6bd1ed4e9fe949b6eb8359239914c61b132327d7404662bd3735a349d46dfa83",
+        "w2.scale": "1851923a887fb6afbb710eb09ce2f486c5919e8e013389ab2e1a329adac76179",
+        "w2.weight": "a5e4014f877958f5e228b445f634c691dec49d4815ffee282841ef3a9de79ce1",
+        "w3.scale": "0a79b11e629b79df282290de2b0157ecc7036a73fa17deb0debbd916fc10b3c2",
+        "w3.weight": "8139b7380abb6f1f30cea7b31951799c2b4e24c92e93b2335d8a50b6b2c4f828"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 6,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.004287624964490533,
+        "down_compute_seconds": 0.0002279590116813779,
+        "method": "staged_overlap",
+        "output_sha256": "bbaf0c79845d0c5c2924ac76c48f8e9f7fc2176bc89356555169bf6d4a5b0594",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.00024112500250339508,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0018117079744115472,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.10684070004587444,
+        "w2_read_seconds": 0.0022104590316303074,
+        "w2_w13_overlap_seconds": 0.00023616699036210775,
+        "w2_wait_seconds": 0.0019763329764828086
+      },
+      "staged_region_sha256": {
+        "w1.scale": "4f8a7d6418b7883004a999a5f8873949d3178443b1a83fd27a87afe59b359269",
+        "w1.weight": "6bd1ed4e9fe949b6eb8359239914c61b132327d7404662bd3735a349d46dfa83",
+        "w2.scale": "1851923a887fb6afbb710eb09ce2f486c5919e8e013389ab2e1a329adac76179",
+        "w2.weight": "a5e4014f877958f5e228b445f634c691dec49d4815ffee282841ef3a9de79ce1",
+        "w3.scale": "0a79b11e629b79df282290de2b0157ecc7036a73fa17deb0debbd916fc10b3c2",
+        "w3.weight": "8139b7380abb6f1f30cea7b31951799c2b4e24c92e93b2335d8a50b6b2c4f828"
+      }
+    },
+    {
+      "complete_change_fraction": -0.08956434887976261,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0031583330128341913,
+        "down_compute_seconds": 0.0002269589458592236,
+        "method": "full_slot_control",
+        "output_sha256": "c80ef60e0b6799587ff449a00fef37a9d71bb0cda1694db556d9e11333de8c1e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022389579680748284,
+        "w13_compute_seconds": 0.0006889160140417516
+      },
+      "expert": 10,
+      "expert_offset": 133693440,
+      "full_region_sha256": {
+        "w1.scale": "b9f3b4ba941a2270c24aaa0b4c0c2084f6db4d3baf2617d16d92c408a629f95b",
+        "w1.weight": "fc625408ba30af9c3f67ea81bc4b2f15339a798d41b5492cd27cbde46d08766b",
+        "w2.scale": "544a08e424391853e47a74ba437942091b49bd37c917c0852c55fb7f2acd257a",
+        "w2.weight": "5ff0a782f51f5b7c593c6d775ba7140c49d533d8bc386075d1ef5871e116823f",
+        "w3.scale": "5285d0d5452c95f6becebbc6d0263d21d6d5bd9b0aa21695e4cf4e70e9d64298",
+        "w3.weight": "faaf14aea5846d5f19e8087883c04b2833a30798fa2cce99552b46de40568298"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 7,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002875458972994238,
+        "down_compute_seconds": 0.00022849999368190765,
+        "method": "staged_overlap",
+        "output_sha256": "c80ef60e0b6799587ff449a00fef37a9d71bb0cda1694db556d9e11333de8c1e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006737499497830868,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001725875015836209,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7462742665024188,
+        "w2_read_seconds": 0.0008946669986471534,
+        "w2_w13_overlap_seconds": 0.0006676669581793249,
+        "w2_wait_seconds": 0.00022245798027142882
+      },
+      "staged_region_sha256": {
+        "w1.scale": "b9f3b4ba941a2270c24aaa0b4c0c2084f6db4d3baf2617d16d92c408a629f95b",
+        "w1.weight": "fc625408ba30af9c3f67ea81bc4b2f15339a798d41b5492cd27cbde46d08766b",
+        "w2.scale": "544a08e424391853e47a74ba437942091b49bd37c917c0852c55fb7f2acd257a",
+        "w2.weight": "5ff0a782f51f5b7c593c6d775ba7140c49d533d8bc386075d1ef5871e116823f",
+        "w3.scale": "5285d0d5452c95f6becebbc6d0263d21d6d5bd9b0aa21695e4cf4e70e9d64298",
+        "w3.weight": "faaf14aea5846d5f19e8087883c04b2833a30798fa2cce99552b46de40568298"
+      }
+    },
+    {
+      "complete_change_fraction": -0.09330504028339104,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.00327241700142622,
+        "down_compute_seconds": 0.00024391600163653493,
+        "method": "full_slot_control",
+        "output_sha256": "a9c274257c86ab1c75753b74a12839852f31eaedc518898c6738db112d5c9b06",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002334584016352892,
+        "w13_compute_seconds": 0.0006907089846208692
+      },
+      "expert": 11,
+      "expert_offset": 147062784,
+      "full_region_sha256": {
+        "w1.scale": "e8fbc5cc63929c1b8be41ef0e47aa99fa81ff6ffc62a0b5f9ebc6d1ad5f432a9",
+        "w1.weight": "0955b28c61568e30cbabe53b8b05bc5ca4c0b0991e741c5c73cacfc725ef33aa",
+        "w2.scale": "08124fbc3ce076dae0a25bbe5daaf3b4451d959eb595bb248b2d1f580f14269b",
+        "w2.weight": "ef7c471755c8681aeab95ba97aa7dcb1f0eac6f82a2eef3450652dafd2f2551d",
+        "w3.scale": "ee701832ef4111119354cdd63ebd90e2957fa31a9207bec4cff6873f196a3116",
+        "w3.weight": "6f70238ac04de4a9e1f0f485d2d22e902b9ab98f39220e0f63dac4054cebda58"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 8,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029670840012840927,
+        "down_compute_seconds": 0.0002387919812463224,
+        "method": "staged_overlap",
+        "output_sha256": "a9c274257c86ab1c75753b74a12839852f31eaedc518898c6738db112d5c9b06",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.00025158398784697056,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0018466250039637089,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.2888973444562781,
+        "w2_read_seconds": 0.0008548329933546484,
+        "w2_w13_overlap_seconds": 0.0002469589817337692,
+        "w2_wait_seconds": 0.0006049579824320972
+      },
+      "staged_region_sha256": {
+        "w1.scale": "e8fbc5cc63929c1b8be41ef0e47aa99fa81ff6ffc62a0b5f9ebc6d1ad5f432a9",
+        "w1.weight": "0955b28c61568e30cbabe53b8b05bc5ca4c0b0991e741c5c73cacfc725ef33aa",
+        "w2.scale": "08124fbc3ce076dae0a25bbe5daaf3b4451d959eb595bb248b2d1f580f14269b",
+        "w2.weight": "ef7c471755c8681aeab95ba97aa7dcb1f0eac6f82a2eef3450652dafd2f2551d",
+        "w3.scale": "ee701832ef4111119354cdd63ebd90e2957fa31a9207bec4cff6873f196a3116",
+        "w3.weight": "6f70238ac04de4a9e1f0f485d2d22e902b9ab98f39220e0f63dac4054cebda58"
+      }
+    },
+    {
+      "complete_change_fraction": -0.07690494880158427,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.00318250001873821,
+        "down_compute_seconds": 0.00023100001271814108,
+        "method": "full_slot_control",
+        "output_sha256": "62b484d786128be443039339cfcffe1b909a259b598bd1c82bf9668c17e31dce",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022608330473303795,
+        "w13_compute_seconds": 0.000687417050357908
+      },
+      "expert": 12,
+      "expert_offset": 160432128,
+      "full_region_sha256": {
+        "w1.scale": "0eb91284838a59ec6540f030a6aae6cf03960f111d848644347aac6507313867",
+        "w1.weight": "7f1a7fa364057e4ce315cdaf780e1c396513c163dcd09c00dd67560accd002c0",
+        "w2.scale": "31b58f40c8296a697b22a2edbc2660c8d6b1481f93d48c65fec2f76450203e0e",
+        "w2.weight": "446174b353c3067099fc76ee81e69a05d0eb23ada0bce909aab0c59bbf9f449d",
+        "w3.scale": "fcc2b2d1052f0d875003d135a94f71ac20e98667669b648f6f90b714e0c743ba",
+        "w3.weight": "9195dd0d9f0ffe09db7aa6f22b8761e1a49a171debad69989ee023f068b4f42d"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 9,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002937750017736107,
+        "down_compute_seconds": 0.00024204200599342585,
+        "method": "staged_overlap",
+        "output_sha256": "62b484d786128be443039339cfcffe1b909a259b598bd1c82bf9668c17e31dce",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006842910079285502,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017477080109529197,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7363387812400319,
+        "w2_read_seconds": 0.000921166967600584,
+        "w2_w13_overlap_seconds": 0.00067829096224159,
+        "w2_wait_seconds": 0.00023670803057029843
+      },
+      "staged_region_sha256": {
+        "w1.scale": "0eb91284838a59ec6540f030a6aae6cf03960f111d848644347aac6507313867",
+        "w1.weight": "7f1a7fa364057e4ce315cdaf780e1c396513c163dcd09c00dd67560accd002c0",
+        "w2.scale": "31b58f40c8296a697b22a2edbc2660c8d6b1481f93d48c65fec2f76450203e0e",
+        "w2.weight": "446174b353c3067099fc76ee81e69a05d0eb23ada0bce909aab0c59bbf9f449d",
+        "w3.scale": "fcc2b2d1052f0d875003d135a94f71ac20e98667669b648f6f90b714e0c743ba",
+        "w3.weight": "9195dd0d9f0ffe09db7aa6f22b8761e1a49a171debad69989ee023f068b4f42d"
+      }
+    },
+    {
+      "complete_change_fraction": -0.09025463436125314,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032112920307554305,
+        "down_compute_seconds": 0.00023250002413988113,
+        "method": "full_slot_control",
+        "output_sha256": "f8eeddd0eb8e52cd68924e6c601c074c48c87e8b5cc038013c71710971361d2a",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023242500028572977,
+        "w13_compute_seconds": 0.0006512919790111482
+      },
+      "expert": 13,
+      "expert_offset": 173801472,
+      "full_region_sha256": {
+        "w1.scale": "9196a89b345fd7057e068336ff4726531a46d533d23b5d46dcfb9e583dc0d1be",
+        "w1.weight": "aab255326361f16e04dada04cb25c49990c76c4dc0e7eb930ded67564b85a1ba",
+        "w2.scale": "42ddc82501c308e0db2465d53b253b0ea48296817b61b700c12dc516a9ed30e5",
+        "w2.weight": "5bc4c868865bd3c11a49b18dfbb2b50e12f537c7cd39ebf2f7a8ba44555721ee",
+        "w3.scale": "521f07a953a310b9fa78a467d6a1bb3d654e588b878f8c1b096f9f77b5fc138d",
+        "w3.weight": "8fcbfa3b2ea35f1b037a0cb7dd99ac8c883e0b7b2196dd4e40528275e3fe0352"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 10,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002921458042692393,
+        "down_compute_seconds": 0.00022808404173702002,
+        "method": "staged_overlap",
+        "output_sha256": "f8eeddd0eb8e52cd68924e6c601c074c48c87e8b5cc038013c71710971361d2a",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.00025283300783485174,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0018040839931927621,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.2886265689446862,
+        "w2_read_seconds": 0.0008605410112068057,
+        "w2_w13_overlap_seconds": 0.0002483749995008111,
+        "w2_wait_seconds": 0.0006136660231277347
+      },
+      "staged_region_sha256": {
+        "w1.scale": "9196a89b345fd7057e068336ff4726531a46d533d23b5d46dcfb9e583dc0d1be",
+        "w1.weight": "aab255326361f16e04dada04cb25c49990c76c4dc0e7eb930ded67564b85a1ba",
+        "w2.scale": "42ddc82501c308e0db2465d53b253b0ea48296817b61b700c12dc516a9ed30e5",
+        "w2.weight": "5bc4c868865bd3c11a49b18dfbb2b50e12f537c7cd39ebf2f7a8ba44555721ee",
+        "w3.scale": "521f07a953a310b9fa78a467d6a1bb3d654e588b878f8c1b096f9f77b5fc138d",
+        "w3.weight": "8fcbfa3b2ea35f1b037a0cb7dd99ac8c883e0b7b2196dd4e40528275e3fe0352"
+      }
+    },
+    {
+      "complete_change_fraction": 0.06372177596548045,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0031713329954072833,
+        "down_compute_seconds": 0.00024824996944516897,
+        "method": "full_slot_control",
+        "output_sha256": "0f21d3e4bf8f4c6e997eb6705fc922b5d80443faac4af5679b5da960e122bbd0",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022763750166632235,
+        "w13_compute_seconds": 0.0006437500123865902
+      },
+      "expert": 14,
+      "expert_offset": 187170816,
+      "full_region_sha256": {
+        "w1.scale": "817740d39e509f14097b277f3508a3f61f5677aadd794e7db8321a55b635f6bf",
+        "w1.weight": "fa938adcf41e8b6c84fb9c22e33d888ebe3f907eba689dc4667e9ae2da066942",
+        "w2.scale": "605443c67d9fcf1c617af2051e85735f620ff55238957bcbad3a733fdfcf641c",
+        "w2.weight": "4f0ca100c177eb6f43d799c5290b4b950538115a4c828458ca099cb954b74cdb",
+        "w3.scale": "3ec7cc7051770dce8e3beba8a7e8d1cb7e2a36fffc6b740fd544e4f35b2351b7",
+        "w3.weight": "cc1ee1d93920160d616fe47c6ddc8513e632e99f2c2a9acdd6066ffba56a2b91"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 1,
+      "sample": 11,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003373415966052562,
+        "down_compute_seconds": 0.0007001249468885362,
+        "method": "staged_overlap",
+        "output_sha256": "0f21d3e4bf8f4c6e997eb6705fc922b5d80443faac4af5679b5da960e122bbd0",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006344169960357249,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017723750206641853,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7181726189518854,
+        "w2_read_seconds": 0.0008758340263739228,
+        "w2_w13_overlap_seconds": 0.0006290000164881349,
+        "w2_wait_seconds": 0.0002428340376354754
+      },
+      "staged_region_sha256": {
+        "w1.scale": "817740d39e509f14097b277f3508a3f61f5677aadd794e7db8321a55b635f6bf",
+        "w1.weight": "fa938adcf41e8b6c84fb9c22e33d888ebe3f907eba689dc4667e9ae2da066942",
+        "w2.scale": "605443c67d9fcf1c617af2051e85735f620ff55238957bcbad3a733fdfcf641c",
+        "w2.weight": "4f0ca100c177eb6f43d799c5290b4b950538115a4c828458ca099cb954b74cdb",
+        "w3.scale": "3ec7cc7051770dce8e3beba8a7e8d1cb7e2a36fffc6b740fd544e4f35b2351b7",
+        "w3.weight": "cc1ee1d93920160d616fe47c6ddc8513e632e99f2c2a9acdd6066ffba56a2b91"
+      }
+    },
+    {
+      "complete_change_fraction": -0.009782361126697725,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033350830199196935,
+        "down_compute_seconds": 0.0002923749852925539,
+        "method": "full_slot_control",
+        "output_sha256": "10e9ae09a7fb1d20754ba446cfc4bbfe49adf5aa42f13b9d825418c7a41494ef",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022849590168334544,
+        "w13_compute_seconds": 0.0007545830449089408
+      },
+      "expert": 15,
+      "expert_offset": 200540160,
+      "full_region_sha256": {
+        "w1.scale": "0a5c38ce7c3368d5b38ff37fb945b51ec68d9ceb12c279bdf3f13f1395f888c6",
+        "w1.weight": "e5e453fbf348d7fff723f822a2efacfe1e9e6c21ef08b045a3aea40d7f538f66",
+        "w2.scale": "53908cfce1999ab0103eae505522f7b019cde414820ceaf6bc03977713f4f737",
+        "w2.weight": "8ec88fc893b03e33ce54f0167bf2463a8859be49a03db7d9ab6fdced78b7314a",
+        "w3.scale": "80e284cd2775b48141487b133f398f98dc6867b1e45aa6e48a6218d9f07db5f1",
+        "w3.weight": "fa566502895a3703b1c33ba11105e6898a1ac91f2e10034cbb5b81ea4e6a5f41"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 0,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033024580334313214,
+        "down_compute_seconds": 0.0006149589898996055,
+        "method": "staged_overlap",
+        "output_sha256": "10e9ae09a7fb1d20754ba446cfc4bbfe49adf5aa42f13b9d825418c7a41494ef",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006920419982634485,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017955829971469939,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.79882916718425,
+        "w2_read_seconds": 0.000860791013110429,
+        "w2_w13_overlap_seconds": 0.0006876249681226909,
+        "w2_wait_seconds": 0.0001699170097708702
+      },
+      "staged_region_sha256": {
+        "w1.scale": "0a5c38ce7c3368d5b38ff37fb945b51ec68d9ceb12c279bdf3f13f1395f888c6",
+        "w1.weight": "e5e453fbf348d7fff723f822a2efacfe1e9e6c21ef08b045a3aea40d7f538f66",
+        "w2.scale": "53908cfce1999ab0103eae505522f7b019cde414820ceaf6bc03977713f4f737",
+        "w2.weight": "8ec88fc893b03e33ce54f0167bf2463a8859be49a03db7d9ab6fdced78b7314a",
+        "w3.scale": "80e284cd2775b48141487b133f398f98dc6867b1e45aa6e48a6218d9f07db5f1",
+        "w3.weight": "fa566502895a3703b1c33ba11105e6898a1ac91f2e10034cbb5b81ea4e6a5f41"
+      }
+    },
+    {
+      "complete_change_fraction": -0.09689720029288684,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032646250328980386,
+        "down_compute_seconds": 0.00025412498507648706,
+        "method": "full_slot_control",
+        "output_sha256": "0c0646bad704d09d509d63e8aa337d27a3517bfaede3741a52761001c99cc513",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023114579962566495,
+        "w13_compute_seconds": 0.0006951669929549098
+      },
+      "expert": 16,
+      "expert_offset": 213909504,
+      "full_region_sha256": {
+        "w1.scale": "42a1af2da12ffd6e577a1338eab90ea0265828a6388d4c2990e56e34d20087dd",
+        "w1.weight": "f9a8069006cc275779da8f4da3d8aeff05ff4e6f40d735e22b2cf794d49e7ff8",
+        "w2.scale": "7949b6eca1e5e582020c54fbf4aa5ebe9939ebbe78505146a46c5c394a461907",
+        "w2.weight": "96d4a45d724e60c440795948bc815424c179c2d001ebf2a5ecbdca2787289e8b",
+        "w3.scale": "4b8bd0a1caf5c8d97d77cba04e0b723ec7c97b88740c336e1d334aee4ecdb63e",
+        "w3.weight": "4384b25808c86d3f5174daa39db4a4699d66ecdcf8688612c6292cae39304ba9"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 1,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002948292007204145,
+        "down_compute_seconds": 0.000258082989603281,
+        "method": "staged_overlap",
+        "output_sha256": "0c0646bad704d09d509d63e8aa337d27a3517bfaede3741a52761001c99cc513",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007143749971874058,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001772125018760562,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7934071144751879,
+        "w2_read_seconds": 0.0008936660015024245,
+        "w2_w13_overlap_seconds": 0.0007090409635566175,
+        "w2_wait_seconds": 0.00018012500368058681
+      },
+      "staged_region_sha256": {
+        "w1.scale": "42a1af2da12ffd6e577a1338eab90ea0265828a6388d4c2990e56e34d20087dd",
+        "w1.weight": "f9a8069006cc275779da8f4da3d8aeff05ff4e6f40d735e22b2cf794d49e7ff8",
+        "w2.scale": "7949b6eca1e5e582020c54fbf4aa5ebe9939ebbe78505146a46c5c394a461907",
+        "w2.weight": "96d4a45d724e60c440795948bc815424c179c2d001ebf2a5ecbdca2787289e8b",
+        "w3.scale": "4b8bd0a1caf5c8d97d77cba04e0b723ec7c97b88740c336e1d334aee4ecdb63e",
+        "w3.weight": "4384b25808c86d3f5174daa39db4a4699d66ecdcf8688612c6292cae39304ba9"
+      }
+    },
+    {
+      "complete_change_fraction": -0.00312665640637122,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033713330049067736,
+        "down_compute_seconds": 0.0002565000322647393,
+        "method": "full_slot_control",
+        "output_sha256": "b33fdf6af6b8c83c84ebd0d0d0be4d5d63fd31f1c769a7be6d426656e20e7ed0",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002329166978597641,
+        "w13_compute_seconds": 0.000782540999352932
+      },
+      "expert": 17,
+      "expert_offset": 227278848,
+      "full_region_sha256": {
+        "w1.scale": "dff11187278172c048bdd53c57797fea8c11a0bd7b637dc6197d2660873b42f9",
+        "w1.weight": "860c884d367a148e8d51ecf80564c1bbd1b6d93a0589660270c9d69a8aa4ff56",
+        "w2.scale": "e1149b4f1d6c52de6d87631d5b2b28481ec7508a308446f24c472517bb039a8c",
+        "w2.weight": "2fa804513f43745ef199f508608e92290cba38699207e4cd8dd8afd6a34290df",
+        "w3.scale": "bbd717446f201b80f308d6089533f9c5d784b0aa5b3f3e30eedec4b47735086e",
+        "w3.weight": "c2ab7d646b65030bd173ef5bf82ef4be121ce69e2f272df1517e77f4fbd1346b"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 2,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003360792004968971,
+        "down_compute_seconds": 0.0006579580367542803,
+        "method": "staged_overlap",
+        "output_sha256": "b33fdf6af6b8c83c84ebd0d0d0be4d5d63fd31f1c769a7be6d426656e20e7ed0",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0002949159825220704,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0018124170019291341,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.3375200312684532,
+        "w2_read_seconds": 0.0008624169859103858,
+        "w2_w13_overlap_seconds": 0.0002910830080509186,
+        "w2_wait_seconds": 0.0005714169819839299
+      },
+      "staged_region_sha256": {
+        "w1.scale": "dff11187278172c048bdd53c57797fea8c11a0bd7b637dc6197d2660873b42f9",
+        "w1.weight": "860c884d367a148e8d51ecf80564c1bbd1b6d93a0589660270c9d69a8aa4ff56",
+        "w2.scale": "e1149b4f1d6c52de6d87631d5b2b28481ec7508a308446f24c472517bb039a8c",
+        "w2.weight": "2fa804513f43745ef199f508608e92290cba38699207e4cd8dd8afd6a34290df",
+        "w3.scale": "bbd717446f201b80f308d6089533f9c5d784b0aa5b3f3e30eedec4b47735086e",
+        "w3.weight": "c2ab7d646b65030bd173ef5bf82ef4be121ce69e2f272df1517e77f4fbd1346b"
+      }
+    },
+    {
+      "complete_change_fraction": -0.22008166199811618,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003722290974110365,
+        "down_compute_seconds": 0.0007290420471690595,
+        "method": "full_slot_control",
+        "output_sha256": "b0c547a6e2289ce2e2228428411190a757ab1df017566aadce5093b56dfa84c6",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022682499838992953,
+        "w13_compute_seconds": 0.0007216669619083405
+      },
+      "expert": 18,
+      "expert_offset": 240648192,
+      "full_region_sha256": {
+        "w1.scale": "2378fa090d9130bd5710270b4eea59417ee4c21d425fb0132659326c3e8ffd0a",
+        "w1.weight": "4d92159808043ec34b67cb5df28eee4a0bcbd41f6cb6a72e407b3f8017352f4e",
+        "w2.scale": "f9d910365c916b4ed5df0c533f51559404af3b0d12aa3de4a94a525d125ab937",
+        "w2.weight": "5c690add1dd783c382b8c45424c99205eed6fa08871dfebeb6463e11e7628f47",
+        "w3.scale": "6e1f5692adea25c947221cd115df616fb18a828a58c5fdd0b7343c6746181662",
+        "w3.weight": "ec2bce6fadbc9a6b9b70d9c85f5172fb9d0765662699e2080edbfccb92eba524"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 3,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029030829900875688,
+        "down_compute_seconds": 0.0002478330279700458,
+        "method": "staged_overlap",
+        "output_sha256": "b0c547a6e2289ce2e2228428411190a757ab1df017566aadce5093b56dfa84c6",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.000714499969035387,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017769999685697258,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8338561408452748,
+        "w2_read_seconds": 0.0008501670090481639,
+        "w2_w13_overlap_seconds": 0.0007089169812388718,
+        "w2_wait_seconds": 0.00013812503311783075
+      },
+      "staged_region_sha256": {
+        "w1.scale": "2378fa090d9130bd5710270b4eea59417ee4c21d425fb0132659326c3e8ffd0a",
+        "w1.weight": "4d92159808043ec34b67cb5df28eee4a0bcbd41f6cb6a72e407b3f8017352f4e",
+        "w2.scale": "f9d910365c916b4ed5df0c533f51559404af3b0d12aa3de4a94a525d125ab937",
+        "w2.weight": "5c690add1dd783c382b8c45424c99205eed6fa08871dfebeb6463e11e7628f47",
+        "w3.scale": "6e1f5692adea25c947221cd115df616fb18a828a58c5fdd0b7343c6746181662",
+        "w3.weight": "ec2bce6fadbc9a6b9b70d9c85f5172fb9d0765662699e2080edbfccb92eba524"
+      }
+    },
+    {
+      "complete_change_fraction": -0.11135315254047973,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032872079755179584,
+        "down_compute_seconds": 0.0002572920056991279,
+        "method": "full_slot_control",
+        "output_sha256": "97ada40b3ad5c973a1babfd89523da045de3976d5d7c03beb44058473057375c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022865000064484775,
+        "w13_compute_seconds": 0.0007404590141959488
+      },
+      "expert": 19,
+      "expert_offset": 254017536,
+      "full_region_sha256": {
+        "w1.scale": "8f5c6be78a70f248a196de5c3ed94a28b002179a6d2bb968c569a18ffff01cec",
+        "w1.weight": "58aa7422ef7db43356b07b6a68e5377d962a7d6170531c77561902f709d96db3",
+        "w2.scale": "2f85a5b79458ebab45cb9be506b90e7c2c2defc39bfba77ff0d09a1f8d3c4e80",
+        "w2.weight": "918f532b83aa9884d71e45a94cb41804943549b3397759154376decc349d9fb7",
+        "w3.scale": "ebb4c2d90a5bdbd19635c84a09fe93312fdd5bdf7fd46da7baad6396ed01d714",
+        "w3.weight": "2b749ee8a83924f4b49a83cbeb0476f9537d981aa8e111940d8f0ea558f5ea75"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 4,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029211670043878257,
+        "down_compute_seconds": 0.0002643340267241001,
+        "method": "staged_overlap",
+        "output_sha256": "97ada40b3ad5c973a1babfd89523da045de3976d5d7c03beb44058473057375c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007577919750474393,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017556249513290823,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8632925154650171,
+        "w2_read_seconds": 0.0008732080459594727,
+        "w2_w13_overlap_seconds": 0.0007538339705206454,
+        "w2_wait_seconds": 0.00011608301429077983
+      },
+      "staged_region_sha256": {
+        "w1.scale": "8f5c6be78a70f248a196de5c3ed94a28b002179a6d2bb968c569a18ffff01cec",
+        "w1.weight": "58aa7422ef7db43356b07b6a68e5377d962a7d6170531c77561902f709d96db3",
+        "w2.scale": "2f85a5b79458ebab45cb9be506b90e7c2c2defc39bfba77ff0d09a1f8d3c4e80",
+        "w2.weight": "918f532b83aa9884d71e45a94cb41804943549b3397759154376decc349d9fb7",
+        "w3.scale": "ebb4c2d90a5bdbd19635c84a09fe93312fdd5bdf7fd46da7baad6396ed01d714",
+        "w3.weight": "2b749ee8a83924f4b49a83cbeb0476f9537d981aa8e111940d8f0ea558f5ea75"
+      }
+    },
+    {
+      "complete_change_fraction": -0.09344635528996359,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003245165979024023,
+        "down_compute_seconds": 0.0002507499884814024,
+        "method": "full_slot_control",
+        "output_sha256": "36c47bcba8386906cfb961f46e0111089d25e0f7c109809eb2d5d394fefb5c37",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002289332973305136,
+        "w13_compute_seconds": 0.0007018749602138996
+      },
+      "expert": 20,
+      "expert_offset": 267386880,
+      "full_region_sha256": {
+        "w1.scale": "24ae689139e0b3654198e5149e3ca192f465d6e0252f36b1cfe8014da34717ff",
+        "w1.weight": "0aa1370c0433eb5d2d7bb5257b4db11650b20f6777dc492098076efa67f3e23e",
+        "w2.scale": "49ae5db2ebb588cd2db6a5d1027c70a59488d0246a730ca9269f46e26a7c1036",
+        "w2.weight": "f6cd45660ff5ec6346682d75f8906edfd73eb6136fa33a5fcaf5b1e2eaba793e",
+        "w3.scale": "b0c12b3c531642abcab02b077278ca122aaae110c2852e9cd75a76718c8d4eea",
+        "w3.weight": "d6c589fbed43e0dc8b9ff2780ad1414ec6cedf955ef3881713c983281d170ab6"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 5,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029419170459732413,
+        "down_compute_seconds": 0.00025474996073171496,
+        "method": "staged_overlap",
+        "output_sha256": "36c47bcba8386906cfb961f46e0111089d25e0f7c109809eb2d5d394fefb5c37",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.000706166960299015,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0018075829721055925,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8208037908243753,
+        "w2_read_seconds": 0.0008535840315744281,
+        "w2_w13_overlap_seconds": 0.0007006250089034438,
+        "w2_wait_seconds": 0.000149125000461936
+      },
+      "staged_region_sha256": {
+        "w1.scale": "24ae689139e0b3654198e5149e3ca192f465d6e0252f36b1cfe8014da34717ff",
+        "w1.weight": "0aa1370c0433eb5d2d7bb5257b4db11650b20f6777dc492098076efa67f3e23e",
+        "w2.scale": "49ae5db2ebb588cd2db6a5d1027c70a59488d0246a730ca9269f46e26a7c1036",
+        "w2.weight": "f6cd45660ff5ec6346682d75f8906edfd73eb6136fa33a5fcaf5b1e2eaba793e",
+        "w3.scale": "b0c12b3c531642abcab02b077278ca122aaae110c2852e9cd75a76718c8d4eea",
+        "w3.weight": "d6c589fbed43e0dc8b9ff2780ad1414ec6cedf955ef3881713c983281d170ab6"
+      }
+    },
+    {
+      "complete_change_fraction": -0.0005116768036070862,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032559999963268638,
+        "down_compute_seconds": 0.00025583297247067094,
+        "method": "full_slot_control",
+        "output_sha256": "81ed2c9655ddaef89fc0e48b4f3d5b02be16e5a180b86f74e380c85fc36973f8",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.00227087497478351,
+        "w13_compute_seconds": 0.000726083992049098
+      },
+      "expert": 21,
+      "expert_offset": 280756224,
+      "full_region_sha256": {
+        "w1.scale": "054cde42db0bf484191ad4758570cf768da176e7dfc1fac7efaf9a9f9a7cc87a",
+        "w1.weight": "3e1f0ef75f03b6c0cd92676012ceaae69bffac03820376da0f3339d246f9d00d",
+        "w2.scale": "5481ce34b03ffe118d7f13fe5b44f10957df350811acabad4847f8926d9f0326",
+        "w2.weight": "a9944895b423824fb16c484c0e7ef05568a1f88a1ab3a8ee8b432eaf6d7fa30c",
+        "w3.scale": "a4631a4537269f337d7f007694a2014a935f900ef32b679f4c8e088e68565d43",
+        "w3.weight": "89f752e558d92de960f29e12876cb66325af13923c898a723fe9951e9cffe0ad"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 6,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032543339766561985,
+        "down_compute_seconds": 0.0006336669903248549,
+        "method": "staged_overlap",
+        "output_sha256": "81ed2c9655ddaef89fc0e48b4f3d5b02be16e5a180b86f74e380c85fc36973f8",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.00028545898385345936,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017085839645005763,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.31722916767883147,
+        "w2_read_seconds": 0.0008865830022841692,
+        "w2_w13_overlap_seconds": 0.00028124998789280653,
+        "w2_wait_seconds": 0.0006018339772708714
+      },
+      "staged_region_sha256": {
+        "w1.scale": "054cde42db0bf484191ad4758570cf768da176e7dfc1fac7efaf9a9f9a7cc87a",
+        "w1.weight": "3e1f0ef75f03b6c0cd92676012ceaae69bffac03820376da0f3339d246f9d00d",
+        "w2.scale": "5481ce34b03ffe118d7f13fe5b44f10957df350811acabad4847f8926d9f0326",
+        "w2.weight": "a9944895b423824fb16c484c0e7ef05568a1f88a1ab3a8ee8b432eaf6d7fa30c",
+        "w3.scale": "a4631a4537269f337d7f007694a2014a935f900ef32b679f4c8e088e68565d43",
+        "w3.weight": "89f752e558d92de960f29e12876cb66325af13923c898a723fe9951e9cffe0ad"
+      }
+    },
+    {
+      "complete_change_fraction": -0.2192888638029159,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0037106669624336064,
+        "down_compute_seconds": 0.0007006250089034438,
+        "method": "full_slot_control",
+        "output_sha256": "030db7d676d8773b5a9c9f1a904f7eadf0d152b73d3866622788be16dd1f86cf",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002311958000063896,
+        "w13_compute_seconds": 0.0006951250252313912
+      },
+      "expert": 22,
+      "expert_offset": 294125568,
+      "full_region_sha256": {
+        "w1.scale": "4b7d91e706e51b5b3ed5667a529e1b87dcc22672d5048cab313196caad7bea00",
+        "w1.weight": "05c0e9b514153c89354a39f92fd7d42d7ea041c167201346cf4aea7e5d8b0628",
+        "w2.scale": "1b48af8fec5ae6ad3a2aa8761114e539a5ae21845b581c05c645a45062de545d",
+        "w2.weight": "071416091a9e6623dc94fe14b9ce6c4549a7e38a87ccd6f1f6a0ea79e0189efb",
+        "w3.scale": "ad8b21f1e1dd9f46112735d328b099f16376d70ee9c39be0995fe51016b68aca",
+        "w3.weight": "6eca6021fabc9c79768cbde4c8810d9f995fbce59f58315cfb0c3734df5c4d03"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 7,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0028969590202905238,
+        "down_compute_seconds": 0.00024129200028255582,
+        "method": "staged_overlap",
+        "output_sha256": "030db7d676d8773b5a9c9f1a904f7eadf0d152b73d3866622788be16dd1f86cf",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007404169882647693,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017879160004667938,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8733860666262429,
+        "w2_read_seconds": 0.0008424590341746807,
+        "w2_w13_overlap_seconds": 0.0007357919821515679,
+        "w2_wait_seconds": 0.0001029159757308662
+      },
+      "staged_region_sha256": {
+        "w1.scale": "4b7d91e706e51b5b3ed5667a529e1b87dcc22672d5048cab313196caad7bea00",
+        "w1.weight": "05c0e9b514153c89354a39f92fd7d42d7ea041c167201346cf4aea7e5d8b0628",
+        "w2.scale": "1b48af8fec5ae6ad3a2aa8761114e539a5ae21845b581c05c645a45062de545d",
+        "w2.weight": "071416091a9e6623dc94fe14b9ce6c4549a7e38a87ccd6f1f6a0ea79e0189efb",
+        "w3.scale": "ad8b21f1e1dd9f46112735d328b099f16376d70ee9c39be0995fe51016b68aca",
+        "w3.weight": "6eca6021fabc9c79768cbde4c8810d9f995fbce59f58315cfb0c3734df5c4d03"
+      }
+    },
+    {
+      "complete_change_fraction": -0.13692751496057542,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032824589870870113,
+        "down_compute_seconds": 0.00025116599863395095,
+        "method": "full_slot_control",
+        "output_sha256": "125ac1e7a0881ccc8ea29efc29ed66d400bd546c0fc001340d4a6d9670f5ff76",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002315582998562604,
+        "w13_compute_seconds": 0.0007128330180421472
+      },
+      "expert": 23,
+      "expert_offset": 307494912,
+      "full_region_sha256": {
+        "w1.scale": "0e7c05a499855443777bd6f0db5df1ea89e9e926b27b3237fc0c398e68972064",
+        "w1.weight": "43f87d81a145ddb8503facee61f3bfe9990045489aeed5383f29de450e13809b",
+        "w2.scale": "cbbc6b93e352b2c93eaa9d2efb49a614e7e22f9a96c3f4f35340e81d9ecf717a",
+        "w2.weight": "b81e6dd78224d6e3b76d91dee41b9911a970013fd33f94a93e2f0af61a271def",
+        "w3.scale": "7395214c4848b6403af8eb357419cf8a1757db4932153346f426bee6b4d55794",
+        "w3.weight": "0d86f9d18a828549b26fe2cf215ad4329b4838fe920793befc28d872d8076b41"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 8,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0028330000350251794,
+        "down_compute_seconds": 0.00023499998496845365,
+        "method": "staged_overlap",
+        "output_sha256": "125ac1e7a0881ccc8ea29efc29ed66d400bd546c0fc001340d4a6d9670f5ff76",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006677089841105044,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017110839835368097,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7693280797189438,
+        "w2_read_seconds": 0.0008628750219941139,
+        "w2_w13_overlap_seconds": 0.000663833983708173,
+        "w2_wait_seconds": 0.00019624998094514012
+      },
+      "staged_region_sha256": {
+        "w1.scale": "0e7c05a499855443777bd6f0db5df1ea89e9e926b27b3237fc0c398e68972064",
+        "w1.weight": "43f87d81a145ddb8503facee61f3bfe9990045489aeed5383f29de450e13809b",
+        "w2.scale": "cbbc6b93e352b2c93eaa9d2efb49a614e7e22f9a96c3f4f35340e81d9ecf717a",
+        "w2.weight": "b81e6dd78224d6e3b76d91dee41b9911a970013fd33f94a93e2f0af61a271def",
+        "w3.scale": "7395214c4848b6403af8eb357419cf8a1757db4932153346f426bee6b4d55794",
+        "w3.weight": "0d86f9d18a828549b26fe2cf215ad4329b4838fe920793befc28d872d8076b41"
+      }
+    },
+    {
+      "complete_change_fraction": -0.21951713004493223,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.00374420901061967,
+        "down_compute_seconds": 0.0007661250419914722,
+        "method": "full_slot_control",
+        "output_sha256": "922a5dc7cc21dfd1baf6407a0ca7a0c8806d86094134822d8b21d1941602dab3",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023003749665804207,
+        "w13_compute_seconds": 0.0006747500156052411
+      },
+      "expert": 24,
+      "expert_offset": 320864256,
+      "full_region_sha256": {
+        "w1.scale": "656e0013a0834ced4fa0ec7bb2e46e772a5c0edd9fb6cc61ae823315b8a68a74",
+        "w1.weight": "7d353b8c32b107caed0c5a33828cbdc5330174c513980f169abc4189f534f20e",
+        "w2.scale": "cef1e16ccdb960c057426d3485b4d20861acd983af81c980ca447ff2c60991e5",
+        "w2.weight": "8665073b2d5e7ae62d51563d69ce576f90e10d5246b4abb9cac22b0dc13d5cf4",
+        "w3.scale": "1bb77a05adfaa3f0939958567eaf9a44c5d32037042996ca26b46b11053d0d4c",
+        "w3.weight": "6c4008bc25fbe4c70af888d0fc2373d0e770707b6cea39c7bda93ed565690d33"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 9,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029222909943200648,
+        "down_compute_seconds": 0.0002519580302760005,
+        "method": "staged_overlap",
+        "output_sha256": "922a5dc7cc21dfd1baf6407a0ca7a0c8806d86094134822d8b21d1941602dab3",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007064170204102993,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.00180079200072214,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8313839413960515,
+        "w2_read_seconds": 0.000844125053845346,
+        "w2_w13_overlap_seconds": 0.0007017920142970979,
+        "w2_wait_seconds": 0.00013987504644319415
+      },
+      "staged_region_sha256": {
+        "w1.scale": "656e0013a0834ced4fa0ec7bb2e46e772a5c0edd9fb6cc61ae823315b8a68a74",
+        "w1.weight": "7d353b8c32b107caed0c5a33828cbdc5330174c513980f169abc4189f534f20e",
+        "w2.scale": "cef1e16ccdb960c057426d3485b4d20861acd983af81c980ca447ff2c60991e5",
+        "w2.weight": "8665073b2d5e7ae62d51563d69ce576f90e10d5246b4abb9cac22b0dc13d5cf4",
+        "w3.scale": "1bb77a05adfaa3f0939958567eaf9a44c5d32037042996ca26b46b11053d0d4c",
+        "w3.weight": "6c4008bc25fbe4c70af888d0fc2373d0e770707b6cea39c7bda93ed565690d33"
+      }
+    },
+    {
+      "complete_change_fraction": -0.10469323584772616,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032519579981453717,
+        "down_compute_seconds": 0.00025183300022035837,
+        "method": "full_slot_control",
+        "output_sha256": "97a1b69a7f0722d2fe1fcc760f22431ac56067a35e2c1e2cf2a13f3ee4b04d71",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022424160270020366,
+        "w13_compute_seconds": 0.0007526660338044167
+      },
+      "expert": 25,
+      "expert_offset": 334233600,
+      "full_region_sha256": {
+        "w1.scale": "92da5d193168dee7fe41136971ee249529ca4d26c1dedc459c4bbfe54d6fa9b2",
+        "w1.weight": "130b696c861b1ee39ea4b7c4b435251901d740ff60376e6e1971260b8529f9c2",
+        "w2.scale": "1d50cc7f2939c453292f81d0a4c9cbf8de84162268201094938fcc3e8a487a2d",
+        "w2.weight": "7486550689b5fa796a79344dfc764875cad85e47bb87811ce4766bc0e20f38b0",
+        "w3.scale": "e7123c0541ba9815abe77a07a132c58b4f37af5279cc989f52e1b798b8bb3de4",
+        "w3.weight": "fd2ef4aedc34e4c85fff7de6486eb6c25ce947bc7755a4ff8d819c3bb9c99dd6"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 10,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002911499992478639,
+        "down_compute_seconds": 0.00025029201060533524,
+        "method": "staged_overlap",
+        "output_sha256": "97a1b69a7f0722d2fe1fcc760f22431ac56067a35e2c1e2cf2a13f3ee4b04d71",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0006744170095771551,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017196250264532864,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7472437537322307,
+        "w2_read_seconds": 0.0008957920363172889,
+        "w2_w13_overlap_seconds": 0.0006693750037811697,
+        "w2_wait_seconds": 0.00023100001271814108
+      },
+      "staged_region_sha256": {
+        "w1.scale": "92da5d193168dee7fe41136971ee249529ca4d26c1dedc459c4bbfe54d6fa9b2",
+        "w1.weight": "130b696c861b1ee39ea4b7c4b435251901d740ff60376e6e1971260b8529f9c2",
+        "w2.scale": "1d50cc7f2939c453292f81d0a4c9cbf8de84162268201094938fcc3e8a487a2d",
+        "w2.weight": "7486550689b5fa796a79344dfc764875cad85e47bb87811ce4766bc0e20f38b0",
+        "w3.scale": "e7123c0541ba9815abe77a07a132c58b4f37af5279cc989f52e1b798b8bb3de4",
+        "w3.weight": "fd2ef4aedc34e4c85fff7de6486eb6c25ce947bc7755a4ff8d819c3bb9c99dd6"
+      }
+    },
+    {
+      "complete_change_fraction": -0.07124533176221737,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003235874988604337,
+        "down_compute_seconds": 0.0002452919725328684,
+        "method": "full_slot_control",
+        "output_sha256": "8c798bf73f61e3709aadf1af075c1545f849b961a4a79ef7c76c6d9c90c3c3f7",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023123749997466803,
+        "w13_compute_seconds": 0.0006745000137016177
+      },
+      "expert": 26,
+      "expert_offset": 347602944,
+      "full_region_sha256": {
+        "w1.scale": "5ce0d3122ab1c707df4f62f60837b2439c3501ee168c5c6d5aa273defb0d4ec8",
+        "w1.weight": "c8f2b4b87e1f7a3a88a2e07d7cdd9197116d5a4dc2fa5ab4b96aed6bd0a30ba1",
+        "w2.scale": "848e008320ee5f801e177038673e27e80291d1360b861f0a7c251bf312a67193",
+        "w2.weight": "b4203bb6a453b433daefdf188e3bc06e72122bfc60db6bf0a3fb9dbba443b201",
+        "w3.scale": "af5f7dc6802aa9fd3106bf6f904acb9d14f82b867bd902501f99f2d22606821e",
+        "w3.weight": "1518e1b98ed49af11a70561d03e60cb7b0a35175bac6d598f1e0ead026592f54"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 4,
+      "sample": 11,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0030053340015001595,
+        "down_compute_seconds": 0.00026483304100111127,
+        "method": "staged_overlap",
+        "output_sha256": "8c798bf73f61e3709aadf1af075c1545f849b961a4a79ef7c76c6d9c90c3c3f7",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007427499513141811,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001851834007538855,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8650523513144498,
+        "w2_read_seconds": 0.0008466250146739185,
+        "w2_w13_overlap_seconds": 0.0007323749596253037,
+        "w2_wait_seconds": 0.0001116669736802578
+      },
+      "staged_region_sha256": {
+        "w1.scale": "5ce0d3122ab1c707df4f62f60837b2439c3501ee168c5c6d5aa273defb0d4ec8",
+        "w1.weight": "c8f2b4b87e1f7a3a88a2e07d7cdd9197116d5a4dc2fa5ab4b96aed6bd0a30ba1",
+        "w2.scale": "848e008320ee5f801e177038673e27e80291d1360b861f0a7c251bf312a67193",
+        "w2.weight": "b4203bb6a453b433daefdf188e3bc06e72122bfc60db6bf0a3fb9dbba443b201",
+        "w3.scale": "af5f7dc6802aa9fd3106bf6f904acb9d14f82b867bd902501f99f2d22606821e",
+        "w3.weight": "1518e1b98ed49af11a70561d03e60cb7b0a35175bac6d598f1e0ead026592f54"
+      }
+    },
+    {
+      "complete_change_fraction": 0.0041741896618077146,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033441249979659915,
+        "down_compute_seconds": 0.0002894169883802533,
+        "method": "full_slot_control",
+        "output_sha256": "83679257f0e2b9de97b73a0d52c546ce16e91268a75d0c182a08f0ba3f88051e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022493330179713666,
+        "w13_compute_seconds": 0.0008017919608391821
+      },
+      "expert": 27,
+      "expert_offset": 360972288,
+      "full_region_sha256": {
+        "w1.scale": "b9a702fb418b5ba8b3e48e334a3a5b61e8d446baa1e1b1935a67f7d72479d926",
+        "w1.weight": "873800de449281dd681aeea837635877f663a7cecd5e52b908138d953345b636",
+        "w2.scale": "a2c0e572503565758b4cdba7744a91fa1246199f699c96f620cd997987df73cc",
+        "w2.weight": "5d777946d3df23b484f660799e606fcf16621e10b55a689a128de4d155c7e490",
+        "w3.scale": "9525dad9f3d08e1d8b41c2ed576c413f2c0077a1bb65f3adfad45a05d27039ae",
+        "w3.weight": "6d0d0f00aa1fe70ff5be084c4eae44b948377cad426bcdfe2677945ae6927c6b"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 0,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033580840099602938,
+        "down_compute_seconds": 0.0007031249697320163,
+        "method": "staged_overlap",
+        "output_sha256": "83679257f0e2b9de97b73a0d52c546ce16e91268a75d0c182a08f0ba3f88051e",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007270839996635914,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001718499988783151,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.7943793920306521,
+        "w2_read_seconds": 0.0009088339866138995,
+        "w2_w13_overlap_seconds": 0.0007219589897431433,
+        "w2_wait_seconds": 0.00018333300249651074
+      },
+      "staged_region_sha256": {
+        "w1.scale": "b9a702fb418b5ba8b3e48e334a3a5b61e8d446baa1e1b1935a67f7d72479d926",
+        "w1.weight": "873800de449281dd681aeea837635877f663a7cecd5e52b908138d953345b636",
+        "w2.scale": "a2c0e572503565758b4cdba7744a91fa1246199f699c96f620cd997987df73cc",
+        "w2.weight": "5d777946d3df23b484f660799e606fcf16621e10b55a689a128de4d155c7e490",
+        "w3.scale": "9525dad9f3d08e1d8b41c2ed576c413f2c0077a1bb65f3adfad45a05d27039ae",
+        "w3.weight": "6d0d0f00aa1fe70ff5be084c4eae44b948377cad426bcdfe2677945ae6927c6b"
+      }
+    },
+    {
+      "complete_change_fraction": -0.22497899599255788,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003847207990474999,
+        "down_compute_seconds": 0.0007781249587424099,
+        "method": "full_slot_control",
+        "output_sha256": "a9f78c9221fa73923ce8192afae8750d64791f08318dd3c4f9c66c67e215868c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0023026250419206917,
+        "w13_compute_seconds": 0.0007634579669684172
+      },
+      "expert": 28,
+      "expert_offset": 374341632,
+      "full_region_sha256": {
+        "w1.scale": "d8e5fdba23fdb83452195bb8dae903cdc0d58aca97ecbb961ff74ab6ca8044ef",
+        "w1.weight": "43b04bdced8fe487644c6a07599b7f465a138e94d7feb97691cf52ed2e805e9f",
+        "w2.scale": "59b7053797b324fc8c04c108b429dcfe44645465fec1680e302dbe1f2ca9a96d",
+        "w2.weight": "e99afdbde2576120812f2c41c3884c71682d4e9d54752ab4674ff547eca2c3a7",
+        "w3.scale": "168ad1c0d60b70ee759a02ebbb92f42947d8105fad412340de853008e8abd5d7",
+        "w3.weight": "57b7d82c37cad87a39505aea9c036ca732b2a161abb32a6a5092e9c79ebb5084"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 1,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029816669994033873,
+        "down_compute_seconds": 0.00029029097640886903,
+        "method": "staged_overlap",
+        "output_sha256": "a9f78c9221fa73923ce8192afae8750d64791f08318dd3c4f9c66c67e215868c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007995410123839974,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017953749629668891,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.9222912726728527,
+        "w2_read_seconds": 0.0008611249504610896,
+        "w2_w13_overlap_seconds": 0.0007942080264911056,
+        "w2_wait_seconds": 7.07499566487968e-05
+      },
+      "staged_region_sha256": {
+        "w1.scale": "d8e5fdba23fdb83452195bb8dae903cdc0d58aca97ecbb961ff74ab6ca8044ef",
+        "w1.weight": "43b04bdced8fe487644c6a07599b7f465a138e94d7feb97691cf52ed2e805e9f",
+        "w2.scale": "59b7053797b324fc8c04c108b429dcfe44645465fec1680e302dbe1f2ca9a96d",
+        "w2.weight": "e99afdbde2576120812f2c41c3884c71682d4e9d54752ab4674ff547eca2c3a7",
+        "w3.scale": "168ad1c0d60b70ee759a02ebbb92f42947d8105fad412340de853008e8abd5d7",
+        "w3.weight": "57b7d82c37cad87a39505aea9c036ca732b2a161abb32a6a5092e9c79ebb5084"
+      }
+    },
+    {
+      "complete_change_fraction": -0.0218621951812229,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003358124988153577,
+        "down_compute_seconds": 0.00028787500923499465,
+        "method": "full_slot_control",
+        "output_sha256": "96be156c6dc1cb6b4e65619bd6038e957e87ca414a2164126d0a557d7174cf96",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022612910252064466,
+        "w13_compute_seconds": 0.0008059159736149013
+      },
+      "expert": 29,
+      "expert_offset": 387710976,
+      "full_region_sha256": {
+        "w1.scale": "848ac5ef114aa7d5f3802c3cca1301526e166dfb796f68bf03e10e75d9cac013",
+        "w1.weight": "55281c944362b4451d15d04ae9579cbccbcdb41a490f5fe6247eccc4db9dc60f",
+        "w2.scale": "7ea64cddf16ceec83136047cfc8baa07aabb452f2d45863dc47358196ec0f04c",
+        "w2.weight": "920975319b6e1f1f3b11bec278de89ebe51bb0c7cc929635a43acf9192aa66c2",
+        "w3.scale": "5a9d6eb01af2503af18b831e9524b966a96402845a1b89229f4f79256ce2e21b",
+        "w3.weight": "f2d65390eb7adfd94d60d389d8d87597ddd43b59ad6539aeec8a7f734328c870"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 2,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0032847090042196214,
+        "down_compute_seconds": 0.0006514170090667903,
+        "method": "staged_overlap",
+        "output_sha256": "96be156c6dc1cb6b4e65619bd6038e957e87ca414a2164126d0a557d7174cf96",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007526249974034727,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017353749717585742,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8585500528511956,
+        "w2_read_seconds": 0.0008713330025784671,
+        "w2_w13_overlap_seconds": 0.0007480829954147339,
+        "w2_wait_seconds": 0.00012066698400303721
+      },
+      "staged_region_sha256": {
+        "w1.scale": "848ac5ef114aa7d5f3802c3cca1301526e166dfb796f68bf03e10e75d9cac013",
+        "w1.weight": "55281c944362b4451d15d04ae9579cbccbcdb41a490f5fe6247eccc4db9dc60f",
+        "w2.scale": "7ea64cddf16ceec83136047cfc8baa07aabb452f2d45863dc47358196ec0f04c",
+        "w2.weight": "920975319b6e1f1f3b11bec278de89ebe51bb0c7cc929635a43acf9192aa66c2",
+        "w3.scale": "5a9d6eb01af2503af18b831e9524b966a96402845a1b89229f4f79256ce2e21b",
+        "w3.weight": "f2d65390eb7adfd94d60d389d8d87597ddd43b59ad6539aeec8a7f734328c870"
+      }
+    },
+    {
+      "complete_change_fraction": -0.12490702618331773,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033614999847486615,
+        "down_compute_seconds": 0.00029441702645272017,
+        "method": "full_slot_control",
+        "output_sha256": "495a5841bd94325c943c8b5cdfd0afcaa0aa1fad6264e88ac7956d44ac8218fc",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002281333028804511,
+        "w13_compute_seconds": 0.0007823330233804882
+      },
+      "expert": 30,
+      "expert_offset": 401080320,
+      "full_region_sha256": {
+        "w1.scale": "958ce707759335bf282524253d618d48bc0aadad6edeb21dcb63672083db90b4",
+        "w1.weight": "5ac4079ea016de27df35888935fd0b81e2ba42c9af641050cdf41bfa2c7decd1",
+        "w2.scale": "a8bc9a379d519ff807f1e97e0d6e6cc5297bd3f95678ef7c9dd76b0cce237bc8",
+        "w2.weight": "875c6a2206510e5c90d0676d950fe37166196ef095681a46973821c9e7e18ec2",
+        "w3.scale": "db6642f08ad9b599f9b6efae40d90abbdbaa11c2e2dec3b5e139e52acae07c5e",
+        "w3.weight": "b9ff8149a5a046bc0b8e47b5f4a64bdeb90eb742c05c8ac47e633bf3fba83b33"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 3,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029416250181384385,
+        "down_compute_seconds": 0.0002823749673552811,
+        "method": "staged_overlap",
+        "output_sha256": "495a5841bd94325c943c8b5cdfd0afcaa0aa1fad6264e88ac7956d44ac8218fc",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007812079857103527,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017765420489013195,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.9063091775056401,
+        "w2_read_seconds": 0.0008565409807488322,
+        "w2_w13_overlap_seconds": 0.0007762909517623484,
+        "w2_wait_seconds": 7.820798782631755e-05
+      },
+      "staged_region_sha256": {
+        "w1.scale": "958ce707759335bf282524253d618d48bc0aadad6edeb21dcb63672083db90b4",
+        "w1.weight": "5ac4079ea016de27df35888935fd0b81e2ba42c9af641050cdf41bfa2c7decd1",
+        "w2.scale": "a8bc9a379d519ff807f1e97e0d6e6cc5297bd3f95678ef7c9dd76b0cce237bc8",
+        "w2.weight": "875c6a2206510e5c90d0676d950fe37166196ef095681a46973821c9e7e18ec2",
+        "w3.scale": "db6642f08ad9b599f9b6efae40d90abbdbaa11c2e2dec3b5e139e52acae07c5e",
+        "w3.weight": "b9ff8149a5a046bc0b8e47b5f4a64bdeb90eb742c05c8ac47e633bf3fba83b33"
+      }
+    },
+    {
+      "complete_change_fraction": -0.12443592942415782,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033240000484511256,
+        "down_compute_seconds": 0.0002842079848051071,
+        "method": "full_slot_control",
+        "output_sha256": "46270a8fab0b2f49adec1253308f5df26ce51a570ffa65746d88fc28aab2e82c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002266625000629574,
+        "w13_compute_seconds": 0.0007700829883106053
+      },
+      "expert": 31,
+      "expert_offset": 414449664,
+      "full_region_sha256": {
+        "w1.scale": "951a63111a3ab38299d2b20160ba9d21e44abe5f2476deaefba78632e59415f0",
+        "w1.weight": "00041f2c6fc9295e7ea4b605f5a0c0b9d085a23a04a962b0697af1ebea53d87f",
+        "w2.scale": "e904a35b77578aaf1a2ca8e5afee5686e3cca0a67fb69e31d5d8eecf761fa5d5",
+        "w2.weight": "7a775a7172a9d2fd31e20aa92a6f3e2745751f64277f0f29dfac8c28038b9430",
+        "w3.scale": "111726058a18ded0cedd86ed4c2c221cf4f97315c63a9d2da2d67f52a1d99534",
+        "w3.weight": "15dc179500b4271fa64de95552d2c847b072826af986e7656f5a4e0cc0cf0f63"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 4,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029103750130161643,
+        "down_compute_seconds": 0.0002722499775700271,
+        "method": "staged_overlap",
+        "output_sha256": "46270a8fab0b2f49adec1253308f5df26ce51a570ffa65746d88fc28aab2e82c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007477499893866479,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001717458013445139,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8502582617924448,
+        "w2_read_seconds": 0.0008748330292291939,
+        "w2_w13_overlap_seconds": 0.0007438340107910335,
+        "w2_wait_seconds": 0.0001396249863319099
+      },
+      "staged_region_sha256": {
+        "w1.scale": "951a63111a3ab38299d2b20160ba9d21e44abe5f2476deaefba78632e59415f0",
+        "w1.weight": "00041f2c6fc9295e7ea4b605f5a0c0b9d085a23a04a962b0697af1ebea53d87f",
+        "w2.scale": "e904a35b77578aaf1a2ca8e5afee5686e3cca0a67fb69e31d5d8eecf761fa5d5",
+        "w2.weight": "7a775a7172a9d2fd31e20aa92a6f3e2745751f64277f0f29dfac8c28038b9430",
+        "w3.scale": "111726058a18ded0cedd86ed4c2c221cf4f97315c63a9d2da2d67f52a1d99534",
+        "w3.weight": "15dc179500b4271fa64de95552d2c847b072826af986e7656f5a4e0cc0cf0f63"
+      }
+    },
+    {
+      "complete_change_fraction": -0.22929010658170257,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003830667003057897,
+        "down_compute_seconds": 0.0007635420188307762,
+        "method": "full_slot_control",
+        "output_sha256": "f352b1d10dcfec656876fd0e3b718b0c44947f250eb2ec57696bf9aea0510b96",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022884170175530016,
+        "w13_compute_seconds": 0.0007760000298731029
+      },
+      "expert": 32,
+      "expert_offset": 427819008,
+      "full_region_sha256": {
+        "w1.scale": "0e2775bf9ee19569419cb1cd1a35f8f0db8e44315fb36d98cf380f8b15b721a3",
+        "w1.weight": "2015a1fbf62597e55f1854e8b0ac932052f54388e175ba673f05ae8f0ba0a7c9",
+        "w2.scale": "9fd498d911f20b96ef3b291f3c20edb72f6e5d5f9ac17c4327d4cf21d21bde8f",
+        "w2.weight": "9399898c873f9a7780e7df2d2f87ac5d24de13595e19b169f651f15cd65c706f",
+        "w3.scale": "19cca44a95da6b15b4465034a3250c501c4fb88a1d0176fa983f6461db2d8610",
+        "w3.weight": "4ad0be58ceef4e13d066dc6360deecb927ce3b854cde46d744c6d3b5dc9b1d25"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 5,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.002952332957647741,
+        "down_compute_seconds": 0.00028120900969952345,
+        "method": "staged_overlap",
+        "output_sha256": "f352b1d10dcfec656876fd0e3b718b0c44947f250eb2ec57696bf9aea0510b96",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007562919636256993,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001789500005543232,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8771520443882413,
+        "w2_read_seconds": 0.0008567500044591725,
+        "w2_w13_overlap_seconds": 0.0007515000179409981,
+        "w2_wait_seconds": 0.00010137498611584306
+      },
+      "staged_region_sha256": {
+        "w1.scale": "0e2775bf9ee19569419cb1cd1a35f8f0db8e44315fb36d98cf380f8b15b721a3",
+        "w1.weight": "2015a1fbf62597e55f1854e8b0ac932052f54388e175ba673f05ae8f0ba0a7c9",
+        "w2.scale": "9fd498d911f20b96ef3b291f3c20edb72f6e5d5f9ac17c4327d4cf21d21bde8f",
+        "w2.weight": "9399898c873f9a7780e7df2d2f87ac5d24de13595e19b169f651f15cd65c706f",
+        "w3.scale": "19cca44a95da6b15b4465034a3250c501c4fb88a1d0176fa983f6461db2d8610",
+        "w3.weight": "4ad0be58ceef4e13d066dc6360deecb927ce3b854cde46d744c6d3b5dc9b1d25"
+      }
+    },
+    {
+      "complete_change_fraction": -0.13292718091366662,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003808791982010007,
+        "down_compute_seconds": 0.0007621659897267818,
+        "method": "full_slot_control",
+        "output_sha256": "5c007018a21985e3e10129952070e48e4aae48a04daa847ca654120c568aeacd",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.00225274998228997,
+        "w13_compute_seconds": 0.0007910419953987002
+      },
+      "expert": 33,
+      "expert_offset": 441188352,
+      "full_region_sha256": {
+        "w1.scale": "28f5d53576a953273fb48dfced0cb4184019cd613161a5724c358ffc6090af58",
+        "w1.weight": "7495a6f636d35ec585b2a93a264d65fe9afd95bb9717aab7642243b50aa92cc4",
+        "w2.scale": "d90fdf2e70ae47e54861db46b8f552668e93d869662e1bdcdd03416fd23ce3ba",
+        "w2.weight": "f1fb98013b5a11dc13ae093ac1f2d8ac079595452d0f9f077a5de07a63c2c005",
+        "w3.scale": "d79cab5e879e5beadab8587125e1de6991251bf6462ea7eed0f8b65eb428ecdc",
+        "w3.weight": "cc27e31a38d89ca548d805071e7841239e908c555bc2a73ab7a935da83de472f"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 6,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.00330250000115484,
+        "down_compute_seconds": 0.0006687500281259418,
+        "method": "staged_overlap",
+        "output_sha256": "5c007018a21985e3e10129952070e48e4aae48a04daa847ca654120c568aeacd",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007401250186376274,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017510419711470604,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8633406719266554,
+        "w2_read_seconds": 0.0008527919999323785,
+        "w2_w13_overlap_seconds": 0.000736250018235296,
+        "w2_wait_seconds": 0.00011391600128263235
+      },
+      "staged_region_sha256": {
+        "w1.scale": "28f5d53576a953273fb48dfced0cb4184019cd613161a5724c358ffc6090af58",
+        "w1.weight": "7495a6f636d35ec585b2a93a264d65fe9afd95bb9717aab7642243b50aa92cc4",
+        "w2.scale": "d90fdf2e70ae47e54861db46b8f552668e93d869662e1bdcdd03416fd23ce3ba",
+        "w2.weight": "f1fb98013b5a11dc13ae093ac1f2d8ac079595452d0f9f077a5de07a63c2c005",
+        "w3.scale": "d79cab5e879e5beadab8587125e1de6991251bf6462ea7eed0f8b65eb428ecdc",
+        "w3.weight": "cc27e31a38d89ca548d805071e7841239e908c555bc2a73ab7a935da83de472f"
+      }
+    },
+    {
+      "complete_change_fraction": -0.23881242921547619,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0037969169788993895,
+        "down_compute_seconds": 0.0007612920016981661,
+        "method": "full_slot_control",
+        "output_sha256": "9ad844d9225c6156cd1abc790d0712015258ef73ec11ab298c5918f0c236144c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022679170360788703,
+        "w13_compute_seconds": 0.0007646660087630153
+      },
+      "expert": 34,
+      "expert_offset": 454557696,
+      "full_region_sha256": {
+        "w1.scale": "b96fc33e7b1e3c9928e66b68bc95bf2829646d73061ae1913f856587fa7c3e5c",
+        "w1.weight": "8f33085af3c88f1be75cbfb04351f123bf07040a3c45e34fdcbca62c980b1be3",
+        "w2.scale": "aa99f39c68fbc6d66da1aea6f7e78854274b51f641889edca45a4fb482d9f44b",
+        "w2.weight": "6965c97c75de23e607365ec17b9e9d9dd920e63989104ea8325b63ff4dc74507",
+        "w3.scale": "22fa0cd148ceb9adda6647f151321499c1cbbab2dbd3d3ff839cc0d1c3a2f9e3",
+        "w3.weight": "b9da0c9605d788908282ee03490d736679993d4ec302f830374d1e4d7505aa72"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 7,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0028901660116389394,
+        "down_compute_seconds": 0.00028558296617120504,
+        "method": "staged_overlap",
+        "output_sha256": "9ad844d9225c6156cd1abc790d0712015258ef73ec11ab298c5918f0c236144c",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0008053750498220325,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017097079544328153,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.9211915812450859,
+        "w2_read_seconds": 0.0008692090050317347,
+        "w2_w13_overlap_seconds": 0.0008007080177776515,
+        "w2_wait_seconds": 6.71250163577497e-05
+      },
+      "staged_region_sha256": {
+        "w1.scale": "b96fc33e7b1e3c9928e66b68bc95bf2829646d73061ae1913f856587fa7c3e5c",
+        "w1.weight": "8f33085af3c88f1be75cbfb04351f123bf07040a3c45e34fdcbca62c980b1be3",
+        "w2.scale": "aa99f39c68fbc6d66da1aea6f7e78854274b51f641889edca45a4fb482d9f44b",
+        "w2.weight": "6965c97c75de23e607365ec17b9e9d9dd920e63989104ea8325b63ff4dc74507",
+        "w3.scale": "22fa0cd148ceb9adda6647f151321499c1cbbab2dbd3d3ff839cc0d1c3a2f9e3",
+        "w3.weight": "b9da0c9605d788908282ee03490d736679993d4ec302f830374d1e4d7505aa72"
+      }
+    },
+    {
+      "complete_change_fraction": -0.030092343957093703,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003420042048674077,
+        "down_compute_seconds": 0.0003085000207647681,
+        "method": "full_slot_control",
+        "output_sha256": "eee2c0ee4e92e04a9a2f9c72918d820b27aafa90c479cf873d754951fa978071",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022978330380283296,
+        "w13_compute_seconds": 0.0008108329493552446
+      },
+      "expert": 35,
+      "expert_offset": 467927040,
+      "full_region_sha256": {
+        "w1.scale": "e0cbed334191071e399ab64ad9c4bcfbbc9b080a07d6f5be6d7829b617ca6b92",
+        "w1.weight": "c562d5e76efd4c5c44f2c949a4de3f17428036038df9d187b9825726464c77c1",
+        "w2.scale": "15cbb09d9409e39a4d5478a3f40fcc546630bf9fd9de06542dab5e828cec6d38",
+        "w2.weight": "9edf7e5767ebe0e9c4e13439cf8a00a8206af4353e52faa83bb5d2fdb89de4bf",
+        "w3.scale": "2dbb92ec5c92bce3c852326969a6ba3a6c05484ba628e6ef0021bf6cfb908bdc",
+        "w3.weight": "97521f4b04a449e8b01e04a6c5056d29eb55472712ce07b7452c926c94b0c99c"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 8,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033171249669976532,
+        "down_compute_seconds": 0.0006579580367542803,
+        "method": "staged_overlap",
+        "output_sha256": "eee2c0ee4e92e04a9a2f9c72918d820b27aafa90c479cf873d754951fa978071",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007582499529235065,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017911249888129532,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8939205961754679,
+        "w2_read_seconds": 0.000843707995954901,
+        "w2_w13_overlap_seconds": 0.0007542079547420144,
+        "w2_wait_seconds": 8.804199751466513e-05
+      },
+      "staged_region_sha256": {
+        "w1.scale": "e0cbed334191071e399ab64ad9c4bcfbbc9b080a07d6f5be6d7829b617ca6b92",
+        "w1.weight": "c562d5e76efd4c5c44f2c949a4de3f17428036038df9d187b9825726464c77c1",
+        "w2.scale": "15cbb09d9409e39a4d5478a3f40fcc546630bf9fd9de06542dab5e828cec6d38",
+        "w2.weight": "9edf7e5767ebe0e9c4e13439cf8a00a8206af4353e52faa83bb5d2fdb89de4bf",
+        "w3.scale": "2dbb92ec5c92bce3c852326969a6ba3a6c05484ba628e6ef0021bf6cfb908bdc",
+        "w3.weight": "97521f4b04a449e8b01e04a6c5056d29eb55472712ce07b7452c926c94b0c99c"
+      }
+    },
+    {
+      "complete_change_fraction": -0.223578399724094,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0037717910017818213,
+        "down_compute_seconds": 0.0007403749623335898,
+        "method": "full_slot_control",
+        "output_sha256": "c1ba52504569fee4c130348a2c621e4ba77ea6ed47fcd6e1b50fa1e47ccd01ed",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.0022644170094281435,
+        "w13_compute_seconds": 0.0007641250267624855
+      },
+      "expert": 36,
+      "expert_offset": 481296384,
+      "full_region_sha256": {
+        "w1.scale": "6bf34e5c3f21d1d18eefabcfd9bb5bb34c60301d765fb3807fc1de7e7e767763",
+        "w1.weight": "9656109df7aa17472851dee5539ae2bd4c2eacec6c70914f1b16c0817bdfd92a",
+        "w2.scale": "c689e01fe607643bc0e4e09d987030e101f96ad5feb65e7c118d4f480f6064fa",
+        "w2.weight": "ca7a5563ea311c2f6c9b168f55caffc16bc0b7f6301ca318480091bced743a78",
+        "w3.scale": "58f96c8714dd595e78d16edcbb3338f6d13946964969aa96c37821a846e78ae0",
+        "w3.weight": "1dd5099634bad704fcfdc79237aa742ab0dc65a1fb544f47232101c76f7a5a1e"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 9,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0029285000055097044,
+        "down_compute_seconds": 0.0002906250301748514,
+        "method": "staged_overlap",
+        "output_sha256": "c1ba52504569fee4c130348a2c621e4ba77ea6ed47fcd6e1b50fa1e47ccd01ed",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007814999553374946,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017332920106127858,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8808950356072808,
+        "w2_read_seconds": 0.0008815840119495988,
+        "w2_w13_overlap_seconds": 0.0007765829795971513,
+        "w2_wait_seconds": 0.00010095804464071989
+      },
+      "staged_region_sha256": {
+        "w1.scale": "6bf34e5c3f21d1d18eefabcfd9bb5bb34c60301d765fb3807fc1de7e7e767763",
+        "w1.weight": "9656109df7aa17472851dee5539ae2bd4c2eacec6c70914f1b16c0817bdfd92a",
+        "w2.scale": "c689e01fe607643bc0e4e09d987030e101f96ad5feb65e7c118d4f480f6064fa",
+        "w2.weight": "ca7a5563ea311c2f6c9b168f55caffc16bc0b7f6301ca318480091bced743a78",
+        "w3.scale": "58f96c8714dd595e78d16edcbb3338f6d13946964969aa96c37821a846e78ae0",
+        "w3.weight": "1dd5099634bad704fcfdc79237aa742ab0dc65a1fb544f47232101c76f7a5a1e"
+      }
+    },
+    {
+      "complete_change_fraction": -0.006517691660494429,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033818750525824726,
+        "down_compute_seconds": 0.0002941659768112004,
+        "method": "full_slot_control",
+        "output_sha256": "7d333dc91755eca4e999a37f2c553c83ec00febbbe9dd2043154e531eed3c11b",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002295083017088473,
+        "w13_compute_seconds": 0.0007896670140326023
+      },
+      "expert": 37,
+      "expert_offset": 494665728,
+      "full_region_sha256": {
+        "w1.scale": "9e79bd6f9f73cf328642cddd0a2a6c77ccbbe53898c2a60442556550d117c896",
+        "w1.weight": "6467b73afc5ac865d006868ad5e4969fd09b32590f7e6c2f82ed6725e35f1e2c",
+        "w2.scale": "676f01a4d5746be908cbdb3480c5f4e020c818ae868cd749480e3849541e8a98",
+        "w2.weight": "17c4cf44406d98966f8cdc4ee4db221623c9e612993d2557a216534846bca583",
+        "w3.scale": "337b001e62482ffb64373f2195832b483906cc92bc8cc83e18f7002330a9cce8",
+        "w3.weight": "f99626f5cd09712bbc65ac8b8c62be3bb1bdd029beb4196283236fe6869d7c26"
+      },
+      "layer": 0,
+      "order": "control-staged",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 10,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0033598330337554216,
+        "down_compute_seconds": 0.000714541005436331,
+        "method": "staged_overlap",
+        "output_sha256": "7d333dc91755eca4e999a37f2c553c83ec00febbbe9dd2043154e531eed3c11b",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.000826665956992656,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.001770583970937878,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.974770015747962,
+        "w2_read_seconds": 0.0008439170196652412,
+        "w2_w13_overlap_seconds": 0.0008226250065490603,
+        "w2_wait_seconds": 2.220796886831522e-05
+      },
+      "staged_region_sha256": {
+        "w1.scale": "9e79bd6f9f73cf328642cddd0a2a6c77ccbbe53898c2a60442556550d117c896",
+        "w1.weight": "6467b73afc5ac865d006868ad5e4969fd09b32590f7e6c2f82ed6725e35f1e2c",
+        "w2.scale": "676f01a4d5746be908cbdb3480c5f4e020c818ae868cd749480e3849541e8a98",
+        "w2.weight": "17c4cf44406d98966f8cdc4ee4db221623c9e612993d2557a216534846bca583",
+        "w3.scale": "337b001e62482ffb64373f2195832b483906cc92bc8cc83e18f7002330a9cce8",
+        "w3.weight": "f99626f5cd09712bbc65ac8b8c62be3bb1bdd029beb4196283236fe6869d7c26"
+      }
+    },
+    {
+      "complete_change_fraction": -0.1480460463815816,
+      "control": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.0037876659771427512,
+        "down_compute_seconds": 0.0007670419872738421,
+        "method": "full_slot_control",
+        "output_sha256": "9f9aa8dfdad303fdebbeb0e33285b3d17bcae15d6be2fa3f68ecfeca2028a323",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 1,
+        "read_seconds": 0.002231749997008592,
+        "w13_compute_seconds": 0.0007859999896027148
+      },
+      "expert": 38,
+      "expert_offset": 508035072,
+      "full_region_sha256": {
+        "w1.scale": "b2cb5c38cae5d13d459c0c98640c85ffaca2b44ae416dc0b2c4941bb3b25b837",
+        "w1.weight": "73064211487fec2cc0ec47326981968dd158b886f57d2fd8af6192d69ca78b6f",
+        "w2.scale": "364495091f54f02c94968475b0847c7e6ca6212c5528abe66ab57857e2731439",
+        "w2.weight": "d5b9948cb263b345e13edfcfa66dcdcc14b060cf0bae20d32c697f86180f3e41",
+        "w3.scale": "7aec0ed31ddc63f9b9496d4849d25266cf4e0b3ed9ff63fa4deb6c13969f63c4",
+        "w3.weight": "e6a5e7e9f6881ec5de05ce261fb60d308720252f3e2d40e4e9aa0e78b6f3dc7f"
+      },
+      "layer": 0,
+      "order": "staged-control",
+      "output_exact": true,
+      "region_hashes_exact": true,
+      "rows": 8,
+      "sample": 11,
+      "selected_page_cache": {
+        "available": true,
+        "nonresident_bytes": 13369344,
+        "page_size_bytes": 16384,
+        "requested_bytes": 13369344,
+        "resident_bytes": 0,
+        "resident_fraction": 0.0
+      },
+      "staged": {
+        "bytes_read": 13369344,
+        "complete_seconds": 0.003226917004212737,
+        "down_compute_seconds": 0.0006398750119842589,
+        "method": "staged_overlap",
+        "output_sha256": "9f9aa8dfdad303fdebbeb0e33285b3d17bcae15d6be2fa3f68ecfeca2028a323",
+        "page_cache_after": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "page_cache_before": {
+          "available": true,
+          "nonresident_bytes": 13369344,
+          "page_size_bytes": 16384,
+          "requested_bytes": 13369344,
+          "resident_bytes": 0,
+          "resident_fraction": 0.0
+        },
+        "preadv_calls": 3,
+        "w13_compute_seconds": 0.0007563330000266433,
+        "w13_read_bytes": 8912896,
+        "w13_read_seconds": 0.0017036250210367143,
+        "w2_read_bytes": 4456448,
+        "w2_read_hidden_fraction": 0.8736980866821413,
+        "w2_read_seconds": 0.0008603750029578805,
+        "w2_w13_overlap_seconds": 0.0007517079939134419,
+        "w2_wait_seconds": 0.00010541704250499606
+      },
+      "staged_region_sha256": {
+        "w1.scale": "b2cb5c38cae5d13d459c0c98640c85ffaca2b44ae416dc0b2c4941bb3b25b837",
+        "w1.weight": "73064211487fec2cc0ec47326981968dd158b886f57d2fd8af6192d69ca78b6f",
+        "w2.scale": "364495091f54f02c94968475b0847c7e6ca6212c5528abe66ab57857e2731439",
+        "w2.weight": "d5b9948cb263b345e13edfcfa66dcdcc14b060cf0bae20d32c697f86180f3e41",
+        "w3.scale": "7aec0ed31ddc63f9b9496d4849d25266cf4e0b3ed9ff63fa4deb6c13969f63c4",
+        "w3.weight": "e6a5e7e9f6881ec5de05ce261fb60d308720252f3e2d40e4e9aa0e78b6f3dc7f"
+      }
+    }
+  ],
+  "protocol": {
+    "candidate": "two w13 preadv calls, background w2 preadv overlapped with w13 eval, then w2 eval",
+    "control": "one preadv into current fused full slot, then w13 and w2 eval",
+    "file_cache_policy": "F_NOCACHE and F_RDAHEAD disabled",
+    "input_float32_sha256_by_rows": {
+      "1": "de375b0dad540dd24694c56d5f08fa2eaf8a342ffe9dab514fabc266c5ad0d61",
+      "4": "2bdfc92de007399f78cc94884db4baf5b3300ec05a5a8556c4b80b898a29bde1",
+      "8": "72ba6df4472c2e1e1a29997869e639761b4e418cb915454aa31e36d9b85a29ef"
+    },
+    "method_order": "alternating control-staged and staged-control",
+    "optimistic_route_distribution": "all rows use one expert; 4/8 rows are an upper bound, not an observed route trace",
+    "row_counts": [
+      1,
+      4,
+      8
+    ],
+    "samples_per_shape": 12,
+    "swiglu_limit": 10.0,
+    "warmup_iterations_per_shape_and_layout": 2
+  },
+  "recorded_at": "2026-08-27T05:45:38.162702+08:00",
+  "schema_version": 1,
+  "shape_summaries": [
+    {
+      "complete_median_change_fraction": -0.08061794137927047,
+      "complete_p95_change_fraction": 0.3102318447257346,
+      "control_complete_median_seconds": 0.003178833518177271,
+      "control_complete_p95_seconds": 0.00327241700142622,
+      "down_compute_median_seconds": 0.00022829201770946383,
+      "rows": 1,
+      "sample_count": 12,
+      "staged_complete_median_seconds": 0.0029225625039543957,
+      "staged_complete_p95_seconds": 0.004287624964490533,
+      "w13_compute_median_seconds": 0.0004389795067254454,
+      "w13_read_median_seconds": 0.0017762290081009269,
+      "w2_read_hidden_fraction_median": 0.4923681344300838,
+      "w2_read_median_seconds": 0.000868103961693123,
+      "w2_w13_overlap_median_seconds": 0.0004334794939495623,
+      "w2_wait_median_seconds": 0.0004390414687804878
+    },
+    {
+      "complete_median_change_fraction": -0.10738123048355241,
+      "complete_p95_change_fraction": -0.1024026715824935,
+      "control_complete_median_seconds": 0.003284833481302485,
+      "control_complete_p95_seconds": 0.00374420901061967,
+      "down_compute_median_seconds": 0.000256416475167498,
+      "rows": 4,
+      "sample_count": 12,
+      "staged_complete_median_seconds": 0.002932104020146653,
+      "staged_complete_p95_seconds": 0.003360792004968971,
+      "w13_compute_median_seconds": 0.0007062919903546572,
+      "w13_read_median_seconds": 0.0017824579845182598,
+      "w2_read_hidden_fraction_median": 0.8098164790043126,
+      "w2_read_median_seconds": 0.0008616039995104074,
+      "w2_w13_overlap_median_seconds": 0.0007012085116002709,
+      "w2_wait_median_seconds": 0.0001595210051164031
+    },
+    {
+      "complete_median_change_fraction": -0.13671744601711022,
+      "complete_p95_change_fraction": -0.1266827678478083,
+      "control_complete_median_seconds": 0.003595916525227949,
+      "control_complete_p95_seconds": 0.003847207990474999,
+      "down_compute_median_seconds": 0.00046525002107955515,
+      "rows": 8,
+      "sample_count": 12,
+      "staged_complete_median_seconds": 0.003104292001808062,
+      "staged_complete_p95_seconds": 0.0033598330337554216,
+      "w13_compute_median_seconds": 0.0007572914764750749,
+      "w13_read_median_seconds": 0.0017432084714528173,
+      "w2_read_hidden_fraction_median": 0.8790235399977611,
+      "w2_read_median_seconds": 0.000860749976709485,
+      "w2_w13_overlap_median_seconds": 0.0007529579743277282,
+      "w2_wait_median_seconds": 0.00010116651537828147
+    }
+  ],
+  "source": {
+    "benchmark_script_sha256": "a62d38cf07968829640247de05693989bada6e2e5f28d586041c87e086db740a",
+    "commit": "997e2ca756d3d6c8ae97aa4df3effcf566ed449f",
+    "expert_cache_sha256": "325892c3bb9efc59e8be6063eed5e4c6eaf4f14108f51cbe7a4572709d8c0166",
+    "model_runtime_sha256": "2c8da2f93f3544e557cd5053784cac19e020a7dda8c3234e5f1e2ec17baa3d85",
+    "tracked_diff_sha256_at_run": "d1cfa64c6ffb259c390616d13924fef5f1c32806f28ffd7b5762b57b6f40143a",
+    "working_tree_dirty": true
+  },
+  "warmup_expert": {
+    "expert": 2,
+    "layer": 0,
+    "page_cache_before": {
+      "available": true,
+      "nonresident_bytes": 13369344,
+      "page_size_bytes": 16384,
+      "requested_bytes": 13369344,
+      "resident_bytes": 0,
+      "resident_fraction": 0.0
+    }
+  }
+}

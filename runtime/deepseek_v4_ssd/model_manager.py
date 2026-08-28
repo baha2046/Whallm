@@ -11,7 +11,12 @@ from typing import Any, Callable, Iterator
 import mlx.core as mx
 
 from .generation import ModelRuntime, RuntimeMetrics
-from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
+from .io_metrics import EXPERT_FILE_CACHE_POLICIES
+from .model import (
+    RuntimeConfig,
+    _POWER_SAVING_LIMITS_GBPS,
+    _validate_adaptive_expert_prefill_config,
+)
 
 CATALOG_VERSION = 1
 MAX_GENERATION_TOKENS = 272_000
@@ -175,6 +180,17 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
     runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime")
     if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
         raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
+    if model_kind == "qwen3.8-flash-next" and runtime.staged_expert_streaming:
+        raise ModelCatalogError(
+            "Qwen3.8-Flash-Next does not support staged expert streaming"
+        )
+    if (
+        model_kind == "qwen3.8-flash-next"
+        and runtime.adaptive_expert_prefill_threshold is not None
+    ):
+        raise ModelCatalogError(
+            "Qwen3.8-Flash-Next does not support adaptive expert prefill"
+        )
     defaults = _parse_defaults(value["defaults"], f"{prefix}.defaults")
     return ModelSpec(
         id=model_id,
@@ -227,7 +243,15 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "batched_expert_prefill",
         "fp4_index_cache",
         "dspark_enabled",
+        "dspark_prompt_cache",
+        "dspark_hash_prefetch",
+        "dspark_adaptive_block",
+        "dspark_fallback_enabled",
+        "dspark_sequential_verification",
+        "dspark_hybrid_verification",
+        "expert_page_cache_probe",
         "ready_expert_decode",
+        "staged_expert_streaming",
     }
     for name in boolean_names:
         if type(getattr(config, name)) is not bool:
@@ -246,6 +270,33 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         value = getattr(config, name)
         if value is not None and not isinstance(value, str):
             raise ValueError(f"{name} must be a string or null")
+    if config.expert_file_cache_policy not in EXPERT_FILE_CACHE_POLICIES:
+        raise ValueError("expert_file_cache_policy is not supported")
+    for name in (
+        "dspark_prompt_cache",
+        "dspark_hash_prefetch",
+        "dspark_adaptive_block",
+        "dspark_sequential_verification",
+        "dspark_hybrid_verification",
+    ):
+        if getattr(config, name) and not config.dspark_enabled:
+            raise ValueError(f"{name} requires dspark_enabled")
+    if not config.dspark_fallback_enabled and not config.dspark_enabled:
+        raise ValueError("dspark_fallback_enabled requires dspark_enabled when false")
+    if config.dspark_sequential_verification and config.dspark_hash_prefetch:
+        raise ValueError(
+            "dspark_sequential_verification cannot use dspark_hash_prefetch"
+        )
+    if config.dspark_hybrid_verification and config.dspark_sequential_verification:
+        raise ValueError(
+            "dspark_hybrid_verification and dspark_sequential_verification "
+            "are mutually exclusive"
+        )
+    if config.staged_expert_streaming and not config.ready_expert_decode:
+        raise ValueError("staged_expert_streaming requires ready_expert_decode")
+    if config.staged_expert_streaming and config.dspark_enabled:
+        raise ValueError("staged_expert_streaming does not support dspark_enabled")
+    _validate_adaptive_expert_prefill_config(config)
 
 
 def _parse_defaults(value: Any, prefix: str) -> ModelDefaults:
@@ -423,9 +474,27 @@ class ModelManager:
                     "prompt_cache_memory_gib": config.prompt_cache_memory_gib,
                     "persistent_prompt_cache": config.persistent_prompt_cache,
                     "fp4_index_cache": config.fp4_index_cache,
+                    "expert_page_cache_probe": config.expert_page_cache_probe,
+                    "expert_file_cache_policy": config.expert_file_cache_policy,
+                    "expert_file_direct_io_alignment_bytes": getattr(
+                        cache, "direct_io_alignment", 0
+                    ),
                     "dspark_available": installed.has_dspark,
                     "dspark_enabled": bool(
                         getattr(getattr(runtime, "model", None), "dspark", None)
+                    ),
+                    "dspark_prompt_cache": config.dspark_prompt_cache,
+                    "dspark_hash_prefetch": config.dspark_hash_prefetch,
+                    "dspark_adaptive_block": config.dspark_adaptive_block,
+                    "dspark_fallback_enabled": config.dspark_fallback_enabled,
+                    "dspark_sequential_verification": (
+                        config.dspark_sequential_verification
+                    ),
+                    "dspark_hybrid_verification": (
+                        config.dspark_hybrid_verification
+                    ),
+                    "dspark_hash_prefetch_scratch_slots": getattr(
+                        cache, "speculative_slots", 0
                     ),
                     "dspark_confidence_threshold": config.dspark_confidence_threshold,
                     "dspark_slots": config.dspark_slots,
