@@ -4,6 +4,8 @@ import Foundation
 import Security
 
 struct ServerStatus: Decodable {
+  struct Runtime: Decodable {}
+
   struct Performance: Decodable {
     struct ActiveParametersCache: Decodable {
       let hitRate: Double
@@ -31,6 +33,12 @@ struct ServerStatus: Decodable {
     let activeParametersCache: ActiveParametersCache
   }
 
+  let model: String?
+  let sourceModel: String?
+  let modelPath: String?
+  let runtime: Runtime?
+  let loadedModel: String?
+  let loadingModel: String?
   let performance: Performance
 
   static func decode(_ data: Data) throws -> ServerStatus {
@@ -148,6 +156,8 @@ struct LivePerformance: Equatable {
   var dsparkEnabled = false
   var dsparkAcceptanceRate = 0.0
   var dsparkAverageAcceptedLength = 0.0
+  var loadedModel: String?
+  var loadingModel: String?
 
   var liveFirstTokenWaitTime: Double {
     if generating && snapshot.outputTokens == 0 {
@@ -192,7 +202,9 @@ private struct RuntimeEnvironment {
   }
 }
 
-struct ModelAdvancedSettings: Codable, Equatable {
+struct ModelAdvancedSettings: Codable, Equatable, Sendable {
+  private static let legacyModelPreference = "modelAdvancedSettingsLegacyModelKind"
+
   var slots = 1_152
   var readWorkers = 4
   var memoryLimitGiB = 0
@@ -214,8 +226,8 @@ struct ModelAdvancedSettings: Codable, Equatable {
     var settings = ModelAdvancedSettings()
     if modelKind == .qwen3_8FlashNext {
       settings.defaultMaxTokens = 262_144
-      settings.defaultTemperature = 1.0
-      settings.defaultTopP = 0.95
+      settings.defaultTemperature = 0.7
+      settings.defaultTopP = 0.8
       settings.defaultTopK = 20
     }
     return settings
@@ -223,54 +235,19 @@ struct ModelAdvancedSettings: Codable, Equatable {
 
   private init() {}
 
-  fileprivate init(configuration: ServerConfiguration) {
-    slots = configuration.slots
-    readWorkers = configuration.readWorkers
-    memoryLimitGiB = configuration.memoryLimitGiB
-    prefillStepSize = configuration.prefillStepSize
-    layerMajorPrefill = configuration.layerMajorPrefill
-    promptCacheEntries = configuration.promptCacheEntries
-    promptCacheMemoryGiB = configuration.promptCacheMemoryGiB
-    warmupPromptPath = configuration.warmupPromptPath
-    bf16KVCache = configuration.bf16KVCache
-    dsparkEnabled = configuration.dsparkEnabled
-    dsparkSlots = configuration.dsparkSlots
-    dsparkConfidenceThreshold = configuration.dsparkConfidenceThreshold
-    defaultMaxTokens = configuration.defaultMaxTokens
-    defaultTemperature = configuration.defaultTemperature
-    defaultTopP = configuration.defaultTopP
-    defaultTopK = configuration.defaultTopK
-  }
-
-  fileprivate func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
+  func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = self
     if modelKind == .qwen3_8FlashNext {
       settings.bf16KVCache = false
       settings.dsparkEnabled = false
+      settings.defaultTemperature = 0.7
+      settings.defaultTopP = 0.8
+      settings.defaultTopK = 20
     }
     return settings
   }
 
-  fileprivate func apply(to configuration: inout ServerConfiguration) {
-    configuration.slots = slots
-    configuration.readWorkers = readWorkers
-    configuration.memoryLimitGiB = memoryLimitGiB
-    configuration.prefillStepSize = prefillStepSize
-    configuration.layerMajorPrefill = layerMajorPrefill
-    configuration.promptCacheEntries = promptCacheEntries
-    configuration.promptCacheMemoryGiB = promptCacheMemoryGiB
-    configuration.warmupPromptPath = warmupPromptPath
-    configuration.bf16KVCache = bf16KVCache
-    configuration.dsparkEnabled = dsparkEnabled
-    configuration.dsparkSlots = dsparkSlots
-    configuration.dsparkConfidenceThreshold = dsparkConfidenceThreshold
-    configuration.defaultMaxTokens = defaultMaxTokens
-    configuration.defaultTemperature = defaultTemperature
-    configuration.defaultTopP = defaultTopP
-    configuration.defaultTopK = defaultTopK
-  }
-
-  fileprivate static func load(
+  static func load(
     for modelKind: ModelKind,
     defaults: UserDefaults
   ) -> ModelAdvancedSettings? {
@@ -278,9 +255,121 @@ struct ModelAdvancedSettings: Codable, Equatable {
     return try? JSONDecoder().decode(ModelAdvancedSettings.self, from: data)
   }
 
-  fileprivate func save(for modelKind: ModelKind, defaults: UserDefaults) {
+  static func loadOrDefault(
+    for modelKind: ModelKind,
+    defaults: UserDefaults = .standard
+  ) -> ModelAdvancedSettings {
+    let settings = load(for: modelKind, defaults: defaults)
+      ?? legacySettings(for: modelKind, defaults: defaults)
+      ?? ModelAdvancedSettings.defaults(for: modelKind)
+    let normalized = settings.normalized(for: modelKind)
+    normalized.save(for: modelKind, defaults: defaults)
+    return normalized
+  }
+
+  func save(for modelKind: ModelKind, defaults: UserDefaults = .standard) {
     guard let data = try? JSONEncoder().encode(normalized(for: modelKind)) else { return }
     defaults.set(data, forKey: Self.preferenceKey(for: modelKind))
+  }
+
+  func validate(for modelKind: ModelKind) throws {
+    guard slots >= 6 else {
+      throw ConfigurationError(L10n.string("Slots must be at least 6."))
+    }
+    guard readWorkers >= 1, memoryLimitGiB >= 0, prefillStepSize >= 0 else {
+      throw ConfigurationError(
+        L10n.string(
+          "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater."
+        ))
+    }
+    guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
+      throw ConfigurationError(
+        L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
+    }
+    guard dsparkSlots >= 30, (0...1).contains(dsparkConfidenceThreshold) else {
+      throw ConfigurationError(L10n.string("Correct the default generation parameters."))
+    }
+    guard (1...272_000).contains(defaultMaxTokens),
+      (0...2).contains(defaultTemperature),
+      (0.000_001...1).contains(defaultTopP),
+      (0...248_320).contains(defaultTopK)
+    else {
+      throw ConfigurationError(L10n.string("Correct the default generation parameters."))
+    }
+    if !warmupPromptPath.isEmpty,
+      !FileManager.default.isReadableFile(atPath: warmupPromptPath)
+    {
+      throw ConfigurationError(L10n.string("The warmup prompt file cannot be read."))
+    }
+    if modelKind == .qwen3_8FlashNext, dsparkEnabled {
+      throw ConfigurationError(L10n.string("Qwen3.8-Flash-Next does not support DSpark."))
+    }
+  }
+
+  private struct Legacy: Decodable {
+    let publicModel: String?
+    let slots: Int
+    let readWorkers: Int
+    let memoryLimitGiB: Int?
+    let prefillStepSize: Int
+    let layerMajorPrefill: Bool
+    let promptCacheEntries: Int
+    let promptCacheMemoryGiB: Int
+    let warmupPromptPath: String
+    let bf16KVCache: Bool
+    let dsparkEnabled: Bool
+    let dsparkSlots: Int
+    let dsparkConfidenceThreshold: Double
+    let defaultMaxTokens: Int
+    let defaultTemperature: Double
+    let defaultTopP: Double
+    let defaultTopK: Int?
+  }
+
+  private static func legacySettings(
+    for modelKind: ModelKind,
+    defaults: UserDefaults
+  ) -> ModelAdvancedSettings? {
+    guard let data = defaults.data(forKey: ServerConfiguration.preferenceKey),
+      let legacy = try? JSONDecoder().decode(Legacy.self, from: data)
+    else { return nil }
+    let identifiedKind: ModelKind
+    if let savedKind = defaults.string(forKey: legacyModelPreference)
+      .flatMap(ModelKind.init(rawValue:))
+    {
+      identifiedKind = savedKind
+    } else {
+      let selectedKind = defaults.string(forKey: "selectedInstallModelKind")
+        .flatMap(ModelKind.init(rawValue:)) ?? .deepSeekV4
+      switch legacy.publicModel {
+      case "Qwen/Qwen3.8-Flash-Next-FP8", "qwen3.8-flash-next-fp8":
+        identifiedKind = .qwen3_8FlashNext
+      case "deepseek-v4-flash-0731", "deepseek-ai/DeepSeek-V4-Flash-0731":
+        identifiedKind = .deepSeekV4
+      default:
+        identifiedKind = selectedKind
+      }
+      defaults.set(identifiedKind.rawValue, forKey: legacyModelPreference)
+    }
+    guard identifiedKind == modelKind else { return nil }
+    var settings = ModelAdvancedSettings.defaults(for: modelKind)
+    settings.slots = legacy.slots
+    settings.readWorkers = legacy.readWorkers
+    settings.memoryLimitGiB = legacy.memoryLimitGiB ?? 0
+    settings.prefillStepSize = legacy.prefillStepSize
+    settings.layerMajorPrefill = legacy.layerMajorPrefill
+    settings.promptCacheEntries = legacy.promptCacheEntries
+    settings.promptCacheMemoryGiB = legacy.promptCacheMemoryGiB
+    settings.warmupPromptPath = legacy.warmupPromptPath
+    settings.bf16KVCache = legacy.bf16KVCache
+    settings.dsparkEnabled = legacy.dsparkEnabled
+    settings.dsparkSlots = legacy.dsparkSlots
+    settings.dsparkConfidenceThreshold = legacy.dsparkConfidenceThreshold
+    settings.defaultMaxTokens = legacy.defaultMaxTokens
+    settings.defaultTemperature = legacy.defaultTemperature
+    settings.defaultTopP = legacy.defaultTopP
+    settings.defaultTopK = legacy.defaultTopK ?? 0
+    return settings
   }
 
   private static func preferenceKey(for modelKind: ModelKind) -> String {
@@ -289,35 +378,17 @@ struct ModelAdvancedSettings: Codable, Equatable {
 }
 
 struct ServerConfiguration: Codable, Equatable {
-  private static let preferenceKey = "serverConfiguration"
+  static let preferenceKey = "serverConfiguration"
   static let powerSavingLimitOptionsGBps: [Double?] = [0.5, 1, 2, 3, 5, 10, 25, nil]
 
   var runtimeDirectory: String
   var pythonExecutable: String
   var pythonHome: String?
   var sitePackages: String?
-  var modelPath: String
   var host: String
   var port: Int
   var apiKey: String
-  var publicModel: String
-  var slots: Int
-  var readWorkers: Int
   var powerSavingLimitGBps: Double?
-  var memoryLimitGiB: Int
-  var prefillStepSize: Int
-  var layerMajorPrefill: Bool
-  var promptCacheEntries: Int
-  var promptCacheMemoryGiB: Int
-  var warmupPromptPath: String
-  var bf16KVCache: Bool
-  var dsparkEnabled: Bool
-  var dsparkSlots: Int
-  var dsparkConfidenceThreshold: Double
-  var defaultMaxTokens: Int
-  var defaultTemperature: Double
-  var defaultTopP: Double
-  var defaultTopK: Int
 
   static var localDefault: ServerConfiguration {
     load(defaults: .standard, apiKey: AppKeychain.readAPIKey())
@@ -325,34 +396,15 @@ struct ServerConfiguration: Codable, Equatable {
 
   static func load(defaults: UserDefaults, apiKey: String) -> ServerConfiguration {
     let runtime = RuntimeEnvironment.current
-    let advanced = ModelAdvancedSettings.defaults(for: .deepSeekV4)
     var configuration = ServerConfiguration(
       runtimeDirectory: runtime.runtimeDirectory.path,
       pythonExecutable: runtime.pythonExecutable.path,
       pythonHome: runtime.pythonHome?.path,
       sitePackages: runtime.sitePackages?.path,
-      modelPath: UserDefaults.standard.string(forKey: "selectedModelPath") ?? "",
       host: "127.0.0.1",
       port: 11_434,
       apiKey: "",
-      publicModel: "deepseek-v4-flash-0731",
-      slots: advanced.slots,
-      readWorkers: advanced.readWorkers,
-      powerSavingLimitGBps: nil,
-      memoryLimitGiB: advanced.memoryLimitGiB,
-      prefillStepSize: advanced.prefillStepSize,
-      layerMajorPrefill: advanced.layerMajorPrefill,
-      promptCacheEntries: advanced.promptCacheEntries,
-      promptCacheMemoryGiB: advanced.promptCacheMemoryGiB,
-      warmupPromptPath: advanced.warmupPromptPath,
-      bf16KVCache: advanced.bf16KVCache,
-      dsparkEnabled: advanced.dsparkEnabled,
-      dsparkSlots: advanced.dsparkSlots,
-      dsparkConfidenceThreshold: advanced.dsparkConfidenceThreshold,
-      defaultMaxTokens: advanced.defaultMaxTokens,
-      defaultTemperature: advanced.defaultTemperature,
-      defaultTopP: advanced.defaultTopP,
-      defaultTopK: advanced.defaultTopK
+      powerSavingLimitGBps: nil
     )
     if let data = defaults.data(forKey: preferenceKey),
       var saved = decodeSavedConfiguration(data)
@@ -374,64 +426,8 @@ struct ServerConfiguration: Codable, Equatable {
     return configuration
   }
 
-  static func hasSavedConfiguration(defaults: UserDefaults = .standard) -> Bool {
-    defaults.data(forKey: preferenceKey) != nil
-  }
-
-  static func hasSavedAdvancedSettings(
-    for modelKind: ModelKind,
-    defaults: UserDefaults = .standard
-  ) -> Bool {
-    ModelAdvancedSettings.load(for: modelKind, defaults: defaults) != nil
-  }
-
-  mutating func loadAdvancedSettings(
-    for modelKind: ModelKind,
-    defaults: UserDefaults = .standard,
-    migrateCurrent: Bool = false
-  ) {
-    let settings =
-      ModelAdvancedSettings.load(for: modelKind, defaults: defaults)
-      ?? (migrateCurrent && canMigrateAdvancedSettings(to: modelKind)
-        ? ModelAdvancedSettings(configuration: self)
-        : ModelAdvancedSettings.defaults(for: modelKind))
-    let normalized = settings.normalized(for: modelKind)
-    normalized.apply(to: &self)
-    normalized.save(for: modelKind, defaults: defaults)
-  }
-
-  func saveAdvancedSettings(
-    for modelKind: ModelKind,
-    defaults: UserDefaults = .standard
-  ) {
-    ModelAdvancedSettings(configuration: self).save(for: modelKind, defaults: defaults)
-  }
-
-  private func canMigrateAdvancedSettings(to modelKind: ModelKind) -> Bool {
-    if !modelPath.isEmpty,
-      let installedModel = InstalledModelDiscovery.inspect(URL(fileURLWithPath: modelPath))
-    {
-      return installedModel.modelKind == modelKind
-    }
-    if publicModel == ModelKind.deepSeekV4.defaultPublicModel {
-      return modelKind == .deepSeekV4
-    }
-    if publicModel == ModelKind.qwen3_8FlashNext.defaultPublicModel {
-      return modelKind == .qwen3_8FlashNext
-    }
-    return true
-  }
-
   private static func decodeSavedConfiguration(_ data: Data) -> ServerConfiguration? {
-    if let configuration = try? JSONDecoder().decode(ServerConfiguration.self, from: data) {
-      return configuration
-    }
-    guard var payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else { return nil }
-    if payload["memoryLimitGiB"] == nil { payload["memoryLimitGiB"] = 0 }
-    if payload["defaultTopK"] == nil { payload["defaultTopK"] = 0 }
-    guard let migrated = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
-    return try? JSONDecoder().decode(ServerConfiguration.self, from: migrated)
+    try? JSONDecoder().decode(ServerConfiguration.self, from: data)
   }
 
   func save(defaults: UserDefaults = .standard) {
@@ -443,7 +439,6 @@ struct ServerConfiguration: Codable, Equatable {
     saved.apiKey = ""
     guard let data = try? JSONEncoder().encode(saved) else { return }
     defaults.set(data, forKey: Self.preferenceKey)
-    defaults.set(modelPath, forKey: "selectedModelPath")
   }
 
   var baseURL: URL? {
@@ -452,36 +447,13 @@ struct ServerConfiguration: Codable, Equatable {
     return URL(string: "http://\(formattedHost):\(port)")
   }
 
-  var arguments: [String] {
-    var values = [
+  func arguments(modelCatalogPath: String) -> [String] {
+    [
       "-m", "deepseek_v4_ssd.server",
-      "--model", modelPath,
+      "--model-catalog", modelCatalogPath,
       "--host", host,
       "--port", String(port),
-      "--public-model", publicModel,
-      "--slots", String(slots),
-      "--read-workers", String(readWorkers),
-      "--memory-limit-gib", String(memoryLimitGiB),
-      "--prefill-step-size", String(prefillStepSize),
-      "--prompt-cache-entries", String(promptCacheEntries),
-      "--prompt-cache-memory-gib", String(promptCacheMemoryGiB),
-      "--default-max-tokens", String(defaultMaxTokens),
-      "--default-temperature", String(defaultTemperature),
-      "--default-top-p", String(defaultTopP),
-      "--default-top-k", String(defaultTopK),
     ]
-    if let powerSavingLimitGBps {
-      values += ["--power-saving-limit-gbps", String(powerSavingLimitGBps)]
-    }
-    if !layerMajorPrefill { values.append("--no-layer-major-prefill") }
-    if !warmupPromptPath.isEmpty {
-      values += ["--warmup-prompt-file", warmupPromptPath]
-    }
-    if bf16KVCache { values.append("--bf16-kv-cache") }
-    if dsparkEnabled { values.append("--dspark") }
-    values += ["--dspark-slots", String(dsparkSlots)]
-    values += ["--dspark-confidence-threshold", String(dsparkConfidenceThreshold)]
-    return values
   }
 
   func validate() throws {
@@ -503,9 +475,6 @@ struct ServerConfiguration: Codable, Equatable {
     else {
       throw ConfigurationError(L10n.string("The app runtime is incomplete. Install the app again."))
     }
-    guard InstalledModelDiscovery.inspect(URL(fileURLWithPath: modelPath))?.isUsable == true else {
-      throw ConfigurationError(L10n.string("Select a usable installed model."))
-    }
     guard !host.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       throw ConfigurationError(L10n.string("Host cannot be empty."))
     }
@@ -515,38 +484,192 @@ struct ServerConfiguration: Codable, Equatable {
     guard ["127.0.0.1", "::1", "localhost"].contains(host) || !apiKey.isEmpty else {
       throw ConfigurationError(L10n.string("An API key is required for a non-local host."))
     }
-    guard !publicModel.isEmpty else {
-      throw ConfigurationError(L10n.string("Model ID cannot be empty."))
-    }
-    guard slots >= 6 else {
-      throw ConfigurationError(L10n.string("Slots must be at least 6."))
-    }
-    guard dsparkSlots >= 30 else {
-      throw ConfigurationError(L10n.string("DSpark slots must be at least 30."))
-    }
-    guard readWorkers >= 1, memoryLimitGiB >= 0, prefillStepSize >= 0 else {
-      throw ConfigurationError(
-        L10n.string(
-          "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater."
-        ))
-    }
-    guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
-      throw ConfigurationError(
-        L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
-    }
-    if !warmupPromptPath.isEmpty {
-      guard FileManager.default.isReadableFile(atPath: warmupPromptPath) else {
-        throw ConfigurationError(L10n.string("The warmup prompt file cannot be read."))
+  }
+}
+
+struct CatalogModel: Identifiable, Equatable, Sendable {
+  let id: String
+  let alias: String?
+
+  var requestName: String { alias ?? id }
+}
+
+struct ModelCatalog: Codable, Equatable, Sendable {
+  struct Entry: Codable, Equatable, Sendable {
+    struct Runtime: Codable, Equatable, Sendable {
+      let slots: Int
+      let readWorkers: Int
+      let prefetchReadWorkers: Int
+      let prefillStepSize: Int
+      let fp8KVCache: Bool
+      let memoryLimitGiB: Int
+      let layerMajorPrefill: Bool
+      let promptCacheEntries: Int
+      let promptCacheMemoryGiB: Int
+      let persistentPromptCache: Bool
+      let persistentPromptCacheEntries: Int
+      let promptCacheDirectory: String?
+      let moePrefillStepSize: Int
+      let batchedExpertPrefill: Bool
+      let fp4IndexCache: Bool
+      let dsparkEnabled: Bool
+      let dsparkConfidenceThreshold: Double
+      let dsparkSlots: Int
+      let expertRouteTrace: String?
+      let readyExpertDecode: Bool
+      let powerSavingLimitGBps: Double?
+
+      enum CodingKeys: String, CodingKey {
+        case slots
+        case readWorkers = "read_workers"
+        case prefetchReadWorkers = "prefetch_read_workers"
+        case prefillStepSize = "prefill_step_size"
+        case fp8KVCache = "fp8_kv_cache"
+        case memoryLimitGiB = "memory_limit_gib"
+        case layerMajorPrefill = "layer_major_prefill"
+        case promptCacheEntries = "prompt_cache_entries"
+        case promptCacheMemoryGiB = "prompt_cache_memory_gib"
+        case persistentPromptCache = "persistent_prompt_cache"
+        case persistentPromptCacheEntries = "persistent_prompt_cache_entries"
+        case promptCacheDirectory = "prompt_cache_directory"
+        case moePrefillStepSize = "moe_prefill_step_size"
+        case batchedExpertPrefill = "batched_expert_prefill"
+        case fp4IndexCache = "fp4_index_cache"
+        case dsparkEnabled = "dspark_enabled"
+        case dsparkConfidenceThreshold = "dspark_confidence_threshold"
+        case dsparkSlots = "dspark_slots"
+        case expertRouteTrace = "expert_route_trace"
+        case readyExpertDecode = "ready_expert_decode"
+        case powerSavingLimitGBps = "power_saving_limit_gbps"
+      }
+
+      func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(slots, forKey: .slots)
+        try values.encode(readWorkers, forKey: .readWorkers)
+        try values.encode(prefetchReadWorkers, forKey: .prefetchReadWorkers)
+        try values.encode(prefillStepSize, forKey: .prefillStepSize)
+        try values.encode(fp8KVCache, forKey: .fp8KVCache)
+        try values.encode(memoryLimitGiB, forKey: .memoryLimitGiB)
+        try values.encode(layerMajorPrefill, forKey: .layerMajorPrefill)
+        try values.encode(promptCacheEntries, forKey: .promptCacheEntries)
+        try values.encode(promptCacheMemoryGiB, forKey: .promptCacheMemoryGiB)
+        try values.encode(persistentPromptCache, forKey: .persistentPromptCache)
+        try values.encode(persistentPromptCacheEntries, forKey: .persistentPromptCacheEntries)
+        if let promptCacheDirectory {
+          try values.encode(promptCacheDirectory, forKey: .promptCacheDirectory)
+        } else {
+          try values.encodeNil(forKey: .promptCacheDirectory)
+        }
+        try values.encode(moePrefillStepSize, forKey: .moePrefillStepSize)
+        try values.encode(batchedExpertPrefill, forKey: .batchedExpertPrefill)
+        try values.encode(fp4IndexCache, forKey: .fp4IndexCache)
+        try values.encode(dsparkEnabled, forKey: .dsparkEnabled)
+        try values.encode(dsparkConfidenceThreshold, forKey: .dsparkConfidenceThreshold)
+        try values.encode(dsparkSlots, forKey: .dsparkSlots)
+        if let expertRouteTrace {
+          try values.encode(expertRouteTrace, forKey: .expertRouteTrace)
+        } else {
+          try values.encodeNil(forKey: .expertRouteTrace)
+        }
+        try values.encode(readyExpertDecode, forKey: .readyExpertDecode)
+        if let powerSavingLimitGBps {
+          try values.encode(powerSavingLimitGBps, forKey: .powerSavingLimitGBps)
+        } else {
+          try values.encodeNil(forKey: .powerSavingLimitGBps)
+        }
       }
     }
-    guard (1...272_000).contains(defaultMaxTokens),
-      (0...2).contains(defaultTemperature),
-      (0.000_001...1).contains(defaultTopP),
-      defaultTopK >= 0,
-      (0...1).contains(dsparkConfidenceThreshold)
-    else {
-      throw ConfigurationError(L10n.string("Correct the default generation parameters."))
+
+    struct Defaults: Codable, Equatable, Sendable {
+      let maxTokens: Int
+      let temperature: Double
+      let topP: Double
+      let topK: Int
+
+      enum CodingKeys: String, CodingKey {
+        case maxTokens = "max_tokens"
+        case temperature
+        case topP = "top_p"
+        case topK = "top_k"
+      }
     }
+
+    let id: String
+    let alias: String?
+    let path: String
+    let modelKind: String
+    let runtime: Runtime
+    let defaults: Defaults
+    let warmupPromptPath: String?
+
+    enum CodingKeys: String, CodingKey {
+      case id, alias, path, runtime, defaults
+      case modelKind = "model_kind"
+      case warmupPromptPath = "warmup_prompt_path"
+    }
+
+    func encode(to encoder: Encoder) throws {
+      var values = encoder.container(keyedBy: CodingKeys.self)
+      try values.encode(id, forKey: .id)
+      if let alias {
+        try values.encode(alias, forKey: .alias)
+      } else {
+        try values.encodeNil(forKey: .alias)
+      }
+      try values.encode(path, forKey: .path)
+      try values.encode(modelKind, forKey: .modelKind)
+      try values.encode(runtime, forKey: .runtime)
+      try values.encode(defaults, forKey: .defaults)
+      if let warmupPromptPath {
+        try values.encode(warmupPromptPath, forKey: .warmupPromptPath)
+      } else {
+        try values.encodeNil(forKey: .warmupPromptPath)
+      }
+    }
+  }
+
+  let version: Int
+  let models: [Entry]
+
+  init(models: [Entry]) {
+    version = 1
+    self.models = models
+  }
+
+  var availableModels: [CatalogModel] {
+    models.map { CatalogModel(id: $0.id, alias: $0.alias) }
+  }
+
+  func encoded() throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    return try encoder.encode(self)
+  }
+}
+
+struct TemporaryModelCatalog {
+  let url: URL
+
+  init(
+    catalog: ModelCatalog,
+    directory: URL = FileManager.default.temporaryDirectory
+  ) throws {
+    url = directory.appending(path: "whallm-model-catalog-\(UUID().uuidString).json")
+    do {
+      try catalog.encoded().write(to: url, options: .atomic)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600],
+        ofItemAtPath: url.path
+      )
+    } catch {
+      try? FileManager.default.removeItem(at: url)
+      throw error
+    }
+  }
+
+  func remove() {
+    try? FileManager.default.removeItem(at: url)
   }
 }
 
@@ -640,14 +763,17 @@ final class ServerController: ObservableObject {
   @Published private(set) var log = ""
   @Published private(set) var performance = LivePerformance()
   @Published private(set) var performanceHistory = PerformanceHistory()
+  @Published private(set) var catalogModels: [CatalogModel] = []
 
   private var process: Process?
   private var outputTask: Task<Void, Never>?
   private var monitorTask: Task<Void, Never>?
   private var monitorConfiguration: ServerConfiguration?
+  private var temporaryModelCatalog: TemporaryModelCatalog?
   private var previousSSDBytes: UInt64?
   private var previousSSDTime: ContinuousClock.Instant?
   private var lastRecordedCompletedRequestCount = 0
+  private var lastLoadedModel: String?
 
   var isActive: Bool {
     switch state {
@@ -656,16 +782,19 @@ final class ServerController: ObservableObject {
     }
   }
 
-  func start(_ configuration: ServerConfiguration) {
+  func start(_ configuration: ServerConfiguration, catalog: ModelCatalog) {
     guard !isActive else { return }
     do {
       try configuration.validate()
+      let temporaryModelCatalog = try TemporaryModelCatalog(catalog: catalog)
+      self.temporaryModelCatalog = temporaryModelCatalog
       let process = Process()
       let output = Pipe()
       let runtimeURL = URL(fileURLWithPath: configuration.runtimeDirectory)
       process.executableURL = URL(fileURLWithPath: configuration.pythonExecutable)
       process.currentDirectoryURL = runtimeURL
-      process.arguments = configuration.arguments
+      process.arguments = configuration.arguments(
+        modelCatalogPath: temporaryModelCatalog.url.path)
       process.standardOutput = output
       process.standardError = output
       var environment = ProcessInfo.processInfo.environment
@@ -691,10 +820,14 @@ final class ServerController: ObservableObject {
       state = .starting
       try process.run()
       self.process = process
+      catalogModels = catalog.availableModels
       monitorConfiguration = configuration
       readOutput(output.fileHandleForReading)
       startMonitoring()
     } catch {
+      temporaryModelCatalog?.remove()
+      temporaryModelCatalog = nil
+      catalogModels = []
       state = .failed(error.localizedDescription)
       appendLog(L10n.string("Error: %@", error.localizedDescription) + "\n")
     }
@@ -702,6 +835,9 @@ final class ServerController: ObservableObject {
 
   func stop() {
     guard let process, process.isRunning else {
+      temporaryModelCatalog?.remove()
+      temporaryModelCatalog = nil
+      catalogModels = []
       state = .stopped
       return
     }
@@ -766,6 +902,10 @@ final class ServerController: ObservableObject {
       let (data, response) = try await URLSession.shared.data(for: request)
       guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
       let status = try ServerStatus.decode(data)
+      updateLoadedModel(
+        status.loadedModel,
+        completedRequestCount: status.performance.completedRequestCount
+      )
       let now = ContinuousClock.now
       let bytesPerSecond: Double
       if let previousSSDBytes, let previousSSDTime,
@@ -802,7 +942,9 @@ final class ServerController: ObservableObject {
         ),
         dsparkEnabled: status.performance.dsparkEnabled ?? false,
         dsparkAcceptanceRate: status.performance.dsparkAcceptanceRate ?? 0,
-        dsparkAverageAcceptedLength: status.performance.dsparkAverageAcceptedLength ?? 0
+        dsparkAverageAcceptedLength: status.performance.dsparkAverageAcceptedLength ?? 0,
+        loadedModel: status.loadedModel,
+        loadingModel: status.loadingModel
       )
       performance = live
       recordPerformanceSample(live)
@@ -826,6 +968,15 @@ final class ServerController: ObservableObject {
     if requestCompleted {
       lastRecordedCompletedRequestCount = live.completedRequestCount
     }
+  }
+
+  func updateLoadedModel(_ model: String?, completedRequestCount: Int) {
+    guard let model, model != lastLoadedModel else { return }
+    performanceHistory.clear()
+    lastRecordedCompletedRequestCount = completedRequestCount
+    previousSSDBytes = nil
+    previousSSDTime = nil
+    lastLoadedModel = model
   }
 
   private func residentMemoryBytes(_ processID: Int32) -> UInt64 {
@@ -853,9 +1004,13 @@ final class ServerController: ObservableObject {
     monitorTask?.cancel()
     monitorTask = nil
     monitorConfiguration = nil
+    temporaryModelCatalog?.remove()
+    temporaryModelCatalog = nil
+    catalogModels = []
     previousSSDBytes = nil
     previousSSDTime = nil
     performance = LivePerformance()
+    lastLoadedModel = nil
     process = nil
     if case .stopping = state {
       state = .stopped

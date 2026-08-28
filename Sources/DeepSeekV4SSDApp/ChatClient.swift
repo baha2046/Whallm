@@ -29,19 +29,22 @@ struct ChatMessage: Encodable, Identifiable, Sendable {
   var content: String
   var reasoningContent: String
   var toolCalls: [ChatToolCall]
+  var modelName: String?
 
   init(
     id: UUID = UUID(),
     role: String,
     content: String,
     reasoningContent: String = "",
-    toolCalls: [ChatToolCall] = []
+    toolCalls: [ChatToolCall] = [],
+    modelName: String? = nil
   ) {
     self.id = id
     self.role = role
     self.content = content
     self.reasoningContent = reasoningContent
     self.toolCalls = toolCalls
+    self.modelName = modelName
   }
 
   enum CodingKeys: String, CodingKey {
@@ -95,6 +98,7 @@ enum ChatHistory {
     let content: String
     let reasoningContent: String
     let toolCalls: [ChatToolCall]
+    let modelName: String?
 
     init(_ message: ChatMessage) {
       id = message.id
@@ -102,6 +106,7 @@ enum ChatHistory {
       content = message.content
       reasoningContent = message.reasoningContent
       toolCalls = message.toolCalls
+      modelName = message.modelName
     }
 
     var message: ChatMessage {
@@ -110,7 +115,8 @@ enum ChatHistory {
         role: role,
         content: content,
         reasoningContent: reasoningContent,
-        toolCalls: toolCalls
+        toolCalls: toolCalls,
+        modelName: modelName
       )
     }
   }

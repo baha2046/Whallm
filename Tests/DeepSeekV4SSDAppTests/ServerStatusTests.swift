@@ -25,6 +25,47 @@ final class ServerStatusTests: XCTestCase {
     XCTAssertEqual(status.performance.activeParametersCache.capacitySlots, 1_024)
   }
 
+  func testStatusDecodesUnloadedLoadingAndLoadedModels() throws {
+    let unloaded = try ServerStatus.decode(statusFixture(
+      model: nil,
+      sourceModel: nil,
+      modelPath: nil,
+      runtime: nil,
+      loadedModel: nil,
+      loadingModel: nil
+    ))
+    XCTAssertNil(unloaded.model)
+    XCTAssertNil(unloaded.runtime)
+    XCTAssertNil(unloaded.loadedModel)
+    XCTAssertNil(unloaded.loadingModel)
+
+    let loading = try ServerStatus.decode(statusFixture(
+      model: nil,
+      sourceModel: nil,
+      modelPath: nil,
+      runtime: nil,
+      loadedModel: nil,
+      loadingModel: "qwen3.8-flash-next-fp8"
+    ))
+    XCTAssertNil(loading.loadedModel)
+    XCTAssertEqual(loading.loadingModel, "qwen3.8-flash-next-fp8")
+
+    let loaded = try ServerStatus.decode(statusFixture(
+      model: "work-model",
+      sourceModel: "deepseek-ai/DeepSeek-V4-Flash-0731",
+      modelPath: "/tmp/model.dsv4",
+      runtime: [:],
+      loadedModel: "deepseek-v4-flash-0731",
+      loadingModel: nil
+    ))
+    XCTAssertEqual(loaded.model, "work-model")
+    XCTAssertEqual(loaded.sourceModel, "deepseek-ai/DeepSeek-V4-Flash-0731")
+    XCTAssertEqual(loaded.modelPath, "/tmp/model.dsv4")
+    XCTAssertNotNil(loaded.runtime)
+    XCTAssertEqual(loaded.loadedModel, "deepseek-v4-flash-0731")
+    XCTAssertNil(loaded.loadingModel)
+  }
+
   func testPerformanceHistoryTracksAndClearsStatistics() {
     var history = PerformanceHistory()
     history.record(
@@ -169,4 +210,60 @@ final class ServerStatusTests: XCTestCase {
     XCTAssertEqual(prefill?.average, 25)
     XCTAssertEqual(prefill?.maximum, 40)
   }
+
+  @MainActor
+  func testChangingTheLoadedModelClearsMetricHistory() {
+    let controller = ServerController()
+    controller.updateLoadedModel("deepseek-v4-flash-0731", completedRequestCount: 0)
+    controller.recordPerformanceSample(
+      LivePerformance(
+        generating: true,
+        snapshot: PerformanceSnapshot(prefillTokensPerSecond: 10)
+      ))
+    XCTAssertFalse(controller.performanceHistory.isEmpty)
+
+    controller.updateLoadedModel("qwen3.8-flash-next-fp8", completedRequestCount: 1)
+
+    XCTAssertTrue(controller.performanceHistory.isEmpty)
+  }
+}
+
+private func statusFixture(
+  model: String?,
+  sourceModel: String?,
+  modelPath: String?,
+  runtime: [String: Any]?,
+  loadedModel: String?,
+  loadingModel: String?
+) throws -> Data {
+  func jsonValue(_ value: Any?) -> Any { value ?? NSNull() }
+  return try JSONSerialization.data(withJSONObject: [
+    "model": jsonValue(model),
+    "source_model": jsonValue(sourceModel),
+    "model_path": jsonValue(modelPath),
+    "runtime": jsonValue(runtime),
+    "loaded_model": jsonValue(loadedModel),
+    "loading_model": jsonValue(loadingModel),
+    "performance": [
+      "generating": false,
+      "runtime_prompt_tokens": 0,
+      "runtime_generation_tokens": 0,
+      "accumulated_generation_tokens": 0,
+      "completed_request_count": 0,
+      "request_seconds": 0,
+      "time_to_first_token_seconds": 0,
+      "prefill_tokens_per_second": 0,
+      "decode_tokens_per_second": 0,
+      "request_ssd_read_bytes_per_second": 0,
+      "request_expert_cache_hit_rate": 0,
+      "ssd_bytes_read": 0,
+      "active_parameters_cache": [
+        "hit_rate": 0,
+        "hits": 0,
+        "misses": 0,
+        "resident_slots": 0,
+        "capacity_slots": 0,
+      ],
+    ],
+  ])
 }

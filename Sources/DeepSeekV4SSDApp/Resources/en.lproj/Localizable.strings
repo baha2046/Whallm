@@ -71,6 +71,15 @@
 "Minimum" = "Minimum";
 "Memory limit for all prompt caches. The recommended value is 8." = "Memory limit for all prompt caches. The recommended value is 8.";
 "Model" = "Model";
+"Alias" = "Alias";
+"Optional Alias" = "Optional Alias";
+"Alias for %@" = "Alias for %@";
+"Optional request name for this model. Changes are saved automatically." = "Optional request name for this model. Changes are saved automatically.";
+"Alias conflicts with %@." = "Alias conflicts with %@.";
+"Assistant" = "Assistant";
+"Loading %@" = "Loading %@";
+"No model loaded" = "No model loaded";
+"Qwen3.8-Flash-Next does not support DSpark." = "Qwen3.8-Flash-Next does not support DSpark.";
 "Model folder" = "Model folder";
 "Model ID" = "Model ID";
 "Model ID cannot be empty." = "Model ID cannot be empty.";
@@ -248,7 +257,7 @@
 "The App downloads a verified MXFP4 installed model for Qwen." = "The App downloads a verified MXFP4 installed model for Qwen.";
 "%@ · %@ · %@" = "%@ · %@ · %@";
 "Top K" = "Top K";
-"0 disables Top K. Qwen uses 20 by default." = "0 disables Top K. Qwen uses 20 by default.";
+"0 disables Top K." = "0 disables Top K.";
 "Start the server. Then send a message to %@." = "Start the server. Then send a message to %@.";
 "High-speed SSD" = "High-speed SSD";
 "Stop Download" = "Stop Download";

@@ -3,6 +3,27 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ChatStreamDecoderTests: XCTestCase {
+  func testChatModelSelectionUsesAliasAndRestoresSavedSelection() {
+    let models = [
+      CatalogModel(id: "deepseek-v4-flash-0731", alias: "work-model"),
+      CatalogModel(id: "qwen3.8-flash-next-fp8", alias: nil),
+    ]
+
+    XCTAssertEqual(
+      resolvedChatModelName(savedName: "deepseek-v4-flash-0731", models: models),
+      "work-model"
+    )
+    XCTAssertEqual(
+      resolvedChatModelName(savedName: "qwen3.8-flash-next-fp8", models: models),
+      "qwen3.8-flash-next-fp8"
+    )
+    XCTAssertEqual(
+      resolvedChatModelName(savedName: "missing", models: models),
+      "work-model"
+    )
+    XCTAssertNil(resolvedChatModelName(savedName: "work-model", models: []))
+  }
+
   func testDecoderPreservesThinkingAndAnswerDeltas() throws {
     XCTAssertEqual(
       try ChatStreamDecoder.decode(
@@ -104,7 +125,8 @@ final class ChatStreamDecoderTests: XCTestCase {
           type: "function",
           function: .init(name: "get_current_time", arguments: "{}")
         )
-      ]
+      ],
+      modelName: "work-model"
     )
 
     ChatHistory.save([message], defaults: defaults)
@@ -115,5 +137,31 @@ final class ChatStreamDecoderTests: XCTestCase {
     XCTAssertEqual(restored.content, message.content)
     XCTAssertEqual(restored.reasoningContent, message.reasoningContent)
     XCTAssertEqual(restored.toolCalls, message.toolCalls)
+    XCTAssertEqual(restored.modelName, "work-model")
+  }
+
+  func testOldChatHistoryLoadsWithoutAModelName() throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let id = UUID()
+    defaults.set(
+      try JSONSerialization.data(
+        withJSONObject: [
+          [
+            "id": id.uuidString,
+            "role": "assistant",
+            "content": "old answer",
+            "reasoningContent": "",
+            "toolCalls": [],
+          ]
+        ]),
+      forKey: "chatMessages"
+    )
+
+    let message = try XCTUnwrap(ChatHistory.load(defaults: defaults).first)
+
+    XCTAssertEqual(message.id, id)
+    XCTAssertNil(message.modelName)
   }
 }

@@ -25,10 +25,21 @@ extension ModelKind {
     }
   }
 
-  var defaultPublicModel: String {
+  var apiModelID: String {
     switch self {
     case .deepSeekV4: "deepseek-v4-flash-0731"
-    case .qwen3_8FlashNext: "Qwen/Qwen3.8-Flash-Next-FP8"
+    case .qwen3_8FlashNext: "qwen3.8-flash-next-fp8"
+    }
+  }
+}
+
+enum ModelAliasError: LocalizedError, Equatable {
+  case conflict(String)
+
+  var errorDescription: String? {
+    switch self {
+    case .conflict(let name):
+      L10n.string("Alias conflicts with %@.", name)
     }
   }
 }
@@ -227,6 +238,7 @@ final class ModelLibrary: ObservableObject {
   private static let activeDestinationPreference = "modelDownloadDestination"
   private static let activeDownloadModelKindPreference = "modelDownloadModelKind"
   private static let selectedModelKindPreference = "selectedInstallModelKind"
+  private static let aliasMigrationPreference = "modelAliasMigrationVersion"
   nonisolated private static let recommendedMemoryBytes: UInt64 = 64 * 1_024 * 1_024 * 1_024
 
   @Published private(set) var rootURL: URL
@@ -248,6 +260,7 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var installationPlanErrors: [String: String] = [:]
   @Published private(set) var modelFolderAvailableBytes: UInt64?
   @Published private(set) var modelFolderIsWritable = false
+  @Published private(set) var aliases: [ModelKind: String] = [:]
   @Published var selectedModelKind: ModelKind {
     didSet {
       defaults.set(selectedModelKind.rawValue, forKey: Self.selectedModelKindPreference)
@@ -272,6 +285,14 @@ final class ModelLibrary: ObservableObject {
       rootURL = FileManager.default.homeDirectoryForCurrentUser.appending(
         path: ".dsmodel", directoryHint: .isDirectory)
     }
+    Self.migrateLegacyAlias(defaults: defaults, selectedModelKind: selectedModelKind)
+    aliases = Dictionary(
+      uniqueKeysWithValues: Self.supportedModelKinds.compactMap { modelKind in
+        defaults.string(forKey: Self.aliasPreferenceKey(for: modelKind)).map {
+          (modelKind, $0)
+        }
+      }
+    )
   }
 
   var usableModels: [InstalledModelInfo] { models.filter(\.isUsable) }
@@ -283,6 +304,134 @@ final class ModelLibrary: ObservableObject {
   }
   var hasPartialDownload: Bool {
     Self.supportedModelKinds.contains(where: hasPartialDownload(for:))
+  }
+
+  func alias(for modelKind: ModelKind) -> String {
+    aliases[modelKind] ?? ""
+  }
+
+  @discardableResult
+  func saveAlias(_ value: String, for modelKind: ModelKind) throws -> String {
+    let alias = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !alias.isEmpty {
+      for otherKind in Self.supportedModelKinds
+      where otherKind != modelKind && otherKind.apiModelID == alias {
+        throw ModelAliasError.conflict(otherKind.apiModelID)
+      }
+      for otherKind in Self.supportedModelKinds
+      where otherKind != modelKind && aliases[otherKind] == alias {
+        throw ModelAliasError.conflict(alias)
+      }
+    }
+    if alias.isEmpty {
+      aliases.removeValue(forKey: modelKind)
+      defaults.removeObject(forKey: Self.aliasPreferenceKey(for: modelKind))
+    } else {
+      aliases[modelKind] = alias
+      defaults.set(alias, forKey: Self.aliasPreferenceKey(for: modelKind))
+    }
+    return alias
+  }
+
+  func makeServerCatalog(powerSavingLimitGBps: Double?) throws -> ModelCatalog {
+    let settings = Dictionary(
+      uniqueKeysWithValues: Self.supportedModelKinds.map { modelKind in
+        (
+          modelKind,
+          ModelAdvancedSettings.loadOrDefault(for: modelKind, defaults: defaults)
+        )
+      }
+    )
+    return try Self.makeServerCatalog(
+      models: models.filter { canUseModel(at: $0.url.path) },
+      aliases: aliases,
+      settings: settings,
+      powerSavingLimitGBps: powerSavingLimitGBps
+    )
+  }
+
+  static func makeServerCatalog(
+    models: [InstalledModelInfo],
+    aliases: [ModelKind: String],
+    settings: [ModelKind: ModelAdvancedSettings],
+    powerSavingLimitGBps: Double?
+  ) throws -> ModelCatalog {
+    let entries = try supportedModelKinds.compactMap { modelKind -> ModelCatalog.Entry? in
+      guard let model = models.first(where: { $0.modelKind == modelKind && $0.isUsable })
+      else { return nil }
+      let settings = (settings[modelKind] ?? .defaults(for: modelKind))
+        .normalized(for: modelKind)
+      try settings.validate(for: modelKind)
+      let alias = aliases[modelKind] ?? ""
+      return ModelCatalog.Entry(
+        id: modelKind.apiModelID,
+        alias: alias.isEmpty ? nil : alias,
+        path: model.url.path,
+        modelKind: modelKind.rawValue,
+        runtime: ModelCatalog.Entry.Runtime(
+          slots: settings.slots,
+          readWorkers: settings.readWorkers,
+          prefetchReadWorkers: 2,
+          prefillStepSize: settings.prefillStepSize,
+          fp8KVCache: !settings.bf16KVCache,
+          memoryLimitGiB: settings.memoryLimitGiB,
+          layerMajorPrefill: settings.layerMajorPrefill,
+          promptCacheEntries: settings.promptCacheEntries,
+          promptCacheMemoryGiB: settings.promptCacheMemoryGiB,
+          persistentPromptCache: true,
+          persistentPromptCacheEntries: 8,
+          promptCacheDirectory: nil,
+          moePrefillStepSize: 0,
+          batchedExpertPrefill: true,
+          fp4IndexCache: true,
+          dsparkEnabled: settings.dsparkEnabled && model.hasDSpark,
+          dsparkConfidenceThreshold: settings.dsparkConfidenceThreshold,
+          dsparkSlots: settings.dsparkSlots,
+          expertRouteTrace: nil,
+          readyExpertDecode: true,
+          powerSavingLimitGBps: powerSavingLimitGBps
+        ),
+        defaults: ModelCatalog.Entry.Defaults(
+          maxTokens: settings.defaultMaxTokens,
+          temperature: settings.defaultTemperature,
+          topP: settings.defaultTopP,
+          topK: settings.defaultTopK
+        ),
+        warmupPromptPath: settings.warmupPromptPath.isEmpty
+          ? nil : settings.warmupPromptPath
+      )
+    }
+    return ModelCatalog(models: entries)
+  }
+
+  static func aliasPreferenceKey(for modelKind: ModelKind) -> String {
+    "modelAlias.\(modelKind.rawValue)"
+  }
+
+  private static func migrateLegacyAlias(
+    defaults: UserDefaults,
+    selectedModelKind: ModelKind
+  ) {
+    guard defaults.integer(forKey: aliasMigrationPreference) < 1 else { return }
+    defer { defaults.set(1, forKey: aliasMigrationPreference) }
+    guard defaults.string(forKey: aliasPreferenceKey(for: selectedModelKind)) == nil,
+      let data = defaults.data(forKey: ServerConfiguration.preferenceKey),
+      let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+      let rawName = payload["publicModel"] as? String
+    else { return }
+    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    let legacyDefaults: Set<String> = [
+      "deepseek-v4-flash-0731",
+      "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "qwen3.8-flash-next-fp8",
+      "Qwen/Qwen3.8-Flash-Next-FP8",
+    ]
+    guard !name.isEmpty, !legacyDefaults.contains(name),
+      !supportedModelKinds.contains(where: {
+        $0 != selectedModelKind && $0.apiModelID == name
+      })
+    else { return }
+    defaults.set(name, forKey: aliasPreferenceKey(for: selectedModelKind))
   }
 
   func plannedInstalledBytes(for modelKind: ModelKind) -> UInt64? {

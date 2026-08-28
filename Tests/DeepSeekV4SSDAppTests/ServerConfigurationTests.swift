@@ -1,3 +1,5 @@
+import Foundation
+import DeepSeekRepack
 import XCTest
 
 @testable import DeepSeekV4SSDApp
@@ -25,7 +27,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(modelDownloadProgressExtraHeight(hasProgressFraction: true), 72)
   }
 
-  func testServerAndModelDownloadControlsRemainIndependent() {
+  func testServerAndModelControlsRemainIndependent() {
     XCTAssertFalse(
       modelDownloadIsDisabled(
         serverIsActive: true,
@@ -36,14 +38,6 @@ final class ServerConfigurationTests: XCTestCase {
       )
     )
     XCTAssertFalse(
-      modelSelectionIsLocked(
-        serverIsActive: false,
-        operationIsBusy: true,
-        downloadIsActive: true,
-        hasPartialDownload: true
-      )
-    )
-    XCTAssertTrue(
       modelSelectionIsLocked(
         serverIsActive: true,
         operationIsBusy: true,
@@ -67,14 +61,9 @@ final class ServerConfigurationTests: XCTestCase {
     let nodeSpacing = totalWidth / CGFloat(count - 1)
 
     for index in 1..<(count - 1) {
-      let frame = powerSavingLegendFrame(
-        index: index,
-        count: count,
-        totalWidth: totalWidth
-      )
+      let frame = powerSavingLegendFrame(index: index, count: count, totalWidth: totalWidth)
       XCTAssertEqual(frame.midX, CGFloat(index) * nodeSpacing, accuracy: 0.001)
     }
-
     XCTAssertEqual(
       powerSavingLegendFrame(index: 0, count: count, totalWidth: totalWidth).minX,
       0,
@@ -87,155 +76,279 @@ final class ServerConfigurationTests: XCTestCase {
     )
   }
 
-  func testLocalDefaultsUseRequestedGenerationValues() {
-    let configuration = ServerConfiguration.localDefault
-
-    XCTAssertEqual(configuration.port, 11_434)
-    XCTAssertEqual(configuration.host, "127.0.0.1")
-    XCTAssertEqual(configuration.slots, 1_152)
-    XCTAssertEqual(configuration.readWorkers, 4)
-    XCTAssertNil(configuration.powerSavingLimitGBps)
-    XCTAssertEqual(
-      ServerConfiguration.powerSavingLimitOptionsGBps,
-      [0.5, 1, 2, 3, 5, 10, 25, nil]
-    )
-    XCTAssertEqual(configuration.memoryLimitGiB, 0)
-    XCTAssertEqual(configuration.defaultMaxTokens, 272_000)
-    XCTAssertEqual(configuration.defaultTemperature, 0.2)
-    XCTAssertEqual(configuration.defaultTopP, 0.98)
-    XCTAssertEqual(configuration.defaultTopK, 0)
-    XCTAssertEqual(configuration.dsparkSlots, 768)
-    XCTAssertTrue(configuration.arguments.contains("272000"))
-    XCTAssertTrue(configuration.arguments.contains("0.2"))
-    XCTAssertTrue(configuration.arguments.contains("0.98"))
-    XCTAssertTrue(configuration.arguments.contains("11434"))
-    XCTAssertTrue(configuration.arguments.contains("--dspark-slots"))
-    XCTAssertTrue(configuration.arguments.contains("--memory-limit-gib"))
-    XCTAssertTrue(configuration.arguments.contains("--default-top-k"))
-  }
-
-  func testModelAdvancedSettingsUseDefaultsForTheSelectedModel() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
+  func testServerConfigurationContainsOnlyServerArguments() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    var configuration = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "secret")
     configuration.host = "0.0.0.0"
+    configuration.port = 9_000
     configuration.powerSavingLimitGBps = 2
 
-    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
+    let arguments = configuration.arguments(modelCatalogPath: "/tmp/catalog.json")
 
-    XCTAssertEqual(configuration.defaultMaxTokens, 262_144)
-    XCTAssertEqual(configuration.defaultTemperature, 1.0)
-    XCTAssertEqual(configuration.defaultTopP, 0.95)
-    XCTAssertEqual(configuration.defaultTopK, 20)
-    XCTAssertFalse(configuration.dsparkEnabled)
-    XCTAssertEqual(configuration.host, "0.0.0.0")
-    XCTAssertEqual(configuration.powerSavingLimitGBps, 2)
-  }
-
-  func testRuntimeLoadsAdvancedSettingsForTheSelectedModel() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
-    configuration.powerSavingLimitGBps = 5
-    configuration.slots = 700
-    configuration.readWorkers = 3
-    configuration.defaultTopK = 7
-    configuration.dsparkEnabled = true
-    configuration.saveAdvancedSettings(for: .deepSeekV4, defaults: defaults)
-
-    configuration.slots = 900
-    configuration.readWorkers = 6
-    configuration.defaultTopK = 20
-    configuration.dsparkEnabled = true
-    configuration.saveAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
-
-    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
-    XCTAssertEqual(configuration.slots, 700)
-    XCTAssertEqual(configuration.readWorkers, 3)
-    XCTAssertEqual(configuration.defaultTopK, 7)
-    XCTAssertTrue(configuration.dsparkEnabled)
-    XCTAssertEqual(configuration.powerSavingLimitGBps, 5)
-
-    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
-    XCTAssertEqual(configuration.slots, 900)
-    XCTAssertEqual(configuration.readWorkers, 6)
-    XCTAssertEqual(configuration.defaultTopK, 20)
-    XCTAssertFalse(configuration.dsparkEnabled)
-    XCTAssertEqual(configuration.powerSavingLimitGBps, 5)
-  }
-
-  func testQwenAdvancedSettingsDiscardUnsupportedBF16KVCache() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
-    configuration.bf16KVCache = true
-
-    configuration.saveAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
-    configuration.bf16KVCache = false
-    configuration.loadAdvancedSettings(for: .qwen3_8FlashNext, defaults: defaults)
-
-    XCTAssertFalse(configuration.bf16KVCache)
-    XCTAssertFalse(configuration.arguments.contains("--bf16-kv-cache"))
-  }
-
-  func testDeepSeekAdvancedSettingsKeepBF16KVCache() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
-    configuration.bf16KVCache = true
-
-    configuration.saveAdvancedSettings(for: .deepSeekV4, defaults: defaults)
-    configuration.bf16KVCache = false
-    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
-
-    XCTAssertTrue(configuration.bf16KVCache)
-    XCTAssertTrue(configuration.arguments.contains("--bf16-kv-cache"))
-  }
-
-  func testModelAdvancedSettingsMigrateTheExistingSelectedModelValues() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
-    configuration.slots = 640
-    configuration.defaultTemperature = 0.7
-
-    configuration.loadAdvancedSettings(
-      for: .deepSeekV4,
-      defaults: defaults,
-      migrateCurrent: true
+    XCTAssertEqual(configuration.baseURL?.absoluteString, "http://127.0.0.1:9000")
+    XCTAssertEqual(
+      arguments,
+      [
+        "-m", "deepseek_v4_ssd.server",
+        "--model-catalog", "/tmp/catalog.json",
+        "--host", "0.0.0.0",
+        "--port", "9000",
+      ]
     )
-    configuration.slots = 1_152
-    configuration.defaultTemperature = 0.2
-    configuration.loadAdvancedSettings(for: .deepSeekV4, defaults: defaults)
-
-    XCTAssertEqual(configuration.slots, 640)
-    XCTAssertEqual(configuration.defaultTemperature, 0.7)
+    XCTAssertFalse(arguments.contains("secret"))
+    XCTAssertFalse(arguments.contains("--model"))
+    XCTAssertFalse(arguments.contains("--public-model"))
   }
 
-  func testModelAdvancedSettingsDoNotMigrateValuesFromAnotherModel() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.load(defaults: defaults, apiKey: "")
-    configuration.publicModel = "deepseek-v4-flash-0731"
-    configuration.slots = 640
-    configuration.defaultTemperature = 0.7
+  func testServerConfigurationPersistenceDoesNotStoreAPIKey() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    var configuration = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "")
+    configuration.host = "0.0.0.0"
+    configuration.port = 9_000
+    configuration.apiKey = "secret"
+    configuration.powerSavingLimitGBps = 0.5
 
-    configuration.loadAdvancedSettings(
-      for: .qwen3_8FlashNext,
-      defaults: defaults,
-      migrateCurrent: true
+    configuration.save(defaults: isolated.defaults)
+    let restored = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "secret")
+
+    XCTAssertEqual(restored, configuration)
+    let storedData = try XCTUnwrap(
+      isolated.defaults.data(forKey: ServerConfiguration.preferenceKey))
+    XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
+  }
+
+  func testAdvancedSettingsUsePerModelDefaultsAndNormalization() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+
+    var deepSeek = ModelAdvancedSettings.defaults(for: .deepSeekV4)
+    deepSeek.slots = 700
+    deepSeek.bf16KVCache = true
+    deepSeek.dsparkEnabled = true
+    deepSeek.save(for: .deepSeekV4, defaults: isolated.defaults)
+
+    var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    qwen.slots = 900
+    qwen.bf16KVCache = true
+    qwen.dsparkEnabled = true
+    qwen.defaultTemperature = 1.0
+    qwen.defaultTopP = 0.95
+    qwen.defaultTopK = 3
+    isolated.defaults.set(
+      try JSONEncoder().encode(qwen),
+      forKey: "modelAdvancedSettings.qwen3.8-flash-next"
     )
 
-    XCTAssertEqual(configuration.slots, 1_152)
-    XCTAssertEqual(configuration.defaultMaxTokens, 262_144)
-    XCTAssertEqual(configuration.defaultTemperature, 1.0)
-    XCTAssertEqual(configuration.defaultTopK, 20)
+    let restoredDeepSeek = ModelAdvancedSettings.loadOrDefault(
+      for: .deepSeekV4, defaults: isolated.defaults)
+    let restoredQwen = ModelAdvancedSettings.loadOrDefault(
+      for: .qwen3_8FlashNext, defaults: isolated.defaults)
+
+    XCTAssertEqual(restoredDeepSeek.slots, 700)
+    XCTAssertTrue(restoredDeepSeek.bf16KVCache)
+    XCTAssertTrue(restoredDeepSeek.dsparkEnabled)
+    XCTAssertEqual(restoredQwen.slots, 900)
+    XCTAssertEqual(restoredQwen.defaultMaxTokens, 262_144)
+    XCTAssertEqual(restoredQwen.defaultTemperature, 0.7)
+    XCTAssertEqual(restoredQwen.defaultTopP, 0.8)
+    XCTAssertEqual(restoredQwen.defaultTopK, 20)
+    XCTAssertFalse(restoredQwen.bf16KVCache)
+    XCTAssertFalse(restoredQwen.dsparkEnabled)
+  }
+
+  func testLegacyAdvancedSettingsMigrateOnlyToTheCurrentModel() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    isolated.defaults.set("deepseek-v4", forKey: "selectedInstallModelKind")
+    isolated.defaults.set(
+      try JSONSerialization.data(withJSONObject: legacyConfiguration(publicModel: "custom")),
+      forKey: ServerConfiguration.preferenceKey
+    )
+
+    let deepSeek = ModelAdvancedSettings.loadOrDefault(
+      for: .deepSeekV4, defaults: isolated.defaults)
+    isolated.defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+    let qwen = ModelAdvancedSettings.loadOrDefault(
+      for: .qwen3_8FlashNext, defaults: isolated.defaults)
+
+    XCTAssertEqual(deepSeek.slots, 640)
+    XCTAssertEqual(deepSeek.defaultTemperature, 0.7)
+    XCTAssertEqual(qwen.slots, 1_152)
+    XCTAssertEqual(qwen.defaultTemperature, 0.7)
+  }
+
+  @MainActor
+  func testAliasCanBeSavedTrimmedClearedAndSetBeforeInstall() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    let library = ModelLibrary(defaults: isolated.defaults)
+
+    XCTAssertEqual(
+      try library.saveAlias("  work-model  ", for: .deepSeekV4),
+      "work-model"
+    )
+    XCTAssertEqual(library.alias(for: .deepSeekV4), "work-model")
+    XCTAssertNil(library.usableModel(for: .deepSeekV4))
+
+    XCTAssertEqual(try library.saveAlias("   ", for: .deepSeekV4), "")
+    XCTAssertEqual(library.alias(for: .deepSeekV4), "")
+    XCTAssertNil(
+      isolated.defaults.string(forKey: ModelLibrary.aliasPreferenceKey(for: .deepSeekV4)))
+  }
+
+  @MainActor
+  func testAliasValidationIsCaseSensitiveAndRejectsOtherNames() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    let library = ModelLibrary(defaults: isolated.defaults)
+
+    XCTAssertNoThrow(
+      try library.saveAlias("deepseek-v4-flash-0731", for: .deepSeekV4))
+    XCTAssertNoThrow(try library.saveAlias("Work", for: .deepSeekV4))
+    XCTAssertNoThrow(try library.saveAlias("work", for: .qwen3_8FlashNext))
+    XCTAssertThrowsError(try library.saveAlias("Work", for: .qwen3_8FlashNext))
+    XCTAssertThrowsError(
+      try library.saveAlias("deepseek-v4-flash-0731", for: .qwen3_8FlashNext))
+  }
+
+  @MainActor
+  func testLegacyCustomPublicModelMigratesToCurrentAlias() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    isolated.defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+    isolated.defaults.set(
+      try JSONSerialization.data(withJSONObject: ["publicModel": "  old-alias  "]),
+      forKey: ServerConfiguration.preferenceKey
+    )
+
+    let library = ModelLibrary(defaults: isolated.defaults)
+
+    XCTAssertEqual(library.alias(for: .qwen3_8FlashNext), "old-alias")
+  }
+
+  @MainActor
+  func testLegacyQwenDefaultDoesNotMigrateToAlias() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    isolated.defaults.set("qwen3.8-flash-next", forKey: "selectedInstallModelKind")
+    isolated.defaults.set(
+      try JSONSerialization.data(
+        withJSONObject: ["publicModel": "Qwen/Qwen3.8-Flash-Next-FP8"]),
+      forKey: ServerConfiguration.preferenceKey
+    )
+
+    let library = ModelLibrary(defaults: isolated.defaults)
+
+    XCTAssertEqual(library.alias(for: .qwen3_8FlashNext), "")
+  }
+
+  @MainActor
+  func testCatalogUsesFixedIDsAliasesAndCompleteSnakeCaseRuntime() throws {
+    var deepSeek = ModelAdvancedSettings.defaults(for: .deepSeekV4)
+    deepSeek.slots = 700
+    deepSeek.defaultTemperature = 0.4
+    deepSeek.dsparkEnabled = true
+    var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    qwen.slots = 900
+    let catalog = try ModelLibrary.makeServerCatalog(
+      models: [
+        installedModel(
+          .deepSeekV4,
+          issues: [InstalledFileIssue(path: "common.bin", kind: .checksumMismatch)]
+        ),
+        installedModel(.qwen3_8FlashNext),
+        installedModel(.deepSeekV4, hasDSpark: true),
+      ],
+      aliases: [.deepSeekV4: "work-model"],
+      settings: [.deepSeekV4: deepSeek, .qwen3_8FlashNext: qwen],
+      powerSavingLimitGBps: 2
+    )
+
+    XCTAssertEqual(
+      catalog.models.map(\.id),
+      ["deepseek-v4-flash-0731", "qwen3.8-flash-next-fp8"]
+    )
+    XCTAssertEqual(catalog.models[0].alias, "work-model")
+    XCTAssertTrue(catalog.models[0].runtime.dsparkEnabled)
+    XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
+    XCTAssertEqual(catalog.models[1].defaults.temperature, 0.7)
+    XCTAssertEqual(catalog.models[1].defaults.topP, 0.8)
+    XCTAssertEqual(catalog.models[1].defaults.topK, 20)
+    XCTAssertEqual(catalog.availableModels[0].requestName, "work-model")
+
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: catalog.encoded()) as? [String: Any])
+    let models = try XCTUnwrap(object["models"] as? [[String: Any]])
+    let runtime = try XCTUnwrap(models[0]["runtime"] as? [String: Any])
+    XCTAssertEqual(
+      Set(runtime.keys),
+      [
+        "slots", "read_workers", "prefetch_read_workers", "prefill_step_size",
+        "fp8_kv_cache", "memory_limit_gib", "layer_major_prefill",
+        "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
+        "persistent_prompt_cache_entries", "prompt_cache_directory",
+        "moe_prefill_step_size", "batched_expert_prefill", "fp4_index_cache",
+        "dspark_enabled", "dspark_confidence_threshold", "dspark_slots",
+        "expert_route_trace", "ready_expert_decode", "power_saving_limit_gbps",
+      ]
+    )
+    XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
+    XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)
+  }
+
+  @MainActor
+  func testEmptyCatalogAndTemporaryFileCleanup() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let catalog = try ModelLibrary.makeServerCatalog(
+      models: [], aliases: [:], settings: [:], powerSavingLimitGBps: nil)
+    let temporary = try TemporaryModelCatalog(catalog: catalog, directory: root)
+
+    XCTAssertTrue(catalog.models.isEmpty)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: temporary.url.path))
+    let attributes = try FileManager.default.attributesOfItem(atPath: temporary.url.path)
+    XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
+    temporary.remove()
+    XCTAssertFalse(FileManager.default.fileExists(atPath: temporary.url.path))
+  }
+
+  @MainActor
+  func testServerStartFailureRemovesTheTemporaryCatalog() throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    let runtime = root.appending(path: "runtime")
+    let package = runtime.appending(path: "deepseek_v4_ssd")
+    let executable = root.appending(path: "invalid-python")
+    try FileManager.default.createDirectory(at: package, withIntermediateDirectories: true)
+    try Data().write(to: package.appending(path: "server.py"))
+    try Data("#!/missing/whallm-python\n".utf8).write(to: executable)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o700],
+      ofItemAtPath: executable.path
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let configuration = ServerConfiguration(
+      runtimeDirectory: runtime.path,
+      pythonExecutable: executable.path,
+      pythonHome: nil,
+      sitePackages: nil,
+      host: "127.0.0.1",
+      port: 11_434,
+      apiKey: "",
+      powerSavingLimitGBps: nil
+    )
+    let before = temporaryCatalogNames()
+    let controller = ServerController()
+
+    controller.start(configuration, catalog: ModelCatalog(models: []))
+
+    guard case .failed = controller.state else {
+      return XCTFail("Expected server startup to fail.")
+    }
+    XCTAssertEqual(temporaryCatalogNames(), before)
   }
 
   func testLocalizationSupportsAllSelectableLanguages() {
@@ -243,35 +356,16 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(L10n.string("Stopped", language: .english), "Stopped")
     XCTAssertEqual(L10n.string("Language", language: .simplifiedChinese), "语言")
     XCTAssertEqual(L10n.string("Language", language: .traditionalChinese), "語言")
-    XCTAssertEqual(L10n.string("Live", language: .simplifiedChinese), "实时")
-    XCTAssertEqual(L10n.string("Live", language: .traditionalChinese), "即時")
+    XCTAssertEqual(L10n.string("Model", language: .traditionalChinese), "模型")
+    XCTAssertEqual(L10n.string("Alias", language: .traditionalChinese), "Alias")
     XCTAssertEqual(
       L10n.string(
-        "A higher value increases output variation.", language: .traditionalChinese),
-      "較高的值會增加輸出變化。")
-    XCTAssertEqual(L10n.string("Memory usage", language: .simplifiedChinese), "内存用量")
-    XCTAssertEqual(
-      AppLanguage.system.displayName(language: .traditionalChinese), "跟隨系統")
-    XCTAssertEqual(AppLanguage.system.displayName(language: .english), "Follow System")
-    XCTAssertEqual(L10n.string("Advance", language: .traditionalChinese), "進階")
-    XCTAssertEqual(L10n.string("Back to Model", language: .traditionalChinese), "返回模型")
-    XCTAssertEqual(L10n.string("High-speed SSD", language: .traditionalChinese), "高速 SSD")
-    XCTAssertEqual(L10n.string("Stop Download", language: .simplifiedChinese), "停止下载")
-    XCTAssertEqual(
-      L10n.string(
-        "Advanced Settings for %@", language: .traditionalChinese, "DeepSeek-V4-Flash-0731"),
-      "DeepSeek-V4-Flash-0731 的進階設定"
+        "Optional request name for this model. Changes are saved automatically.",
+        language: .traditionalChinese
+      ),
+      "此模型的選用 request 名稱。變更會自動儲存。"
     )
-    XCTAssertEqual(L10n.string("Logs", language: .traditionalChinese), "日誌")
-    XCTAssertEqual(L10n.string("Unlimited", language: .simplifiedChinese), "无限制")
-    XCTAssertEqual(L10n.string("Unlimited", language: .traditionalChinese), "無限制")
-    XCTAssertEqual(L10n.string("Power saving", language: .traditionalChinese), "省電")
-    XCTAssertEqual(L10n.string("Performance", language: .traditionalChinese), "效能")
-    XCTAssertEqual(L10n.string("Model to install", language: .traditionalChinese), "要安裝的模型")
-    XCTAssertEqual(
-      L10n.string("127.0.0.1 (Local only)", language: .traditionalChinese),
-      "127.0.0.1（僅本機）"
-    )
+    XCTAssertEqual(L10n.string("Assistant", language: .traditionalChinese), "助理")
   }
 
   func testSystemLanguageUsesSupportedLanguageOrFallsBackToEnglish() {
@@ -283,91 +377,6 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(AppLanguage.systemDefault(preferredLanguages: ["ja-JP"]), .english)
   }
 
-  func testConfigurationBuildsServerArgumentsWithoutExposingAPIKey() {
-    var configuration = ServerConfiguration.localDefault
-    configuration.host = "0.0.0.0"
-    configuration.port = 9000
-    configuration.apiKey = "secret"
-    configuration.bf16KVCache = true
-    configuration.powerSavingLimitGBps = 2
-
-    XCTAssertEqual(configuration.baseURL?.absoluteString, "http://127.0.0.1:9000")
-    XCTAssertTrue(configuration.arguments.contains("--bf16-kv-cache"))
-    XCTAssertTrue(configuration.arguments.contains("--prompt-cache-entries"))
-    XCTAssertTrue(configuration.arguments.contains("--prompt-cache-memory-gib"))
-    let powerSavingArgument = configuration.arguments.firstIndex(
-      of: "--power-saving-limit-gbps")
-    XCTAssertNotNil(powerSavingArgument)
-    XCTAssertEqual(powerSavingArgument.map { configuration.arguments[$0 + 1] }, "2.0")
-    XCTAssertFalse(configuration.arguments.contains("--no-layer-major-prefill"))
-    XCTAssertTrue(configuration.arguments.contains("9000"))
-    XCTAssertFalse(configuration.arguments.contains("secret"))
-  }
-
-  func testConfigurationPersistenceRestoresEveryUserSettingWithoutPlaintextAPIKey() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.localDefault
-    configuration.modelPath = "/tmp/model.dsv4"
-    configuration.host = "0.0.0.0"
-    configuration.port = 9_000
-    configuration.apiKey = "secret"
-    configuration.publicModel = "saved-model"
-    configuration.slots = 900
-    configuration.readWorkers = 8
-    configuration.powerSavingLimitGBps = 0.5
-    configuration.memoryLimitGiB = 16
-    configuration.prefillStepSize = 256
-    configuration.layerMajorPrefill = false
-    configuration.promptCacheEntries = 4
-    configuration.promptCacheMemoryGiB = 12
-    configuration.warmupPromptPath = "/tmp/prompt.txt"
-    configuration.bf16KVCache = true
-    configuration.dsparkEnabled = true
-    configuration.dsparkSlots = 512
-    configuration.dsparkConfidenceThreshold = 0.7
-    configuration.defaultMaxTokens = 4_096
-    configuration.defaultTemperature = 0.8
-    configuration.defaultTopP = 0.9
-    configuration.defaultTopK = 20
-
-    configuration.save(defaults: defaults)
-    let restored = ServerConfiguration.load(defaults: defaults, apiKey: "secret")
-
-    XCTAssertEqual(restored, configuration)
-    let storedData = try XCTUnwrap(defaults.data(forKey: "serverConfiguration"))
-    XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
-  }
-
-  func testConfigurationPersistenceMigratesNewFields() throws {
-    let suite = "ServerConfigurationTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
-    defer { defaults.removePersistentDomain(forName: suite) }
-    var configuration = ServerConfiguration.localDefault
-    configuration.modelPath = "/tmp/model.dsv4"
-    configuration.slots = 900
-    configuration.save(defaults: defaults)
-
-    let storedData = try XCTUnwrap(defaults.data(forKey: "serverConfiguration"))
-    var payload = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: storedData) as? [String: Any]
-    )
-    payload.removeValue(forKey: "memoryLimitGiB")
-    payload.removeValue(forKey: "defaultTopK")
-    defaults.set(
-      try JSONSerialization.data(withJSONObject: payload),
-      forKey: "serverConfiguration"
-    )
-
-    let restored = ServerConfiguration.load(defaults: defaults, apiKey: "")
-
-    XCTAssertEqual(restored.modelPath, configuration.modelPath)
-    XCTAssertEqual(restored.slots, configuration.slots)
-    XCTAssertEqual(restored.memoryLimitGiB, 0)
-    XCTAssertEqual(restored.defaultTopK, 0)
-  }
-
   func testAPIKeyRoundTripsThroughIsolatedKeychainItem() {
     let service = "ServerConfigurationTests.\(UUID().uuidString)"
     let account = "api-key"
@@ -377,4 +386,55 @@ final class ServerConfigurationTests: XCTestCase {
 
     XCTAssertEqual(AppKeychain.readAPIKey(service: service, account: account), "secret")
   }
+}
+
+private func isolatedDefaults() throws -> (defaults: UserDefaults, suite: String) {
+  let suite = "ServerConfigurationTests.\(UUID().uuidString)"
+  return (try XCTUnwrap(UserDefaults(suiteName: suite)), suite)
+}
+
+private func temporaryCatalogNames() -> Set<String> {
+  let names =
+    (try? FileManager.default.contentsOfDirectory(
+      atPath: FileManager.default.temporaryDirectory.path)) ?? []
+  return Set(names.filter { $0.hasPrefix("whallm-model-catalog-") })
+}
+
+private func installedModel(
+  _ modelKind: ModelKind,
+  hasDSpark: Bool = false,
+  issues: [InstalledFileIssue] = []
+) -> InstalledModelInfo {
+  InstalledModelInfo(
+    url: URL(fileURLWithPath: "/tmp/\(modelKind.rawValue).dsv4"),
+    size: 1,
+    quickIssues: issues,
+    hasDSpark: hasDSpark,
+    modelKind: modelKind,
+    modelID: modelKind == .deepSeekV4
+      ? "deepseek-ai/DeepSeek-V4-Flash-0731"
+      : "Qwen/Qwen3.8-Flash-Next-FP8"
+  )
+}
+
+private func legacyConfiguration(publicModel: String) -> [String: Any] {
+  [
+    "publicModel": publicModel,
+    "slots": 640,
+    "readWorkers": 3,
+    "memoryLimitGiB": 0,
+    "prefillStepSize": 0,
+    "layerMajorPrefill": true,
+    "promptCacheEntries": 2,
+    "promptCacheMemoryGiB": 8,
+    "warmupPromptPath": "",
+    "bf16KVCache": false,
+    "dsparkEnabled": false,
+    "dsparkSlots": 768,
+    "dsparkConfidenceThreshold": 0.6,
+    "defaultMaxTokens": 4_096,
+    "defaultTemperature": 0.7,
+    "defaultTopP": 0.9,
+    "defaultTopK": 0,
+  ]
 }

@@ -7,7 +7,10 @@ struct ContentView: View {
   let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
   @State private var configuration = ServerConfiguration.localDefault
-  @State private var configurationModelKind: ModelKind?
+  @State private var advancedSettings = ModelAdvancedSettings.defaults(for: .deepSeekV4)
+  @State private var advancedSettingsModelKind: ModelKind?
+  @State private var aliasDraft = ""
+  @State private var aliasError: String?
   @State private var modelNavigationPath: [String] = []
   @AppStorage("selectedAppPage") private var selectedPage = AppPage.server
   @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
@@ -50,51 +53,7 @@ struct ContentView: View {
 
           Divider()
 
-          ZStack {
-            ServerView(
-              configuration: $configuration,
-              server: server,
-              modelLibrary: modelLibrary,
-              language: selectedLanguage,
-              showAdvancedSettings: showModelAdvancedSettings
-            )
-            .pageVisibility(selectedPage == .server)
-
-            AdvancedView(
-              configuration: $configuration,
-              serverActive: server.isActive,
-              language: selectedLanguage
-            )
-            .pageVisibility(selectedPage == .advanced)
-
-            ChatView(
-              configuration: configuration,
-              server: server,
-              assistantName: modelLibrary.selectedModelKind.assistantName,
-              language: selectedLanguage
-            )
-            .pageVisibility(selectedPage == .chat)
-
-            MetricView(
-              model: configuration.publicModel,
-              state: server.state,
-              performance: server.performance,
-              history: server.performanceHistory,
-              language: selectedLanguage,
-              clearHistory: server.clearPerformanceHistory
-            )
-            .pageVisibility(selectedPage == .metric)
-
-            LogsView(server: server, language: selectedLanguage)
-              .pageVisibility(selectedPage == .logs)
-
-            SettingsView(
-              languageCode: $languageCode,
-              language: selectedLanguage,
-              checkForUpdates: checkForUpdates
-            )
-            .pageVisibility(selectedPage == .settings)
-          }
+          selectedPageView
         }
         .background(AppTheme.pageBackground)
         .navigationDestination(for: String.self) { rawValue in
@@ -115,16 +74,26 @@ struct ContentView: View {
     }
     .onChange(of: modelLibrary.models) { activateSelectedModel() }
     .onChange(of: modelLibrary.selectedModelKind) { activateSelectedModel() }
-    .onChange(of: configuration.modelPath) { synchronizeSelectedModelIdentity() }
     .onChange(of: configuration) {
       configuration.save()
-      if let configurationModelKind {
-        configuration.saveAdvancedSettings(for: configurationModelKind)
-      }
       AppKeychain.saveAPIKey(configuration.apiKey)
     }
+    .onChange(of: advancedSettings) {
+      if let advancedSettingsModelKind {
+        advancedSettings.save(for: advancedSettingsModelKind)
+      }
+    }
+    .onChange(of: aliasDraft) {
+      guard let advancedSettingsModelKind else { return }
+      do {
+        _ = try modelLibrary.saveAlias(aliasDraft, for: advancedSettingsModelKind)
+        aliasError = nil
+      } catch {
+        aliasError = error.localizedDescription
+      }
+    }
     .onChange(of: selectedPage) {
-      if selectedPage != .server {
+      if selectedPage != .model {
         modelNavigationPath.removeAll()
       }
     }
@@ -135,30 +104,69 @@ struct ContentView: View {
     (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
   }
 
-  private func activateSelectedModel() {
-    let modelKind = modelLibrary.selectedModelKind
-    if configurationModelKind != modelKind {
-      if let configurationModelKind {
-        configuration.saveAdvancedSettings(for: configurationModelKind)
-      }
-      let migratesCurrentSettings =
-        configurationModelKind == nil
-        && !ServerConfiguration.hasSavedAdvancedSettings(for: modelKind)
-        && ServerConfiguration.hasSavedConfiguration()
-      configuration.loadAdvancedSettings(
-        for: modelKind,
-        migrateCurrent: migratesCurrentSettings
+  @ViewBuilder
+  private var selectedPageView: some View {
+    switch selectedPage {
+    case .server:
+      ServerView(
+        page: .server,
+        configuration: $configuration,
+        server: server,
+        modelLibrary: modelLibrary,
+        language: selectedLanguage,
+        showAdvancedSettings: showModelAdvancedSettings
       )
-      configurationModelKind = modelKind
+    case .model:
+      ServerView(
+        page: .model,
+        configuration: $configuration,
+        server: server,
+        modelLibrary: modelLibrary,
+        language: selectedLanguage,
+        showAdvancedSettings: showModelAdvancedSettings
+      )
+    case .advanced:
+      AdvancedView(
+        configuration: $configuration,
+        serverActive: server.isActive,
+        language: selectedLanguage
+      )
+    case .chat:
+      ChatView(
+        configuration: configuration,
+        server: server,
+        language: selectedLanguage
+      )
+    case .metric:
+      MetricView(
+        state: server.state,
+        performance: server.performance,
+        history: server.performanceHistory,
+        language: selectedLanguage,
+        clearHistory: server.clearPerformanceHistory
+      )
+    case .logs:
+      LogsView(server: server, language: selectedLanguage)
+    case .settings:
+      SettingsView(
+        languageCode: $languageCode,
+        language: selectedLanguage,
+        checkForUpdates: checkForUpdates
+      )
     }
-    synchronizeSelectedModelIdentity()
   }
 
-  private func synchronizeSelectedModelIdentity() {
+  private func activateSelectedModel() {
     let modelKind = modelLibrary.selectedModelKind
-    let model = modelLibrary.usableModel(for: modelKind)
-    configuration.modelPath = model?.url.path ?? ""
-    configuration.publicModel = model?.modelID ?? modelKind.defaultPublicModel
+    if advancedSettingsModelKind != modelKind {
+      if let advancedSettingsModelKind {
+        advancedSettings.save(for: advancedSettingsModelKind)
+      }
+      advancedSettingsModelKind = modelKind
+      advancedSettings = ModelAdvancedSettings.loadOrDefault(for: modelKind)
+      aliasDraft = modelLibrary.alias(for: modelKind)
+      aliasError = nil
+    }
   }
 
   private func showModelAdvancedSettings(_ modelKind: ModelKind) {
@@ -196,7 +204,9 @@ struct ContentView: View {
       Divider()
 
       ModelAdvancedView(
-        configuration: $configuration,
+        settings: $advancedSettings,
+        alias: $aliasDraft,
+        aliasError: aliasError,
         serverActive: server.isActive,
         dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
         modelKind: modelKind,
@@ -210,6 +220,7 @@ struct ContentView: View {
 
 private enum AppPage: String, CaseIterable, Identifiable {
   case server
+  case model
   case advanced
   case chat
   case metric
@@ -218,11 +229,12 @@ private enum AppPage: String, CaseIterable, Identifiable {
 
   var id: String { rawValue }
 
-  static let primaryPages: [AppPage] = [.server, .advanced, .chat, .metric, .logs]
+  static let primaryPages: [AppPage] = [.server, .model, .advanced, .chat, .metric, .logs]
 
   var icon: String {
     switch self {
     case .server: "externaldrive"
+    case .model: "shippingbox"
     case .advanced: "slider.horizontal.3"
     case .chat: "bubble"
     case .metric: "gauge.with.dots.needle.50percent"
@@ -234,6 +246,7 @@ private enum AppPage: String, CaseIterable, Identifiable {
   func title(language: AppLanguage) -> String {
     switch self {
     case .server: L10n.string("Server", language: language)
+    case .model: L10n.string("Model", language: language)
     case .advanced: L10n.string("Advance", language: language)
     case .chat: L10n.string("Chat", language: language)
     case .metric: L10n.string("Metric", language: language)
@@ -359,13 +372,6 @@ private struct AppInputModifier: ViewModifier {
 }
 
 extension View {
-  fileprivate func pageVisibility(_ isVisible: Bool) -> some View {
-    opacity(isVisible ? 1 : 0)
-      .allowsHitTesting(isVisible)
-      .disabled(!isVisible)
-      .accessibilityHidden(!isVisible)
-  }
-
   fileprivate func appCard(padding: CGFloat = 16) -> some View {
     modifier(AppCardModifier(padding: padding))
   }
@@ -375,7 +381,13 @@ extension View {
   }
 }
 
+private enum ServerViewPage {
+  case server
+  case model
+}
+
 private struct ServerView: View {
+  let page: ServerViewPage
   @Binding var configuration: ServerConfiguration
   @ObservedObject var server: ServerController
   @ObservedObject var modelLibrary: ModelLibrary
@@ -387,58 +399,61 @@ private struct ServerView: View {
   @State private var repairTarget: InstalledModelInfo?
   @State private var confirmsReinstall = false
   @State private var reinstallTarget: URL?
+  @State private var startError: String?
 
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 18) {
-        serverSummaryCard
+        if page == .server {
+          serverSummaryCard
 
-        SectionHeader(title: L10n.string("System Check", language: language))
-          .padding(.top, 10)
-        systemCheckPanel
+          SectionHeader(title: L10n.string("System Check", language: language))
+            .padding(.top, 10)
+          systemCheckPanel
 
-        HStack(spacing: 16) {
-          SectionHeader(title: L10n.string("Model", language: language))
-          Spacer()
-          Button {
-            chooseModelDirectory()
-          } label: {
-            Label(
-              L10n.string("Select Model Folder", language: language),
-              systemImage: "folder"
-            )
+          SectionHeader(title: L10n.string("Server", language: language))
+            .padding(.top, 10)
+          serverPanel
+        } else {
+          HStack(spacing: 16) {
+            SectionHeader(title: L10n.string("Model", language: language))
+            Spacer()
+            Button {
+              chooseModelDirectory()
+            } label: {
+              Label(
+                L10n.string("Select Model Folder", language: language),
+                systemImage: "folder"
+              )
+            }
+            .buttonStyle(.bordered)
+            .frame(minHeight: 40)
+            .contentShape(Rectangle())
+            .help(L10n.string("Select Model Folder", language: language))
+            .disabled(modelLibrary.isBusy)
           }
-          .buttonStyle(.bordered)
-          .frame(minHeight: 40)
-          .contentShape(Rectangle())
-          .help(L10n.string("Select Model Folder", language: language))
-          .disabled(server.isActive || modelLibrary.isBusy)
+
+          modelPanel
+
+          if modelLibrary.isBusy && modelLibrary.downloadModelKind == nil {
+            operationPanel
+          }
+
+          if let message = modelLibrary.message {
+            Label(
+              message,
+              systemImage: message.hasPrefix("無法")
+                ? "exclamationmark.triangle.fill" : "info.circle"
+            )
+            .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
+            .textSelection(.enabled)
+            .accessibilityLabel(L10n.string("Model status: %@", language: language, message))
+          }
+
+          if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
+            damagedModelsPanel
+          }
         }
-        .padding(.top, 10)
-
-        modelPanel
-
-        if modelLibrary.isBusy && modelLibrary.downloadModelKind == nil {
-          operationPanel
-        }
-
-        if let message = modelLibrary.message {
-          Label(
-            message,
-            systemImage: message.hasPrefix("無法") ? "exclamationmark.triangle.fill" : "info.circle"
-          )
-          .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
-          .textSelection(.enabled)
-          .accessibilityLabel(L10n.string("Model status: %@", language: language, message))
-        }
-
-        if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
-          damagedModelsPanel
-        }
-
-        SectionHeader(title: L10n.string("Server", language: language))
-          .padding(.top, 10)
-        serverPanel
       }
       .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
@@ -495,40 +510,47 @@ private struct ServerView: View {
   }
 
   private var serverSummaryCard: some View {
-    HStack(spacing: 18) {
-      Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
-        .resizable()
-        .interpolation(.high)
-        .frame(width: 56, height: 56)
-        .accessibilityHidden(true)
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 18) {
+        Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+          .resizable()
+          .interpolation(.high)
+          .frame(width: 56, height: 56)
+          .accessibilityHidden(true)
 
-      VStack(alignment: .leading, spacing: 5) {
-        HStack(spacing: 10) {
-          Text(selectedModel?.name ?? modelLibrary.selectedModelKind.displayName)
-            .font(.title3.bold())
-            .lineLimit(1)
-          Label(summaryStatusLabel, systemImage: summaryStatusSymbol)
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(summaryStatusColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(summaryStatusColor.opacity(0.12), in: Capsule())
+        VStack(alignment: .leading, spacing: 5) {
+          HStack(spacing: 10) {
+            Text("Whallm")
+              .font(.title3.bold())
+              .lineLimit(1)
+            Label(summaryStatusLabel, systemImage: summaryStatusSymbol)
+              .font(.callout.weight(.semibold))
+              .foregroundStyle(summaryStatusColor)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 4)
+              .background(summaryStatusColor.opacity(0.12), in: Capsule())
+          }
+          Text(summaryDetail)
+            .font(.callout.monospaced())
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
         }
-        Text(summaryDetail)
-          .font(selectedModelIsUsable ? .callout.monospaced() : .callout)
-          .foregroundStyle(.secondary)
-          .textSelection(.enabled)
-      }
-      .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .combine)
 
-      Spacer(minLength: 20)
+        Spacer(minLength: 20)
 
-      if server.isActive || selectedModelIsUsable {
         Button {
           if server.isActive {
             server.stop()
           } else {
-            server.start(configuration)
+            do {
+              let catalog = try modelLibrary.makeServerCatalog(
+                powerSavingLimitGBps: configuration.powerSavingLimitGBps)
+              startError = nil
+              server.start(configuration, catalog: catalog)
+            } catch {
+              startError = error.localizedDescription
+            }
           }
         } label: {
           Label(
@@ -540,6 +562,13 @@ private struct ServerView: View {
         .tint(.blue)
         .controlSize(.large)
         .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
+      }
+
+      if let startError {
+        Text(startError)
+          .font(.caption)
+          .foregroundStyle(.red)
+          .accessibilityLabel(L10n.string("Error: %@", language: language, startError))
       }
     }
     .appCard(padding: 22)
@@ -595,17 +624,6 @@ private struct ServerView: View {
       }
       .disabled(server.isActive)
 
-      Divider()
-
-      SettingRow(
-        "Model ID",
-        hint: "Model name exposed by the OpenAI-compatible API.",
-        language: language
-      ) {
-        TextField("deepseek-v4-flash-0731", text: $configuration.publicModel)
-          .appInput(width: 320)
-      }
-      .disabled(server.isActive)
     }
     .appCard()
   }
@@ -690,7 +708,7 @@ private struct ServerView: View {
       Divider()
       modelFolderSummary
 
-      if modelLibrary.verificationModelPath == configuration.modelPath,
+      if modelLibrary.verificationModelPath == selectedModel?.url.path,
         let issues = modelLibrary.verificationIssues
       {
         if issues.isEmpty {
@@ -1018,65 +1036,22 @@ private struct ServerView: View {
   }
 
   private var selectedModel: InstalledModelInfo? {
-    modelLibrary.usableModels.first { $0.url.path == configuration.modelPath }
-  }
-
-  private var selectedModelIsUsable: Bool {
-    modelLibrary.canUseModel(at: configuration.modelPath)
-  }
-
-  private var selectedModelDownloadIsActive: Bool {
-    modelLibrary.downloadModelKind == modelLibrary.selectedModelKind
-  }
-
-  private var selectedModelNeedsAttention: Bool {
-    (selectedModel != nil && !selectedModelIsUsable)
-      || modelLibrary.damagedModels.contains {
-        $0.modelKind == modelLibrary.selectedModelKind
-      }
+    modelLibrary.usableModel(for: modelLibrary.selectedModelKind)
   }
 
   private var summaryStatusLabel: String {
-    if selectedModelDownloadIsActive {
-      return L10n.string("Setup in progress", language: language)
-    }
-    if selectedModelNeedsAttention {
-      return L10n.string("Model needs attention", language: language)
-    }
-    if selectedModel == nil {
-      return L10n.string("Setup required", language: language)
-    }
     return server.state.label
   }
 
   private var summaryStatusSymbol: String {
-    if selectedModelDownloadIsActive { return "arrow.down.circle.fill" }
-    if !selectedModelIsUsable { return "exclamationmark.circle.fill" }
     return "circle.fill"
   }
 
   private var summaryStatusColor: Color {
-    if selectedModelDownloadIsActive { return .blue }
-    if selectedModelNeedsAttention { return .red }
-    if selectedModel == nil { return .orange }
     return statusColor
   }
 
   private var summaryDetail: String {
-    if selectedModelDownloadIsActive {
-      return L10n.string(
-        "Download progress is shown in the model row below.", language: language)
-    }
-    if selectedModelNeedsAttention {
-      return L10n.string(
-        "Verify or repair the model before starting the server.", language: language)
-    }
-    if selectedModel == nil {
-      return L10n.string(
-        "Download this model or select a model folder that contains it.",
-        language: language
-      )
-    }
     return configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL")
   }
 
@@ -1231,8 +1206,6 @@ private struct ServerView: View {
         {
           modelLibrary.selectedModelKind = firstModel.modelKind
         }
-        configuration.modelPath =
-          modelLibrary.usableModel(for: modelLibrary.selectedModelKind)?.url.path ?? ""
       }
     }
   }
@@ -1320,12 +1293,12 @@ func modelDownloadIsDisabled(
 }
 
 func modelSelectionIsLocked(
-  serverIsActive: Bool,
+  serverIsActive _: Bool,
   operationIsBusy: Bool,
   downloadIsActive: Bool,
   hasPartialDownload _: Bool
 ) -> Bool {
-  serverIsActive || (operationIsBusy && !downloadIsActive)
+  operationIsBusy && !downloadIsActive
 }
 
 private struct AdvancedView: View {
@@ -1439,7 +1412,9 @@ private struct AdvancedView: View {
 }
 
 private struct ModelAdvancedView: View {
-  @Binding var configuration: ServerConfiguration
+  @Binding var settings: ModelAdvancedSettings
+  @Binding var alias: String
+  let aliasError: String?
   let serverActive: Bool
   let dsparkAvailable: Bool
   let modelKind: ModelKind
@@ -1448,31 +1423,63 @@ private struct ModelAdvancedView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: L10n.string("Model", language: language))
+        VStack(spacing: 0) {
+          SettingRow(
+            "Alias",
+            hint: "Optional request name for this model. Changes are saved automatically.",
+            language: language
+          ) {
+            VStack(alignment: .trailing, spacing: 6) {
+              TextField(
+                L10n.string("Optional Alias", language: language),
+                text: $alias
+              )
+              .appInput(width: 340)
+              .accessibilityLabel(
+                L10n.string("Alias for %@", language: language, modelKind.displayName))
+
+              if let aliasError {
+                Label(aliasError, systemImage: "exclamationmark.triangle.fill")
+                  .font(.caption)
+                  .foregroundStyle(.red)
+                  .accessibilityLabel(
+                    L10n.string("Error: %@", language: language, aliasError))
+              }
+            }
+          }
+        }
+        .appCard()
+        .disabled(serverActive)
+
         SectionHeader(title: L10n.string("Generate", language: language))
+          .padding(.top, 12)
         VStack(spacing: 0) {
           integerField(
             "Max tokens",
             hint: "Default token limit for each request.",
-            value: $configuration.defaultMaxTokens
+            value: $settings.defaultMaxTokens
           )
-          Divider()
-          doubleField(
-            "Temperature",
-            hint: "A higher value increases output variation.",
-            value: $configuration.defaultTemperature
-          )
-          Divider()
-          doubleField(
-            "Top P",
-            hint: "A lower value reduces the candidate token range.",
-            value: $configuration.defaultTopP
-          )
-          Divider()
-          integerField(
-            "Top K",
-            hint: "0 disables Top K. Qwen uses 20 by default.",
-            value: $configuration.defaultTopK
-          )
+          if modelKind == .deepSeekV4 {
+            Divider()
+            doubleField(
+              "Temperature",
+              hint: "A higher value increases output variation.",
+              value: $settings.defaultTemperature
+            )
+            Divider()
+            doubleField(
+              "Top P",
+              hint: "A lower value reduces the candidate token range.",
+              value: $settings.defaultTopP
+            )
+            Divider()
+            integerField(
+              "Top K",
+              hint: "0 disables Top K.",
+              value: $settings.defaultTopK
+            )
+          }
         }
         .appCard()
         .disabled(serverActive)
@@ -1484,44 +1491,44 @@ private struct ModelAdvancedView: View {
             "Slots",
             hint:
               "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
-            value: $configuration.slots
+            value: $settings.slots
           )
           Divider()
           integerField(
             "Read workers",
             hint:
               "Number of workers that read expert blobs at the same time. The recommended value is 4.",
-            value: $configuration.readWorkers
+            value: $settings.readWorkers
           )
           Divider()
           integerField(
             "Memory limit GiB",
             hint: "0 selects the model-safe automatic limit.",
-            value: $configuration.memoryLimitGiB
+            value: $settings.memoryLimitGiB
           )
           Divider()
           integerField(
             "Prefill step size",
             hint: "0 selects 128, 256, or 1024 based on the prompt length.",
-            value: $configuration.prefillStepSize
+            value: $settings.prefillStepSize
           )
           Divider()
           toggleField(
             "Use layer-major prefill",
             hint: "Loads routed experts by layer during prefill.",
-            value: $configuration.layerMajorPrefill
+            value: $settings.layerMajorPrefill
           )
           Divider()
           integerField(
             "Prompt cache entries",
             hint: "Number of linear conversations to keep. The recommended value is 2.",
-            value: $configuration.promptCacheEntries
+            value: $settings.promptCacheEntries
           )
           Divider()
           integerField(
             "Prompt cache GiB",
             hint: "Memory limit for all prompt caches. The recommended value is 8.",
-            value: $configuration.promptCacheMemoryGiB
+            value: $settings.promptCacheMemoryGiB
           )
           Divider()
           SettingRow(
@@ -1531,7 +1538,7 @@ private struct ModelAdvancedView: View {
           ) {
             TextField(
               L10n.string("Optional UTF-8 prompt file path", language: language),
-              text: $configuration.warmupPromptPath
+              text: $settings.warmupPromptPath
             )
             .appInput(width: 340)
           }
@@ -1540,13 +1547,13 @@ private struct ModelAdvancedView: View {
             toggleField(
               "Use BF16 KV cache",
               hint: "Stores the KV cache in BF16 format.",
-              value: $configuration.bf16KVCache
+              value: $settings.bf16KVCache
             )
             Divider()
             toggleField(
               "Use DSpark",
               hint: "Uses DSpark speculative decoding when it is installed.",
-              value: $configuration.dsparkEnabled
+              value: $settings.dsparkEnabled
             )
             .disabled(!dsparkAvailable)
             Divider()
@@ -1554,17 +1561,17 @@ private struct ModelAdvancedView: View {
               "DSpark slots",
               hint:
                 "Number of DSpark routed experts kept in memory. The recommended value is 768.",
-              value: $configuration.dsparkSlots
+              value: $settings.dsparkSlots
             )
-            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+            .disabled(!settings.dsparkEnabled || !dsparkAvailable)
             Divider()
             doubleField(
               "DSpark confidence threshold",
               hint:
                 "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
-              value: $configuration.dsparkConfidenceThreshold
+              value: $settings.dsparkConfidenceThreshold
             )
-            .disabled(!configuration.dsparkEnabled || !dsparkAvailable)
+            .disabled(!settings.dsparkEnabled || !dsparkAvailable)
           }
         }
         .appCard()
@@ -1825,7 +1832,6 @@ private struct SettingsView: View {
 }
 
 private struct MetricView: View {
-  let model: String
   let state: ServerController.State
   let performance: LivePerformance
   let history: PerformanceHistory
@@ -1977,7 +1983,7 @@ private struct MetricView: View {
         .frame(width: 9, height: 9)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 3) {
-        Text(model)
+        Text(activeModelLabel)
           .font(.headline)
           .lineLimit(1)
         Text(localizedStateLabel)
@@ -2070,6 +2076,14 @@ private struct MetricView: View {
     case .stopping: localized("Stopping")
     case .failed: localized("Start failed")
     }
+  }
+
+  private var activeModelLabel: String {
+    if let loadedModel = performance.loadedModel { return loadedModel }
+    if let loadingModel = performance.loadingModel {
+      return L10n.string("Loading %@", language: language, loadingModel)
+    }
+    return localized("No model loaded")
   }
 
   private func metricTitle(_ metric: PerformanceMetric) -> String {
@@ -2192,14 +2206,21 @@ private struct SettingRow<Value: View>: View {
   }
 }
 
+func resolvedChatModelName(savedName: String, models: [CatalogModel]) -> String? {
+  guard !models.isEmpty else { return nil }
+  return models.first {
+    $0.requestName == savedName || $0.id == savedName
+  }?.requestName ?? models.first?.requestName
+}
+
 private struct ChatView: View {
   let configuration: ServerConfiguration
   @ObservedObject var server: ServerController
-  let assistantName: String
   let language: AppLanguage
   @State private var messages = ChatHistory.load()
   @AppStorage("chatDraft") private var input = ""
   @AppStorage("chatThinkingMode") private var thinkingMode = "chat"
+  @AppStorage("chatModel") private var selectedModelName = ""
   @State private var isSending = false
   @State private var generationTask: Task<Void, Never>?
   @State private var errorMessage: String?
@@ -2216,6 +2237,15 @@ private struct ChatView: View {
         }
         .accessibilityElement(children: .combine)
         Spacer()
+        Picker(localized("Model"), selection: $selectedModelName) {
+          ForEach(server.catalogModels) { model in
+            Text(modelPickerLabel(model)).tag(model.requestName)
+          }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 300)
+        .disabled(server.catalogModels.isEmpty)
+        .accessibilityLabel(localized("Model"))
         Picker(localized("Mode"), selection: $thinkingMode) {
           Text(localized("Chat")).tag("chat")
           Text(localized("Thinking")).tag("thinking")
@@ -2238,7 +2268,7 @@ private struct ChatView: View {
                     L10n.string(
                       "Start the server. Then send a message to %@.",
                       language: language,
-                      assistantName
+                      selectedCatalogModel?.requestName ?? localized("Assistant")
                     )
                   )
                 )
@@ -2246,7 +2276,10 @@ private struct ChatView: View {
               } else {
                 ForEach(messages) { message in
                   VStack(alignment: .leading, spacing: 6) {
-                    Text(message.role == "user" ? localized("You") : assistantName)
+                    Text(
+                      message.role == "user"
+                        ? localized("You") : message.modelName ?? localized("Assistant")
+                    )
                       .font(.callout.bold())
                       .foregroundStyle(.secondary)
                     if !message.reasoningContent.isEmpty {
@@ -2369,7 +2402,7 @@ private struct ChatView: View {
             .buttonStyle(.borderedProminent)
             .tint(.blue)
             .controlSize(.large)
-            .disabled(server.state != .running)
+            .disabled(server.state != .running || selectedCatalogModel == nil)
             .keyboardShortcut(.return, modifiers: .command)
           }
         }
@@ -2383,6 +2416,8 @@ private struct ChatView: View {
     .background(AppTheme.pageBackground)
     .environment(\.locale, language.locale)
     .onDisappear { generationTask?.cancel() }
+    .onChange(of: server.catalogModels) { selectAvailableModel() }
+    .onAppear { selectAvailableModel() }
     .confirmationDialog(
       localized("Clear the test chat?"),
       isPresented: $showingClearConfirmation,
@@ -2421,9 +2456,30 @@ private struct ChatView: View {
     L10n.string(key, language: language)
   }
 
+  private var selectedCatalogModel: CatalogModel? {
+    server.catalogModels.first {
+      $0.requestName == selectedModelName || $0.id == selectedModelName
+    }
+  }
+
+  private func modelPickerLabel(_ model: CatalogModel) -> String {
+    guard let alias = model.alias, alias != model.id else { return model.id }
+    return "\(alias) — \(model.id)"
+  }
+
+  private func selectAvailableModel() {
+    guard let resolved = resolvedChatModelName(
+      savedName: selectedModelName,
+      models: server.catalogModels
+    ) else { return }
+    selectedModelName = resolved
+  }
+
   private func send() {
     let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty, let baseURL = configuration.baseURL else { return }
+    guard !text.isEmpty, let baseURL = configuration.baseURL,
+      let model = selectedCatalogModel?.requestName
+    else { return }
     let userMessage = ChatMessage(role: "user", content: text)
     messages.append(userMessage)
     input = ""
@@ -2431,7 +2487,8 @@ private struct ChatView: View {
     isSending = true
     let requestMessages = messages
     let assistantID = UUID()
-    messages.append(ChatMessage(id: assistantID, role: "assistant", content: ""))
+    messages.append(
+      ChatMessage(id: assistantID, role: "assistant", content: "", modelName: model))
     ChatHistory.save(messages)
     generationTask = Task {
       defer {
@@ -2444,7 +2501,7 @@ private struct ChatView: View {
           messages: requestMessages,
           baseURL: baseURL,
           apiKey: configuration.apiKey,
-          model: configuration.publicModel,
+          model: model,
           thinkingMode: thinkingMode,
           enableTestTool: false
         ) { delta in

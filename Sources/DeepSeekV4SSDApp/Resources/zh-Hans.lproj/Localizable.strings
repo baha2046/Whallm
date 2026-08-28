@@ -71,6 +71,15 @@
 "Minimum" = "历史最低";
 "Memory limit for all prompt caches. The recommended value is 8." = "所有 prompt cache 的内存上限。建议值是 8。";
 "Model" = "模型";
+"Alias" = "Alias";
+"Optional Alias" = "可选 Alias";
+"Alias for %@" = "%@ 的 Alias";
+"Optional request name for this model. Changes are saved automatically." = "此模型的可选 request 名称。更改会自动保存。";
+"Alias conflicts with %@." = "Alias 与 %@ 冲突。";
+"Assistant" = "助理";
+"Loading %@" = "正在加载 %@";
+"No model loaded" = "尚未加载模型";
+"Qwen3.8-Flash-Next does not support DSpark." = "Qwen3.8-Flash-Next 不支持 DSpark。";
 "Model folder" = "模型文件夹";
 "Model ID" = "模型 ID";
 "Model ID cannot be empty." = "Model ID 不可为空。";
@@ -248,7 +257,7 @@
 "The App downloads a verified MXFP4 installed model for Qwen." = "App 会为 Qwen 下载经过验证的 MXFP4 installed model。";
 "%@ · %@ · %@" = "%@ · %@ · %@";
 "Top K" = "Top K";
-"0 disables Top K. Qwen uses 20 by default." = "0 表示停用 Top K。Qwen 默认使用 20。";
+"0 disables Top K." = "0 表示停用 Top K。";
 "Start the server. Then send a message to %@." = "启动服务器，然后向 %@ 发送消息。";
 "High-speed SSD" = "高速 SSD";
 "Stop Download" = "停止下载";
