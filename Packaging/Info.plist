@@ -35,7 +35,7 @@
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>SUFeedURL</key>
-  <string>https://github.com/yanun0323/deepseek_ssd/releases/latest/download/appcast.xml</string>
+  <string>https://github.com/yanun0323/Wallm/releases/latest/download/appcast.xml</string>
   <key>SUEnableAutomaticChecks</key>
   <true/>
   <key>SUAutomaticallyUpdate</key>

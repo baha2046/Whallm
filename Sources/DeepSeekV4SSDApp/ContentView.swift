@@ -1879,28 +1879,28 @@ private struct SettingsView: View {
             title: "GitHub Repository",
             note: "Source, issues, and roadmap",
             icon: "chevron.left.forwardslash.chevron.right",
-            url: "https://github.com/yanun0323/deepseek_ssd"
+            url: "https://github.com/yanun0323/Wallm"
           )
           Divider()
           projectLink(
             title: "Releases",
             note: "Download the latest macOS app",
             icon: "shippingbox",
-            url: "https://github.com/yanun0323/deepseek_ssd/releases"
+            url: "https://github.com/yanun0323/Wallm/releases"
           )
           Divider()
           projectLink(
             title: "Documentation",
             note: "Setup, model management, and API usage",
             icon: "book.closed",
-            url: "https://github.com/yanun0323/deepseek_ssd#readme"
+            url: "https://github.com/yanun0323/Wallm#readme"
           )
           Divider()
           projectLink(
             title: "Report an Issue",
             note: "Report bugs and request features on GitHub",
             icon: "exclamationmark.bubble",
-            url: "https://github.com/yanun0323/deepseek_ssd/issues"
+            url: "https://github.com/yanun0323/Wallm/issues"
           )
         }
         .appCard()
