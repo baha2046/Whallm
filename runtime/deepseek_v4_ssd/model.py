@@ -37,6 +37,7 @@ class RuntimeConfig:
     fp8_kv_cache: bool = True
     memory_limit_gib: int = 0
     layer_major_prefill: bool = True
+    layer_major_prefill_threshold: int = 1_024
     prompt_cache_entries: int = 2
     prompt_cache_memory_gib: int = 8
     persistent_prompt_cache: bool = True

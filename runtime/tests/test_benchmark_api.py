@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 import tempfile
 import threading
 import time
@@ -11,8 +12,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "runtime"))
+from deepseek_v4_ssd.tool_codec import ToolCodec
+
 SPEC = importlib.util.spec_from_file_location(
     "benchmark_api",
     PROJECT_ROOT / "Scripts" / "benchmark_api.py",
@@ -35,6 +38,13 @@ class FakeTokenizer:
     def apply_chat_template(self, messages, *, add_generation_prompt, tokenize):
         assert add_generation_prompt and not tokenize
         return f"<user>{messages[0]['content']}</user><assistant>"
+
+
+class MissingTemplateTokenizer(FakeTokenizer):
+    chat_template = None
+
+    def apply_chat_template(self, messages, *, add_generation_prompt, tokenize):
+        raise ValueError("tokenizer.chat_template is not set")
 
 
 class FakeBenchmarkHandler(BaseHTTPRequestHandler):
@@ -98,6 +108,35 @@ class FakeBenchmarkHandler(BaseHTTPRequestHandler):
 
 
 class BenchmarkAPITests(unittest.TestCase):
+    def test_loads_the_deepseek_chat_encoder_when_jinja_is_missing(self):
+        tokenizer = MissingTemplateTokenizer()
+        auto_tokenizer = mock.Mock()
+        auto_tokenizer.from_pretrained.return_value = tokenizer
+        codec = mock.Mock()
+        codec.encode.side_effect = lambda messages, thinking_mode: (
+            f"<user>{messages[0]['content']}</user><assistant>"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory)
+            (model_path / "tokenizer").mkdir()
+            with (
+                mock.patch.dict(
+                    "sys.modules",
+                    {"transformers": SimpleNamespace(AutoTokenizer=auto_tokenizer)},
+                ),
+                mock.patch.object(ToolCodec, "open", return_value=codec),
+            ):
+                loaded = benchmark_api.load_tokenizer(str(model_path))
+                prompt, tokens = benchmark_api.build_exact_prompt(
+                    loaded,
+                    {"role": "user", "content": "x" * 2_000},
+                    1_024,
+                )
+
+        self.assertEqual(len(tokens), 1_024)
+        self.assertTrue(prompt.endswith("</user><assistant>"))
+        codec.encode.assert_called_with(mock.ANY, "chat")
+
     def test_builds_an_exact_prompt(self):
         prompt, tokens = benchmark_api.build_exact_prompt(
             FakeTokenizer(),

@@ -48,6 +48,7 @@ from deepseek_v4_ssd.generation import (
     _encode_cache_state,
     _persistence_cache_state,
     _restore_persistence_cache,
+    _uses_layer_major_prefill,
 )
 from deepseek_v4_ssd.io_metrics import (
     PageCacheReadClassification,
@@ -84,6 +85,28 @@ _mlx_lm_generate = importlib.import_module("mlx_lm.generate")
 
 
 class ModelRuntimeTests(unittest.TestCase):
+    def test_layer_major_prefill_uses_configured_deepseek_threshold(self):
+        default = SimpleNamespace(layer_major_prefill=True)
+        configured = SimpleNamespace(
+            layer_major_prefill=True,
+            layer_major_prefill_threshold=2_048,
+        )
+        self.assertFalse(
+            _uses_layer_major_prefill(default, is_qwen=False, token_count=1_023)
+        )
+        self.assertTrue(
+            _uses_layer_major_prefill(default, is_qwen=False, token_count=1_024)
+        )
+        self.assertFalse(
+            _uses_layer_major_prefill(configured, is_qwen=False, token_count=2_047)
+        )
+        self.assertTrue(
+            _uses_layer_major_prefill(configured, is_qwen=False, token_count=2_048)
+        )
+        self.assertTrue(
+            _uses_layer_major_prefill(configured, is_qwen=True, token_count=128)
+        )
+
     def test_generation_passes_sampler_and_presence_processor_options(self):
         installed = SimpleNamespace(
             root=Path("/tmp/tokenizer"),

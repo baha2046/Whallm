@@ -154,6 +154,12 @@ class ModelCatalogTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ModelCatalogError):
                 parse_model_catalog({"version": 1, "models": [model]})
 
+    def test_layer_major_prefill_threshold_must_be_positive(self):
+        model = raw_model("deepseek-v4")
+        model["runtime"]["layer_major_prefill_threshold"] = 0
+        with self.assertRaises(ModelCatalogError):
+            parse_model_catalog({"version": 1, "models": [model]})
+
 
 class ModelManagerTests(unittest.TestCase):
     def test_listing_and_status_do_not_load_a_runtime(self):
@@ -194,6 +200,24 @@ class ModelManagerTests(unittest.TestCase):
         with manager.request("deepseek-v4-flash-0731") as second:
             self.assertIs(first.runtime, second.runtime)
         self.assertEqual(loads, ["deepseek-v4-flash-0731"])
+
+    def test_manual_load_and_unload_use_the_same_runtime(self):
+        events = []
+        manager = ModelManager(
+            [spec("deepseek-v4", "work-model")],
+            runtime_loader=lambda model: FakeRuntime(model.id, events),
+            clear_cache=lambda: events.append("clear"),
+        )
+
+        manager.load("work-model")
+        self.assertEqual(
+            manager.status_snapshot()["loaded_model"],
+            "deepseek-v4-flash-0731",
+        )
+        manager.unload("deepseek-v4-flash-0731")
+
+        self.assertIsNone(manager.status_snapshot()["loaded_model"])
+        self.assertEqual(events, ["close:deepseek-v4-flash-0731", "clear"])
 
     def test_switch_closes_and_clears_before_loading_the_next_runtime(self):
         events = []

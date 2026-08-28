@@ -48,6 +48,17 @@ THINK_START = "<think>"
 THINK_END = "</think>"
 
 
+def _uses_layer_major_prefill(config: Any, *, is_qwen: bool, token_count: int) -> bool:
+    threshold = (
+        128
+        if is_qwen
+        else getattr(config, "layer_major_prefill_threshold", 1_024)
+    )
+    return bool(
+        getattr(config, "layer_major_prefill", True) and token_count >= threshold
+    )
+
+
 @contextmanager
 def _use_mlx_lm_generation_stream(stream):
     with _MLX_LM_GENERATION_LOCK:
@@ -1868,9 +1879,10 @@ class ModelRuntime:
                     getattr(self.config, "prefill_step_size", 128),
                     len(generation_prompt),
                 )
-                use_layer_major = bool(
-                    getattr(self.config, "layer_major_prefill", True)
-                    and len(generation_prompt) >= (128 if self._is_qwen else 4_096)
+                use_layer_major = _uses_layer_major_prefill(
+                    self.config,
+                    is_qwen=self._is_qwen,
+                    token_count=len(generation_prompt),
                 )
                 self.metrics.start(
                     len(prompt_tokens),

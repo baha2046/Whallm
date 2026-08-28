@@ -38,6 +38,7 @@ class FakeRuntime:
         moe_prefill_step_size=0,
         fp8_kv_cache=True,
         layer_major_prefill=True,
+        layer_major_prefill_threshold=1_024,
         batched_expert_prefill=True,
         prompt_cache_entries=2,
         prompt_cache_memory_gib=8,
@@ -403,6 +404,19 @@ class ServerArgumentTests(unittest.TestCase):
         )
         self.assertEqual(arguments.expert_file_cache_policy, "bypass")
 
+    def test_layer_major_prefill_threshold_defaults_to_1024(self):
+        arguments = _parser().parse_args(["--model", "/tmp/model"])
+        self.assertEqual(arguments.layer_major_prefill_threshold, 1_024)
+        arguments = _parser().parse_args(
+            [
+                "--model",
+                "/tmp/model",
+                "--layer-major-prefill-threshold",
+                "2048",
+            ]
+        )
+        self.assertEqual(arguments.layer_major_prefill_threshold, 2_048)
+
     def test_power_saving_limit_uses_fixed_values(self):
         self.assertIsNone(
             _parser().parse_args(["--model", "/tmp/model"]).power_saving_limit_gbps
@@ -510,6 +524,70 @@ class ServerTests(unittest.TestCase):
             ["deepseek-v4-flash-0731", "work-model"],
         )
         self.assertEqual(models[0]["owned_by"], models[1]["owned_by"])
+
+    def test_model_load_and_unload_require_bearer_key(self):
+        runtime = FakeRuntime()
+        manager = ModelManager(
+            [
+                ModelSpec(
+                    id="deepseek-v4-flash-0731",
+                    alias="work-model",
+                    path="/tmp/model",
+                    model_kind="deepseek-v4",
+                    runtime=RuntimeConfig(),
+                    defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
+                )
+            ],
+            runtime_loader=lambda _: runtime,
+            clear_cache=lambda: None,
+        )
+        server = OpenAIServer(("127.0.0.1", 0), manager, api_key="secret")
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base = f"http://127.0.0.1:{server.server_port}"
+
+        def request(path, model, *, authenticated=True):
+            headers = {"Content-Type": "application/json"}
+            if authenticated:
+                headers["Authorization"] = "Bearer secret"
+            value = Request(
+                base + path,
+                data=json.dumps({"model": model}).encode(),
+                headers=headers,
+                method="POST",
+            )
+            try:
+                with urlopen(value) as response:
+                    return response.status, response.read()
+            except HTTPError as error:
+                try:
+                    return error.code, error.read()
+                finally:
+                    error.close()
+
+        try:
+            status, body = request(
+                "/api/models/load", "work-model", authenticated=False
+            )
+            self.assertEqual(status, 401)
+            self.assertEqual(json.loads(body)["error"]["code"], "invalid_api_key")
+
+            status, body = request("/api/models/load", "work-model")
+            self.assertEqual(status, 200)
+            self.assertEqual(
+                json.loads(body)["loaded_model"], "deepseek-v4-flash-0731"
+            )
+
+            status, body = request(
+                "/api/models/unload", "deepseek-v4-flash-0731"
+            )
+            self.assertEqual(status, 200)
+            self.assertIsNone(json.loads(body)["loaded_model"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+            manager.close()
 
     def test_generation_responses_preserve_the_requested_alias(self):
         chat_status, _, chat_body = self.request(
@@ -1154,6 +1232,7 @@ class ServerTests(unittest.TestCase):
         self.assertIsNone(payload["runtime"]["power_saving_limit_gbps"])
         self.assertFalse(payload["runtime"]["expert_page_cache_probe"])
         self.assertFalse(payload["runtime"]["dspark_prompt_cache"])
+        self.assertEqual(payload["runtime"]["layer_major_prefill_threshold"], 1_024)
         self.assertEqual(payload["runtime"]["expert_file_cache_policy"], "cached")
         self.assertEqual(
             payload["runtime"]["expert_file_direct_io_alignment_bytes"],

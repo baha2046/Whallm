@@ -57,6 +57,7 @@ def main() -> None:
     parser.add_argument("--prefill-step-size", type=int, default=0)
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
     parser.add_argument("--no-layer-major-prefill", action="store_true")
+    parser.add_argument("--layer-major-prefill-threshold", type=int, default=1_024)
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
@@ -160,6 +161,8 @@ def main() -> None:
         parser.error("--prefill-step-size must be zero or greater")
     if arguments.moe_prefill_step_size < 0:
         parser.error("--moe-prefill-step-size must be zero or greater")
+    if arguments.layer_major_prefill_threshold < 1:
+        parser.error("--layer-major-prefill-threshold must be greater than zero")
     if arguments.prompt_cache_entries < 1:
         parser.error("--prompt-cache-entries must be greater than zero")
     if arguments.prompt_cache_memory_gib < 1:
@@ -204,6 +207,7 @@ def main() -> None:
         moe_prefill_step_size=arguments.moe_prefill_step_size,
         fp8_kv_cache=not arguments.bf16_kv_cache,
         layer_major_prefill=not arguments.no_layer_major_prefill,
+        layer_major_prefill_threshold=arguments.layer_major_prefill_threshold,
         batched_expert_prefill=not arguments.no_batched_expert_prefill,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
@@ -330,6 +334,7 @@ def main() -> None:
             "peak_memory_bytes": mx.get_peak_memory(),
             "fp8_kv_cache": config.fp8_kv_cache,
             "prefill_step_size": config.prefill_step_size,
+            "layer_major_prefill_threshold": config.layer_major_prefill_threshold,
             "moe_prefill_step_size": config.moe_prefill_step_size,
             "selected_moe_prefill_step_size": selected_moe_step_size,
             "prefill_attention_chunk_sizes": attention_chunk_sizes,

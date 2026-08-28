@@ -225,6 +225,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "prefetch_read_workers": 1,
         "prefill_step_size": 0,
         "memory_limit_gib": 0,
+        "layer_major_prefill_threshold": 1,
         "prompt_cache_entries": 1,
         "prompt_cache_memory_gib": 1,
         "persistent_prompt_cache_entries": 1,
@@ -408,6 +409,30 @@ class ModelManager:
             runtime = self._ensure_loaded(spec, name)
             yield ModelRequest(name, spec.id, runtime, spec.defaults)
 
+    def load(self, name: Any) -> None:
+        spec = self._by_name.get(name) if isinstance(name, str) else None
+        if spec is None:
+            raise ModelNotFound(str(name) if name is not None else "")
+        with self._generation_lock:
+            self._ensure_loaded(spec, name)
+
+    def unload(self, name: Any) -> None:
+        spec = self._by_name.get(name) if isinstance(name, str) else None
+        if spec is None:
+            raise ModelNotFound(str(name) if name is not None else "")
+        with self._generation_lock:
+            with self._state_lock:
+                if self._loaded != spec:
+                    return
+            runtime = self._detach_runtime()
+            if runtime is not None:
+                try:
+                    runtime.close()
+                finally:
+                    del runtime
+                    gc.collect()
+                    self._clear_cache()
+
     def status_snapshot(self) -> dict[str, Any]:
         with self._state_lock:
             runtime = self._runtime
@@ -469,6 +494,9 @@ class ModelManager:
                     "prefill_step_size": config.prefill_step_size,
                     "moe_prefill_step_size": config.moe_prefill_step_size,
                     "layer_major_prefill": config.layer_major_prefill,
+                    "layer_major_prefill_threshold": (
+                        config.layer_major_prefill_threshold
+                    ),
                     "batched_expert_prefill": config.batched_expert_prefill,
                     "prompt_cache_entries": config.prompt_cache_entries,
                     "prompt_cache_memory_gib": config.prompt_cache_memory_gib,

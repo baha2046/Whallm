@@ -286,6 +286,16 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             payload = self._request_json()
             with self.app.model_manager.request(payload.get("model")) as model:
                 self._completion(payload, model)
+        elif path == "/api/models/load":
+            self._authorize()
+            payload = self._request_json()
+            self.app.model_manager.load(payload.get("model"))
+            self._json(200, self._status())
+        elif path == "/api/models/unload":
+            self._authorize()
+            payload = self._request_json()
+            self.app.model_manager.unload(payload.get("model"))
+            self._json(200, self._status())
         else:
             raise APIError("Route not found.", status=404, code="not_found")
 
@@ -1898,6 +1908,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--moe-prefill-step-size", type=int, default=0)
     parser.add_argument("--no-layer-major-prefill", action="store_true")
+    parser.add_argument(
+        "--layer-major-prefill-threshold",
+        type=int,
+        default=1_024,
+        help="minimum uncached prompt tokens for DeepSeek layer-major prefill",
+    )
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
@@ -1983,6 +1999,7 @@ def main() -> None:
         moe_prefill_step_size=arguments.moe_prefill_step_size,
         fp8_kv_cache=not arguments.bf16_kv_cache,
         layer_major_prefill=not arguments.no_layer_major_prefill,
+        layer_major_prefill_threshold=arguments.layer_major_prefill_threshold,
         batched_expert_prefill=not arguments.no_batched_expert_prefill,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
