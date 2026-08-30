@@ -1,0 +1,85 @@
+{
+  "captured_at": "2026-08-30T01:52:37+08:00",
+  "evidence_kind": "qwen_mtp_external_reference_distribution_parity",
+  "formal_performance_result": false,
+  "status": "passed",
+  "environment": {
+    "machine": "Apple M5 Pro",
+    "memory_gib": 64,
+    "platform": "macOS 26.6.2 arm64",
+    "python": "3.14.7",
+    "go": "1.26.5",
+    "mlx_local": "0.32.0",
+    "mlx_lm_local": "0.31.3",
+    "mlx_reference_commit": "c793734eb715dbcfdb1ced58e348ec53c2d7ed85",
+    "mlx_c_reference_commit": "fba4470b89073180056c9ea46c443051375f7399"
+  },
+  "source_provenance": {
+    "checkpoint_model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "ollama_repository": "https://github.com/ollama/ollama",
+    "ollama_commit": "f96e7aa0513b9973a0ccc71be414c2ecb9d65b1a",
+    "ollama_qwen_graph_sha256": "41c8ec468f929260d4bf4f63dc298086ca3cb37f51365fa1d3786648ffe03163",
+    "reference_harness_sha256": "c4afb826f35c160587320db70900fd4a02c2b383446f68fe2073cfd3bda3a0f7",
+    "project_base_commit": "c86532e6585a9a4d0d6d36222049b0721f926701",
+    "project_working_tree_dirty": true,
+    "local_qwen_graph_sha256": "cbe10ac2610ae4c94dc5a08633cd19b6cfd7cd3d27ad43a3b8fb86e495437c4d",
+    "comparison_script_sha256": "02ce675dfdcea7c9be2fc0bff074fb20ab6983d740acdd145df8f2d16a822951",
+    "mtp_common_sha256": "2604d969eabc990b83830581c85d1bb647f4994810939ded5637480b60fb6641",
+    "mtp_experts_sha256": "8c4b24665ee3a74c86880d25dd44939232447fc4b4b2cd183e7bc0730aa06da2"
+  },
+  "workload": {
+    "prompt": "Hello world",
+    "prompt_sha256": "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c",
+    "prompt_token_ids": [9419, 1814],
+    "prompt_token_i32le_sha256": "8d5c527d7f8ef42fc8558d1e4dcd5048967996653b45af0074a61ac31883f6ca",
+    "paired_token_id": 1814,
+    "target_hidden_shape": [1, 1, 10240],
+    "mtp_expert_slots": 32
+  },
+  "method": {
+    "local_runner": "project MLX MTPModel",
+    "reference_runner": "Ollama qwen4_exp mtpDraft compiled from the pinned commit",
+    "weights": "Both runners used the same installed BF16 common tensors and MXFP4 expert tensors.",
+    "lm_head": "Both distributions used the installed model LM head.",
+    "cache_state": "Fresh one-token MTP QSA main and side caches.",
+    "reference_input_sha256": "8c3934febe7f1930ceba04512c50df2fe54e8fd544cb03fb1e21c3314abf55fc",
+    "local_output_file_sha256": "870c893cce349307bb7b6fba27fb97909ec694c3a3faa70abd516b59adadc3a3",
+    "reference_output_file_sha256": "439f014ba93cebce095abd616658e111c0f8e2f8f9ad884740783b2e2ea25f7e"
+  },
+  "comparison": {
+    "wide_hidden": {
+      "maximum_absolute_error": 0.015625,
+      "mean_absolute_error": 0.000874112534802407,
+      "cosine_similarity": 0.9999961256980896
+    },
+    "sample_hidden": {
+      "maximum_absolute_error": 0.25,
+      "mean_absolute_error": 0.008507251739501953,
+      "cosine_similarity": 0.9999913573265076
+    },
+    "distribution": {
+      "maximum_absolute_error": 0.125,
+      "mean_absolute_error": 0.009346404112875462,
+      "cosine_similarity": 0.999992847442627
+    },
+    "pre_moe_stages_equal_within_fp32_rounding": true,
+    "first_nonzero_stage": "stage.08_moe_output",
+    "first_nonzero_stage_maximum_absolute_error": 0.0078125,
+    "argmax_token_id_equal": true,
+    "ordered_top10_equal": true,
+    "top10_token_ids": [0, 11, 321, 272, 6040, 13, 729, 1076, 271, 198],
+    "local_distribution_sha256": "58c9bb70541347388164cf453ed87f0a218e44f0e4a9adb745abffa14cde1be7",
+    "reference_distribution_sha256": "95142ffd97281a292def1b7e148824251d3c45bd3bb063b3daa27be06631fab6"
+  },
+  "gate": {
+    "ordered_top10_equal": true,
+    "minimum_distribution_cosine_similarity": 0.9999,
+    "actual_distribution_cosine_similarity": 0.999992847442627,
+    "maximum_distribution_absolute_error": 0.25,
+    "actual_distribution_absolute_error": 0.125,
+    "passed": true
+  },
+  "finding": "The first run exposed an incorrect grouped pre_fc_norm_hidden implementation. The corrected graph applies RMSNorm across all 10240 hidden values, as the pinned Ollama graph does.",
+  "evidence_limit": "This result validates one short-prompt MTP distribution against an independent graph implementation using the same installed MXFP4 weights. It does not validate raw FP8 parity, speculative decoding correctness, output-token parity across five workloads, acceptance rate, or performance."
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "qwen_lfu_decay_trace_simulation",
+  "trace_sha256": "01e3de5405396033188e88186629b701bc1215a3684d30680af72db4028b9857",
+  "slots": 1152,
+  "layer_reserve": 12,
+  "recorded_decode_misses": 114821,
+  "current_simulated_misses": 114821,
+  "current_matches_recorded": true,
+  "policies": [
+    {
+      "policy": "current",
+      "prefill_handoff_calls": 96,
+      "decode_tokens": 1024,
+      "hits": 376699,
+      "misses": 114821,
+      "evictions": 114350,
+      "decays": 53,
+      "resident_experts": 1152,
+      "expert_bytes": 299820595200,
+      "miss_change_fraction": 0.0
+    },
+    {
+      "policy": "token_128",
+      "prefill_handoff_calls": 96,
+      "decode_tokens": 1024,
+      "hits": 304927,
+      "misses": 186593,
+      "evictions": 186122,
+      "decays": 8,
+      "resident_experts": 1152,
+      "expert_bytes": 487231641600,
+      "miss_change_fraction": 0.6250772942231821
+    },
+    {
+      "policy": "token_512",
+      "prefill_handoff_calls": 96,
+      "decode_tokens": 1024,
+      "hits": 276492,
+      "misses": 215028,
+      "evictions": 214557,
+      "decays": 2,
+      "resident_experts": 1152,
+      "expert_bytes": 561481113600,
+      "miss_change_fraction": 0.8727236306947335
+    },
+    {
+      "policy": "token_1024",
+      "prefill_handoff_calls": 96,
+      "decode_tokens": 1024,
+      "hits": 276507,
+      "misses": 215013,
+      "evictions": 214542,
+      "decays": 1,
+      "resident_experts": 1152,
+      "expert_bytes": 561441945600,
+      "miss_change_fraction": 0.8725929925710454
+    },
+    {
+      "policy": "never",
+      "prefill_handoff_calls": 96,
+      "decode_tokens": 1024,
+      "hits": 276507,
+      "misses": 215013,
+      "evictions": 214542,
+      "decays": 0,
+      "resident_experts": 1152,
+      "expert_bytes": 561441945600,
+      "miss_change_fraction": 0.8725929925710454
+    }
+  ]
+}

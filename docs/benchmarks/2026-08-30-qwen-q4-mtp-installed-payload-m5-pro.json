@@ -1,0 +1,75 @@
+{
+  "captured_at": "2026-08-30T01:29:00+08:00",
+  "environment": {
+    "machine": "Apple M5 Pro",
+    "memory_gib": 64,
+    "platform": "macOS 26.6.2"
+  },
+  "evidence_kind": "qwen_mtp_installed_payload_validation",
+  "formal_performance_result": false,
+  "installed_model": {
+    "file_count": 59,
+    "manifest_bytes": 256468,
+    "manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc",
+    "path": "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+    "total_declared_bytes": 126809562251
+  },
+  "mtp_contract": {
+    "common_tensor_count": 29,
+    "layer_count": 1,
+    "routed_expert_count": 512,
+    "source_tensor_count": 3101,
+    "use_dedicated_embeddings": false
+  },
+  "mtp_files": [
+    {
+      "path": "mtp/common.bin",
+      "sha256": "2604d969eabc990b83830581c85d1bb647f4994810939ded5637480b60fb6641",
+      "size": 181136896
+    },
+    {
+      "path": "mtp/experts/layer_00.bin",
+      "sha256": "8c4b24665ee3a74c86880d25dd44939232447fc4b4b2cd183e7bc0730aa06da2",
+      "size": 1336934400
+    }
+  ],
+  "mtp_installed_bytes": 1518071296,
+  "source_provenance": {
+    "checkpoint_model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "source_commit": "c86532e6585a9a4d0d6d36222049b0721f926701"
+  },
+  "validation": {
+    "independent_sha256_match": true,
+    "python_manifest_loader": {
+      "common_tensor_count": 29,
+      "has_mtp": true,
+      "layer_count": 1
+    },
+    "mtp_graph_strict_load": {
+      "cache_branches": 2,
+      "common_parameter_bytes": 181136896,
+      "common_tensor_count": 29,
+      "layer_type": "full_attention",
+      "passed": true
+    },
+    "mtp_prefill_pairing_test": true,
+    "mtp_rollback_test": true,
+    "qwen_python_tests": {
+      "failed": 0,
+      "passed": 27
+    },
+    "python_full_suite": {
+      "failed": 0,
+      "passed": 246
+    },
+    "swift_full_suite": {
+      "failed": 0,
+      "passed": 62
+    },
+    "swift_repacker_tests": {
+      "failed": 0,
+      "passed": 17
+    }
+  }
+}

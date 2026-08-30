@@ -3,7 +3,7 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-08-28。
+最後核對日期是 2026-08-30。
 Qwen 支援核對版本是目前工作樹。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
@@ -68,6 +68,8 @@ server 可以使用空 model catalog 啟動。
 Model 頁面的標題列提供模型資料夾按鈕。
 模型卡片會顯示模型資料夾路徑與可用空間。
 每個未安裝模型的列提供下載按鈕。
+已安裝的 Qwen 缺少 MTP 時，模型列會顯示 MTP 下載按鈕。
+MTP 安裝會保留既有 Qwen 主模型，並可續傳未完成的 MTP 下載。
 每個模型的進階設定頁提供 Alias 欄位。
 有效的 Alias 變更會自動儲存。
 使用者可以在安裝模型前設定 Alias。
@@ -128,6 +130,25 @@ closure。這不表示 deferred training／ANE／approximate model 已實作；�
 
 目前的研究查核位於
 [`research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md`](../research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md)。
+Qwen runtime 的 active 效能研究、採用門檻和 MTP 合約查核計畫位於
+[`research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md`](../research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md)。
+Qwen MTP installed payload 驗證位於
+[`docs/benchmarks/2026-08-30-qwen-q4-mtp-installed-payload-m5-pro.json`](benchmarks/2026-08-30-qwen-q4-mtp-installed-payload-m5-pro.json)。
+Qwen MTP 與固定 Ollama commit 的 reference parity 位於
+[`docs/benchmarks/2026-08-30-qwen-q4-mtp-ollama-reference-parity-m5-pro.json`](benchmarks/2026-08-30-qwen-q4-mtp-ollama-reference-parity-m5-pro.json)。
+Qwen MTP block verifier 的五種 greedy output parity 位於
+[`docs/benchmarks/2026-08-30-qwen-mtp-block-greedy-parity-128-m5-pro.json`](benchmarks/2026-08-30-qwen-mtp-block-greedy-parity-128-m5-pro.json)。
+Qwen MTP 的 4K 正式 stop gate 位於
+[`docs/benchmarks/2026-08-30-qwen-mtp-block-formal-stop-code4k64-m5-pro.json`](benchmarks/2026-08-30-qwen-mtp-block-formal-stop-code4k64-m5-pro.json)。
+Qwen MTP bounded Prefill 的 4K 正式 stop gate 位於
+[`docs/benchmarks/2026-08-30-qwen-mtp-bounded-prefill-formal-stop-code4k64-m5-pro.json`](benchmarks/2026-08-30-qwen-mtp-bounded-prefill-formal-stop-code4k64-m5-pro.json)。
+32-slot bounded Prefill 的 4K output parity 位於
+[`docs/benchmarks/2026-08-30-qwen-mtp-bounded-prefill-slots32-code4k64-parity-m5-pro.json`](benchmarks/2026-08-30-qwen-mtp-bounded-prefill-slots32-code4k64-parity-m5-pro.json)。
+MTP verifier burst latency 的 Draft-2 與 Draft-1 探索結果位於
+[`Draft-2`](benchmarks/2026-08-30-qwen-mtp-draft2-latency-code4k64-exploratory-m5-pro.json)
+和
+[`Draft-1`](benchmarks/2026-08-30-qwen-mtp-draft1-latency-code4k64-exploratory-m5-pro.json)。
+較早的本機 distribution artifact 已標示為 superseded。
 `PLAN.md` 全方向的 active requirement／evidence／remaining-gate tracker 位於
 [`research/PLAN_EXECUTION_STATUS_2026-08-27.md`](../research/PLAN_EXECUTION_STATUS_2026-08-27.md)。
 Hash exact prefetch 的 active experiment plan 位於
