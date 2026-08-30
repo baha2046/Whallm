@@ -210,6 +210,8 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
 | persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 4 依 reuse count 和 access recency 執行 eviction。 |
 | `memory_limit_gib` | 0 | 0 使用模型安全自動上限。Qwen 自動上限不超過 48 GiB。DeepSeek 使用 Metal 建議上限。正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
+| `mtp_enabled` | `false` | 啟用 Qwen MTP speculative decoding prototype。需要 installed MTP sidecar。 |
+| `mtp_slots` | 32 | Qwen MTP 使用獨立 expert cache。最小值是 10。 |
 | `dspark_enabled` | `false` | DSpark 預設停用。 |
 | `dspark_prompt_cache` | `false` | 實驗性原子 target KV + DSpark context prefix reuse；需要 DSpark。 |
 | `dspark_slots` | 768 | DSpark 使用獨立 expert cache。 |

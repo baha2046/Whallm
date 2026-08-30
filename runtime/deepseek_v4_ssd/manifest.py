@@ -71,6 +71,13 @@ class NGram:
 
 
 @dataclass(frozen=True)
+class MTP:
+    layer_count: int
+    use_dedicated_embeddings: bool
+    common_tensors: tuple[Tensor, ...]
+
+
+@dataclass(frozen=True)
 class InstalledModel:
     root: Path
     model_id: str
@@ -86,6 +93,7 @@ class InstalledModel:
     maximum_context: int = 1_048_576
     expert_quantization: ExpertQuantization | None = None
     ngram: NGram | None = None
+    mtp: MTP | None = None
     dspark_layer_count: int = 0
     dspark_block_size: int = 0
     dspark_noise_token_id: int = 0
@@ -100,6 +108,10 @@ class InstalledModel:
     @property
     def is_qwen(self) -> bool:
         return self.model_kind == "qwen3.8-flash-next"
+
+    @property
+    def has_mtp(self) -> bool:
+        return self.mtp is not None
 
     @classmethod
     def open(cls, root: str | Path) -> InstalledModel:
@@ -181,6 +193,33 @@ class InstalledModel:
                 if files[path] != expected_layer_size:
                     raise ValueError(f"installed DSpark expert layer has an invalid size: {path}")
 
+        mtp_raw = raw.get("mtp")
+        mtp: MTP | None = None
+        if mtp_raw is not None:
+            mtp_common_tensors = tuple(
+                Tensor(
+                    name=item["name"],
+                    dtype=item["dtype"],
+                    shape=tuple(item["shape"]),
+                    offset=item["offset"],
+                    length=item["length"],
+                )
+                for item in mtp_raw["commonTensors"]
+            )
+            _validate_tensors(
+                mtp_common_tensors,
+                files["mtp/common.bin"],
+                "MTP common",
+                prefix="mtp.",
+            )
+            if any(".experts." in item.name for item in mtp_common_tensors):
+                raise ValueError("installed MTP common tensor table contains an expert")
+            mtp = MTP(
+                layer_count=mtp_raw["layerCount"],
+                use_dedicated_embeddings=mtp_raw["useDedicatedEmbeddings"],
+                common_tensors=mtp_common_tensors,
+            )
+
         return cls(
             root=root,
             model_id=raw["modelID"],
@@ -196,6 +235,7 @@ class InstalledModel:
             maximum_context=contract["maximum_context"],
             expert_quantization=contract.get("expert_quantization"),
             ngram=contract.get("ngram"),
+            mtp=mtp,
             dspark_layer_count=dspark["layerCount"] if dspark is not None else 0,
             dspark_block_size=dspark["blockSize"] if dspark is not None else 0,
             dspark_noise_token_id=dspark["noiseTokenID"] if dspark is not None else 0,
@@ -300,6 +340,23 @@ def _qwen_contract(raw: dict) -> dict:
     file_sizes = {item.get("path"): item.get("size") for item in raw.get("files", [])}
     if file_sizes.get("ngram.bin") != 128 * 2_500_012 * 160:
         raise ValueError("installed Qwen N-gram file has an invalid size")
+    mtp = raw.get("mtp")
+    if mtp is not None:
+        common_tensors = mtp.get("commonTensors")
+        if not (
+            mtp.get("layerCount") == 1
+            and mtp.get("useDedicatedEmbeddings") is False
+            and isinstance(common_tensors, list)
+            and len(common_tensors) == 29
+        ):
+            raise ValueError("installed Qwen model has an invalid MTP contract")
+        mtp_files = {"mtp/common.bin", "mtp/experts/layer_00.bin"}
+        required.update(mtp_files)
+        if (
+            file_sizes.get("mtp/common.bin") != 181_136_896
+            or file_sizes.get("mtp/experts/layer_00.bin") != 512 * 2_611_200
+        ):
+            raise ValueError("installed Qwen MTP file has an invalid size")
     return {
         "required": required,
         "allowed": required,

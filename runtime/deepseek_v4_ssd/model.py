@@ -4,7 +4,7 @@ import copy
 import json
 import time
 from contextlib import nullcontext
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -50,6 +50,8 @@ class RuntimeConfig:
     dspark_prompt_cache: bool = False
     dspark_confidence_threshold: float = 0.6
     dspark_slots: int = 768
+    mtp_enabled: bool = False
+    mtp_slots: int = 32
     dspark_hash_prefetch: bool = False
     dspark_adaptive_block: bool = False
     dspark_fallback_enabled: bool = True
@@ -837,13 +839,27 @@ def load_model(
             )
         from .qwen4_exp import load as load_qwen
 
-        return load_qwen(
+        model, cache = load_qwen(
             installed_model,
             config,
             raw_config,
             _load_common_weights(installed_model),
             read_limiter,
         )
+        model.mtp = None
+        model.mtp_expert_cache = None
+        if config.mtp_enabled:
+            try:
+                model.mtp, model.mtp_expert_cache = _load_qwen_mtp(
+                    installed_model,
+                    model.args,
+                    config,
+                    read_limiter,
+                )
+            except Exception:
+                cache.close()
+                raise
+        return model, cache
     args = deepseek_v4.ModelArgs.from_dict(raw_config)
 
     deepseek_v4.SwitchGLU = _EmptySwitchGLU
@@ -1417,7 +1433,50 @@ def _load_dspark(
             markov_rank=installed_model.dspark_markov_rank,
         )
         mx.eval(dspark.parameters())
-        return dspark
+    except Exception:
+        expert_cache.close()
+        raise
+    return dspark
+
+
+def _load_qwen_mtp(
+    installed_model: InstalledModel,
+    args,
+    config: RuntimeConfig,
+    read_limiter: _ReadLimiter | None,
+):
+    if installed_model.mtp is None:
+        raise ValueError("Qwen MTP requires an installed MTP sidecar")
+    from .qwen4_exp import MTPModel
+
+    mtp_installed = replace(
+        installed_model,
+        root=installed_model.root / "mtp",
+        layer_count=1,
+        common_tensors=installed_model.mtp.common_tensors,
+        ngram=None,
+        mtp=None,
+    )
+    expert_cache = ExpertCache(
+        mtp_installed,
+        config.mtp_slots,
+        config.read_workers,
+        config.prefetch_read_workers,
+        ready_expert_decode=config.ready_expert_decode,
+        read_limiter=read_limiter,
+        page_cache_probe=config.expert_page_cache_probe,
+        file_cache_policy=config.expert_file_cache_policy,
+    )
+    try:
+        model = MTPModel(args, expert_cache)
+        weights = _load_tensor_file(
+            installed_model.root / "mtp/common.bin",
+            installed_model.mtp.common_tensors,
+        )
+        model.load_weights(list(model.sanitize(weights).items()), strict=True)
+        model.eval()
+        mx.eval(model.parameters())
+        return model, expert_cache
     except Exception:
         expert_cache.close()
         raise

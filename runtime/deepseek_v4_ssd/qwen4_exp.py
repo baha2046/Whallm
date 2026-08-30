@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, fields
+import time
+from dataclasses import dataclass, fields, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterator
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -186,6 +187,30 @@ def ngram_ids(
         offsets = np.asarray(descriptor.head_offsets[start : start + 8], dtype=np.int64)
         blocks.append(np.remainder(mixed[..., None], sizes) + offsets)
     return np.concatenate(blocks, axis=-1)
+
+
+def mtp_prefill_pairs(
+    target_hidden: mx.array,
+    prompt_token_ids: mx.array,
+) -> tuple[mx.array, mx.array]:
+    """Pair target hidden[S] with prompt token[S+1]."""
+    if target_hidden.ndim != 3 or prompt_token_ids.ndim != 2:
+        raise ValueError("Qwen MTP Prefill requires batched hidden states and tokens")
+    if target_hidden.shape[:2] != prompt_token_ids.shape:
+        raise ValueError("Qwen MTP Prefill hidden state and token shape do not match")
+    return target_hidden[:, :-1], prompt_token_ids[:, 1:]
+
+
+def rollback_mtp_cache(cache: CacheList, checkpoint: int) -> None:
+    """Restore both QSA cache branches to one earlier token count."""
+    if checkpoint < 0:
+        raise ValueError("Qwen MTP cache checkpoint must not be negative")
+    current = cache.size()
+    if checkpoint > current:
+        raise ValueError("Qwen MTP cache checkpoint is ahead of the cache")
+    trimmed = cache.trim(current - checkpoint)
+    if trimmed != current - checkpoint or cache.size() != checkpoint:
+        raise ValueError("Qwen MTP cache branches do not share one token count")
 
 
 class NGramStore:
@@ -634,6 +659,8 @@ class SparseMoE(nn.Module):
         scores = mx.take_along_axis(probabilities, indices, axis=-1)
         if self.norm_topk_prob:
             scores = scores / scores.sum(axis=-1, keepdims=True)
+        if getattr(self.cache, "route_trace_enabled", False):
+            self.cache.record_routes(self.layer, np.asarray(indices, dtype=np.int32))
         shared = mx.sigmoid(self.shared_expert_gate(value)) * self.shared_expert(value)
         routed = self.experts(value, indices)
         routed = (routed * scores[..., None].astype(routed.dtype)).sum(axis=-2)
@@ -697,7 +724,7 @@ class TextModel(nn.Module):
         ]
         self.hyper_connection_mixer = GatedResidual(args, combine=False)
 
-    def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
+    def hidden_states(self, input_ids: mx.array, cache=None) -> mx.array:
         hidden = self.embed_tokens(input_ids)
         hidden = mx.tile(hidden, (1, 1, self.args.hc_count))
         if cache is None:
@@ -705,7 +732,10 @@ class TextModel(nn.Module):
         mask = create_ssm_mask(hidden[..., : self.args.hidden_size], cache[0])
         for layer, layer_cache in zip(self.layers, cache):
             hidden = layer(hidden, input_ids, mask, layer_cache)
-        return self.hyper_connection_mixer(hidden)
+        return hidden
+
+    def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
+        return self.hyper_connection_mixer(self.hidden_states(input_ids, cache))
 
 
 class Model(nn.Module):
@@ -718,6 +748,13 @@ class Model(nn.Module):
 
     def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
         return self.lm_head(self.model(input_ids, cache))
+
+    def forward_with_hidden(
+        self, input_ids: mx.array, cache=None
+    ) -> tuple[mx.array, mx.array]:
+        hidden = self.model.hidden_states(input_ids, cache)
+        logits = self.lm_head(self.model.hyper_connection_mixer(hidden))
+        return logits, hidden
 
     @property
     def layers(self):
@@ -760,6 +797,329 @@ class Model(nn.Module):
                 value = value + 1
             sanitized[key] = value
         return sanitized
+
+
+class MTPModel(nn.Module):
+    """One checkpoint-faithful Qwen MTP layer without speculative control flow."""
+
+    def __init__(self, args: ModelArgs, cache: ExpertCache):
+        super().__init__()
+        self.expert_cache = cache
+        self.args = replace(
+            args,
+            num_hidden_layers=1,
+            layer_types=("full_attention",),
+            ple_layer_ids=(),
+        )
+        wide_size = self.args.hc_count * self.args.hidden_size
+        self.pre_fc_norm_embedding = GroupRMSNorm(
+            self.args.hidden_size, None, self.args.rms_norm_eps
+        )
+        self.pre_fc_norm_hidden = GroupRMSNorm(
+            wide_size, None, self.args.rms_norm_eps
+        )
+        self.fc_embedding = nn.Linear(
+            self.args.hidden_size, self.args.hidden_size, bias=False
+        )
+        self.fc_hidden = nn.Linear(
+            self.args.hidden_size, self.args.hidden_size, bias=False
+        )
+        self.layers = [DecoderLayer(self.args, 0, cache, None)]
+        self.hyper_connection_mixer = GatedResidual(self.args, combine=False)
+
+    def __call__(
+        self,
+        target_hidden: mx.array,
+        next_token_ids: mx.array,
+        embedding_weight: mx.array,
+        lm_head_weight: mx.array,
+        cache: CacheList | None,
+    ) -> tuple[mx.array, mx.array]:
+        expected = self.args.hc_count * self.args.hidden_size
+        if target_hidden.shape[-1] != expected:
+            raise ValueError("Qwen MTP target hidden state has an invalid width")
+        if target_hidden.shape[:2] != next_token_ids.shape:
+            raise ValueError("Qwen MTP hidden state and token shape do not match")
+        embedded = mx.take(embedding_weight, next_token_ids, axis=0)
+        embedded = self.fc_embedding(self.pre_fc_norm_embedding(embedded))
+        hidden = self.pre_fc_norm_hidden(target_hidden).reshape(
+            *target_hidden.shape[:-1], self.args.hc_count, self.args.hidden_size
+        )
+        hidden = self.fc_hidden(hidden)
+        mixed = (hidden + embedded[..., None, :]).reshape(*target_hidden.shape)
+        wide_hidden = self.layers[0](mixed, next_token_ids, None, cache)
+        output = self.hyper_connection_mixer(wide_hidden)
+        logits = output @ lm_head_weight.T
+        return logits, wide_hidden
+
+    def make_cache(self) -> CacheList:
+        return CacheList(KVCache(), KVCache())
+
+    def sanitize(self, weights: dict[str, mx.array]) -> dict[str, mx.array]:
+        sanitized = {}
+        norm_suffixes = (
+            ".hc_norm.weight",
+            ".q_norm.weight",
+            ".k_norm.weight",
+            ".q_layernorm.weight",
+            ".k_layernorm.weight",
+            "pre_fc_norm_embedding.weight",
+            "pre_fc_norm_hidden.weight",
+        )
+        for key, value in weights.items():
+            if not key.startswith("mtp."):
+                continue
+            key = key.removeprefix("mtp.")
+            if key.endswith(norm_suffixes):
+                value = value + 1
+            sanitized[key] = value
+        return sanitized
+
+
+def generate_mtp_tokens(
+    prompt: list[int],
+    main_model: Model,
+    mtp_model: MTPModel,
+    target_cache,
+    *,
+    max_tokens: int,
+    prefill_step_size: int,
+    temperature: float = 0.0,
+    top_p: float = 1.0,
+    top_k: int = 0,
+    min_p: float = 0.0,
+    logits_processors: list[Callable[[mx.array, mx.array], mx.array]] | None = None,
+    prefilled_hidden: mx.array | None = None,
+    record_round: Callable[[int, int, float, float, float, bool], None] | None = None,
+) -> Iterator[tuple[int, bool]]:
+    """Yield tokens from exact target-distribution MTP verification."""
+    if not prompt or max_tokens < 1:
+        return
+    if prefill_step_size < 1:
+        raise ValueError("Qwen MTP Prefill step size must be positive")
+
+    from .dspark import DraftResult, _sample, _verify, sampling_logprobs
+    from .model import _fork_prompt_cache, eval_prompt_cache
+
+    logits_processors = logits_processors or []
+    sampling_tokens = [prompt[-1]]
+
+    def adjusted_logprobs(logits: mx.array, tokens: list[int]) -> mx.array:
+        for processor in logits_processors:
+            logits = processor(mx.array(tokens, dtype=mx.int32), logits)
+        return sampling_logprobs(
+            logits,
+            temperature,
+            top_p,
+            top_k,
+            min_p,
+        )[0]
+
+    embedding_weight = main_model.model.embed_tokens.weight
+    lm_head_weight = main_model.lm_head.weight
+    mtp_cache = mtp_model.make_cache()
+    cache_slots = int(getattr(mtp_model.expert_cache, "slots", 0))
+    selected_experts = int(getattr(mtp_model.args, "num_experts_per_tok", 0))
+    mtp_prefill_step = (
+        max(1, cache_slots // selected_experts)
+        if cache_slots and selected_experts
+        else prefill_step_size
+    )
+
+    def prefill_mtp(paired_hidden: mx.array, paired_tokens: mx.array) -> None:
+        for start in range(0, paired_tokens.shape[1], mtp_prefill_step):
+            end = min(start + mtp_prefill_step, paired_tokens.shape[1])
+            mtp_logits, _ = mtp_model(
+                paired_hidden[:, start:end],
+                paired_tokens[:, start:end],
+                embedding_weight,
+                lm_head_weight,
+                mtp_cache,
+            )
+            eval_prompt_cache([mtp_cache], mtp_logits)
+
+    if prefilled_hidden is not None:
+        if prefilled_hidden.shape[1] != len(prompt) - 1:
+            raise ValueError("Qwen MTP Prefill hidden state length does not match")
+        mtp_prefill_window = min(prefilled_hidden.shape[1], mtp_prefill_step)
+        prefill_mtp(
+            prefilled_hidden[:, -mtp_prefill_window:],
+            mx.array([prompt[1:]], dtype=mx.int32)[:, -mtp_prefill_window:],
+        )
+        final_logits, final_hidden = main_model.forward_with_hidden(
+            mx.array([[prompt[-1]]], dtype=mx.int32),
+            target_cache,
+        )
+        eval_prompt_cache(target_cache, final_logits, final_hidden)
+        processed = len(prompt)
+    else:
+        final_logits = final_hidden = None
+        processed = 0
+    previous_hidden = None
+    while processed < len(prompt):
+        count = min(prefill_step_size, len(prompt) - processed)
+        token_ids = mx.array([prompt[processed : processed + count]], dtype=mx.int32)
+        final_logits, final_hidden = main_model.forward_with_hidden(
+            token_ids,
+            target_cache,
+        )
+        if previous_hidden is None:
+            paired_hidden = final_hidden[:, :-1]
+            paired_tokens = token_ids[:, 1:]
+        else:
+            paired_hidden = mx.concatenate(
+                [previous_hidden, final_hidden[:, :-1]],
+                axis=1,
+            )
+            paired_tokens = token_ids
+        if paired_tokens.shape[1]:
+            prefill_mtp(paired_hidden, paired_tokens)
+            mx.eval(final_hidden)
+        else:
+            mx.eval(final_logits, final_hidden)
+        previous_hidden = final_hidden[:, -1:]
+        processed += count
+
+    assert final_logits is not None and final_hidden is not None
+    final_logprobs = adjusted_logprobs(final_logits[:, -1], sampling_tokens)
+    anchor = _sample(final_logprobs, temperature)
+    predecessor_hidden = final_hidden[:, -1:]
+    yield anchor, False
+    sampling_tokens.append(anchor)
+    generated = 1
+
+    while generated < max_tokens:
+        remaining = max_tokens - generated
+        if remaining == 1:
+            logits, predecessor_hidden = main_model.forward_with_hidden(
+                mx.array([[anchor]], dtype=mx.int32),
+                target_cache,
+            )
+            eval_prompt_cache(target_cache, logits, predecessor_hidden)
+            logprobs = adjusted_logprobs(logits[:, -1], sampling_tokens)
+            anchor = _sample(logprobs, temperature)
+            yield anchor, False
+            sampling_tokens.append(anchor)
+            return
+
+        draft_limit = min(5, remaining - 1)
+        checkpoint = mtp_cache.size()
+        draft_started = time.perf_counter()
+        draft_tokens: list[int] = []
+        draft_logprobs: list[mx.array] = []
+        draft_hidden = predecessor_hidden
+        draft_input = anchor
+        for _ in range(draft_limit):
+            draft_logits, draft_hidden = mtp_model(
+                draft_hidden,
+                mx.array([[draft_input]], dtype=mx.int32),
+                embedding_weight,
+                lm_head_weight,
+                mtp_cache,
+            )
+            eval_prompt_cache([mtp_cache], draft_logits, draft_hidden)
+            draft_distribution = adjusted_logprobs(
+                draft_logits[:, -1],
+                sampling_tokens + draft_tokens,
+            )
+            draft_input = _sample(draft_distribution, temperature)
+            draft_tokens.append(draft_input)
+            draft_logprobs.append(draft_distribution)
+        draft_seconds = time.perf_counter() - draft_started
+
+        verification_started = time.perf_counter()
+        verified_cache, copied = _fork_prompt_cache(target_cache)
+        if copied:
+            mx.eval(*copied)
+        verified_logits, verified_hidden = main_model.forward_with_hidden(
+            mx.array([[anchor, *draft_tokens]], dtype=mx.int32),
+            verified_cache,
+        )
+        eval_prompt_cache(verified_cache, verified_logits, verified_hidden)
+        target_logprobs = mx.stack(
+            [
+                adjusted_logprobs(
+                    verified_logits[:, index],
+                    sampling_tokens + draft_tokens[:index],
+                )
+                for index in range(len(draft_tokens) + 1)
+            ]
+        )
+        mx.eval(target_logprobs)
+        draft = DraftResult(
+            tokens=draft_tokens,
+            logprobs=draft_logprobs,
+            confidence=[1.0] * len(draft_tokens),
+            seconds=draft_seconds,
+        )
+        accepted, next_token, _ = _verify(draft, target_logprobs, temperature)
+        verification_seconds = time.perf_counter() - verification_started
+        replay_seconds = 0.0
+
+        if accepted == len(draft_tokens):
+            target_cache[:] = verified_cache
+            predecessor_hidden = verified_hidden[:, -1:]
+            sync_logits, _ = mtp_model(
+                draft_hidden,
+                mx.array([[draft_tokens[-1]]], dtype=mx.int32),
+                embedding_weight,
+                lm_head_weight,
+                mtp_cache,
+            )
+            eval_prompt_cache([mtp_cache], sync_logits)
+        else:
+            rollback_mtp_cache(mtp_cache, checkpoint + accepted + 1)
+            replay_started = time.perf_counter()
+            replay_logits = replay_hidden = None
+            for input_token in [anchor, *draft_tokens[:accepted]]:
+                replay_logits, replay_hidden = main_model.forward_with_hidden(
+                    mx.array([[input_token]], dtype=mx.int32),
+                    target_cache,
+                )
+                eval_prompt_cache(target_cache, replay_logits, replay_hidden)
+            assert replay_logits is not None and replay_hidden is not None
+            predecessor_hidden = replay_hidden[:, -1:]
+            replay_seconds = time.perf_counter() - replay_started
+
+        fallback = accepted == 0
+        if record_round is not None:
+            record_round(
+                len(draft_tokens),
+                accepted,
+                draft_seconds,
+                verification_seconds,
+                replay_seconds,
+                fallback,
+            )
+
+        for token in draft_tokens[:accepted]:
+            if generated >= max_tokens:
+                return
+            yield token, True
+            sampling_tokens.append(token)
+            generated += 1
+        if generated >= max_tokens:
+            return
+        anchor = next_token
+        yield anchor, False
+        sampling_tokens.append(anchor)
+        generated += 1
+
+        if fallback:
+            # ponytail: one zero-acceptance round disables MTP; replace this
+            # with a measured cost gate only after the correctness matrix passes.
+            while generated < max_tokens:
+                logits, predecessor_hidden = main_model.forward_with_hidden(
+                    mx.array([[anchor]], dtype=mx.int32),
+                    target_cache,
+                )
+                eval_prompt_cache(target_cache, logits, predecessor_hidden)
+                logprobs = adjusted_logprobs(logits[:, -1], sampling_tokens)
+                anchor = _sample(logprobs, temperature)
+                yield anchor, False
+                sampling_tokens.append(anchor)
+                generated += 1
+            return
 
 
 def load(

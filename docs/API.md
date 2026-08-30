@@ -83,6 +83,14 @@ Atomic DSpark prefix reuse 是另一個預設停用的研究設定。
 server 會拒絕沒有 `--dspark` 的 `--dspark-prompt-cache`。
 APP 預設不會啟用此設定。
 
+Qwen MTP 是預設停用的 speculative decoding prototype。
+直接啟動 server 時，可以使用 `--mtp`。
+Model catalog 可以設定 `mtp_enabled=true` 和 `mtp_slots>=10`。
+MTP 支援 Qwen 的 Temperature、Top P、Top K、Min P 和 logit processor。
+Installed model 必須包含 MTP sidecar。
+Qwen3.8 的 Advanced Settings 可以啟用 MTP。
+APP 只會在 installed model 包含 MTP sidecar 時啟用 MTP。
+
 ## 驗證與網路邊界
 
 本機 host 可以不設定 API key。
@@ -596,7 +604,9 @@ verification／replay `get_many` acquisition 總次數。它必須和
 - requested output 上限是 272,000 token。
 - output 上限不是已驗證 context 長度。
 - API 只支援文字。
-- Qwen 不支援 vision、video、MTP 或 DSpark。
+- Qwen 不支援 vision、video 或 DSpark。
+- Qwen MTP prototype 支援 greedy 和 categorical sampling，且預設停用。
+- Sampled MTP 尚未取得完整 installed model 的正式效能結果。
 - API 不支援 image、audio、logprobs、stop 和 structured output。
 - server 一次只執行一個 generation request。
 - server 不執行 tool、web search 或外部 command。

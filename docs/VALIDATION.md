@@ -118,6 +118,7 @@ working tree。
 2026-08-27 使用當時的工作樹執行 Swift 測試。
 2026-08-28 在 Codex 和 Qwen request 格式修正後，重新執行 Python 測試。
 2026-08-28 在兩個分支合併後，重新執行兩組完整測試。
+2026-08-30 在 sampled MTP 實作後，重新執行兩組完整測試。
 
 ```sh
 make test
@@ -128,12 +129,27 @@ PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
-| Swift `DeepSeekRepackTests` | 16 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 45 | 0 | 0 |
-| Python runtime 與 server | 239 | 0 | 0 |
-| 合計 | 300 | 0 | 0 |
+| Swift `DeepSeekRepackTests` | 17 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 47 | 0 | 0 |
+| Python runtime 與 server | 254 | 0 | 0 |
+| 合計 | 318 | 0 | 0 |
 
 本次沒有略過測試。
+
+2026-08-30 的目前工作樹已執行 `make package`。
+HEAD 是 `c86532e6585a9a4d0d6d36222049b0721f926701`。
+App 版本和 build 都是 `1.0.0`。
+本機 App 使用 ad hoc signature。
+ZIP SHA-256 是
+`06fbef9c0ec684cdf3b15bd68496389c3a3112a1fc2820834f801cc12fb98031`。
+本次驗證沒有 notarize、建立 Git tag 或上傳檔案。
+本機 App 和重新解壓的 App 都通過 strict deep signature 驗證。
+兩個 App 都包含英文、簡體中文和繁體中文 localization。
+隔離啟動檢查禁止兩個 App 讀取專案 `.build` 目錄。
+隔離啟動檢查也禁止兩個 App 讀取 Swift resource bundle。
+兩個 App 都從 `Contents/Resources` 載入三種 localization。
+兩個 App 在每種語言下都持續執行，且沒有在 `L10n` 初始化時停止。
+
 2026-08-28 的目前工作樹已執行 `make package`。
 該 package 包含 2026-08-28 的 `QwenToolCodec` 修正。
 App 版本是 `1.1.0`，build 是 `1.1.1`。

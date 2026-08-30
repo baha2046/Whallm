@@ -707,6 +707,8 @@ class PrefillTests(unittest.TestCase):
         self.assertEqual(RuntimeConfig().read_workers, 4)
         self.assertEqual(RuntimeConfig().memory_limit_gib, 0)
         self.assertEqual(RuntimeConfig().dspark_slots, 768)
+        self.assertFalse(RuntimeConfig().mtp_enabled)
+        self.assertEqual(RuntimeConfig().mtp_slots, 32)
         self.assertFalse(RuntimeConfig().dspark_prompt_cache)
         self.assertFalse(RuntimeConfig().dspark_hash_prefetch)
         self.assertFalse(RuntimeConfig().dspark_adaptive_block)

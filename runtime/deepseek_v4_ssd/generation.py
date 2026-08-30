@@ -120,10 +120,10 @@ def _qwen_layer_major_prefill(
     prompt_cache: Any,
     step_size: int,
     expert_cache: Any,
-) -> None:
+) -> mx.array | None:
     """Populate Qwen caches while reading each complete expert layer once."""
     if not token_ids:
-        return
+        return None
     core = model.model
     if len(prompt_cache) != len(core.layers):
         raise ValueError("prompt cache does not match the Qwen model layers")
@@ -144,10 +144,10 @@ def _qwen_layer_major_prefill(
                 output = layer(chunk, chunk_ids, mask, layer_cache)
                 eval_prompt_cache([layer_cache], output)
                 outputs.append(output)
-        if layer_index + 1 == len(core.layers):
-            return
         hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
         mx.eval(hidden)
+        if layer_index + 1 == len(core.layers):
+            return hidden
 
 
 @dataclass
@@ -448,6 +448,19 @@ class RuntimeMetrics:
         self._expert_request = CacheMetrics()
         self._process_disk_io_before: ProcessDiskIO | None = None
         self._request_process_disk_io: ProcessDiskIO | None = None
+        self._mtp_enabled = False
+        self._mtp_rounds = 0
+        self._mtp_proposed_tokens = 0
+        self._mtp_accepted_tokens = 0
+        self._mtp_committed_tokens = 0
+        self._mtp_draft_seconds = 0.0
+        self._mtp_verification_seconds = 0.0
+        self._mtp_replay_seconds = 0.0
+        self._mtp_fallback = False
+        self._mtp_fallback_rounds = 0
+        self._mtp_cache = None
+        self._mtp_expert_before = CacheMetrics()
+        self._mtp_expert_request = CacheMetrics()
         self._dspark_enabled = False
         self._dspark_rounds = 0
         self._dspark_proposed_tokens = 0
@@ -558,6 +571,8 @@ class RuntimeMetrics:
         prefill_step_size: int,
         layer_major_prefill_enabled: bool,
         expert_before: CacheMetrics,
+        mtp_enabled: bool = False,
+        mtp_cache=None,
         dspark_enabled: bool = False,
         dspark_cache=None,
         dspark_prompt_cache_source: str = "disabled",
@@ -587,6 +602,23 @@ class RuntimeMetrics:
             self._request_active = True
             self._expert_before = expert_before
             self._expert_request = CacheMetrics()
+            self._mtp_enabled = mtp_enabled
+            self._mtp_rounds = 0
+            self._mtp_proposed_tokens = 0
+            self._mtp_accepted_tokens = 0
+            self._mtp_committed_tokens = 0
+            self._mtp_draft_seconds = 0.0
+            self._mtp_verification_seconds = 0.0
+            self._mtp_replay_seconds = 0.0
+            self._mtp_fallback = False
+            self._mtp_fallback_rounds = 0
+            self._mtp_cache = mtp_cache
+            self._mtp_expert_before = (
+                mtp_cache.metrics_snapshot()
+                if mtp_cache is not None
+                else CacheMetrics()
+            )
+            self._mtp_expert_request = CacheMetrics()
             self._dspark_enabled = dspark_enabled
             self._dspark_rounds = 0
             self._dspark_proposed_tokens = 0
@@ -1048,6 +1080,27 @@ class RuntimeMetrics:
         with self._lock:
             self._dspark_fallback = True
 
+    def record_mtp_round(
+        self,
+        proposed: int,
+        accepted: int,
+        draft_seconds: float,
+        verification_seconds: float,
+        replay_seconds: float,
+        fallback: bool,
+    ) -> None:
+        with self._lock:
+            self._mtp_rounds += 1
+            self._mtp_proposed_tokens += proposed
+            self._mtp_accepted_tokens += accepted
+            self._mtp_committed_tokens += accepted + 1
+            self._mtp_draft_seconds += draft_seconds
+            self._mtp_verification_seconds += verification_seconds
+            self._mtp_replay_seconds += replay_seconds
+            if fallback:
+                self._mtp_fallback = True
+                self._mtp_fallback_rounds += 1
+
     def finish(self, expert_after: CacheMetrics) -> None:
         with self._lock:
             self._request_seconds = time.perf_counter() - self._request_started
@@ -1064,6 +1117,10 @@ class RuntimeMetrics:
                 self._dspark_expert_request = self._dspark_cache.metrics_snapshot().delta(
                     self._dspark_expert_before
                 )
+            if self._mtp_cache is not None:
+                self._mtp_expert_request = self._mtp_cache.metrics_snapshot().delta(
+                    self._mtp_expert_before
+                )
             if self._generation_tokens > 0:
                 self._accumulated_generation_tokens += self._generation_tokens
                 self._completed_request_count += 1
@@ -1078,6 +1135,11 @@ class RuntimeMetrics:
             if self._request_active and self._dspark_cache is not None:
                 dspark_expert = self._dspark_cache.metrics_snapshot().delta(
                     self._dspark_expert_before
+                )
+            mtp_expert = self._mtp_expert_request
+            if self._request_active and self._mtp_cache is not None:
+                mtp_expert = self._mtp_cache.metrics_snapshot().delta(
+                    self._mtp_expert_before
                 )
             process_disk_io = self._request_process_disk_io
             if self._request_active and self._process_disk_io_before is not None:
@@ -1318,6 +1380,43 @@ class RuntimeMetrics:
                 ),
                 "request_adaptive_prefill_plan_seconds": (
                     self._expert_request.adaptive_prefill_plan_seconds
+                ),
+                "mtp_enabled": self._mtp_enabled,
+                "mtp_fallback": self._mtp_fallback,
+                "mtp_fallback_rounds": self._mtp_fallback_rounds,
+                "mtp_rounds": self._mtp_rounds,
+                "mtp_proposed_tokens": self._mtp_proposed_tokens,
+                "mtp_accepted_tokens": self._mtp_accepted_tokens,
+                "mtp_committed_tokens": self._mtp_committed_tokens,
+                "mtp_rejected_tokens": (
+                    self._mtp_proposed_tokens - self._mtp_accepted_tokens
+                ),
+                "mtp_acceptance_rate": (
+                    self._mtp_accepted_tokens / self._mtp_proposed_tokens
+                    if self._mtp_proposed_tokens
+                    else 0.0
+                ),
+                "mtp_average_accepted_length": (
+                    self._mtp_accepted_tokens / self._mtp_rounds
+                    if self._mtp_rounds
+                    else 0.0
+                ),
+                "mtp_draft_seconds": self._mtp_draft_seconds,
+                "mtp_verification_seconds": self._mtp_verification_seconds,
+                "mtp_replay_seconds": self._mtp_replay_seconds,
+                "mtp_expert_cache_hit_rate": mtp_expert.hit_rate,
+                "mtp_expert_cache_hits": mtp_expert.hits,
+                "mtp_expert_cache_misses": mtp_expert.misses,
+                "mtp_expert_evictions": mtp_expert.evictions,
+                "mtp_expert_bytes_read": mtp_expert.bytes_read,
+                "mtp_expert_read_seconds": mtp_expert.read_seconds,
+                "mtp_expert_resident_slots": (
+                    self._mtp_cache.resident_count
+                    if self._mtp_cache is not None
+                    else 0
+                ),
+                "mtp_expert_capacity_slots": (
+                    self._mtp_cache.slots if self._mtp_cache is not None else 0
                 ),
                 "dspark_enabled": self._dspark_enabled,
                 "dspark_fallback": self._dspark_fallback,
@@ -1750,6 +1849,8 @@ class ModelRuntime:
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
         if self._is_qwen and getattr(config, "dspark_enabled", False):
             raise ValueError("Qwen3.8-Flash-Next does not support DSpark")
+        if not self._is_qwen and getattr(config, "mtp_enabled", False):
+            raise ValueError("MTP is supported only by Qwen3.8-Flash-Next")
         with mx.stream(self._generation_stream):
             self.model, self.expert_cache = load_model(installed, config)
             try:
@@ -1761,18 +1862,22 @@ class ModelRuntime:
                 dspark = getattr(self.model, "dspark", None)
                 if dspark is not None:
                     dspark.expert_cache.close()
+                mtp_expert_cache = getattr(self.model, "mtp_expert_cache", None)
+                if mtp_expert_cache is not None:
+                    mtp_expert_cache.close()
                 self.expert_cache.close()
                 raise
         self._prompt_cache_directory = self._open_prompt_cache_directory()
         if self._prompt_cache_directory is not None:
             dspark = getattr(self.model, "dspark", None)
+            mtp = getattr(self.model, "mtp", None)
             if dspark is not None and getattr(
                 self.config, "dspark_prompt_cache", False
             ):
                 self._persistent_dspark_prompt_caches = (
                     self._scan_persistent_dspark_prompt_caches(dspark)
                 )
-            elif dspark is None:
+            elif dspark is None and mtp is None:
                 self._persistent_prompt_caches = (
                     self._scan_persistent_prompt_caches()
                 )
@@ -1849,6 +1954,7 @@ class ModelRuntime:
                 if options.max_tokens > available_tokens:
                     options = replace(options, max_tokens=available_tokens)
                 dspark = getattr(self.model, "dspark", None)
+                mtp = getattr(self.model, "mtp", None)
                 dspark_prompt_cache_enabled = bool(
                     dspark is not None
                     and getattr(self.config, "dspark_prompt_cache", False)
@@ -1863,6 +1969,8 @@ class ModelRuntime:
                         list(dspark_entry.tokens),
                     )
                     dspark.restore_cache_state(dspark_entry.context_state)
+                elif mtp is not None:
+                    entry = _PromptCacheEntry(_make_prompt_cache(self.model), [])
                 else:
                     entry = (
                         _PromptCacheEntry(_make_prompt_cache(self.model), [])
@@ -1873,7 +1981,7 @@ class ModelRuntime:
                 cache_tokens = entry.tokens
                 reused_tokens = len(cache_tokens)
                 generation_prompt = prompt_tokens[reused_tokens:]
-                if dspark is None:
+                if dspark is None and mtp is None:
                     cache_tokens.extend(generation_prompt)
                 step_size = _select_prefill_step_size(
                     getattr(self.config, "prefill_step_size", 128),
@@ -1890,6 +1998,8 @@ class ModelRuntime:
                     step_size,
                     use_layer_major,
                     self._expert_metrics(),
+                    mtp_enabled=mtp is not None,
+                    mtp_cache=getattr(self.model, "mtp_expert_cache", None),
                     dspark_enabled=dspark is not None,
                     dspark_cache=(dspark.expert_cache if dspark is not None else None),
                     dspark_prompt_cache_source=dspark_prompt_cache_source,
@@ -1936,6 +2046,28 @@ class ModelRuntime:
                             step_size,
                             reused_tokens,
                             dspark_prompt_cache_enabled,
+                        )
+                        completed = True
+                        return
+                    if mtp is not None:
+                        prefilled_hidden = None
+                        if use_layer_major:
+                            with _route_phase(self.expert_cache, "prefill"):
+                                prefilled_hidden = _qwen_layer_major_prefill(
+                                    self.model,
+                                    prompt_tokens[:-1],
+                                    prompt_cache,
+                                    step_size,
+                                    self.expert_cache,
+                                )
+                        yield from self._stream_mtp(
+                            prompt_tokens,
+                            prompt_cache,
+                            mtp,
+                            options,
+                            step_size,
+                            prefilled_hidden,
+                            logits_processors,
                         )
                         completed = True
                         return
@@ -2019,12 +2151,84 @@ class ModelRuntime:
                             )
                 finally:
                     self.metrics.finish(self._expert_metrics())
-                    if completed and dspark is None:
+                    if completed and dspark is None and mtp is None:
                         if prefill_persist_entry is not None:
                             self._persist_prompt_cache(prefill_persist_entry)
                         for snapshot in prefill_persist_snapshots.values():
                             self._persist_prompt_cache_snapshot(snapshot)
                         self._store_prompt_cache(entry, persist=True)
+
+    def _stream_mtp(
+        self,
+        prompt_tokens: list[int],
+        prompt_cache,
+        mtp,
+        options: GenerationOptions,
+        step_size: int,
+        prefilled_hidden: mx.array | None,
+        logits_processors,
+    ) -> Iterator[GeneratedPiece]:
+        from .qwen4_exp import generate_mtp_tokens
+
+        tokenizer = TokenizerWrapper(self.tokenizer)
+        detokenizer = tokenizer.detokenizer
+        responses = iter(
+            generate_mtp_tokens(
+                prompt_tokens,
+                self.model,
+                mtp,
+                prompt_cache,
+                max_tokens=options.max_tokens,
+                prefill_step_size=step_size,
+                temperature=options.temperature,
+                top_p=options.top_p,
+                top_k=options.top_k,
+                min_p=options.min_p,
+                logits_processors=logits_processors,
+                prefilled_hidden=prefilled_hidden,
+                record_round=self.metrics.record_mtp_round,
+            )
+        )
+        generation_tokens = 0
+        last_token = 0
+        pending_text = ""
+        finish_reason = "length"
+        while generation_tokens < options.max_tokens:
+            started = time.perf_counter()
+            try:
+                token, _ = next(responses)
+            except StopIteration:
+                break
+            step_seconds = time.perf_counter() - started
+            generation_tokens += 1
+            last_token = token
+            if token in tokenizer.eos_token_ids:
+                finish_reason = "stop"
+                break
+            detokenizer.add_token(token)
+            self.metrics.record_token(generation_tokens, step_seconds, 0.0)
+            if generation_tokens == options.max_tokens:
+                pending_text = detokenizer.last_segment
+                break
+            yield GeneratedPiece(
+                text=detokenizer.last_segment,
+                token=token,
+                prompt_tokens=len(prompt_tokens),
+                generation_tokens=generation_tokens,
+                finish_reason=None,
+            )
+        detokenizer.finalize()
+        final_text = detokenizer.last_segment
+        if pending_text and not final_text.startswith(pending_text):
+            final_text = pending_text + final_text
+        self.metrics.record_token(generation_tokens, 0.0, 0.0)
+        yield GeneratedPiece(
+            text=final_text,
+            token=last_token,
+            prompt_tokens=len(prompt_tokens),
+            generation_tokens=generation_tokens,
+            finish_reason=finish_reason,
+        )
 
     def _stream_dspark(
         self,
@@ -2143,6 +2347,8 @@ class ModelRuntime:
         )
 
     def warm_prompt(self, prompt: str) -> int:
+        if getattr(self.model, "mtp", None) is not None:
+            return 0
         tokens = self._encode_prompt(prompt)
         if len(tokens) < 2:
             return 0
@@ -2865,6 +3071,9 @@ class ModelRuntime:
         if dspark is not None:
             dspark.reset_cache()
             dspark.expert_cache.close()
+        mtp_expert_cache = getattr(self.model, "mtp_expert_cache", None)
+        if mtp_expert_cache is not None:
+            mtp_expert_cache.close()
         self.expert_cache.close()
 
     def __enter__(self) -> ModelRuntime:

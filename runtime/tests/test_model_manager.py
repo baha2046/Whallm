@@ -160,6 +160,18 @@ class ModelCatalogTests(unittest.TestCase):
         with self.assertRaises(ModelCatalogError):
             parse_model_catalog({"version": 1, "models": [model]})
 
+    def test_mtp_requires_qwen_and_accepts_sampling_defaults(self):
+        qwen = raw_model("qwen3.8-flash-next")
+        qwen["runtime"]["mtp_enabled"] = True
+        parsed = parse_model_catalog({"version": 1, "models": [qwen]})
+        self.assertTrue(parsed[0].runtime.mtp_enabled)
+        self.assertEqual(parsed[0].defaults.temperature, 1.0)
+
+        deepseek = raw_model("deepseek-v4")
+        deepseek["runtime"]["mtp_enabled"] = True
+        with self.assertRaises(ModelCatalogError):
+            parse_model_catalog({"version": 1, "models": [deepseek]})
+
 
 class ModelManagerTests(unittest.TestCase):
     def test_listing_and_status_do_not_load_a_runtime(self):

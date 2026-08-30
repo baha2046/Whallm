@@ -180,6 +180,8 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
     runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime")
     if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
         raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
+    if model_kind != "qwen3.8-flash-next" and runtime.mtp_enabled:
+        raise ModelCatalogError("MTP is supported only by Qwen3.8-Flash-Next")
     if model_kind == "qwen3.8-flash-next" and runtime.staged_expert_streaming:
         raise ModelCatalogError(
             "Qwen3.8-Flash-Next does not support staged expert streaming"
@@ -231,6 +233,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "persistent_prompt_cache_entries": 1,
         "moe_prefill_step_size": 0,
         "dspark_slots": 30,
+        "mtp_slots": 10,
     }
     for name, minimum in integer_minimums.items():
         value = getattr(config, name)
@@ -244,6 +247,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "batched_expert_prefill",
         "fp4_index_cache",
         "dspark_enabled",
+        "mtp_enabled",
         "dspark_prompt_cache",
         "dspark_hash_prefetch",
         "dspark_adaptive_block",
@@ -526,6 +530,11 @@ class ModelManager:
                     ),
                     "dspark_confidence_threshold": config.dspark_confidence_threshold,
                     "dspark_slots": config.dspark_slots,
+                    "mtp_available": bool(getattr(installed, "has_mtp", False)),
+                    "mtp_enabled": bool(
+                        getattr(getattr(runtime, "model", None), "mtp", None)
+                    ),
+                    "mtp_slots": getattr(config, "mtp_slots", 32),
                     "kv_cache": "MXFP8" if config.fp8_kv_cache else "BF16",
                 },
                 "performance": {

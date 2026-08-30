@@ -65,6 +65,12 @@ def main() -> None:
     parser.add_argument("--prompt-cache-directory")
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
+    parser.add_argument(
+        "--mtp",
+        action="store_true",
+        help="enable experimental Qwen MTP speculative decoding",
+    )
+    parser.add_argument("--mtp-slots", type=int, default=32)
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
         "--dspark-prompt-cache",
@@ -134,6 +140,10 @@ def main() -> None:
         parser.error(str(error))
     if installed.is_qwen and arguments.dspark:
         parser.error("Qwen3.8-Flash-Next does not support --dspark")
+    if arguments.mtp and not installed.is_qwen:
+        parser.error("--mtp is supported only by Qwen3.8-Flash-Next")
+    if arguments.mtp and not installed.has_mtp:
+        parser.error("--mtp requires an installed MTP sidecar")
     temperature = arguments.temperature
     top_p = arguments.top_p
     top_k = arguments.top_k
@@ -171,6 +181,8 @@ def main() -> None:
         parser.error("--dspark-confidence-threshold must be between zero and one")
     if arguments.dspark_slots < 30:
         parser.error("--dspark-slots must be at least 30")
+    if arguments.mtp_slots < 10:
+        parser.error("--mtp-slots must be at least 10")
     if arguments.dspark_prompt_cache and not arguments.dspark:
         parser.error("--dspark-prompt-cache requires --dspark")
     if arguments.dspark_hash_prefetch and not arguments.dspark:
@@ -214,6 +226,8 @@ def main() -> None:
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
+        mtp_enabled=arguments.mtp,
+        mtp_slots=arguments.mtp_slots,
         dspark_enabled=arguments.dspark,
         dspark_prompt_cache=arguments.dspark_prompt_cache,
         dspark_hash_prefetch=arguments.dspark_hash_prefetch,
@@ -348,6 +362,9 @@ def main() -> None:
                 runtime.expert_cache.direct_io_alignment
             ),
             "power_saving_limit_gbps": config.power_saving_limit_gbps,
+            "mtp_available": runtime.installed.has_mtp,
+            "mtp_enabled": config.mtp_enabled and runtime.installed.has_mtp,
+            "mtp_slots": config.mtp_slots,
             "dspark_enabled": config.dspark_enabled and runtime.installed.has_dspark,
             "dspark_prompt_cache": config.dspark_prompt_cache,
             "dspark_hash_prefetch": config.dspark_hash_prefetch,

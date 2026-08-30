@@ -11,7 +11,7 @@ import numpy as np
 from mlx_lm.models import deepseek_v4
 from mlx_lm.models.cache import RotatingKVCache
 from mlx_lm.models.hyper_connection import HyperConnection, HyperHead, hc_expand
-from mlx_lm.sample_utils import apply_top_p
+from mlx_lm.sample_utils import apply_min_p, apply_top_k, apply_top_p
 
 from .expert_cache import (
     CacheMetrics,
@@ -614,12 +614,18 @@ def sampling_logprobs(
     logits: mx.array,
     temperature: float,
     top_p: float,
+    top_k: int = 0,
+    min_p: float = 0.0,
 ) -> mx.array:
     if temperature == 0:
         return logits
     logprobs = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
     if 0 < top_p < 1:
         logprobs = apply_top_p(logprobs, top_p)
+    if min_p:
+        logprobs = apply_min_p(logprobs, min_p)
+    if 0 < top_k < logprobs.shape[-1]:
+        logprobs = apply_top_k(logprobs, top_k)
     scaled = logprobs / max(temperature, 1e-5)
     return scaled - mx.logsumexp(scaled, axis=-1, keepdims=True)
 

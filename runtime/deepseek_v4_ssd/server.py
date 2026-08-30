@@ -1924,6 +1924,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-fp4-index-cache", action="store_true")
     parser.add_argument("--no-ready-expert-decode", action="store_true")
     parser.add_argument(
+        "--mtp",
+        action="store_true",
+        help="enable experimental Qwen MTP speculative decoding",
+    )
+    parser.add_argument("--mtp-slots", type=int, default=32)
+    parser.add_argument(
         "--expert-page-cache-probe",
         action="store_true",
         help=(
@@ -2009,6 +2015,8 @@ def main() -> None:
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
         ready_expert_decode=not arguments.no_ready_expert_decode,
+        mtp_enabled=arguments.mtp,
+        mtp_slots=arguments.mtp_slots,
         dspark_enabled=arguments.dspark,
         dspark_prompt_cache=arguments.dspark_prompt_cache,
         dspark_hash_prefetch=arguments.dspark_hash_prefetch,
@@ -2048,6 +2056,10 @@ def main() -> None:
             parser.error(f"unsupported model kind: {installed.model_kind}")
         if installed.is_qwen and arguments.dspark:
             parser.error("Qwen3.8-Flash-Next does not support --dspark")
+        if arguments.mtp and not installed.is_qwen:
+            parser.error("--mtp is supported only by Qwen3.8-Flash-Next")
+        if arguments.mtp and not installed.has_mtp:
+            parser.error("--mtp requires an installed MTP sidecar")
 
         default_temperature = arguments.default_temperature
         default_top_p = arguments.default_top_p

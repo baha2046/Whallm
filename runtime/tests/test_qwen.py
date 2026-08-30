@@ -12,16 +12,30 @@ from mlx_lm.models.cache import ArraysCache, CacheList, KVCache
 
 from deepseek_v4_ssd.expert_cache import ExpertCache
 from deepseek_v4_ssd.generation import _qwen_layer_major_prefill
-from deepseek_v4_ssd.manifest import InstalledModel, NGram, QWEN_EXPERT_REGIONS, Tensor
+from deepseek_v4_ssd.manifest import (
+    QWEN_EXPERT_REGIONS,
+    QWEN_MODEL_ID,
+    QWEN_NGRAM_HEAD_OFFSETS,
+    QWEN_NGRAM_HEAD_VOCAB_SIZES,
+    QWEN_REVISION,
+    InstalledModel,
+    NGram,
+    Tensor,
+    _qwen_contract,
+)
 from deepseek_v4_ssd.qwen4_exp import (
     ModelArgs,
+    MTPModel,
     NGramStore,
     PLELayer,
     QSAAttention,
     RMSNormGated,
     SparseMoE,
+    generate_mtp_tokens,
     ngram_ids,
     qsa_causal_block_mask,
+    mtp_prefill_pairs,
+    rollback_mtp_cache,
 )
 from deepseek_v4_ssd.tool_codec import (
     QwenToolCodec,
@@ -40,6 +54,118 @@ class FakeTokenizer:
         return "qwen prompt"
 
 
+class FakeTargetCache:
+    def __init__(self):
+        self.offset = 0
+
+
+class FakeMTPGenerationCache:
+    def __init__(self):
+        self.offset = 0
+
+    def size(self):
+        return self.offset
+
+    def trim(self, count):
+        self.offset -= count
+        return count
+
+
+class FakeGreedyTarget:
+    def __init__(self):
+        weight = mx.zeros((32, 1))
+        self.model = SimpleNamespace(
+            embed_tokens=SimpleNamespace(weight=weight),
+        )
+        self.lm_head = SimpleNamespace(weight=weight)
+        self.maximum_input_tokens = 0
+
+    def forward_with_hidden(self, input_ids, cache):
+        tokens = np.asarray(input_ids, dtype=np.int32)
+        self.maximum_input_tokens = max(self.maximum_input_tokens, tokens.shape[1])
+        cache[0].offset += tokens.shape[1]
+        logits = np.full((*tokens.shape, 32), -1_000.0, dtype=np.float32)
+        for position, token in enumerate(tokens[0]):
+            logits[0, position, (int(token) + 1) % 32] = 1_000.0
+        hidden = tokens[..., None].astype(np.float32)
+        return mx.array(logits), mx.array(hidden)
+
+
+class FakeGreedyMTP:
+    def __init__(self, reject_first_draft=False, reject_input_token=None):
+        self.reject_first_draft = reject_first_draft
+        self.reject_input_token = reject_input_token
+        self.cache = None
+        self.expert_cache = SimpleNamespace(slots=10)
+        self.args = SimpleNamespace(num_experts_per_tok=10)
+        self.maximum_input_tokens = 0
+
+    def make_cache(self):
+        self.cache = FakeMTPGenerationCache()
+        return self.cache
+
+    def __call__(
+        self,
+        target_hidden,
+        next_token_ids,
+        embedding_weight,
+        lm_head_weight,
+        cache,
+    ):
+        del target_hidden, embedding_weight, lm_head_weight
+        tokens = np.asarray(next_token_ids, dtype=np.int32)
+        self.maximum_input_tokens = max(self.maximum_input_tokens, tokens.shape[1])
+        cache.offset += tokens.shape[1]
+        logits = np.full((*tokens.shape, 32), -1_000.0, dtype=np.float32)
+        for position, token in enumerate(tokens[0]):
+            prediction = int(token) + 1
+            if (
+                self.reject_first_draft and int(token) == 3
+            ) or int(token) == self.reject_input_token:
+                prediction += 1
+            logits[0, position, prediction % 32] = 1_000.0
+        hidden = tokens[..., None].astype(np.float32)
+        return mx.array(logits), mx.array(hidden)
+
+
+class FakeSamplingTarget(FakeGreedyTarget):
+    def __init__(self, supported_tokens=(0, 1)):
+        super().__init__()
+        self.supported_tokens = supported_tokens
+
+    def forward_with_hidden(self, input_ids, cache):
+        tokens = np.asarray(input_ids, dtype=np.int32)
+        self.maximum_input_tokens = max(self.maximum_input_tokens, tokens.shape[1])
+        cache[0].offset += tokens.shape[1]
+        logits = np.full((*tokens.shape, 32), -np.inf, dtype=np.float32)
+        logits[..., list(self.supported_tokens)] = 0
+        hidden = tokens[..., None].astype(np.float32)
+        return mx.array(logits), mx.array(hidden)
+
+
+class FakeSamplingMTP(FakeGreedyMTP):
+    def __init__(self, supported_tokens=(0, 1)):
+        super().__init__()
+        self.supported_tokens = supported_tokens
+
+    def __call__(
+        self,
+        target_hidden,
+        next_token_ids,
+        embedding_weight,
+        lm_head_weight,
+        cache,
+    ):
+        del target_hidden, embedding_weight, lm_head_weight
+        tokens = np.asarray(next_token_ids, dtype=np.int32)
+        self.maximum_input_tokens = max(self.maximum_input_tokens, tokens.shape[1])
+        cache.offset += tokens.shape[1]
+        logits = np.full((*tokens.shape, 32), -np.inf, dtype=np.float32)
+        logits[..., list(self.supported_tokens)] = 0
+        hidden = tokens[..., None].astype(np.float32)
+        return mx.array(logits), mx.array(hidden)
+
+
 class QwenTests(unittest.TestCase):
     descriptor = NGram(
         "ngram.bin",
@@ -50,6 +176,279 @@ class QwenTests(unittest.TestCase):
         tuple(range(0, 160, 10)),
         tuple(range(11, 27)),
     )
+
+    def test_qwen_manifest_accepts_pinned_mtp_sidecar(self):
+        raw = {
+            "formatVersion": 2,
+            "modelKind": "qwen3.8-flash-next",
+            "modelID": QWEN_MODEL_ID,
+            "revision": QWEN_REVISION,
+            "layerCount": 48,
+            "expertCount": 512,
+            "selectedExpertCount": 10,
+            "expertBlobSize": 2_611_200,
+            "maximumContext": 262_144,
+            "expertQuantization": {
+                "bits": 4,
+                "conversionVersion": 2,
+                "groupSize": 32,
+                "mode": "mxfp4",
+            },
+            "ngram": {
+                "file": "ngram.bin",
+                "dtype": "F8_E4M3",
+                "rowBytes": 160,
+                "shardCount": 128,
+                "shardRowCount": 2_500_012,
+                "headOffsets": list(QWEN_NGRAM_HEAD_OFFSETS),
+                "headVocabSizes": list(QWEN_NGRAM_HEAD_VOCAB_SIZES),
+            },
+            "files": [
+                {"path": "ngram.bin", "size": 128 * 2_500_012 * 160},
+                {"path": "mtp/common.bin", "size": 181_136_896},
+                {"path": "mtp/experts/layer_00.bin", "size": 512 * 2_611_200},
+            ],
+            "mtp": {
+                "layerCount": 1,
+                "useDedicatedEmbeddings": False,
+                "commonTensors": [
+                    {
+                        "name": f"mtp.fixture_{index}",
+                        "dtype": "BF16",
+                        "shape": [1],
+                        "offset": index * 2,
+                        "length": 2,
+                    }
+                    for index in range(29)
+                ],
+            },
+        }
+
+        contract = _qwen_contract(raw)
+
+        self.assertIn("mtp/common.bin", contract["required"])
+        self.assertIn("mtp/experts/layer_00.bin", contract["required"])
+
+    def test_mtp_prefill_pairs_next_token_with_previous_hidden_state(self):
+        hidden = mx.arange(5 * 4).reshape(1, 5, 4)
+        tokens = mx.array([[10, 11, 12, 13, 14]])
+
+        paired_hidden, paired_tokens = mtp_prefill_pairs(hidden, tokens)
+
+        np.testing.assert_array_equal(np.asarray(paired_hidden), np.arange(16).reshape(1, 4, 4))
+        np.testing.assert_array_equal(np.asarray(paired_tokens), [[11, 12, 13, 14]])
+
+    def test_mtp_rollback_restores_both_qsa_caches(self):
+        cache = CacheList(KVCache(), KVCache())
+        cache[0].offset = 7
+        cache[1].offset = 7
+
+        rollback_mtp_cache(cache, 4)
+
+        self.assertEqual(cache[0].offset, 4)
+        self.assertEqual(cache[1].offset, 4)
+
+    def test_mtp_graph_uses_qsa_and_two_cache_branches(self):
+        args = ModelArgs(
+            hidden_size=8,
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            num_key_value_heads=1,
+            head_dim=4,
+            num_experts=4,
+            num_experts_per_tok=2,
+            moe_intermediate_size=4,
+            shared_expert_intermediate_size=4,
+            indexer_n_heads=1,
+            indexer_kv_heads=1,
+            indexer_head_dim=4,
+            hc_count=2,
+            hc_lowrank=2,
+            layer_types=("full_attention",),
+            ple_layer_ids=(),
+        )
+        model = MTPModel(args, SimpleNamespace())
+
+        self.assertEqual(model.layers[0].layer_type, "full_attention")
+        self.assertEqual(len(model.make_cache().caches), 2)
+        self.assertEqual(model.fc_hidden.weight.shape, (8, 8))
+        self.assertIsNone(model.pre_fc_norm_hidden.group_size)
+
+    def test_mtp_generation_commits_verified_drafts_and_bonus_token(self):
+        target = FakeGreedyTarget()
+        mtp = FakeGreedyMTP()
+        target_cache = [FakeTargetCache()]
+        rounds = []
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=7,
+                prefill_step_size=1,
+                record_round=lambda *values: rounds.append(values),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [3, 4, 5, 6, 7, 8, 9])
+        self.assertEqual([draft for _, draft in generated], [False, True, True, True, True, True, False])
+        self.assertEqual(target_cache[0].offset, 8)
+        self.assertEqual(target.maximum_input_tokens, 6)
+        self.assertEqual(mtp.cache.offset, 7)
+        self.assertEqual(mtp.maximum_input_tokens, 1)
+        self.assertEqual(rounds[0][:2], (5, 5))
+        self.assertFalse(rounds[0][-1])
+
+    def test_mtp_sampling_accepts_an_identical_draft_distribution(self):
+        mx.random.seed(7)
+        target = FakeSamplingTarget()
+        mtp = FakeSamplingMTP()
+        target_cache = [FakeTargetCache()]
+        rounds = []
+        processor_contexts = []
+
+        def record_context(tokens, logits):
+            processor_contexts.append(np.asarray(tokens).tolist())
+            return logits
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=3,
+                prefill_step_size=2,
+                temperature=0.7,
+                top_p=0.8,
+                top_k=2,
+                logits_processors=[record_context],
+                record_round=lambda *values: rounds.append(values),
+            )
+        )
+
+        self.assertEqual([draft for _, draft in generated], [False, True, False])
+        self.assertEqual(rounds[0][:2], (1, 1))
+        self.assertEqual(processor_contexts[0], [2])
+        self.assertIn([2, generated[0][0]], processor_contexts)
+
+    def test_mtp_sampling_uses_the_corrected_target_distribution(self):
+        mx.random.seed(7)
+        target = FakeSamplingTarget((0,))
+        mtp = FakeSamplingMTP((1,))
+        rounds = []
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                [FakeTargetCache()],
+                max_tokens=3,
+                prefill_step_size=2,
+                temperature=1.0,
+                record_round=lambda *values: rounds.append(values),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [0, 0, 0])
+        self.assertEqual([draft for _, draft in generated], [False, False, False])
+        self.assertEqual(rounds[0][:2], (1, 0))
+        self.assertTrue(rounds[0][-1])
+
+    def test_mtp_generation_falls_back_after_zero_acceptance(self):
+        target = FakeGreedyTarget()
+        mtp = FakeGreedyMTP(reject_first_draft=True)
+        target_cache = [FakeTargetCache()]
+        rounds = []
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=7,
+                prefill_step_size=2,
+                record_round=lambda *values: rounds.append(values),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [3, 4, 5, 6, 7, 8, 9])
+        self.assertEqual(target_cache[0].offset, 8)
+        self.assertEqual(mtp.cache.offset, 2)
+        self.assertEqual(rounds[0][:2], (5, 0))
+        self.assertTrue(rounds[0][-1])
+
+    def test_mtp_generation_replays_only_a_partially_accepted_prefix(self):
+        target = FakeGreedyTarget()
+        mtp = FakeGreedyMTP(reject_input_token=5)
+        target_cache = [FakeTargetCache()]
+        rounds = []
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=5,
+                prefill_step_size=2,
+                record_round=lambda *values: rounds.append(values),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [3, 4, 5, 6, 7])
+        self.assertEqual(target_cache[0].offset, 6)
+        self.assertEqual(mtp.cache.offset, 4)
+        self.assertEqual(rounds[0][:2], (3, 2))
+        self.assertGreater(rounds[0][4], 0)
+
+    def test_mtp_generation_accepts_layer_major_prefill_hidden_states(self):
+        target = FakeGreedyTarget()
+        mtp = FakeGreedyMTP()
+        target_cache = [FakeTargetCache()]
+        target_cache[0].offset = 1
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=3,
+                prefill_step_size=2,
+                prefilled_hidden=mx.array([[[1.0]]]),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [3, 4, 5])
+        self.assertEqual(target_cache[0].offset, 4)
+
+    def test_mtp_layer_major_prefill_is_bounded_by_expert_slots(self):
+        target = FakeGreedyTarget()
+        mtp = FakeGreedyMTP()
+        mtp.expert_cache.slots = 20
+        target_cache = [FakeTargetCache()]
+        target_cache[0].offset = 6
+
+        generated = list(
+            generate_mtp_tokens(
+                [1, 2, 3, 4, 5, 6, 7],
+                target,
+                mtp,
+                target_cache,
+                max_tokens=1,
+                prefill_step_size=128,
+                prefilled_hidden=mx.ones((1, 6, 1)),
+            )
+        )
+
+        self.assertEqual([token for token, _ in generated], [8])
+        self.assertEqual(mtp.cache.offset, 2)
+        self.assertEqual(target_cache[0].offset, 7)
 
     def test_ngram_hash_keeps_cross_chunk_context(self):
         tokens = np.array([[4, 5, 6, 7]], dtype=np.int64)
@@ -646,6 +1045,12 @@ class QwenTests(unittest.TestCase):
         class Cache:
             def __init__(self):
                 self.batched_layers = []
+                self.routes = []
+
+            route_trace_enabled = True
+
+            def record_routes(self, layer, selected):
+                self.routes.append((layer, selected.shape))
 
             def current_batched(self, _layer):
                 return None
@@ -669,6 +1074,7 @@ class QwenTests(unittest.TestCase):
         mx.eval(result)
 
         self.assertEqual(cache.batched_layers, [])
+        self.assertEqual(cache.routes, [(0, (1, 5, 1))])
 
 
 if __name__ == "__main__":
