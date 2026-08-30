@@ -48,6 +48,7 @@ struct InstalledModelInfo: Identifiable, Equatable, Sendable {
   let url: URL
   let size: UInt64
   let quickIssues: [InstalledFileIssue]
+  let hasMTP: Bool
   let hasDSpark: Bool
   let modelKind: ModelKind
   let modelID: String
@@ -133,6 +134,7 @@ enum InstalledModelDiscovery {
       url: root,
       size: totalSize,
       quickIssues: issues,
+      hasMTP: manifest.mtp != nil,
       hasDSpark: manifest.dspark != nil,
       modelKind: modelKind,
       modelID: manifest.modelID
@@ -196,6 +198,7 @@ enum ModelOperationPhase: Equatable {
   case idle
   case preparingDownload
   case downloading
+  case installingMTP
   case cancelling
   case verifying
   case preparingRepair
@@ -208,6 +211,7 @@ enum ModelOperationPhase: Equatable {
     case .idle: ""
     case .preparingDownload: L10n.string("Preparing download")
     case .downloading: L10n.string("Downloading and installing the model")
+    case .installingMTP: L10n.string("Downloading and installing MTP")
     case .cancelling: L10n.string("Stopping")
     case .verifying: L10n.string("Verifying the complete model")
     case .preparingRepair: L10n.string("Preparing repair")
@@ -233,6 +237,7 @@ struct ModelOperationProgress: Equatable {
 @MainActor
 final class ModelLibrary: ObservableObject {
   static let supportedModelKinds: [ModelKind] = [.deepSeekV4, .qwen3_8FlashNext]
+  static let qwenMTPInstalledBytes: UInt64 = 1_518_071_296
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
   private static let activeDestinationPreference = "modelDownloadDestination"
@@ -385,6 +390,8 @@ final class ModelLibrary: ObservableObject {
           moePrefillStepSize: 0,
           batchedExpertPrefill: true,
           fp4IndexCache: true,
+          mtpEnabled: settings.mtpEnabled == true && model.hasMTP,
+          mtpSlots: settings.mtpSlots ?? 32,
           dsparkEnabled: settings.dsparkEnabled && model.hasDSpark,
           dsparkPromptCache: false,
           dsparkConfidenceThreshold: settings.dsparkConfidenceThreshold,
@@ -490,6 +497,26 @@ final class ModelLibrary: ObservableObject {
   func canStartDownload(_ modelKind: ModelKind) -> Bool {
     canDownload(modelKind)
       && !FileManager.default.fileExists(atPath: downloadDestination(for: modelKind).path)
+  }
+
+  func hasPartialMTPInstallation(for model: InstalledModelInfo) -> Bool {
+    FileManager.default.fileExists(atPath: mtpInstallationPartialURL(for: model).path)
+  }
+
+  func mtpDownloadBlock(for model: InstalledModelInfo) -> ModelDownloadBlock? {
+    guard model.modelKind == .qwen3_8FlashNext, !model.hasMTP else { return nil }
+    guard !preflightChecks.contains(where: { $0.blocksDownload && $0.status == .failed }) else {
+      return .unsupportedArchitecture
+    }
+    guard modelFolderIsWritable else { return .modelFolderNotWritable }
+    let allocated = Self.allocatedBytes(at: mtpInstallationPartialURL(for: model))
+    let requiredBytes =
+      Self.qwenMTPInstalledBytes > allocated
+      ? Self.qwenMTPInstalledBytes - allocated : 0
+    return Self.storageDownloadBlock(
+      requiredBytes: requiredBytes,
+      availableBytes: modelFolderAvailableBytes
+    )
   }
 
   func model(at path: String) -> InstalledModelInfo? {
@@ -676,6 +703,23 @@ final class ModelLibrary: ObservableObject {
     }
   }
 
+  func startMTPInstallation(_ model: InstalledModelInfo) {
+    guard !isBusy, !model.hasMTP, model.modelKind == .qwen3_8FlashNext else { return }
+    refreshPreflight()
+    if let block = mtpDownloadBlock(for: model) {
+      message = block.message
+      return
+    }
+    downloadModelKind = model.modelKind
+    operationPhase = .installingMTP
+    operationProgress = nil
+    downloadStart = nil
+    message = nil
+    operationTask = Task { [weak self] in
+      await self?.performMTPInstallation(model.url)
+    }
+  }
+
   func removeDSpark(_ model: InstalledModelInfo) {
     guard !isBusy, model.hasDSpark else { return }
     do {
@@ -742,6 +786,12 @@ final class ModelLibrary: ObservableObject {
     hasPartialDownload(for: modelKind)
       ? partialDownloadURL(for: modelKind).deletingPathExtension()
       : defaultDownloadDestination(for: modelKind)
+  }
+
+  private func mtpInstallationPartialURL(for model: InstalledModelInfo) -> URL {
+    model.url.deletingLastPathComponent()
+      .appendingPathComponent(model.url.lastPathComponent + ".mtp-install")
+      .appendingPathExtension("partial")
   }
 
   private func performDownload(
@@ -883,6 +933,29 @@ final class ModelLibrary: ObservableObject {
       await scan()
       message = L10n.string(
         "DSpark could not be installed. Check the network and storage.\n%@",
+        String(describing: error)
+      )
+    }
+    finishOperation()
+  }
+
+  private func performMTPInstallation(_ url: URL) async {
+    do {
+      _ = try await QwenFlashNextCheckpoint().installMTP(at: url) { [weak self] progress in
+        Task { @MainActor in
+          self?.updateRepackProgress(progress, phase: .installingMTP)
+        }
+      }
+      try Task.checkCancellation()
+      await scan()
+      message = L10n.string("MTP is installed and ready.")
+    } catch is CancellationError {
+      await scan()
+      message = L10n.string("MTP installation stopped. The app kept the progress.")
+    } catch {
+      await scan()
+      message = L10n.string(
+        "MTP could not be installed. Check the network and storage.\n%@",
         String(describing: error)
       )
     }

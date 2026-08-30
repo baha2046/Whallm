@@ -17,7 +17,8 @@ struct Repacker {
   func run(
     plan: RepackPlan,
     output: URL,
-    progress: (@Sendable (RepackProgress) -> Void)?
+    progress: (@Sendable (RepackProgress) -> Void)?,
+    companions requestedCompanions: [CompanionFile]? = nil
   ) async throws -> InstalledManifest {
     let fileManager = FileManager.default
     let output = output.standardizedFileURL
@@ -211,8 +212,9 @@ struct Repacker {
         }
         return InstalledFile(path: file.path, size: size, sha256: try sha256(url))
       }
-      let companions =
-        plan.modelKind == .qwen3_8FlashNext ? QwenContract.companions : ModelContract.companions
+      let companions = requestedCompanions
+        ?? (plan.modelKind == .qwen3_8FlashNext
+          ? QwenContract.companions : ModelContract.companions)
       for companion in companions {
         let data = try await read(path: companion.source)
         let url = try safeFileURL(root: partial, path: companion.destination)
@@ -238,6 +240,7 @@ struct Repacker {
         commonTensors: plan.commonTensors,
         expertRegions: plan.expertRegions,
         dspark: plan.dspark,
+        mtp: nil,
         modelKind: plan.modelKind,
         maximumContext: plan.maximumContext,
         expertQuantization: plan.expertQuantization,
@@ -898,6 +901,7 @@ public enum InstalledModel {
       files: files,
       commonTensors: current.commonTensors,
       expertRegions: current.expertRegions,
+      mtp: current.mtp,
       modelKind: current.modelKind,
       maximumContext: current.maximumContext,
       expertQuantization: current.expertQuantization,
@@ -1030,7 +1034,7 @@ public enum InstalledModel {
         "installed manifest does not match the pinned Qwen model contract")
     }
 
-    let requiredPaths = Set(
+    let mainPaths = Set(
       [
         "common.bin", "ngram.bin", "config.json", "generation_config.json",
         "tokenizer/tokenizer.json", "tokenizer/tokenizer_config.json",
@@ -1038,6 +1042,8 @@ public enum InstalledModel {
       ] + (0..<QwenContract.layerCount).map {
         String(format: "experts/layer_%02d.bin", $0)
       })
+    let mtpPaths: Set<String> = ["mtp/common.bin", "mtp/experts/layer_00.bin"]
+    let requiredPaths = mainPaths.union(manifest.mtp == nil ? [] : mtpPaths)
     let actualPaths = Set(manifest.files.map(\.path))
     guard actualPaths == requiredPaths, manifest.files.count == actualPaths.count else {
       throw RepackError.invalidPlan("installed Qwen manifest has an incomplete file set")
@@ -1066,6 +1072,28 @@ public enum InstalledModel {
         tensor.length <= commonSize - tensor.offset
       else {
         throw RepackError.invalidPlan("invalid Qwen common tensor \(tensor.name)")
+      }
+    }
+    if let mtp = manifest.mtp {
+      guard mtp.layerCount == QwenContract.mtpLayerCount,
+        mtp.useDedicatedEmbeddings == false,
+        mtp.commonTensors.count == QwenContract.mtpCommonTensorCount,
+        let mtpCommonSize = manifest.files.first(where: { $0.path == "mtp/common.bin" })?.size,
+        manifest.files.first(where: { $0.path == "mtp/experts/layer_00.bin" })?.size
+          == UInt64(QwenContract.expertCount) * QwenContract.expertBlobSize
+      else {
+        throw RepackError.invalidPlan("installed Qwen manifest has an invalid MTP contract")
+      }
+      var mtpNames = Set<String>()
+      for tensor in mtp.commonTensors {
+        guard tensor.name.hasPrefix("mtp."),
+          !tensor.name.contains(".experts."),
+          mtpNames.insert(tensor.name).inserted,
+          tensor.offset <= mtpCommonSize,
+          tensor.length <= mtpCommonSize - tensor.offset
+        else {
+          throw RepackError.invalidPlan("invalid Qwen MTP common tensor \(tensor.name)")
+        }
       }
     }
     return manifest

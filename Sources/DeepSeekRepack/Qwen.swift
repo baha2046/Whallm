@@ -9,6 +9,8 @@ enum QwenContract {
   static let hiddenSize = 2_560
   static let expertIntermediateSize = 640
   static let maximumContext = 262_144
+  static let mtpLayerCount = 1
+  static let mtpCommonTensorCount = 29
   static let ngramShardCount = 128
   static let ngramShardRowCount = 2_500_012
   static let ngramRowBytes = 160
@@ -82,6 +84,8 @@ enum QwenContract {
       ("text_config.num_experts_per_tok", String(text.selectedExpertCount), String(selectedExpertCount)),
       ("text_config.num_hidden_layers", String(text.hiddenLayerCount), String(layerCount)),
       ("text_config.max_position_embeddings", String(text.maximumContext), String(maximumContext)),
+      ("text_config.mtp_num_hidden_layers", String(text.mtpLayerCount), String(mtpLayerCount)),
+      ("text_config.mtp_use_dedicated_embeddings", String(text.mtpUsesDedicatedEmbeddings), "false"),
       ("text_config.split_ngram_parts", String(text.ngramShardCount), String(ngramShardCount)),
       ("text_config.num_attention_heads", String(text.attentionHeadCount), "24"),
       ("text_config.num_key_value_heads", String(text.keyValueHeadCount), "2"),
@@ -147,6 +151,8 @@ struct QwenConfig: Decodable, Sendable {
     let selectedExpertCount: Int
     let hiddenLayerCount: Int
     let maximumContext: Int
+    let mtpLayerCount: Int
+    let mtpUsesDedicatedEmbeddings: Bool
     let ngramShardCount: Int
     let attentionHeadCount: Int
     let keyValueHeadCount: Int
@@ -176,6 +182,8 @@ struct QwenConfig: Decodable, Sendable {
       case selectedExpertCount = "num_experts_per_tok"
       case hiddenLayerCount = "num_hidden_layers"
       case maximumContext = "max_position_embeddings"
+      case mtpLayerCount = "mtp_num_hidden_layers"
+      case mtpUsesDedicatedEmbeddings = "mtp_use_dedicated_embeddings"
       case ngramShardCount = "split_ngram_parts"
       case attentionHeadCount = "num_attention_heads"
       case keyValueHeadCount = "num_key_value_heads"
@@ -196,6 +204,114 @@ struct QwenConfig: Decodable, Sendable {
       case pleLayerIDs = "ple_layer_ids"
       case layerTypes = "layer_types"
     }
+  }
+}
+
+enum QwenMTPPlanner {
+  static let commonPath = "mtp/common.bin"
+  static let expertPath = "mtp/experts/layer_00.bin"
+
+  static func makePlan(index: CheckpointIndex, tensors: [String: SafeTensor]) throws
+    -> RepackPlan
+  {
+    guard tensors.count == index.weightMap.count,
+      tensors.keys.allSatisfy({ $0.hasPrefix("mtp.") })
+    else {
+      throw RepackError.invalidIndex("MTP tensor index is incomplete")
+    }
+
+    let experts = try expertConversions(tensors)
+    let excluded = Set(experts.flatMap { [$0.tensor, $0.sourceScaleTensor] })
+    var copies: [TensorCopy] = []
+    var commonTensors: [InstalledTensor] = []
+    var commonOffset: UInt64 = 0
+    for tensor in tensors.values.sorted(by: { $0.name < $1.name })
+    where !excluded.contains(tensor.name)
+    {
+      guard !tensor.name.contains(".experts.") else {
+        throw RepackError.invalidPlan("unexpected MTP expert tensor \(tensor.name)")
+      }
+      commonOffset = aligned(commonOffset, to: QwenContract.commonAlignment)
+      commonTensors.append(
+        InstalledTensor(
+          name: tensor.name, dtype: tensor.dtype, shape: tensor.shape,
+          offset: commonOffset, length: tensor.length))
+      copies.append(
+        TensorCopy(
+          tensor: tensor.name, sourceFile: tensor.sourceFile,
+          sourceOffset: tensor.sourceOffset, length: tensor.length,
+          destinationFile: commonPath, destinationOffset: commonOffset))
+      commonOffset += tensor.length
+    }
+    guard commonTensors.count == QwenContract.mtpCommonTensorCount else {
+      throw RepackError.invalidPlan(
+        "MTP has \(commonTensors.count) common tensors; expected \(QwenContract.mtpCommonTensorCount)")
+    }
+
+    let layerSize = UInt64(QwenContract.expertCount) * QwenContract.expertBlobSize
+    return RepackPlan(
+      formatVersion: 2,
+      modelID: QwenContract.modelID,
+      revision: QwenContract.revision,
+      layerCount: QwenContract.layerCount,
+      expertCount: QwenContract.expertCount,
+      selectedExpertCount: QwenContract.selectedExpertCount,
+      expertBlobSize: QwenContract.expertBlobSize,
+      checkpointTensorBytes: copies.reduce(UInt64(0)) { $0 + $1.length }
+        + experts.reduce(UInt64(0)) { $0 + sourceBytes($1) },
+      files: [
+        PlannedFile(path: commonPath, size: commonOffset),
+        PlannedFile(path: expertPath, size: layerSize),
+      ],
+      commonTensors: commonTensors,
+      expertRegions: QwenContract.expertRegions,
+      copies: copies,
+      modelKind: .qwen3_8FlashNext,
+      maximumContext: QwenContract.maximumContext,
+      expertQuantization: QwenContract.quantization,
+      expertConversions: experts)
+  }
+
+  private static func expertConversions(_ tensors: [String: SafeTensor]) throws
+    -> [ExpertConversion]
+  {
+    var result: [ExpertConversion] = []
+    for expert in 0..<QwenContract.expertCount {
+      for projection in ["gate_proj", "up_proj", "down_proj"] {
+        let rows = projection == "down_proj"
+          ? QwenContract.hiddenSize : QwenContract.expertIntermediateSize
+        let columns = projection == "down_proj"
+          ? QwenContract.expertIntermediateSize : QwenContract.hiddenSize
+        let prefix = "mtp.layers.0.mlp.experts.\(expert).\(projection)"
+        let name = "\(prefix).weight"
+        let scaleName = "\(prefix).weight_scale_inv"
+        guard let tensor = tensors[name], let scale = tensors[scaleName] else {
+          throw RepackError.invalidPlan("missing MTP routed expert tensor \(prefix)")
+        }
+        guard tensor.dtype == "F8_E4M3", tensor.shape == [rows, columns],
+          scale.dtype == "BF16", scale.shape == [rows / 128, columns / 128]
+        else {
+          throw RepackError.invalidPlan("invalid MTP FP8 layout for \(prefix)")
+        }
+        result.append(
+          ExpertConversion(
+            tensor: name, sourceFile: tensor.sourceFile, sourceOffset: tensor.sourceOffset,
+            sourceDType: tensor.dtype, sourceShape: tensor.shape,
+            sourceScaleTensor: scaleName, sourceScaleFile: scale.sourceFile,
+            sourceScaleOffset: scale.sourceOffset, sourceScaleDType: scale.dtype,
+            sourceScaleShape: scale.shape, destinationFile: expertPath,
+            expert: expert,
+            destinationRow: projection == "up_proj" ? QwenContract.expertIntermediateSize : 0,
+            weightRegion: projection == "down_proj" ? "down.weight" : "gate_up.weight",
+            scaleRegion: projection == "down_proj" ? "down.scale" : "gate_up.scale"))
+      }
+    }
+    return result
+  }
+
+  private static func sourceBytes(_ conversion: ExpertConversion) -> UInt64 {
+    conversion.sourceShape.reduce(UInt64(1)) { $0 * UInt64($1) }
+      + conversion.sourceScaleShape.reduce(UInt64(2)) { $0 * UInt64($1) }
   }
 }
 
@@ -372,6 +488,100 @@ public struct QwenFlashNextCheckpoint: Sendable {
     return try QwenPlanner.makePlan(index: index, tensors: try await readTensors(index: index))
   }
 
+  public func makeMTPRepackPlan() async throws -> RepackPlan {
+    let config: QwenConfig
+    do {
+      config = try JSONDecoder().decode(
+        QwenConfig.self, from: try await source.data(path: "config.json"))
+    } catch {
+      throw RepackError.incompatibleModel("cannot decode Qwen model config: \(error)")
+    }
+    try QwenContract.validate(config)
+    let index = try CheckpointIndex.decode(
+      try await source.data(path: "model.safetensors.index.json"))
+    let mtpWeightMap = index.weightMap.filter { $0.key.hasPrefix("mtp.") }
+    guard !mtpWeightMap.isEmpty else {
+      throw RepackError.invalidIndex("checkpoint index has no MTP tensors")
+    }
+    let mtpIndex = CheckpointIndex(totalSize: index.totalSize, weightMap: mtpWeightMap)
+    return try QwenMTPPlanner.makePlan(
+      index: mtpIndex, tensors: try await readTensors(index: mtpIndex))
+  }
+
+  public func installMTP(
+    at output: URL,
+    progress: (@Sendable (RepackProgress) -> Void)? = nil
+  ) async throws -> InstalledManifest {
+    let output = output.standardizedFileURL
+    let current = try InstalledModel.loadManifest(at: output)
+    guard current.modelKind == .qwen3_8FlashNext else {
+      throw RepackError.incompatibleModel("installed model is not Qwen3.8-Flash-Next")
+    }
+    if current.mtp != nil {
+      return try verifyInstalledMTP(current, at: output)
+    }
+
+    let fileManager = FileManager.default
+    let installedMTP = output.appendingPathComponent("mtp")
+    guard !fileManager.fileExists(atPath: installedMTP.path) else {
+      throw RepackError.destinationExists(installedMTP.path)
+    }
+    let stage = output.deletingLastPathComponent().appendingPathComponent(
+      output.lastPathComponent + ".mtp-install")
+    guard !fileManager.fileExists(atPath: stage.path) else {
+      throw RepackError.destinationExists(stage.path)
+    }
+
+    let plan = try await makeMTPRepackPlan()
+    let staged = try await Repacker(source: source).run(
+      plan: plan, output: stage, progress: progress, companions: [])
+    let mtpFiles = staged.files.filter { $0.path.hasPrefix("mtp/") }
+    guard mtpFiles.count == 2 else {
+      throw RepackError.invalidPlan("staged MTP file set is incomplete")
+    }
+    for file in mtpFiles {
+      let url = try safeFileURL(root: stage, path: file.path)
+      guard try fileSize(url) == file.size, try sha256(url) == file.sha256 else {
+        throw RepackError.invalidPlan("staged MTP file failed verification: \(file.path)")
+      }
+    }
+
+    let stagedMTP = stage.appendingPathComponent("mtp")
+    try fileManager.moveItem(at: stagedMTP, to: installedMTP)
+    do {
+      let manifest = InstalledManifest(
+        formatVersion: current.formatVersion,
+        modelID: current.modelID,
+        revision: current.revision,
+        layerCount: current.layerCount,
+        expertCount: current.expertCount,
+        selectedExpertCount: current.selectedExpertCount,
+        expertBlobSize: current.expertBlobSize,
+        files: current.files + mtpFiles,
+        commonTensors: current.commonTensors,
+        expertRegions: current.expertRegions,
+        dspark: current.dspark,
+        mtp: MTPDescriptor(
+          layerCount: QwenContract.mtpLayerCount,
+          useDedicatedEmbeddings: false,
+          commonTensors: plan.commonTensors),
+        modelKind: current.modelKind,
+        maximumContext: current.maximumContext,
+        expertQuantization: current.expertQuantization,
+        ngram: current.ngram)
+      let encoder = JSONEncoder()
+      encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+      try encoder.encode(manifest).write(
+        to: output.appendingPathComponent("manifest.json"), options: .atomic)
+      try? fileManager.removeItem(at: stage)
+      return try verifyInstalledMTP(
+        InstalledModel.loadManifest(at: output), at: output)
+    } catch {
+      try? fileManager.moveItem(at: installedMTP, to: stagedMTP)
+      throw error
+    }
+  }
+
   public func repack(
     to output: URL,
     progress: (@Sendable (RepackProgress) -> Void)? = nil
@@ -413,6 +623,10 @@ public struct QwenFlashNextCheckpoint: Sendable {
     guard manifest.modelKind == .qwen3_8FlashNext else {
       throw RepackError.incompatibleModel("installed model is not Qwen3.8-Flash-Next")
     }
+    guard manifest.mtp == nil else {
+      throw RepackError.invalidPlan(
+        "Qwen main-model repair is not available while MTP is installed")
+    }
     return try await Repacker(source: source).repair(
       plan: makeRepackPlan(), output: output, invalidFiles: invalidFiles, progress: progress)
   }
@@ -446,6 +660,26 @@ public struct QwenFlashNextCheckpoint: Sendable {
         length: entry.dataEnd - entry.dataStart)
     }
     return tensors
+  }
+
+  private func verifyInstalledMTP(
+    _ manifest: InstalledManifest,
+    at output: URL
+  ) throws -> InstalledManifest {
+    let files = manifest.files.filter { $0.path.hasPrefix("mtp/") }
+    guard manifest.mtp != nil, files.count == 2 else {
+      throw RepackError.invalidPlan("installed MTP file set is incomplete")
+    }
+    for file in files {
+      let url = try safeFileURL(root: output, path: file.path)
+      guard try fileSize(url) == file.size else {
+        throw RepackError.invalidPlan("installed size mismatch for \(file.path)")
+      }
+      guard try sha256(url) == file.sha256 else {
+        throw RepackError.invalidPlan("installed SHA-256 mismatch for \(file.path)")
+      }
+    }
+    return manifest
   }
 
   private func readHeader(_ shard: String) async throws

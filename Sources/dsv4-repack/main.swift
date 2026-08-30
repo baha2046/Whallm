@@ -71,6 +71,14 @@ struct CLI {
       ) { printer.update($0) }
       print("DSpark installed: \(model)")
       print("files: \(manifest.files.count)")
+    case "install-mtp":
+      let model = try value(after: "--model", in: arguments)
+      let printer = ProgressPrinter()
+      let manifest = try await QwenFlashNextCheckpoint().installMTP(
+        at: URL(fileURLWithPath: model)
+      ) { printer.update($0) }
+      print("MTP installed: \(model)")
+      print("files: \(manifest.files.count)")
     case "benchmark":
       let model = try value(after: "--model", in: arguments)
       let samples = try integer(after: "--samples", in: arguments, default: 32)
@@ -161,6 +169,7 @@ struct CLI {
         dsv4-repack repack [--model qwen3.8-flash-next] --output MODEL.dsv4 [--plan plan.json]
         dsv4-repack verify --model deepseek-v4-flash-0731.dsv4
         dsv4-repack install-dspark --model deepseek-v4-flash-0731.dsv4
+        dsv4-repack install-mtp --model qwen3.8-flash-next.dsv4
         dsv4-repack benchmark --model deepseek-v4-flash-0731.dsv4 [--samples 32]
       """)
   }

@@ -215,6 +215,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var promptCacheMemoryGiB = 8
   var warmupPromptPath = ""
   var bf16KVCache = false
+  var mtpEnabled: Bool? = false
+  var mtpSlots: Int? = 32
   var dsparkEnabled = false
   var dsparkSlots = 768
   var dsparkConfidenceThreshold = 0.6
@@ -241,10 +243,15 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     if modelKind == .qwen3_8FlashNext {
       settings.bf16KVCache = false
+      settings.mtpEnabled = settings.mtpEnabled ?? false
+      settings.mtpSlots = settings.mtpSlots ?? 32
       settings.dsparkEnabled = false
       settings.defaultTemperature = 0.7
       settings.defaultTopP = 0.8
       settings.defaultTopK = 20
+    } else {
+      settings.mtpEnabled = false
+      settings.mtpSlots = settings.mtpSlots ?? 32
     }
     return settings
   }
@@ -291,6 +298,9 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     guard promptCacheEntries >= 1, promptCacheMemoryGiB >= 1 else {
       throw ConfigurationError(
         L10n.string("Prompt cache entries and the memory limit must be greater than 0."))
+    }
+    guard (mtpSlots ?? 32) >= 10 else {
+      throw ConfigurationError(L10n.string("MTP slots must be at least 10."))
     }
     guard dsparkSlots >= 30, (0...1).contains(dsparkConfidenceThreshold) else {
       throw ConfigurationError(L10n.string("Correct the default generation parameters."))
@@ -519,6 +529,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let moePrefillStepSize: Int
       let batchedExpertPrefill: Bool
       let fp4IndexCache: Bool
+      let mtpEnabled: Bool
+      let mtpSlots: Int
       let dsparkEnabled: Bool
       let dsparkPromptCache: Bool
       let dsparkConfidenceThreshold: Double
@@ -553,6 +565,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case moePrefillStepSize = "moe_prefill_step_size"
         case batchedExpertPrefill = "batched_expert_prefill"
         case fp4IndexCache = "fp4_index_cache"
+        case mtpEnabled = "mtp_enabled"
+        case mtpSlots = "mtp_slots"
         case dsparkEnabled = "dspark_enabled"
         case dsparkPromptCache = "dspark_prompt_cache"
         case dsparkConfidenceThreshold = "dspark_confidence_threshold"
@@ -596,6 +610,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(moePrefillStepSize, forKey: .moePrefillStepSize)
         try values.encode(batchedExpertPrefill, forKey: .batchedExpertPrefill)
         try values.encode(fp4IndexCache, forKey: .fp4IndexCache)
+        try values.encode(mtpEnabled, forKey: .mtpEnabled)
+        try values.encode(mtpSlots, forKey: .mtpSlots)
         try values.encode(dsparkEnabled, forKey: .dsparkEnabled)
         try values.encode(dsparkPromptCache, forKey: .dsparkPromptCache)
         try values.encode(dsparkConfidenceThreshold, forKey: .dsparkConfidenceThreshold)

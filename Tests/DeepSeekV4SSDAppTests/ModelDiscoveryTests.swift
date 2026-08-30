@@ -69,6 +69,7 @@ final class ModelDiscoveryTests: XCTestCase {
     XCTAssertEqual(model.modelKind, .qwen3_8FlashNext)
     XCTAssertEqual(model.modelID, "Qwen/Qwen3.8-Flash-Next-FP8")
     XCTAssertEqual(model.modelKindLabel, "Qwen3.8 Flash Next")
+    XCTAssertFalse(model.hasMTP)
     XCTAssertFalse(model.hasDSpark)
     XCTAssertFalse(model.isUsable)
   }

@@ -211,6 +211,7 @@ struct ContentView: View {
         alias: $aliasDraft,
         aliasError: aliasError,
         serverActive: server.isActive,
+        mtpAvailable: modelLibrary.usableModel(for: modelKind)?.hasMTP == true,
         dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
         modelKind: modelKind,
         language: selectedLanguage
@@ -398,6 +399,8 @@ private struct ServerView: View {
   let showAdvancedSettings: (ModelKind) -> Void
   @State private var confirmsDownload = false
   @State private var downloadTarget: ModelKind?
+  @State private var confirmsMTPDownload = false
+  @State private var mtpDownloadTarget: InstalledModelInfo?
   @State private var confirmsRepair = false
   @State private var repairTarget: InstalledModelInfo?
   @State private var confirmsReinstall = false
@@ -523,6 +526,26 @@ private struct ServerView: View {
         L10n.string(
           "The app will move the damaged model to Trash. It will then download the complete model.")
       )
+    }
+    .confirmationDialog(
+      L10n.string("Download and install MTP?", language: language),
+      isPresented: $confirmsMTPDownload,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Download MTP", language: language)) {
+        if let mtpDownloadTarget { modelLibrary.startMTPInstallation(mtpDownloadTarget) }
+      }
+      Button(L10n.string("Cancel", language: language), role: .cancel) {}
+    } message: {
+      if let mtpDownloadTarget {
+        Text(
+          L10n.string(
+            "The app will add MTP to %@. The existing Qwen model will remain installed.",
+            language: language,
+            mtpDownloadTarget.url.path
+          )
+        )
+      }
     }
   }
 
@@ -795,6 +818,8 @@ private struct ServerView: View {
           .disabled(modelLibrary.operationPhase == .cancelling)
         } else if model == nil {
           modelDownloadButton(modelKind, block: downloadBlock)
+        } else if let model, shouldShowMTPDownloadButton(model) {
+          mtpDownloadButton(model)
         }
 
         modelLifecycleButton(modelKind, model: model)
@@ -849,15 +874,16 @@ private struct ServerView: View {
   @ViewBuilder
   private func modelStatus(_ modelKind: ModelKind, model: InstalledModelInfo?) -> some View {
     if let model {
+      let status = L10n.string(
+        isModelLoading(modelKind)
+          ? "Loading" : (isModelLoaded(modelKind) ? "Loaded" : "Installed"),
+        language: language
+      )
       Text(
         L10n.string(
-          "%@ · %@",
+          shouldShowMTPDownloadButton(model) ? "%@ · %@ · MTP download available" : "%@ · %@",
           language: language,
-          L10n.string(
-            isModelLoading(modelKind)
-              ? "Loading" : (isModelLoaded(modelKind) ? "Loaded" : "Installed"),
-            language: language
-          ),
+          status,
           formattedBytes(model.size)
         )
       )
@@ -1000,6 +1026,39 @@ private struct ServerView: View {
       button
         .buttonStyle(.bordered)
         .tint(isDisabled ? .gray : .secondary)
+    }
+  }
+
+  private func mtpDownloadButton(_ model: InstalledModelInfo) -> some View {
+    let block = modelLibrary.mtpDownloadBlock(for: model)
+    let disabledReason =
+      modelLibrary.isBusy
+      ? L10n.string("Wait for the current model operation to finish.", language: language)
+      : block?.message
+    let label = L10n.string(
+      modelLibrary.hasPartialMTPInstallation(for: model)
+        ? "Resume MTP download for %@" : "Download MTP for %@",
+      language: language,
+      model.modelKind.displayName
+    )
+
+    return Button {
+      requestMTPDownload(model)
+    } label: {
+      Label(label, systemImage: "arrow.down.circle")
+    }
+    .buttonStyle(TertiaryIconButtonStyle())
+    .accessibilityLabel(label)
+    .accessibilityHint(disabledReason ?? "")
+    .help(label)
+    .disabled(disabledReason != nil)
+    .overlay {
+      if let disabledReason {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(disabledReason)
+          .accessibilityHidden(true)
+      }
     }
   }
 
@@ -1282,6 +1341,16 @@ private struct ServerView: View {
     }
   }
 
+  private func requestMTPDownload(_ model: InstalledModelInfo) {
+    guard !modelLibrary.isBusy, modelLibrary.mtpDownloadBlock(for: model) == nil else { return }
+    if modelLibrary.hasPartialMTPInstallation(for: model) {
+      modelLibrary.startMTPInstallation(model)
+    } else {
+      mtpDownloadTarget = model
+      confirmsMTPDownload = true
+    }
+  }
+
   private func downloadHelp(
     _ modelKind: ModelKind,
     block: ModelDownloadBlock?
@@ -1393,6 +1462,10 @@ func shouldShowModelDownloadReason(
   hasReason: Bool
 ) -> Bool {
   !modelIsInstalled && !modelIsDownloading && hasReason
+}
+
+func shouldShowMTPDownloadButton(_ model: InstalledModelInfo?) -> Bool {
+  model?.modelKind == .qwen3_8FlashNext && model?.hasMTP == false
 }
 
 func modelDownloadProgressExtraHeight(hasProgressFraction: Bool) -> CGFloat {
@@ -1540,6 +1613,7 @@ private struct ModelAdvancedView: View {
   @Binding var alias: String
   let aliasError: String?
   let serverActive: Bool
+  let mtpAvailable: Bool
   let dsparkAvailable: Bool
   let modelKind: ModelKind
   let language: AppLanguage
@@ -1676,6 +1750,25 @@ private struct ModelAdvancedView: View {
             )
             .appInput(width: 340)
           }
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            toggleField(
+              "Use MTP",
+              hint: mtpAvailable
+                ? "MTP uses speculative decoding. Text may arrive in short bursts."
+                : "Install the MTP files before enabling this setting.",
+              value: mtpEnabled
+            )
+            .disabled(!mtpAvailable)
+            Divider()
+            integerField(
+              "MTP slots",
+              hint:
+                "Number of MTP experts kept in memory. More slots use more memory. The default is 32.",
+              value: mtpSlots
+            )
+            .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
+          }
           if modelKind == .deepSeekV4 {
             Divider()
             toggleField(
@@ -1724,6 +1817,22 @@ private struct ModelAdvancedView: View {
     Binding(
       get: { settings.layerMajorPrefillThreshold ?? 1_024 },
       set: { settings.layerMajorPrefillThreshold = $0 }
+    )
+  }
+
+  private var mtpEnabled: Binding<Bool> {
+    Binding(
+      get: { mtpAvailable && settings.mtpEnabled == true },
+      set: { enabled in
+        settings.mtpEnabled = enabled
+      }
+    )
+  }
+
+  private var mtpSlots: Binding<Int> {
+    Binding(
+      get: { settings.mtpSlots ?? 32 },
+      set: { settings.mtpSlots = $0 }
     )
   }
 

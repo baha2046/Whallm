@@ -193,6 +193,22 @@ public struct DSparkDescriptor: Codable, Equatable, Sendable {
   public let commonTensors: [InstalledTensor]
 }
 
+public struct MTPDescriptor: Codable, Equatable, Sendable {
+  public let layerCount: Int
+  public let useDedicatedEmbeddings: Bool
+  public let commonTensors: [InstalledTensor]
+
+  public init(
+    layerCount: Int,
+    useDedicatedEmbeddings: Bool,
+    commonTensors: [InstalledTensor]
+  ) {
+    self.layerCount = layerCount
+    self.useDedicatedEmbeddings = useDedicatedEmbeddings
+    self.commonTensors = commonTensors
+  }
+}
+
 public struct ExpertQuantizationDescriptor: Codable, Equatable, Sendable {
   public let mode: String
   public let bits: Int
@@ -368,6 +384,7 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
   public let commonTensors: [InstalledTensor]
   public let expertRegions: [ExpertRegion]
   public let dspark: DSparkDescriptor?
+  public let mtp: MTPDescriptor?
   public let modelKind: ModelKind?
   public let maximumContext: Int?
   public let expertQuantization: ExpertQuantizationDescriptor?
@@ -385,6 +402,7 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     commonTensors: [InstalledTensor],
     expertRegions: [ExpertRegion],
     dspark: DSparkDescriptor? = nil,
+    mtp: MTPDescriptor? = nil,
     modelKind: ModelKind? = nil,
     maximumContext: Int? = nil,
     expertQuantization: ExpertQuantizationDescriptor? = nil,
@@ -401,6 +419,7 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     self.commonTensors = commonTensors
     self.expertRegions = expertRegions
     self.dspark = dspark
+    self.mtp = mtp
     self.modelKind = modelKind
     self.maximumContext = maximumContext
     self.expertQuantization = expertQuantization

@@ -5,6 +5,14 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  func testMTPDownloadButtonAppearsOnlyForQwenWithoutMTP() {
+    XCTAssertTrue(shouldShowMTPDownloadButton(installedModel(.qwen3_8FlashNext)))
+    XCTAssertFalse(
+      shouldShowMTPDownloadButton(installedModel(.qwen3_8FlashNext, hasMTP: true)))
+    XCTAssertFalse(shouldShowMTPDownloadButton(installedModel(.deepSeekV4)))
+    XCTAssertFalse(shouldShowMTPDownloadButton(nil))
+  }
+
   func testActiveDownloadDoesNotReserveExtraModelListHeight() {
     XCTAssertFalse(
       shouldShowModelDownloadReason(
@@ -134,12 +142,17 @@ final class ServerConfigurationTests: XCTestCase {
     var deepSeek = ModelAdvancedSettings.defaults(for: .deepSeekV4)
     deepSeek.slots = 700
     deepSeek.bf16KVCache = true
+    deepSeek.mtpEnabled = true
     deepSeek.dsparkEnabled = true
     deepSeek.save(for: .deepSeekV4, defaults: isolated.defaults)
 
     var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    XCTAssertFalse(qwen.mtpEnabled ?? true)
+    XCTAssertEqual(qwen.mtpSlots, 32)
     qwen.slots = 900
     qwen.bf16KVCache = true
+    qwen.mtpEnabled = true
+    qwen.mtpSlots = 512
     qwen.dsparkEnabled = true
     qwen.defaultTemperature = 1.0
     qwen.defaultTopP = 0.95
@@ -156,6 +169,7 @@ final class ServerConfigurationTests: XCTestCase {
 
     XCTAssertEqual(restoredDeepSeek.slots, 700)
     XCTAssertTrue(restoredDeepSeek.bf16KVCache)
+    XCTAssertFalse(restoredDeepSeek.mtpEnabled ?? true)
     XCTAssertTrue(restoredDeepSeek.dsparkEnabled)
     XCTAssertEqual(restoredDeepSeek.layerMajorPrefillThreshold, 1_024)
     XCTAssertEqual(restoredQwen.slots, 900)
@@ -164,11 +178,13 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restoredQwen.defaultTopP, 0.8)
     XCTAssertEqual(restoredQwen.defaultTopK, 20)
     XCTAssertFalse(restoredQwen.bf16KVCache)
+    XCTAssertTrue(restoredQwen.mtpEnabled == true)
+    XCTAssertEqual(restoredQwen.mtpSlots, 512)
     XCTAssertFalse(restoredQwen.dsparkEnabled)
     XCTAssertEqual(restoredQwen.layerMajorPrefillThreshold, 1_024)
   }
 
-  func testSavedAdvancedSettingsWithoutPrefillThresholdUseTheNewDefault() throws {
+  func testSavedAdvancedSettingsWithoutNewFieldsUseTheNewDefaults() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
     let encoded = try JSONEncoder().encode(
@@ -176,6 +192,8 @@ final class ServerConfigurationTests: XCTestCase {
     var object = try XCTUnwrap(
       JSONSerialization.jsonObject(with: encoded) as? [String: Any])
     object.removeValue(forKey: "layerMajorPrefillThreshold")
+    object.removeValue(forKey: "mtpEnabled")
+    object.removeValue(forKey: "mtpSlots")
     isolated.defaults.set(
       try JSONSerialization.data(withJSONObject: object),
       forKey: "modelAdvancedSettings.deepseek-v4"
@@ -187,6 +205,8 @@ final class ServerConfigurationTests: XCTestCase {
     )
 
     XCTAssertEqual(restored.layerMajorPrefillThreshold, 1_024)
+    XCTAssertFalse(restored.mtpEnabled ?? true)
+    XCTAssertEqual(restored.mtpSlots, 32)
   }
 
   func testLegacyAdvancedSettingsMigrateOnlyToTheCurrentModel() throws {
@@ -284,13 +304,15 @@ final class ServerConfigurationTests: XCTestCase {
     deepSeek.dsparkEnabled = true
     var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
     qwen.slots = 900
+    qwen.mtpEnabled = true
+    qwen.mtpSlots = 512
     let catalog = try ModelLibrary.makeServerCatalog(
       models: [
         installedModel(
           .deepSeekV4,
           issues: [InstalledFileIssue(path: "common.bin", kind: .checksumMismatch)]
         ),
-        installedModel(.qwen3_8FlashNext),
+        installedModel(.qwen3_8FlashNext, hasMTP: true),
         installedModel(.deepSeekV4, hasDSpark: true),
       ],
       aliases: [.deepSeekV4: "work-model"],
@@ -305,6 +327,8 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(catalog.models[0].alias, "work-model")
     XCTAssertTrue(catalog.models[0].runtime.dsparkEnabled)
     XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
+    XCTAssertTrue(catalog.models[1].runtime.mtpEnabled)
+    XCTAssertEqual(catalog.models[1].runtime.mtpSlots, 512)
     XCTAssertEqual(catalog.models[1].defaults.temperature, 0.7)
     XCTAssertEqual(catalog.models[1].defaults.topP, 0.8)
     XCTAssertEqual(catalog.models[1].defaults.topK, 20)
@@ -323,6 +347,7 @@ final class ServerConfigurationTests: XCTestCase {
         "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
         "persistent_prompt_cache_entries", "prompt_cache_directory",
         "moe_prefill_step_size", "batched_expert_prefill", "fp4_index_cache",
+        "mtp_enabled", "mtp_slots",
         "dspark_enabled", "dspark_prompt_cache", "dspark_confidence_threshold",
         "dspark_slots", "dspark_hash_prefetch", "dspark_adaptive_block",
         "dspark_fallback_enabled", "dspark_sequential_verification",
@@ -334,6 +359,20 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
     XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)
+  }
+
+  @MainActor
+  func testCatalogDisablesMTPWhenTheInstalledModelHasNoMTPFiles() throws {
+    var settings = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    settings.mtpEnabled = true
+    let catalog = try ModelLibrary.makeServerCatalog(
+      models: [installedModel(.qwen3_8FlashNext)],
+      aliases: [:],
+      settings: [.qwen3_8FlashNext: settings],
+      powerSavingLimitGBps: nil
+    )
+
+    XCTAssertFalse(try XCTUnwrap(catalog.models.first).runtime.mtpEnabled)
   }
 
   @MainActor
@@ -404,6 +443,7 @@ final class ServerConfigurationTests: XCTestCase {
       "此模型的選用 request 名稱。變更會自動儲存。"
     )
     XCTAssertEqual(L10n.string("Assistant", language: .traditionalChinese), "助理")
+    XCTAssertEqual(L10n.string("Use MTP", language: .traditionalChinese), "使用 MTP")
   }
 
   func testSystemLanguageUsesSupportedLanguageOrFallsBackToEnglish() {
@@ -440,6 +480,7 @@ private func temporaryCatalogNames() -> Set<String> {
 
 private func installedModel(
   _ modelKind: ModelKind,
+  hasMTP: Bool = false,
   hasDSpark: Bool = false,
   issues: [InstalledFileIssue] = []
 ) -> InstalledModelInfo {
@@ -447,6 +488,7 @@ private func installedModel(
     url: URL(fileURLWithPath: "/tmp/\(modelKind.rawValue).dsv4"),
     size: 1,
     quickIssues: issues,
+    hasMTP: hasMTP,
     hasDSpark: hasDSpark,
     modelKind: modelKind,
     modelID: modelKind == .deepSeekV4

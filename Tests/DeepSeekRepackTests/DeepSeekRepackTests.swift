@@ -386,6 +386,22 @@ final class DeepSeekRepackTests: XCTestCase {
     XCTAssertFalse(plan.copies.contains { $0.tensor.hasPrefix("mtp.") })
   }
 
+  func testQwenMTPPlannerCreatesSidecarLayout() throws {
+    let fixture = makeQwenMTPPlannerFixture()
+    let plan = try QwenMTPPlanner.makePlan(index: fixture.index, tensors: fixture.tensors)
+
+    XCTAssertEqual(plan.files, [
+      PlannedFile(path: "mtp/common.bin", size: 7_169),
+      PlannedFile(
+        path: "mtp/experts/layer_00.bin",
+        size: UInt64(QwenContract.expertCount) * QwenContract.expertBlobSize),
+    ])
+    XCTAssertEqual(plan.commonTensors.count, 29)
+    XCTAssertEqual(plan.expertConversions?.count, 512 * 3)
+    XCTAssertTrue(plan.commonTensors.allSatisfy { $0.name.hasPrefix("mtp.") })
+    XCTAssertTrue(plan.copies.allSatisfy { $0.destinationFile == "mtp/common.bin" })
+  }
+
   func testQwenConversionCanRepairOneDamagedExpertLayer() async throws {
     let gateBytes = QwenContract.expertIntermediateSize * QwenContract.hiddenSize
     let downBytes = QwenContract.hiddenSize * QwenContract.expertIntermediateSize
@@ -602,6 +618,40 @@ private func makeQwenPlannerFixture() -> PlannerFixture {
         add("\(prefix).weight", shape: [rows, columns], dtype: "F8_E4M3")
         add("\(prefix).weight_scale_inv", shape: [rows / 128, columns / 128])
       }
+    }
+  }
+  return PlannerFixture(
+    index: CheckpointIndex(totalSize: offset, weightMap: weightMap), tensors: tensors)
+}
+
+private func makeQwenMTPPlannerFixture() -> PlannerFixture {
+  var tensors: [String: SafeTensor] = [:]
+  var weightMap: [String: String] = [:]
+  var offset: UInt64 = 0
+
+  func add(_ name: String, shape: [Int], dtype: String = "BF16") {
+    let itemSize: UInt64 = dtype == "F8_E4M3" ? 1 : 2
+    let length = shape.reduce(itemSize) { $0 * UInt64($1) }
+    let tensor = SafeTensor(
+      name: name, sourceFile: "mtp.safetensors", dtype: dtype, shape: shape,
+      sourceOffset: offset, length: length)
+    tensors[name] = tensor
+    weightMap[name] = tensor.sourceFile
+    offset += length
+  }
+
+  for index in 0..<QwenContract.mtpCommonTensorCount {
+    add("mtp.fixture_\(index)", shape: [1], dtype: "F8_E4M3")
+  }
+  for expert in 0..<QwenContract.expertCount {
+    for projection in ["gate_proj", "up_proj", "down_proj"] {
+      let rows = projection == "down_proj"
+        ? QwenContract.hiddenSize : QwenContract.expertIntermediateSize
+      let columns = projection == "down_proj"
+        ? QwenContract.expertIntermediateSize : QwenContract.hiddenSize
+      let prefix = "mtp.layers.0.mlp.experts.\(expert).\(projection)"
+      add("\(prefix).weight", shape: [rows, columns], dtype: "F8_E4M3")
+      add("\(prefix).weight_scale_inv", shape: [rows / 128, columns / 128])
     }
   }
   return PlannerFixture(
