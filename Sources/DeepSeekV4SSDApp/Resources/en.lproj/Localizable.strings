@@ -33,6 +33,8 @@
 "Completion time" = "Completion time";
 "Continue Model Installation" = "Continue Model Installation";
 "Correct the default generation parameters." = "Correct the default generation parameters.";
+"Debug" = "Debug";
+"Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content." = "Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content.";
 "Correct the failed download checks first." = "Correct the failed download checks first.";
 "Could not get a response. %@" = "Could not get a response. %@";
 "Decode Tok/s" = "Decode Tok/s";
@@ -46,6 +48,7 @@
 "Downloading damaged data again" = "Downloading damaged data again";
 "Enter a message…" = "Enter a message…";
 "Error: %@" = "Error: %@";
+"Error" = "Error";
 "First Token wait time" = "First Token wait time";
 "Follow System" = "Follow System";
 "Function" = "Function";
@@ -54,6 +57,7 @@
 "Host" = "Host";
 "Host cannot be empty." = "Host cannot be empty.";
 "Install Model" = "Install Model";
+"Info" = "Info";
 "Installed" = "Installed";
 "Installed model" = "Installed model";
 "Invalid Base URL" = "Invalid Base URL";
@@ -90,12 +94,16 @@
 "No Test Messages" = "No Test Messages";
 "Number of linear conversations to keep. The recommended value is 2." = "Number of linear conversations to keep. The recommended value is 2.";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Number of routed experts in the Active Parameters Cache. The recommended value is 4096.";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "Number of workers that read expert blobs at the same time. The recommended value is 4.";
 "Optional for local use" = "Optional for local use";
 "Optional UTF-8 prompt file path" = "Optional UTF-8 prompt file path";
 "Port" = "Port";
 "Port must be from 1 through 65535." = "Port must be from 1 through 65535.";
 "Prefill step size" = "Prefill step size";
+"ANE Prefill share" = "ANE Prefill share";
+"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.";
+"ANE Prefill share must be from 0 through 1." = "ANE Prefill share must be from 0 through 1.";
 "Preparing download" = "Preparing download";
 "Preparing repair" = "Preparing repair";
 "Output Tokens" = "Output Tokens";
@@ -229,6 +237,7 @@
 "Logs" = "Logs";
 "General" = "General";
 "Listen Address" = "Listen Address";
+"Log level" = "Log level";
 "127.0.0.1 (Local only)" = "127.0.0.1 (Local only)";
 "0.0.0.0 (All networks)" = "0.0.0.0 (All networks)";
 "Choose which devices can connect to the server." = "Choose which devices can connect to the server.";

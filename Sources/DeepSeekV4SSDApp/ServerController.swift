@@ -215,6 +215,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var promptCacheMemoryGiB = 8
   var warmupPromptPath = ""
   var bf16KVCache = false
+  var anePrefillRatio: Double? = 0.25
   var mtpEnabled: Bool? = false
   var mtpSlots: Int? = 32
   var dsparkEnabled = false
@@ -228,6 +229,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   static func defaults(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = ModelAdvancedSettings()
     if modelKind == .qwen3_8FlashNext {
+      settings.slots = 4_096
+      settings.mtpEnabled = false
       settings.defaultMaxTokens = 262_144
       settings.defaultTemperature = 0.7
       settings.defaultTopP = 0.8
@@ -241,6 +244,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = self
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
+    settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
     if modelKind == .qwen3_8FlashNext {
       settings.bf16KVCache = false
       settings.mtpEnabled = settings.mtpEnabled ?? false
@@ -301,6 +305,9 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     }
     guard (mtpSlots ?? 32) >= 10 else {
       throw ConfigurationError(L10n.string("MTP slots must be at least 10."))
+    }
+    guard (0...1).contains(anePrefillRatio ?? 0.25) else {
+      throw ConfigurationError(L10n.string("ANE Prefill share must be from 0 through 1."))
     }
     guard dsparkSlots >= 30, (0...1).contains(dsparkConfidenceThreshold) else {
       throw ConfigurationError(L10n.string("Correct the default generation parameters."))
@@ -393,6 +400,22 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   }
 }
 
+enum ServerLogLevel: String, Codable, CaseIterable, Identifiable {
+  case debug
+  case info
+  case error
+
+  var id: String { rawValue }
+
+  var localizationKey: String {
+    switch self {
+    case .debug: "Debug"
+    case .info: "Info"
+    case .error: "Error"
+    }
+  }
+}
+
 struct ServerConfiguration: Codable, Equatable {
   static let preferenceKey = "serverConfiguration"
   static let powerSavingLimitOptionsGBps: [Double?] = [0.5, 1, 2, 3, 5, 10, 25, nil]
@@ -403,6 +426,7 @@ struct ServerConfiguration: Codable, Equatable {
   var sitePackages: String?
   var host: String
   var port: Int
+  var logLevel: ServerLogLevel
   var apiKey: String
   var powerSavingLimitGBps: Double?
 
@@ -419,6 +443,7 @@ struct ServerConfiguration: Codable, Equatable {
       sitePackages: runtime.sitePackages?.path,
       host: "127.0.0.1",
       port: 11_434,
+      logLevel: .info,
       apiKey: "",
       powerSavingLimitGBps: nil
     )
@@ -469,6 +494,7 @@ struct ServerConfiguration: Codable, Equatable {
       "--model-catalog", modelCatalogPath,
       "--host", host,
       "--port", String(port),
+      "--log-level", logLevel.rawValue,
     ]
   }
 
@@ -503,6 +529,34 @@ struct ServerConfiguration: Codable, Equatable {
   }
 }
 
+extension ServerConfiguration {
+  private enum CodingKeys: String, CodingKey {
+    case runtimeDirectory
+    case pythonExecutable
+    case pythonHome
+    case sitePackages
+    case host
+    case port
+    case logLevel
+    case apiKey
+    case powerSavingLimitGBps
+  }
+
+  init(from decoder: Decoder) throws {
+    let values = try decoder.container(keyedBy: CodingKeys.self)
+    runtimeDirectory = try values.decode(String.self, forKey: .runtimeDirectory)
+    pythonExecutable = try values.decode(String.self, forKey: .pythonExecutable)
+    pythonHome = try values.decodeIfPresent(String.self, forKey: .pythonHome)
+    sitePackages = try values.decodeIfPresent(String.self, forKey: .sitePackages)
+    host = try values.decode(String.self, forKey: .host)
+    port = try values.decode(Int.self, forKey: .port)
+    logLevel = try values.decodeIfPresent(ServerLogLevel.self, forKey: .logLevel) ?? .info
+    apiKey = try values.decode(String.self, forKey: .apiKey)
+    powerSavingLimitGBps = try values.decodeIfPresent(
+      Double.self, forKey: .powerSavingLimitGBps)
+  }
+}
+
 struct CatalogModel: Identifiable, Equatable, Sendable {
   let id: String
   let alias: String?
@@ -528,6 +582,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let promptCacheDirectory: String?
       let moePrefillStepSize: Int
       let batchedExpertPrefill: Bool
+      let qwenNextLayerPrefetch: Bool
+      let anePrefill: Bool
+      let anePrefillRatio: Double
       let fp4IndexCache: Bool
       let mtpEnabled: Bool
       let mtpSlots: Int
@@ -564,6 +621,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case promptCacheDirectory = "prompt_cache_directory"
         case moePrefillStepSize = "moe_prefill_step_size"
         case batchedExpertPrefill = "batched_expert_prefill"
+        case qwenNextLayerPrefetch = "qwen_next_layer_prefetch"
+        case anePrefill = "ane_prefill"
+        case anePrefillRatio = "ane_prefill_ratio"
         case fp4IndexCache = "fp4_index_cache"
         case mtpEnabled = "mtp_enabled"
         case mtpSlots = "mtp_slots"
@@ -609,6 +669,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         }
         try values.encode(moePrefillStepSize, forKey: .moePrefillStepSize)
         try values.encode(batchedExpertPrefill, forKey: .batchedExpertPrefill)
+        try values.encode(qwenNextLayerPrefetch, forKey: .qwenNextLayerPrefetch)
+        try values.encode(anePrefill, forKey: .anePrefill)
+        try values.encode(anePrefillRatio, forKey: .anePrefillRatio)
         try values.encode(fp4IndexCache, forKey: .fp4IndexCache)
         try values.encode(mtpEnabled, forKey: .mtpEnabled)
         try values.encode(mtpSlots, forKey: .mtpSlots)
@@ -690,6 +753,10 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       } else {
         try values.encodeNil(forKey: .warmupPromptPath)
       }
+    }
+
+    func jsonObject() throws -> Any {
+      try JSONSerialization.jsonObject(with: JSONEncoder().encode(self))
     }
   }
 
@@ -845,6 +912,8 @@ final class ServerController: ObservableObject {
   private var process: Process?
   private var outputTask: Task<Void, Never>?
   private var monitorTask: Task<Void, Never>?
+  private var modelConfigurationTask: Task<Void, Never>?
+  private var pendingModelConfigurations: [String: ModelCatalog.Entry] = [:]
   private var monitorConfiguration: ServerConfiguration?
   private var temporaryModelCatalog: TemporaryModelCatalog?
   private var previousSSDBytes: UInt64?
@@ -914,6 +983,7 @@ final class ServerController: ObservableObject {
   }
 
   func stop() {
+    cancelModelConfigurationSync()
     guard let process, process.isRunning else {
       temporaryModelCatalog?.remove()
       temporaryModelCatalog = nil
@@ -930,48 +1000,119 @@ final class ServerController: ObservableObject {
     lastRecordedCompletedRequestCount = performance.completedRequestCount
   }
 
-  func loadModel(_ modelID: String) async {
-    await changeLoadedModel(.load(modelID), path: "api/models/load")
+  func configureModel(_ configuration: ModelCatalog.Entry) {
+    guard case .running = state else { return }
+    pendingModelConfigurations[configuration.id] = configuration
+    guard modelConfigurationTask == nil else { return }
+    modelConfigurationTask = Task { [weak self] in
+      await self?.flushModelConfigurations()
+    }
+  }
+
+  func loadModel(_ modelID: String, catalog: () throws -> ModelCatalog) async {
+    do {
+      let configuration = try catalog().models.first { $0.id == modelID }
+      guard let configuration else {
+        throw ConfigurationError(L10n.string("The model is not available to this server."))
+      }
+      await changeLoadedModel(
+        .load(modelID), path: "api/models/load", configuration: configuration)
+    } catch {
+      modelActionError = error.localizedDescription
+    }
   }
 
   func unloadModel(_ modelID: String) async {
     await changeLoadedModel(.unload(modelID), path: "api/models/unload")
   }
 
-  private func changeLoadedModel(_ action: ModelAction, path: String) async {
+  private func changeLoadedModel(
+    _ action: ModelAction,
+    path: String,
+    configuration: ModelCatalog.Entry? = nil
+  ) async {
     guard modelAction == nil, case .running = state,
-      let configuration = monitorConfiguration,
-      let baseURL = configuration.baseURL
+      monitorConfiguration?.baseURL != nil
     else { return }
 
     modelAction = action
     modelActionError = nil
     defer { modelAction = nil }
 
-    var request = URLRequest(url: baseURL.appending(path: path))
-    request.httpMethod = "POST"
-    request.timeoutInterval = 1_800
-    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    if !configuration.apiKey.isEmpty {
-      request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
-    }
-
     do {
-      request.httpBody = try JSONSerialization.data(
-        withJSONObject: ["model": action.modelID]
-      )
-      let (_, response) = try await URLSession.shared.data(for: request)
-      guard let http = response as? HTTPURLResponse else {
-        throw ConfigurationError(L10n.string("The server did not return an HTTP response."))
+      if case .load = action, let modelConfigurationTask {
+        await modelConfigurationTask.value
       }
-      guard (200..<300).contains(http.statusCode) else {
-        throw ConfigurationError(
-          L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
+      var body: [String: Any] = ["model": action.modelID]
+      if let configuration {
+        body["configuration"] = try configuration.jsonObject()
       }
+      try await sendModelRequest(path: path, body: body, timeoutInterval: 1_800)
+      if let configuration { updateCatalogModel(configuration) }
       await refreshPerformance()
     } catch {
       modelActionError = error.localizedDescription
     }
+  }
+
+  private func flushModelConfigurations() async {
+    while !Task.isCancelled, let configuration = pendingModelConfigurations.values.first {
+      pendingModelConfigurations.removeValue(forKey: configuration.id)
+      do {
+        try await sendModelRequest(
+          path: "api/models/configure",
+          body: ["configuration": try configuration.jsonObject()],
+          timeoutInterval: 1_800
+        )
+        updateCatalogModel(configuration)
+        modelActionError = nil
+      } catch {
+        if case .running = state {
+          modelActionError = error.localizedDescription
+        }
+      }
+    }
+    modelConfigurationTask = nil
+  }
+
+  private func sendModelRequest(
+    path: String,
+    body: [String: Any],
+    timeoutInterval: TimeInterval
+  ) async throws {
+    guard case .running = state,
+      let configuration = monitorConfiguration,
+      let baseURL = configuration.baseURL
+    else { throw ConfigurationError(L10n.string("Start the server first")) }
+
+    var request = URLRequest(url: baseURL.appending(path: path))
+    request.httpMethod = "POST"
+    request.timeoutInterval = timeoutInterval
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if !configuration.apiKey.isEmpty {
+      request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+    }
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    let (_, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+      throw ConfigurationError(L10n.string("The server did not return an HTTP response."))
+    }
+    guard (200..<300).contains(http.statusCode) else {
+      throw ConfigurationError(
+        L10n.string("The server returned HTTP %lld.", Int64(http.statusCode)))
+    }
+  }
+
+  private func updateCatalogModel(_ configuration: ModelCatalog.Entry) {
+    guard let index = catalogModels.firstIndex(where: { $0.id == configuration.id })
+    else { return }
+    catalogModels[index] = CatalogModel(id: configuration.id, alias: configuration.alias)
+  }
+
+  private func cancelModelConfigurationSync() {
+    modelConfigurationTask?.cancel()
+    modelConfigurationTask = nil
+    pendingModelConfigurations.removeAll()
   }
 
   private func readOutput(_ handle: FileHandle) {
@@ -1124,6 +1265,7 @@ final class ServerController: ObservableObject {
   }
 
   private func didTerminate(status: Int32) {
+    cancelModelConfigurationSync()
     outputTask?.cancel()
     outputTask = nil
     monitorTask?.cancel()

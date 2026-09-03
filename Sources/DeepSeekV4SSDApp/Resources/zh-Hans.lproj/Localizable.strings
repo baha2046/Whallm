@@ -33,6 +33,8 @@
 "Completion time" = "完成时长";
 "Continue Model Installation" = "继续安装模型";
 "Correct the default generation parameters." = "请修正默认生成参数。";
+"Debug" = "调试";
+"Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content." = "下次启动服务器时生效。调试会记录每个请求的完整 JSON 内容，其中可能包含敏感信息。";
 "Correct the failed download checks first." = "请先修正下载前检查项目。";
 "Could not get a response. %@" = "无法获取响应。%@";
 "Decode Tok/s" = "解码 Token/秒";
@@ -46,6 +48,7 @@
 "Downloading damaged data again" = "正在重新下载损坏数据";
 "Enter a message…" = "输入消息…";
 "Error: %@" = "错误：%@";
+"Error" = "错误";
 "First Token wait time" = "首个 Token 等待时间";
 "Follow System" = "跟随系统";
 "Function" = "函数";
@@ -54,6 +57,7 @@
 "Host" = "主机";
 "Host cannot be empty." = "Host 不可为空。";
 "Install Model" = "安装模型";
+"Info" = "信息";
 "Installed" = "已安装";
 "Installed model" = "已安装模型";
 "Invalid Base URL" = "Base URL 无效";
@@ -90,12 +94,16 @@
 "No Test Messages" = "暂无测试消息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的线性对话数量。建议值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 数量。建议值是 1152。";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Active Parameters Cache 的 routed expert 数量。建议值是 4096。";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "同时读取 expert blob 的工作数量。建议值是 8。";
 "Optional for local use" = "本机使用时可留空";
 "Optional UTF-8 prompt file path" = "可选的 UTF-8 prompt 文件路径";
 "Port" = "端口";
 "Port must be from 1 through 65535." = "Port 必须介于 1 和 65535。";
 "Prefill step size" = "Prefill 步长";
+"ANE Prefill share" = "ANE Prefill 比例";
+"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "分配给 ANE 的 q_proj output channels 比例。0 只使用 GPU。1 只使用 ANE。默认值是 0.25。";
+"ANE Prefill share must be from 0 through 1." = "ANE Prefill 比例必须介于 0 与 1。";
 "Preparing download" = "正在准备下载";
 "Preparing repair" = "正在准备修复";
 "Output Tokens" = "输出 Tokens";
@@ -229,6 +237,7 @@
 "Logs" = "日志";
 "General" = "一般";
 "Listen Address" = "监听地址";
+"Log level" = "日志级别";
 "127.0.0.1 (Local only)" = "127.0.0.1（仅本机）";
 "0.0.0.0 (All networks)" = "0.0.0.0（所有网络）";
 "Choose which devices can connect to the server." = "选择可连接到服务器的设备范围。";

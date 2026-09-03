@@ -37,24 +37,28 @@ test:
 package:
 	./Scripts/package-app.sh
 
+## ane-bridge: build the private Apple Neural Engine runtime bridge
+ane-bridge:
+	./Scripts/build-ane-bridge.sh
+
 ## release: sign, notarize, and publish a Sparkle update to GitHub Releases
 release:
 	./Scripts/release.sh
 
 ## server: start the OpenAI-compatible API server directly
-server:
+server: ane-bridge
 	PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.server \
 		--model "$(MODEL)" --host "$(HOST)" --port "$(PORT)" $(ARGS)
 
 ## benchmark-dsv4: benchmark DeepSeek with SPEED-Bench mixed inputs
 benchmark-dsv4:
 	.venv/bin/python Scripts/benchmark_api.py --model deepseek-v4-flash-0731 \
-		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 2 $(ARGS)
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 3 $(ARGS)
 
 ## benchmark-qwen: benchmark Qwen with SPEED-Bench mixed inputs
 benchmark-qwen:
 	.venv/bin/python Scripts/benchmark_api.py --model qwen3.8-flash-next-fp8 \
-		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 2 $(ARGS)
+		--speed-bench-dir "$(SPEED_BENCH_DIR)" --runs 3 $(ARGS)
 
 %:
 	@:

@@ -83,6 +83,7 @@ struct ContentView: View {
     .onChange(of: advancedSettings) {
       if let advancedSettingsModelKind {
         advancedSettings.save(for: advancedSettingsModelKind)
+        syncAdvancedSettings(for: advancedSettingsModelKind)
       }
     }
     .onChange(of: aliasDraft) {
@@ -90,6 +91,7 @@ struct ContentView: View {
       do {
         _ = try modelLibrary.saveAlias(aliasDraft, for: advancedSettingsModelKind)
         aliasError = nil
+        syncAdvancedSettings(for: advancedSettingsModelKind)
       } catch {
         aliasError = error.localizedDescription
       }
@@ -210,7 +212,12 @@ struct ContentView: View {
         settings: $advancedSettings,
         alias: $aliasDraft,
         aliasError: aliasError,
-        serverActive: server.isActive,
+        settingsLocked: modelAdvancedSettingsAreLocked(
+          modelID: modelKind.apiModelID,
+          loadedModel: server.performance.loadedModel,
+          loadingModel: server.performance.loadingModel,
+          modelActionID: server.modelAction?.modelID
+        ),
         mtpAvailable: modelLibrary.usableModel(for: modelKind)?.hasMTP == true,
         dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
         modelKind: modelKind,
@@ -219,6 +226,21 @@ struct ContentView: View {
     }
     .background(AppTheme.pageBackground)
     .navigationBarBackButtonHidden()
+  }
+
+  private func syncAdvancedSettings(for modelKind: ModelKind) {
+    guard server.canManageModels,
+      !modelAdvancedSettingsAreLocked(
+        modelID: modelKind.apiModelID,
+        loadedModel: server.performance.loadedModel,
+        loadingModel: server.performance.loadingModel,
+        modelActionID: server.modelAction?.modelID
+      ),
+      let catalog = try? modelLibrary.makeServerCatalog(
+        powerSavingLimitGBps: configuration.powerSavingLimitGBps),
+      let entry = catalog.models.first(where: { $0.id == modelKind.apiModelID })
+    else { return }
+    server.configureModel(entry)
   }
 }
 
@@ -655,6 +677,28 @@ private struct ServerView: View {
       Divider()
 
       SettingRow(
+        "Log level",
+        hint:
+          "Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content.",
+        language: language
+      ) {
+        Picker(
+          L10n.string("Log level", language: language),
+          selection: $configuration.logLevel
+        ) {
+          ForEach(ServerLogLevel.allCases) { level in
+            Text(L10n.string(level.localizationKey, language: language)).tag(level)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 240, alignment: .trailing)
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
         "API key",
         hint: "Optional for local use",
         language: language
@@ -933,7 +977,10 @@ private struct ServerView: View {
         if isLoaded {
           await server.unloadModel(modelKind.apiModelID)
         } else {
-          await server.loadModel(modelKind.apiModelID)
+          await server.loadModel(modelKind.apiModelID) {
+            try modelLibrary.makeServerCatalog(
+              powerSavingLimitGBps: configuration.powerSavingLimitGBps)
+          }
         }
       }
     } label: {
@@ -1468,6 +1515,15 @@ func shouldShowMTPDownloadButton(_ model: InstalledModelInfo?) -> Bool {
   model?.modelKind == .qwen3_8FlashNext && model?.hasMTP == false
 }
 
+func modelAdvancedSettingsAreLocked(
+  modelID: String,
+  loadedModel: String?,
+  loadingModel: String?,
+  modelActionID: String?
+) -> Bool {
+  modelID == loadedModel || modelID == loadingModel || modelID == modelActionID
+}
+
 func modelDownloadProgressExtraHeight(hasProgressFraction: Bool) -> CGFloat {
   hasProgressFraction ? 72 : 40
 }
@@ -1612,7 +1668,7 @@ private struct ModelAdvancedView: View {
   @Binding var settings: ModelAdvancedSettings
   @Binding var alias: String
   let aliasError: String?
-  let serverActive: Bool
+  let settingsLocked: Bool
   let mtpAvailable: Bool
   let dsparkAvailable: Bool
   let modelKind: ModelKind
@@ -1648,7 +1704,7 @@ private struct ModelAdvancedView: View {
           }
         }
         .appCard()
-        .disabled(serverActive)
+        .disabled(settingsLocked)
 
         SectionHeader(title: L10n.string("Generate", language: language))
           .padding(.top, 12)
@@ -1680,15 +1736,16 @@ private struct ModelAdvancedView: View {
           }
         }
         .appCard()
-        .disabled(serverActive)
+        .disabled(settingsLocked)
 
         SectionHeader(title: L10n.string("Runtime", language: language))
           .padding(.top, 12)
         VStack(spacing: 0) {
           integerField(
             "Slots",
-            hint:
-              "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
+            hint: modelKind == .qwen3_8FlashNext
+              ? "Number of routed experts in the Active Parameters Cache. The recommended value is 4096."
+              : "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
             value: $settings.slots
           )
           Divider()
@@ -1710,6 +1767,15 @@ private struct ModelAdvancedView: View {
             hint: "0 selects 128, 256, or 1024 based on the prompt length.",
             value: $settings.prefillStepSize
           )
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            doubleField(
+              "ANE Prefill share",
+              hint:
+                "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.",
+              value: anePrefillRatio
+            )
+          }
           Divider()
           toggleField(
             "Use layer-major prefill",
@@ -1802,7 +1868,7 @@ private struct ModelAdvancedView: View {
           }
         }
         .appCard()
-        .disabled(serverActive)
+        .disabled(settingsLocked)
       }
       .frame(maxWidth: AppLayout.contentWidth)
       .frame(maxWidth: .infinity)
@@ -1817,6 +1883,13 @@ private struct ModelAdvancedView: View {
     Binding(
       get: { settings.layerMajorPrefillThreshold ?? 1_024 },
       set: { settings.layerMajorPrefillThreshold = $0 }
+    )
+  }
+
+  private var anePrefillRatio: Binding<Double> {
+    Binding(
+      get: { settings.anePrefillRatio ?? 0.25 },
+      set: { settings.anePrefillRatio = $0 }
     )
   }
 
@@ -2481,6 +2554,8 @@ final class ChatSession: ObservableObject {
   private let defaults: UserDefaults
   private let stream: Stream
   private var generationTask: Task<Void, Never>?
+  private var pendingDeltas: [ChatDelta] = []
+  private var deltaFlushTask: Task<Void, Never>?
 
   init(
     defaults: UserDefaults = .standard,
@@ -2524,6 +2599,7 @@ final class ChatSession: ObservableObject {
 
     generationTask = Task {
       defer {
+        flushPendingDeltas(for: assistantID)
         save()
         isSending = false
         generationTask = nil
@@ -2536,12 +2612,10 @@ final class ChatSession: ObservableObject {
           model,
           thinkingMode
         ) { delta in
-          guard let index = self.messages.firstIndex(where: { $0.id == assistantID }) else {
-            return
-          }
-          self.messages[index].append(delta)
+          self.enqueue(delta, for: assistantID)
         }
       } catch {
+        flushPendingDeltas(for: assistantID)
         if Task.isCancelled {
           removeEmptyAssistantMessage(id: assistantID)
           return
@@ -2573,6 +2647,37 @@ final class ChatSession: ObservableObject {
 
   private func save() {
     ChatHistory.save(messages, defaults: defaults)
+  }
+
+  private func enqueue(_ delta: ChatDelta, for assistantID: UUID) {
+    pendingDeltas.append(delta)
+    guard deltaFlushTask == nil else { return }
+    deltaFlushTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .milliseconds(50))
+      } catch {
+        return
+      }
+      self?.deltaFlushTask = nil
+      self?.flushPendingDeltas(for: assistantID)
+    }
+  }
+
+  private func flushPendingDeltas(for assistantID: UUID) {
+    deltaFlushTask?.cancel()
+    deltaFlushTask = nil
+    guard !pendingDeltas.isEmpty,
+      let index = messages.firstIndex(where: { $0.id == assistantID })
+    else {
+      pendingDeltas.removeAll(keepingCapacity: true)
+      return
+    }
+    var message = messages[index]
+    for delta in pendingDeltas {
+      message.append(delta)
+    }
+    pendingDeltas.removeAll(keepingCapacity: true)
+    messages[index] = message
   }
 
   private func removeEmptyAssistantMessage(id: UUID) {

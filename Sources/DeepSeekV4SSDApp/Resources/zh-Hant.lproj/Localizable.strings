@@ -33,6 +33,8 @@
 "Completion time" = "完成時長";
 "Continue Model Installation" = "繼續安裝模型";
 "Correct the default generation parameters." = "請修正預設生成參數。";
+"Debug" = "偵錯";
+"Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content." = "下次啟動 server 時生效。偵錯會記錄每個 request 的完整 JSON 內容，其中可能包含敏感資訊。";
 "Correct the failed download checks first." = "請先修正下載前檢查項目。";
 "Could not get a response. %@" = "無法取得回應。%@";
 "Decode Tok/s" = "解碼 Token/秒";
@@ -46,6 +48,7 @@
 "Downloading damaged data again" = "正在重新下載損壞資料";
 "Enter a message…" = "輸入訊息…";
 "Error: %@" = "錯誤：%@";
+"Error" = "錯誤";
 "First Token wait time" = "首個 Token 等待時間";
 "Follow System" = "跟隨系統";
 "Function" = "函式";
@@ -54,6 +57,7 @@
 "Host" = "主機";
 "Host cannot be empty." = "Host 不可空白。";
 "Install Model" = "安裝模型";
+"Info" = "資訊";
 "Installed" = "已安裝";
 "Installed model" = "已安裝模型";
 "Invalid Base URL" = "Base URL 無效";
@@ -90,12 +94,16 @@
 "No Test Messages" = "尚無測試訊息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的線性對話數量。推薦值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 數量。建議值是 1152。";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Active Parameters Cache 的 routed expert 數量。建議值是 4096。";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "同時讀取 expert blob 的工作數量。建議值是 8。";
 "Optional for local use" = "本機使用時可留空";
 "Optional UTF-8 prompt file path" = "可選的 UTF-8 prompt 檔案路徑";
 "Port" = "連接埠";
 "Port must be from 1 through 65535." = "Port 必須介於 1 和 65535。";
 "Prefill step size" = "Prefill 步長";
+"ANE Prefill share" = "ANE Prefill 比例";
+"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "分配給 ANE 的 q_proj output channels 比例。0 只使用 GPU。1 只使用 ANE。預設值是 0.25。";
+"ANE Prefill share must be from 0 through 1." = "ANE Prefill 比例必須介於 0 與 1。";
 "Preparing download" = "正在準備下載";
 "Preparing repair" = "正在準備修復";
 "Output Tokens" = "輸出 Tokens";
@@ -229,6 +237,7 @@
 "Logs" = "日誌";
 "General" = "一般";
 "Listen Address" = "監聽位址";
+"Log level" = "Log 層級";
 "127.0.0.1 (Local only)" = "127.0.0.1（僅本機）";
 "0.0.0.0 (All networks)" = "0.0.0.0（所有網路）";
 "Choose which devices can connect to the server." = "選擇可連線至伺服器的裝置範圍。";
