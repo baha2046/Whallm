@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "expert_cache_replacement_oracle_formal",
+  "date": "2026-09-01",
+  "status": "pass_to_phase_2",
+  "source": {
+    "commit": "f585c2d7fe500d875d7083c92428be18e82afcff",
+    "working_tree_dirty": true,
+    "measured_changes": [
+      "Scripts/simulate_qwen_lfu.py",
+      "runtime/deepseek_v4_ssd/route_trace.py"
+    ],
+    "note": "The result includes the uncommitted trace and simulator changes recorded in this artifact."
+  },
+  "environment": {
+    "machine": "MacBook Pro",
+    "machine_model": "Mac17,8",
+    "chip": "Apple M5 Pro",
+    "memory_bytes": 68719476736,
+    "os": "macOS 26.6.2",
+    "os_build": "25G83",
+    "mlx_version": "0.32.0",
+    "mlx_lm_version": "0.31.3"
+  },
+  "model": {
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "installed_model_revision": "753d0aa57059fad70a5f7e6cc249f25df56bbd34",
+    "installed_model_path": "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+    "layer_count": 48,
+    "expert_count": 512,
+    "selected_expert_count": 10,
+    "expert_blob_bytes": 2611200
+  },
+  "workload": {
+    "prompt_manifest": "docs/benchmarks/prompts/2026-09-01-ssd-cache-oracle/manifest.json",
+    "content_types": [
+      "code",
+      "mixed_math",
+      "repeated",
+      "tool_like",
+      "zh_technical"
+    ],
+    "generation_max_tokens": 257,
+    "replayed_decode_steps": 256,
+    "temperature": 0,
+    "slots": 1152,
+    "persistent_prompt_cache": false,
+    "runtime_cache_initial_state": "empty",
+    "os_page_cache_cleared": false,
+    "replay_cache_initial_state": "empty_then_exact_recorded_prefill_cache_accesses",
+    "target_tokens_per_second": 10,
+    "target_rate_is_projection_only": true
+  },
+  "correctness": {
+    "all_cases_have_256_decode_steps": true,
+    "all_current_replays_match_recorded_misses": true,
+    "all_prompt_and_output_token_hashes_reproduced_across_two_captures": true,
+    "failed_first_smoke_included": false
+  },
+  "cases": [
+    {
+      "name": "code",
+      "prompt_tokens": 161,
+      "prompt_token_sha256": "b561236d7fb8b3a974d236c2696773c3c5e73d95ae42d448d8f73b810c5eebc5",
+      "output_token_sha256": "65e533cd4bc4eb0b5046475068c2872b6948db600f8bbdf3b94c45c9fcae58d1",
+      "layer_major_prefill": true,
+      "prefill_cache_access_count": 96,
+      "trace_sha256": "b9b11f65d06875fdd70e96f7ca01bb5927eecdad10f39110cf8fe6b5bff347b0",
+      "replay_sha256": "e4276ad2e160a62c169f8b6f47fb7eec4f7a71218999e2968021d84ea1c9e2d7",
+      "metrics_sha256": "94082cfb1efc4e8fbf43a94543df7da1740abe14f9fda3933864926cbc52d5de",
+      "recorded_decode_misses": 78565,
+      "policies": {
+        "current_lfu": {
+          "misses": 78565,
+          "demand_hit_rate": 0.3606363932291667,
+          "expert_bytes_per_token": 801363000,
+          "required_expert_bandwidth_gbps": 8.01363,
+          "miss_reduction_fraction": 0
+        },
+        "lru": {
+          "misses": 69545,
+          "demand_hit_rate": 0.4340413411458333,
+          "expert_bytes_per_token": 709359000,
+          "required_expert_bandwidth_gbps": 7.09359,
+          "miss_reduction_fraction": 0.11480939349583152
+        },
+        "belady_oracle": {
+          "misses": 42486,
+          "demand_hit_rate": 0.654248046875,
+          "expert_bytes_per_token": 433357200,
+          "required_expert_bandwidth_gbps": 4.333572,
+          "miss_reduction_fraction": 0.4592248456691911
+        }
+      }
+    },
+    {
+      "name": "mixed_math",
+      "prompt_tokens": 214,
+      "prompt_token_sha256": "4a464b7240a6856c0e754ecbeb44f453965b99735adc9610a57509812d0c52fa",
+      "output_token_sha256": "654f8865c27849dca17b06ebfc19ceece2817dfb0eb16b51aa07b4c0a52ab747",
+      "layer_major_prefill": true,
+      "prefill_cache_access_count": 96,
+      "trace_sha256": "3e3fb1d112391dbd4c0ace14592b0b8c07abee080b371c26866bb7f1a8128307",
+      "replay_sha256": "1954470f880388bb9ec695bb59d83c98513940d214d0fae3e0d5749d08dd6fbf",
+      "metrics_sha256": "365a55b2a93240237fd2a54b3cf4f6d04257a07494b363f4d986f271e26505b1",
+      "recorded_decode_misses": 69688,
+      "policies": {
+        "current_lfu": {
+          "misses": 69688,
+          "demand_hit_rate": 0.43287760416666665,
+          "expert_bytes_per_token": 710817600,
+          "required_expert_bandwidth_gbps": 7.108176,
+          "miss_reduction_fraction": 0
+        },
+        "lru": {
+          "misses": 63933,
+          "demand_hit_rate": 0.4797119140625,
+          "expert_bytes_per_token": 652116600,
+          "required_expert_bandwidth_gbps": 6.521166,
+          "miss_reduction_fraction": 0.0825823671220296
+        },
+        "belady_oracle": {
+          "misses": 39361,
+          "demand_hit_rate": 0.6796793619791667,
+          "expert_bytes_per_token": 401482200,
+          "required_expert_bandwidth_gbps": 4.014822,
+          "miss_reduction_fraction": 0.4351825278383653
+        }
+      }
+    },
+    {
+      "name": "repeated",
+      "prompt_tokens": 53,
+      "prompt_token_sha256": "03509c74103fc3b93514b7b53f4e3cb906a6a9e19e485e9b0e89965032bf8d9b",
+      "output_token_sha256": "3c2ba089de1e4c699a790d91dc31fda31a0b98f922f395e663972d3087d83850",
+      "layer_major_prefill": false,
+      "prefill_cache_access_count": 144,
+      "trace_sha256": "1c305180834a1fef03500091622987e2c19f7d3e3d6687966b04450737e298eb",
+      "replay_sha256": "a65536a4f073d226528fc37672ba48ddfca18f0df18d597ece5e96a4573f9049",
+      "metrics_sha256": "8a3462a716a921a8c2e65b19ee3e2aa9b7185d599431ebcd00e29e188caa5a95",
+      "recorded_decode_misses": 36141,
+      "policies": {
+        "current_lfu": {
+          "misses": 36141,
+          "demand_hit_rate": 0.7058837890625,
+          "expert_bytes_per_token": 368638200,
+          "required_expert_bandwidth_gbps": 3.686382,
+          "miss_reduction_fraction": 0
+        },
+        "lru": {
+          "misses": 27422,
+          "demand_hit_rate": 0.7768391927083333,
+          "expert_bytes_per_token": 279704400,
+          "required_expert_bandwidth_gbps": 2.797044,
+          "miss_reduction_fraction": 0.24124955037215357
+        },
+        "belady_oracle": {
+          "misses": 12665,
+          "demand_hit_rate": 0.8969319661458334,
+          "expert_bytes_per_token": 129183000,
+          "required_expert_bandwidth_gbps": 1.29183,
+          "miss_reduction_fraction": 0.6495669737970726
+        }
+      }
+    },
+    {
+      "name": "tool_like",
+      "prompt_tokens": 184,
+      "prompt_token_sha256": "bd67af6930e25674c05fd5f76311b7b6a5a964b4c46e6e3cd1d076bd71ed644b",
+      "output_token_sha256": "d43479a91b7f2afbe4b95c817d8c7164b65bc52a029b578a638fc5a6ca183b12",
+      "layer_major_prefill": true,
+      "prefill_cache_access_count": 96,
+      "trace_sha256": "cbc80d934e6a8c5aeae60f01ba34403cf6f1a1017eecbc002f0e8d1382566996",
+      "replay_sha256": "6f8eea5336af59f4f1d407d83cdd27cc9fbf58b1a3b148f3ac3031443a5ef775",
+      "metrics_sha256": "4a8468af44e8ab5449fd17c9b04e0571ac14b9c37b18947a7c261841bbf10394",
+      "recorded_decode_misses": 76776,
+      "policies": {
+        "current_lfu": {
+          "misses": 76776,
+          "demand_hit_rate": 0.3751953125,
+          "expert_bytes_per_token": 783115200,
+          "required_expert_bandwidth_gbps": 7.831152,
+          "miss_reduction_fraction": 0
+        },
+        "lru": {
+          "misses": 70547,
+          "demand_hit_rate": 0.42588704427083335,
+          "expert_bytes_per_token": 719579400,
+          "required_expert_bandwidth_gbps": 7.195794,
+          "miss_reduction_fraction": 0.08113212462227781
+        },
+        "belady_oracle": {
+          "misses": 44710,
+          "demand_hit_rate": 0.6361490885416666,
+          "expert_bytes_per_token": 456042000,
+          "required_expert_bandwidth_gbps": 4.56042,
+          "miss_reduction_fraction": 0.41765655934146084
+        }
+      }
+    },
+    {
+      "name": "zh_technical",
+      "prompt_tokens": 191,
+      "prompt_token_sha256": "f8bcb9457b3eda1a55a386296cce556e60c2e2696eaecb1e7dfc91690eaeec9c",
+      "output_token_sha256": "c9c92f5ad9cda73ba8a5e99d929b3db9d1771831c74e9630c4ed2de807e36dfe",
+      "layer_major_prefill": true,
+      "prefill_cache_access_count": 96,
+      "trace_sha256": "eb5f877d43fb1231ec04cbf2d8ad85dad4385275354311f84632e3a4190587b2",
+      "replay_sha256": "26c04a8934724eac03353be0b0f69de96638149ec4e79bc0517d66cb7172165d",
+      "metrics_sha256": "f190d6b4bb0599637dd4a2c915b43826209f3a5bbf152cc29c26a9bdc5691ff6",
+      "recorded_decode_misses": 65883,
+      "policies": {
+        "current_lfu": {
+          "misses": 65883,
+          "demand_hit_rate": 0.4638427734375,
+          "expert_bytes_per_token": 672006600,
+          "required_expert_bandwidth_gbps": 6.720066,
+          "miss_reduction_fraction": 0
+        },
+        "lru": {
+          "misses": 59862,
+          "demand_hit_rate": 0.512841796875,
+          "expert_bytes_per_token": 610592400,
+          "required_expert_bandwidth_gbps": 6.105924,
+          "miss_reduction_fraction": 0.09138928099813304
+        },
+        "belady_oracle": {
+          "misses": 35469,
+          "demand_hit_rate": 0.7113525390625,
+          "expert_bytes_per_token": 361783800,
+          "required_expert_bandwidth_gbps": 3.617838,
+          "miss_reduction_fraction": 0.4616365374982925
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "non_repeated_case_count": 4,
+    "non_repeated_lru_miss_reduction_median_fraction": 0.08698582406008132,
+    "non_repeated_belady_miss_reduction_median_fraction": 0.4472036867537782,
+    "non_repeated_belady_miss_reduction_min_fraction": 0.41765655934146084,
+    "non_repeated_belady_miss_reduction_max_fraction": 0.4616365374982925,
+    "non_repeated_cases_at_or_above_10_percent_belady_reduction": 4
+  },
+  "decision": {
+    "correctness_gate": "pass",
+    "replacement_upper_bound_gate": "pass",
+    "next_phase": "Phase 2 causal cache policy",
+    "reason": "Every non-repeated workload has at least 41.76% Belady miss reduction. The plan requires only one non-repeated workload at or above 10%.",
+    "runtime_default_changed": false
+  },
+  "limits": [
+    "Belady oracle sees future Decode routes and ignores the per-layer reserve. It is only an upper bound.",
+    "LRU and Belady values are offline replay results. They are not runtime throughput results.",
+    "The 10 token/s bandwidth values are capacity projections. This run did not measure available SSD bandwidth.",
+    "The repeated workload is only a regression control.",
+    "The route trace synchronizes router indices. Trace wall time is not a runtime speed result.",
+    "The operating-system page cache was not cleared. Replay uses logical expert bytes, not physical SSD bytes."
+  ],
+  "raw_artifacts": {
+    "directory": "scratch/ssd-cache-oracle-2026-09-01",
+    "retention": "local scratch",
+    "case_file_suffixes": [
+      "-metrics.json",
+      "-route.json",
+      "-replay.json"
+    ]
+  }
+}

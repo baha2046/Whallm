@@ -5,6 +5,38 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  func testAdvancedSettingsLockOnlyForTheActiveModel() {
+    let qwen = "qwen3.8-flash-next-fp8"
+    XCTAssertFalse(
+      modelAdvancedSettingsAreLocked(
+        modelID: qwen,
+        loadedModel: "deepseek-v4-flash-0731",
+        loadingModel: nil,
+        modelActionID: nil
+      ))
+    XCTAssertTrue(
+      modelAdvancedSettingsAreLocked(
+        modelID: qwen,
+        loadedModel: qwen,
+        loadingModel: nil,
+        modelActionID: nil
+      ))
+    XCTAssertTrue(
+      modelAdvancedSettingsAreLocked(
+        modelID: qwen,
+        loadedModel: nil,
+        loadingModel: qwen,
+        modelActionID: nil
+      ))
+    XCTAssertTrue(
+      modelAdvancedSettingsAreLocked(
+        modelID: qwen,
+        loadedModel: nil,
+        loadingModel: nil,
+        modelActionID: qwen
+      ))
+  }
+
   func testMTPDownloadButtonAppearsOnlyForQwenWithoutMTP() {
     XCTAssertTrue(shouldShowMTPDownloadButton(installedModel(.qwen3_8FlashNext)))
     XCTAssertFalse(
@@ -98,6 +130,7 @@ final class ServerConfigurationTests: XCTestCase {
     var configuration = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "secret")
     configuration.host = "0.0.0.0"
     configuration.port = 9_000
+    configuration.logLevel = .debug
     configuration.powerSavingLimitGBps = 2
 
     let arguments = configuration.arguments(modelCatalogPath: "/tmp/catalog.json")
@@ -110,6 +143,7 @@ final class ServerConfigurationTests: XCTestCase {
         "--model-catalog", "/tmp/catalog.json",
         "--host", "0.0.0.0",
         "--port", "9000",
+        "--log-level", "debug",
       ]
     )
     XCTAssertFalse(arguments.contains("secret"))
@@ -123,6 +157,7 @@ final class ServerConfigurationTests: XCTestCase {
     var configuration = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "")
     configuration.host = "0.0.0.0"
     configuration.port = 9_000
+    configuration.logLevel = .error
     configuration.apiKey = "secret"
     configuration.powerSavingLimitGBps = 0.5
 
@@ -133,6 +168,26 @@ final class ServerConfigurationTests: XCTestCase {
     let storedData = try XCTUnwrap(
       isolated.defaults.data(forKey: ServerConfiguration.preferenceKey))
     XCTAssertFalse(String(decoding: storedData, as: UTF8.self).contains("secret"))
+  }
+
+  func testSavedServerConfigurationWithoutLogLevelDefaultsToInfo() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    let oldConfiguration: [String: Any] = [
+      "runtimeDirectory": "",
+      "pythonExecutable": "",
+      "host": "127.0.0.1",
+      "port": 11_434,
+      "apiKey": "",
+    ]
+    isolated.defaults.set(
+      try JSONSerialization.data(withJSONObject: oldConfiguration),
+      forKey: ServerConfiguration.preferenceKey
+    )
+
+    let restored = ServerConfiguration.load(defaults: isolated.defaults, apiKey: "")
+
+    XCTAssertEqual(restored.logLevel, .info)
   }
 
   func testAdvancedSettingsUsePerModelDefaultsAndNormalization() throws {
@@ -147,12 +202,15 @@ final class ServerConfigurationTests: XCTestCase {
     deepSeek.save(for: .deepSeekV4, defaults: isolated.defaults)
 
     var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    XCTAssertEqual(qwen.slots, 4_096)
     XCTAssertFalse(qwen.mtpEnabled ?? true)
     XCTAssertEqual(qwen.mtpSlots, 32)
+    XCTAssertEqual(qwen.anePrefillRatio, 0.25)
     qwen.slots = 900
     qwen.bf16KVCache = true
     qwen.mtpEnabled = true
     qwen.mtpSlots = 512
+    qwen.anePrefillRatio = 0.5
     qwen.dsparkEnabled = true
     qwen.defaultTemperature = 1.0
     qwen.defaultTopP = 0.95
@@ -180,6 +238,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertFalse(restoredQwen.bf16KVCache)
     XCTAssertTrue(restoredQwen.mtpEnabled == true)
     XCTAssertEqual(restoredQwen.mtpSlots, 512)
+    XCTAssertEqual(restoredQwen.anePrefillRatio, 0.5)
     XCTAssertFalse(restoredQwen.dsparkEnabled)
     XCTAssertEqual(restoredQwen.layerMajorPrefillThreshold, 1_024)
   }
@@ -194,6 +253,7 @@ final class ServerConfigurationTests: XCTestCase {
     object.removeValue(forKey: "layerMajorPrefillThreshold")
     object.removeValue(forKey: "mtpEnabled")
     object.removeValue(forKey: "mtpSlots")
+    object.removeValue(forKey: "anePrefillRatio")
     isolated.defaults.set(
       try JSONSerialization.data(withJSONObject: object),
       forKey: "modelAdvancedSettings.deepseek-v4"
@@ -207,6 +267,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restored.layerMajorPrefillThreshold, 1_024)
     XCTAssertFalse(restored.mtpEnabled ?? true)
     XCTAssertEqual(restored.mtpSlots, 32)
+    XCTAssertEqual(restored.anePrefillRatio, 0.25)
   }
 
   func testLegacyAdvancedSettingsMigrateOnlyToTheCurrentModel() throws {
@@ -227,7 +288,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(deepSeek.slots, 640)
     XCTAssertEqual(deepSeek.defaultTemperature, 0.7)
     XCTAssertEqual(deepSeek.layerMajorPrefillThreshold, 1_024)
-    XCTAssertEqual(qwen.slots, 1_152)
+    XCTAssertEqual(qwen.slots, 4_096)
     XCTAssertEqual(qwen.defaultTemperature, 0.7)
   }
 
@@ -306,6 +367,7 @@ final class ServerConfigurationTests: XCTestCase {
     qwen.slots = 900
     qwen.mtpEnabled = true
     qwen.mtpSlots = 512
+    qwen.anePrefillRatio = 0.5
     let catalog = try ModelLibrary.makeServerCatalog(
       models: [
         installedModel(
@@ -346,17 +408,25 @@ final class ServerConfigurationTests: XCTestCase {
         "layer_major_prefill_threshold",
         "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
         "persistent_prompt_cache_entries", "prompt_cache_directory",
-        "moe_prefill_step_size", "batched_expert_prefill", "fp4_index_cache",
+        "moe_prefill_step_size", "batched_expert_prefill", "ane_prefill",
+        "ane_prefill_ratio",
+        "fp4_index_cache",
         "mtp_enabled", "mtp_slots",
         "dspark_enabled", "dspark_prompt_cache", "dspark_confidence_threshold",
         "dspark_slots", "dspark_hash_prefetch", "dspark_adaptive_block",
         "dspark_fallback_enabled", "dspark_sequential_verification",
         "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
         "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
-        "adaptive_expert_prefill_threshold", "power_saving_limit_gbps",
+        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch",
+        "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
+    XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
+    XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
+    let qwenRuntime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
+    XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
+    XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
     XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)
   }
@@ -414,6 +484,7 @@ final class ServerConfigurationTests: XCTestCase {
       sitePackages: nil,
       host: "127.0.0.1",
       port: 11_434,
+      logLevel: .info,
       apiKey: "",
       powerSavingLimitGBps: nil
     )

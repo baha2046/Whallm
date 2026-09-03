@@ -255,7 +255,7 @@ Qwen 使用 head dimension 256 和 QSA micro-block selection。
 Q0  現況盤點                 ██████████ 100%  第一輪完成
 Q1  Qwen ready expert         ██████████ 100%  未達 5%，已拒絕
 Q2  Qwen LFU decay            ██████████ 100%  current policy 保留
-Q3  Prefill／QSA              ██████░░░░ 60%  threshold 已拒絕
+Q3  Prefill／QSA              ██████████ 100%  Grouped-KV 已採用
 Q4  Qwen MTP 合約查核         ██████████ 100%  payload 完成，runtime prototype 已進入
 ```
 
@@ -829,3 +829,80 @@ Draft-1 也失去 Decode throughput 改善。
 Runtime 已恢復每 round 最多 5 個 draft token。
 同步 verifier 的 block 大小方向停止。
 新的工作必須使用不同的 throughput workload contract，或改變同步驗證模型。
+
+## 2026-09-02 Q3 Prefill 四方向快速測試
+
+本輪使用 4,577-token `code` prompt。
+每個 request 只產生一個 token。
+每個非 cache candidate 只執行一次。
+作業系統 page cache 沒有清除。
+因此本輪結果是快速停止 gate，不是正式效能結果。
+
+| 方向 | TTFT | Prefill | Peak memory | 結果 |
+| --- | ---: | ---: | ---: | --- |
+| Control，QSA chunk 4 | 92.21 秒 | 49.64 tok/s | 14.79 GB | 比較基準 |
+| QSA chunk 8 | 115.12 秒 | 39.76 tok/s | 17.47 GB | TTFT +24.84%；停止 |
+| Attention 1,024／MoE 4,096 | 118.55 秒 | 38.61 tok/s | 14.89 GB | TTFT +28.56%；停止 |
+| 相同 Prompt cache | 0.373 秒 | 不適用 | 13.01 GB | 重用 4,576 tokens；通過 |
+
+QSA chunk 8 的 peak memory 增加 18.10%。
+這已超過 15% 停止門檻。
+本輪不再測試 chunk 16 和 32。
+
+Attention／MoE 分批把 `gather_qmm` call 從 480 降至 192。
+TTFT 仍增加 28.56%。
+因此 `gather_qmm` call 數不是目前主要限制。
+兩個獨立 candidate 都變慢，所以本輪不測組合 candidate。
+
+分批 observer 記錄下列 wall time：
+
+- QSA：67.75 秒。
+- Gated DeltaNet：3.87 秒。
+- MoE：37.17 秒。
+- Expert layer acquire：8.52 秒。
+- Expert read timer：6.35 秒。
+
+QSA 是此 observer path 最大的 section。
+Expert I/O 不是此 observer path 的主要限制。
+Observer 會加入同步並改變排程。
+因此這些 section time 不是獨立 Metal kernel time。
+下一個 exact 研究方向應檢查 QSA kernel 和 graph 結構。
+
+相同 Runtime 的第二次相同 Prompt 重用 4,576／4,577 個 tokens。
+TTFT 從 121.30 秒降至 0.373 秒。
+兩次的首個 output token 和 token SHA-256 相同。
+這個結果只適用於相同前綴。
+它不能改善新的 Prompt。
+
+機器可讀結果位於
+[`Q3 Prefill 四方向快速 gate`](../docs/benchmarks/2026-09-02-qwen-prefill-four-directions-quick-gate-m5-pro.json)。
+
+## 2026-09-02 Q3 Grouped-KV QSA 採用結果
+
+Component gate 顯示主要成本是 selected K/V 的資料量。
+原本的 QSA 會把兩個 selected KV heads 複製成 24 個 query heads。
+Grouped-KV candidate 改為依兩個 KV heads 分組計算。
+Candidate 保留 2,048 indexer budget 和 4-token query chunk。
+
+Production-shape component gate 的 QSA eval median 從 0.738 秒降至 0.128 秒。
+Component speedup 是 5.78 倍。
+Component peak memory 降低 75.74%。
+Component output SHA-256 完全相同。
+
+完整模型使用 `control／candidate／candidate／control` 順序。
+每次使用 4,577-token `code` prompt，並產生一個 token。
+
+- Paired median TTFT：85.36 秒降至 44.88 秒，改善 47.42%。
+- Paired median Prefill：53.63 提升至 102.00 tok/s，提升 90.18%。
+- Paired median peak memory：14.79 GB 降至 12.84 GB，降低 13.20%。
+- Expert bytes 和 `gather_qmm` call 不變。
+- 四次的首個 output token SHA-256 完全相同。
+
+使用者依 quick gate 授權採用。
+Runtime 已移除舊的 K/V repeat path 和 research switch。
+獨立 benchmark、測試檔和大型 `.gputrace` 已依使用者要求清理。
+核心 QSA regression test 保留在既有 `test_qwen.py`。
+
+這不是正式多-workload、64-output performance gate。
+採用證據與限制位於
+[`Grouped-KV adoption quick gate`](../docs/benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json)。

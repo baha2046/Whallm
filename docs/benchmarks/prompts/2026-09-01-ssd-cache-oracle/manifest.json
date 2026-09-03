@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+  "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+  "installed_model_revision": "753d0aa57059fad70a5f7e6cc249f25df56bbd34",
+  "purpose": "Five-content cache replacement oracle gate",
+  "prompt_format": "Qwen chat template with thinking disabled",
+  "generation": {
+    "max_tokens": 257,
+    "temperature": 0,
+    "slots": 1152,
+    "persistent_prompt_cache": false,
+    "required_decode_steps": 256
+  },
+  "prompts": [
+    {
+      "name": "code",
+      "file": "code.txt",
+      "text_sha256": "9e81c182bd2b5392225e4b8c98343e248eca7ca4f2b82810e45369cc78b4f9cc",
+      "prompt_tokens": 161,
+      "prompt_token_sha256": "b561236d7fb8b3a974d236c2696773c3c5e73d95ae42d448d8f73b810c5eebc5",
+      "output_token_sha256": "65e533cd4bc4eb0b5046475068c2872b6948db600f8bbdf3b94c45c9fcae58d1"
+    },
+    {
+      "name": "mixed_math",
+      "file": "mixed_math.txt",
+      "text_sha256": "f11f357d09de916899ec1caae6c050333464430aeb44fb716820d36df5992ffb",
+      "prompt_tokens": 214,
+      "prompt_token_sha256": "4a464b7240a6856c0e754ecbeb44f453965b99735adc9610a57509812d0c52fa",
+      "output_token_sha256": "654f8865c27849dca17b06ebfc19ceece2817dfb0eb16b51aa07b4c0a52ab747"
+    },
+    {
+      "name": "repeated",
+      "file": "repeated.txt",
+      "text_sha256": "c4170cdd64dc26efc2113beab165b28f5b12463ba79ecf4e21f9654353b494f1",
+      "prompt_tokens": 53,
+      "prompt_token_sha256": "03509c74103fc3b93514b7b53f4e3cb906a6a9e19e485e9b0e89965032bf8d9b",
+      "output_token_sha256": "3c2ba089de1e4c699a790d91dc31fda31a0b98f922f395e663972d3087d83850"
+    },
+    {
+      "name": "tool_like",
+      "file": "tool_like.txt",
+      "text_sha256": "dcab71f793a7c425879adac93a327d0eb94b2a7be1154fafd9aa429bc38cca51",
+      "prompt_tokens": 184,
+      "prompt_token_sha256": "bd67af6930e25674c05fd5f76311b7b6a5a964b4c46e6e3cd1d076bd71ed644b",
+      "output_token_sha256": "d43479a91b7f2afbe4b95c817d8c7164b65bc52a029b578a638fc5a6ca183b12"
+    },
+    {
+      "name": "zh_technical",
+      "file": "zh_technical.txt",
+      "text_sha256": "f5ba1de7121c7e7a4c5e78b1700c40368fd8e0696ba3c2a5d467e23f48eb8718",
+      "prompt_tokens": 191,
+      "prompt_token_sha256": "f8bcb9457b3eda1a55a386296cce556e60c2e2696eaecb1e7dfc91690eaeec9c",
+      "output_token_sha256": "c9c92f5ad9cda73ba8a5e99d929b3db9d1771831c74e9630c4ed2de807e36dfe"
+    }
+  ]
+}

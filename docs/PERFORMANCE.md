@@ -69,6 +69,16 @@ CLI 的 `prompt_token_sha256` 記錄完整 prompt token ID hash。
 CLI 的 `token_sha256` 記錄完整 output token ID hash。
 CLI 也會記錄 attention 與 MoE 的實際 Prefill 區塊大小。
 
+`runtime.ane_prefill_status` 描述 Qwen private ANE projection。
+`active` 代表 12 個固定 shape projection 已 compile、warmup 和 load。
+`requested_ratio` 記錄設定的 ANE 比例。
+`active_ratio`、`ane_channels` 和 `gpu_channels` 記錄對齊後的實際分配。
+`evaluations` 記錄 1,024-token QSA projection 的 ANE dispatch 次數。
+`fallbacks` 記錄 evaluate 錯誤後改用完整 GPU projection 的次數。
+`error` 保存第一次 private interface 錯誤。
+這些欄位只能證明路線與回退行為。
+這些欄位不能單獨證明速度改善。
+
 ### Decode
 
 第一個 output token 計入 TTFT。
@@ -204,9 +214,10 @@ MLX 使用 lazy evaluation。
 | `prompt_cache_write_errors` | Write failure 數。 |
 | `dspark_prompt_cache_source` | 最近一次 DSpark request 的 `disabled`、`none`、`memory` 或 `persistent`。 |
 
-一般 format-4 prompt cache 在 prefill 期間只擷取 bounded first／final checkpoint state，
-並在最後一個 token 之後 serialize／write；client generator 必須正常結束才保存。Snapshot
-capture 進入 TTFT，完成後的 serialize／write 不進入 `request_seconds`。Atomic DSpark
+一般 format-5 prompt cache 在 prefill 期間只擷取 bounded first／final checkpoint state，
+並在 callback 當下深複製、materialize，再於最後一個 token 之後 serialize／write；client
+generator 必須正常結束才保存。Snapshot capture 進入 TTFT，完成後的 serialize／write
+不進入 `request_seconds`。Atomic DSpark
 snapshot 則在 target KV 與三個 context states 都到達同一個 `prompt[:-1]` boundary 時立即
 寫入，所以其 snapshot／serialize／write 會進入該 request TTFT；persistent
 acquisition／load 仍發生在 `RuntimeMetrics.start` 之前。
@@ -1472,6 +1483,7 @@ runtime 提供下列比較開關。
 | MoE tile | `--moe-prefill-step-size N` |
 | 一般 read concurrency | `--read-workers N` |
 | Full-layer prefetch concurrency | `--prefetch-read-workers N` |
+| Qwen next-layer prefetch | `--qwen-next-layer-prefetch` |
 | Slot 壓力 | `--slots N` |
 | KV cache | `--bf16-kv-cache` |
 | Index cache | `--no-fp4-index-cache` |
@@ -1523,8 +1535,18 @@ route coverage 不等於實際 speedup。
 
 route trace 的 `prefill_chunk_histograms` 保存每個 Prefill MoE 區塊的
 rows/expert。
+route trace 的 `prefetch_events` 保存 read submit、read complete、expert deadline、
+compute submit、logical useful bytes 和 logical wasted bytes。
 route trace 會同步 router index。
 因此 route trace 的 wall time 不是正式效能結果。
+
+`--qwen-next-layer-prefetch` 是 default-off research option。
+此選項只在 Qwen layer-major Prefill 生效。
+此選項不使用 route predictor。
+
+Qwen QSA 固定使用 4-token query chunk。
+QSA 直接依兩個 KV head 分組計算 24 個 query heads。
+QSA 不會先複製 K/V 到 24 個 heads。
 
 ### 5. 使用 Metal capture
 
@@ -1645,6 +1667,41 @@ artifact 會記錄 SPEED-Bench question ID、來源、subset file SHA-256 和 `m
 腳本不會清除 prompt cache 或作業系統 page cache。
 Memory 是 MLX active memory，不是 process RSS。
 API 不提供生成 token ID，所以 artifact 不宣稱具有正式 output token hash。
+
+## DeepSeek default approximate routing
+
+2026-09-01 的 Phase 6E 在 M5 Pro 執行兩輪 reversed-order pairs。
+測試包含 repeated、code、zh_technical、mixed_math 和 tool_like。
+每個 run 使用 4,096 prompt tokens 和 256 output tokens。
+每個 run 使用 fresh process、bypass expert-file policy，並停用 persistent prompt cache
+和 DSpark。
+
+`learned-route-drop-lowest-1` 保留三個 hash router 的 top-6。
+它把其餘 40 個 learned routers 改為 top-5。
+
+| 指標 | 結果 | Gate |
+| --- | ---: | ---: |
+| Paired output token agreement | 100% | 每 pair >=90%；aggregate >=95% |
+| Decode logical expert bytes/output token | 1.0915 GB -> 0.9263 GB | 至少 -10% |
+| Aggregate Decode logical expert bytes | -15.14% | 通過 |
+| Decode throughput change 中位數 | +8.37% | 至少 +5% |
+| 最差 workload median Decode p95 change | -1.87% | 不得高於 +2% |
+| Pair Peak memory change 最大值 | 低於 +0.01% | 不得高於 +5% |
+
+Repeated workload 的 logical byte reduction 只有 3.26%。
+其他四種 workload 是 14.04% 至 17.07%。
+Gate 使用所有 workloads 的 aggregate Decode logical bytes。
+
+這些 logical bytes 已扣除固定的 42 個 full-layer Prefill reads。
+它們不是 physical SSD bytes。
+作業系統 page cache 沒有在 runs 之間清除。
+Formal artifact 位於
+[`benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json)。
+
+Formal gate 完成後，使用者已授權把 candidate 設為一般 DeepSeek request 的預設模式。
+API、CLI 和 APP request 未指定 mode 時會使用 candidate。
+Client 可以明確指定 exact。
+Qwen 和 DSpark 維持 exact。
 
 ## A/B 驗收
 

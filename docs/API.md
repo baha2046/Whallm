@@ -1,7 +1,8 @@
 # OpenAI 相容 API
 
 server 預設監聽 `http://127.0.0.1:11434`。
-server 啟動時只讀取 model catalog。
+server 啟動時讀取初始 model catalog。
+APP 可以更新未載入模型的 model catalog entry。
 server 啟動時不載入模型權重。
 第一個 generation request 會載入指定的 installed model。
 client 也可以明確載入或卸載 installed model。
@@ -96,6 +97,12 @@ APP 只會在 installed model 包含 MTP sidecar 時啟用 MTP。
 本機 host 可以不設定 API key。
 非本機 host 必須設定 `--api-key` 或 `DEEPSEEK_API_KEY`。
 
+server 的 `--log-level` 支援 `debug`、`info` 和 `error`，預設為 `info`。
+`info` 顯示一般 request access log；`error` 只顯示 HTTP 4xx／5xx request；`debug`
+除了 access log，還會把每個已解析 JSON request body 完整寫到 Server Log。
+Debug 不會記錄 Authorization header，但 JSON 仍可能包含 prompt、檔案路徑、tool result
+或其他敏感內容。
+
 需要驗證的 request 使用：
 
 ```http
@@ -105,6 +112,7 @@ Authorization: Bearer local-key
 | Endpoint | 設定 key 後是否驗證 |
 | --- | --- |
 | `/v1/*` | 是 |
+| `POST /api/models/configure` | 是 |
 | `POST /api/models/load` | 是 |
 | `POST /api/models/unload` | 是 |
 | `GET /` | 否 |
@@ -122,10 +130,11 @@ server 不提供 TLS、CORS 或 rate limit。
 | `GET` | `/` | 回傳 server 名稱和 API base。 |
 | `GET` | `/favicon.ico` | 回傳空的 `204` response。 |
 | `GET` | `/healthz` | 回傳基本存活狀態。 |
-| `GET` | `/v1/models` | 回傳啟動時 model catalog 內的 API model ID 和 Alias。 |
+| `GET` | `/v1/models` | 回傳目前 model catalog 內的 API model ID 和 Alias。 |
 | `POST` | `/v1/chat/completions` | Chat Completions 相容子集。 |
 | `POST` | `/v1/responses` | Responses 相容子集。 |
 | `POST` | `/v1/completions` | Text Completions 相容子集。 |
+| `POST` | `/api/models/configure` | 更新未載入模型的 model catalog entry。 |
 | `POST` | `/api/models/load` | 載入指定模型。必要時先卸載目前模型。 |
 | `POST` | `/api/models/unload` | 卸載指定模型。 |
 | `GET` | `/api/status` | 回傳 APP 和 profiling 使用的 runtime 狀態。 |
@@ -134,11 +143,17 @@ server 不提供 TLS、CORS 或 rate limit。
 `GET /api/settings` 和 `PUT /api/settings` 也回傳 `404`。
 
 `GET /v1/models` 不會載入模型權重。
-每個 installed model 先列出 API model ID。
+OpenAI 相容的 `data` array 中，每個 installed model 先列出 API model ID。
 如果 Alias 與 API model ID 不同，server 接著列出 Alias。
 兩個項目使用相同的 `owned_by`。
 
-## 模型載入與卸載
+同一個 response 也包含 Codex model metadata 使用的 `models` array。
+每個 API model ID 和 Alias 都有對應的 `slug`，並宣告 context window、text input、
+local shell tool 與 base instructions。Codex provider 的 base URL 含 `/v1` 時，
+`GET /v1/models?client_version=...` 可直接反序列化這個 array，不需使用 fallback
+model metadata。額外的 `models` 欄位不改變標準 `data` array。
+
+## 模型設定、載入與卸載
 
 `POST /api/models/load` 和 `POST /api/models/unload` 使用下列 JSON body：
 
@@ -149,7 +164,35 @@ server 不提供 TLS、CORS 或 rate limit。
 ```
 
 `model` 可以是 API model ID 或 Alias。
-兩個 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。
+`POST /api/models/load` 可以加入 `configuration`。
+`configuration` 必須是該模型的完整 model catalog entry。
+server 會先驗證並更新 entry，再載入模型。
+
+`POST /api/models/configure` 使用下列 JSON body：
+
+```json
+{
+  "configuration": {
+    "id": "deepseek-v4-flash-0731",
+    "alias": "work-model",
+    "path": "/path/to/model.dsv4",
+    "model_kind": "deepseek-v4",
+    "runtime": {},
+    "defaults": {
+      "max_tokens": 272000,
+      "temperature": 0.2,
+      "top_p": 0.98,
+      "top_k": 0
+    },
+    "warmup_prompt_path": null
+  }
+}
+```
+
+實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
+Loaded 或 Loading 的模型不能更新 entry。
+未載入模型的更新會在下次載入時生效。
+三個模型管理 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。
 載入另一個模型時，server 會先關閉目前的 runtime。
 卸載不是目前已載入的模型時，server 不會變更目前的 runtime。
 載入和卸載會等待目前的完整 streaming request 結束。
@@ -158,17 +201,75 @@ server 不提供 TLS、CORS 或 rate limit。
 
 | 欄位 | 規則 |
 | --- | --- |
-| `model` | 必須是啟動時 model catalog 內的 API model ID 或 Alias。名稱比對區分大小寫。 |
+| `model` | 必須是目前 model catalog 內的 API model ID 或 Alias。名稱比對區分大小寫。 |
 | `max_tokens` | 1 至 272,000。預設值是 272,000。 |
 | `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 依模式使用 0.7 或 1.0。 |
 | `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 依模式使用 0.8 或 0.95。 |
 | `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 兩種模式都使用 20。 |
+| `approximation` | 選用 object。一般 DeepSeek 未提供時使用 `learned-route-drop-lowest-1`。Qwen 和 DSpark 使用 `exact`。 |
 | `stream` | 必須是 boolean。 |
 | `stream_options.include_usage` | 必須是 boolean。只影響 streaming response。 |
 | `n` | 只接受 `1`。 |
 
 `max_completion_tokens` 可以取代 Chat Completions 的 `max_tokens`。
 `max_output_tokens` 可以取代 Responses 的 `max_tokens`。
+
+### DeepSeek approximate mode
+
+一般 DeepSeek request 預設使用 `learned-route-drop-lowest-1`。
+Client 不需要加入額外欄位。
+Response 會明確回報實際 mode。
+
+Client 也可以明確指定這個 mode：
+
+```json
+{
+  "approximation": {
+    "mode": "learned-route-drop-lowest-1"
+  }
+}
+```
+
+這個 mode 只在單次 request 內把 40 個 learned-routing layers 從 top-6 改為
+top-5。
+三個 hash-routing layers 保持 top-6。
+Request 完成或失敗後，runtime 會還原 learned router。
+
+Client 可以明確切回 exact mode：
+
+```json
+{
+  "approximation": {
+    "mode": "exact"
+  }
+}
+```
+
+Qwen 和啟用 DSpark 的 DeepSeek 在沒有 `approximation` 欄位時使用 exact mode。
+`approximation` 必須只包含 string `mode`。
+未知 mode 會回傳 HTTP 400。
+Qwen 和 DSpark 不支援 approximate mode。
+
+直接使用 Python CLI 時，一般 DeepSeek 也預設使用 approximate mode。
+下列參數可以切回 exact：
+
+```sh
+PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli \
+  --model /path/to/model.dsv4 \
+  --prompt "Hello" \
+  --approximation exact
+```
+
+Exact 和 approximate memory prompt cache 使用不同 mode key。
+Exact request 不會重用 approximate cache。
+Approximate cache 不會寫入 persistent prompt cache。
+Persistent prefill checkpoint 是當下 cache state 的 immutable snapshot；後續 generation
+不會改寫它。只剩一個 prompt token 時仍可安全 replay。
+
+所有一般 response 和 streaming event 都包含實際的
+`approximation.mode`。
+這個欄位是 Whallm extension。
+它不是 OpenAI API 標準欄位。
 
 ### Qwen 模式取樣
 
@@ -225,6 +326,7 @@ server 明確拒絕下列 request：
 client 不應依賴未知欄位。
 
 所有一般 response 和 streaming event 的 `model` 欄位會回傳 request 使用的名稱。
+所有 generation response 和 streaming event 的 `approximation.mode` 會回傳實際 mode。
 API model ID 和 Alias 會共用同一個 runtime。
 切換 API model ID 時，server 會先關閉舊 runtime，然後載入新 runtime。
 其他 generation request 會等待目前的完整 streaming request 結束。
@@ -421,6 +523,13 @@ Responses 支援：
 - Codex namespace tool
 - `function_call_output`
 
+Codex namespace 與 function name 合併後如果超過 64 個字元，server 會在
+Qwen／DeepSeek prompt 內使用固定的 64 字元 hash Alias。
+Streaming event、完整 response 和後續 `function_call` replay 仍使用 client 原本的
+`namespace` 和 `name`。
+這可避免新版 Codex 內建 app tools 因完整名稱過長而讓整個 request 在 generation
+之前失敗。
+
 server 會忽略 `web_search` tool declaration。
 server 不會執行 web search。
 server 會拒絕其他不支援的 built-in tool。
@@ -428,6 +537,26 @@ server 會拒絕其他不支援的 built-in tool。
 server 只產生 tool request。
 client 必須執行 tool。
 client 必須把 tool result 傳回 server。
+
+Qwen 的 Codex tool-first 模式不需要新增 request 欄位。
+當 Responses request 同時符合下列條件時，server 會把這一輪的 `auto`
+視為 `required`：
+
+- model 是 Qwen。
+- tools 包含 Codex 的 `exec_command`。
+- input 尚未包含 `function_call_output`。
+
+client 傳回 `function_call_output` 後，後續輪維持 `auto`，因此 model 可以繼續呼叫
+tool，也可以輸出最終答案。一般 function tools 不會啟用 Codex tool-first 模式。
+
+Responses 的 `required` 和指定 function 都會驗證完整 generation 結果。
+`required` 至少要產生一個 tool call；指定 function 必須產生該 function 的 call。
+第一次不符合時，server 只會重試一次。重試會使用相同 request 和取樣設定，並加入
+一段要求立即呼叫 tool 的 developer instruction。第一次的無效文字不會傳給 client。
+
+第二次仍沒有符合要求的 call 時，response 以 `tool_choice_not_satisfied` 失敗。
+第二次無法解析 tool call 時，response 以 `invalid_tool_call` 失敗。server 不會進行
+第三次 generation。
 
 ## Streaming
 
@@ -459,15 +588,18 @@ Responses 會傳送 typed event。
 Responses 不傳送 `[DONE]`。
 server 會在 `response.completed` 後關閉連線。
 
-tool streaming 會在 generation 過程中傳送 function name 和 arguments fragment。
-server 會在 generation 結束時驗證完整 tool block。
+Responses 的 tool streaming 會先保留單次 generation 的輸出，並在 generation 結束時
+驗證完整 tool block。驗證後的完整 parser 結果是 SSE 的唯一依據，不會再交給
+streaming parser 重複判定。這同時套用 `auto`、`required`、指定 function 和 Qwen
+Codex tool-first 首輪。
+驗證通過後才傳送該次的文字、function name 和 arguments；若 `required` 或指定
+function 的第一次結果不符合，client 只會看到第二次的有效結果。
 DeepSeek 使用 DSML。Qwen 使用官方 XML tool-call 格式。
-兩個 model kind 都會比較 streaming parser 和完整 parser 的 tool call。
 Chat Completions 驗證失敗時會傳送 error object，然後傳送 `[DONE]`。
 Responses 驗證失敗時會傳送 `error` event。
 接著，server 會傳送一段可見的錯誤文字和 `response.completed`，然後關閉連線。
 最後一個 response 的 `status` 是 `failed`。
-`error.code` 是 `invalid_tool_call`。
+`error.code` 是 `invalid_tool_call` 或 `tool_choice_not_satisfied`。
 這個終止方式用於目前 Codex client 相容性。
 
 ## Status API
@@ -481,6 +613,7 @@ Responses 驗證失敗時會傳送 `error` event。
 | `performance` | generation、時間、記憶體、SSD 和 expert cache 指標。 |
 
 `performance` 同時包含累計值和最近一次 request 值。
+`performance.approximation_mode` 是最近一次或目前 request 的實際 mode。
 `accumulated_generation_tokens` 是目前 server process 產生的 output token 總數。
 `completed_request_count` 和 `accumulated_generation_tokens` 不會因模型切換而歸零。
 欄位語意請見[效能與瓶頸](PERFORMANCE.md)。
@@ -494,6 +627,17 @@ Responses 驗證失敗時會傳送 `error` event。
 `runtime.power_saving_limit_gbps` 是 0.5、1、2、3、5、10、25 或 `null`。
 `runtime.layer_major_prefill_threshold` 是 DeepSeek 啟用 layer-major Prefill 所需的最少未快取 token 數。
 預設值是 1,024。
+`runtime.ane_prefill` 表示 Qwen 是否要求 private ANE Prefill 路線。
+Qwen App catalog 的預設值是 `true`。
+`runtime.ane_prefill_ratio` 是分配給 ANE 的 `q_proj` output channels 比例。
+值域是 0 到 1，預設值是 0.25。
+Runtime 會把比例對齊到 256 個 output channels。
+`runtime.ane_prefill_status.active` 表示目前 loaded model 的 ANE projection 可用。
+`requested_ratio` 和 `active_ratio` 分別表示設定比例與對齊後比例。
+`ane_channels` 和 `gpu_channels` 表示實際 output channels 分配。
+`error` 保存第一次 private interface 錯誤。
+`evaluations` 和 `fallbacks` 是目前 loaded model 的累計值。
+ANE 錯誤不會讓 request 失敗；runtime 會改用原本的 GPU Prefill。
 `null` 代表 routed expert SSD 讀取速度沒有限制。
 `runtime.expert_page_cache_probe` 表示 research-only pre-read `mincore` probe 是否啟用；
 預設為 `false`。`performance.request_expert_page_cache_*` 將本次 logical expert reads
@@ -528,9 +672,10 @@ reuse 是否啟用，預設為 `false`，且需要 DSpark。它使用獨立 form
 一般 target-only prompt entries。`performance.dspark_prompt_cache_source` 回報最近一次
 request 的 `disabled`、`none`、`memory` 或 `persistent`；啟用 gate 只把後三者視為 reuse
 contract 狀態。`performance.prompt_cache_reused_tokens` 同時回報實際重用的 prefix 長度。
-一般 target-only persistent cache 預設使用 format 4；它會驗證 model／RoPE／KV／attention
+一般 target-only persistent cache 預設使用 format 5；它會驗證 model／RoPE／KV／attention
 contract 與 content-addressed token-block chain，並可在 suffix 分岔時重用已保存的 bounded
-prefill checkpoint。這不需要額外 API flag。舊 normal format 1／2 不再載入。
+prefill checkpoint。這不需要額外 API flag。舊 normal format 1／2／4 不再載入；format 4
+失效可避免升級後重用曾被後續 generation 改寫的 Qwen checkpoint。
 `runtime.dspark_hash_prefetch` 表示實驗性 exact prefetch 是否啟用；
 `runtime.dspark_hash_prefetch_scratch_slots` 是 main model verification scratch 的
 expert blob slot 數，停用時為 0。`runtime.dspark_adaptive_block` 表示 storage-aware

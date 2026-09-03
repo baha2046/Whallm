@@ -3,6 +3,11 @@
 Status: local feasibility audit passed; all remaining prerequisites have explicit
 scoped stop/defer and reopening rules.
 
+2026-09-02 note: The ANE closure below applies to the missing DeepSeek dense
+drafter or predictor candidate. Qwen now has a separate fixed-shape `q_proj`
+implementation that directly uses private `AppleNeuralEngine.framework`.
+That implementation does not supply the DeepSeek candidate described here.
+
 ## Purpose
 
 All executable checkpoint-equivalent candidates in the current `PLAN.md` have
@@ -127,8 +132,9 @@ SHA-256
 ## Decision
 
 Close the remaining PLAN scope as prerequisite-deferred or scoped-stop, not as
-implemented runtime features. No training, approximate checkpoint, ANE model,
-native rewrite, or physical-device claim is authorized by this audit.
+implemented runtime features. No training, approximate checkpoint, DeepSeek
+dense ANE model, native rewrite, or physical-device claim is authorized by
+this audit.
 
 The PLAN research can be considered covered when the main tracker points each
 row to its implemented gate, stopped candidate, feasibility rejection, or this

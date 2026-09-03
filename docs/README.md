@@ -3,7 +3,7 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-08-30。
+最後核對日期是 2026-09-04。
 Qwen 支援核對版本是目前工作樹。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
@@ -19,8 +19,9 @@ gate 與 MLX 0.32.0 public handoff stop，以及 fixed-arena／full-model staged
 route-union gate 與 exact-but-slower runtime stop，另包含 DSpark coherent Markov
 candidate-path 的 greedy-only first-round gate 與 0／5 continuation stop，以及
 6,000-label learned-router frozen-transfer baseline 與 training-required stop，另包含
-normal prompt-cache format 4 的完整 contract、content-addressed block chain、partial
-restart reuse、immutable sharing 與 frequency-aware eviction gate，並完成剩餘 training／
+normal prompt-cache format 5 的完整 contract、content-addressed block chain、partial
+restart reuse、immutable sharing、mutable-state snapshot isolation 與 frequency-aware eviction
+gate，並完成剩餘 training／
 ANE／native trace／physical-I/O directions 的本機 prerequisite closure audit。
 DeepSeek checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
@@ -73,7 +74,8 @@ MTP 安裝會保留既有 Qwen 主模型，並可續傳未完成的 MTP 下載�
 每個模型的進階設定頁提供 Alias 欄位。
 有效的 Alias 變更會自動儲存。
 使用者可以在安裝模型前設定 Alias。
-server 執行期間，App 會停用 Alias 和模型進階設定。
+server 執行期間，App 只會停用 Loaded 或 Loading 模型的 Alias 和模型進階設定。
+未載入模型的有效變更會同步到 server，並在下次載入時生效。
 DeepSeek 下載固定包含 DSpark。模型列不提供排除 DSpark 的選項。
 App 使用 pinned revision 的固定 installed model 大小執行下載前空間檢查。
 App 啟動時不會為了取得下載大小連線到 Hugging Face。
@@ -97,6 +99,11 @@ Chat 頁面的模型選單只顯示 server 啟動時可用的 installed model。
 使用者在回覆期間切換頁面時，App 會繼續接收 Chat 回覆。
 Metric 頁面顯示目前載入或載入中的 API model ID。
 模型切換時，App 會清除舊模型的效能歷史。
+Qwen 預設啟用 private ANE Prefill projection。
+模型進階設定可以調整 GPU 和 ANE 的 output channels 分配比例。
+預設 ANE 比例是 0.25。
+原本 GPU Prefill 路線仍保留。
+private interface 錯誤時，runtime 會自動回退到原本路線。
 DeepSeek 的 layer-major Prefill 門檻可以在模型進階設定中調整。
 預設門檻是 1,024 個未快取 token。
 「系統檢查」固定顯示在 Server 頁面。
@@ -104,7 +111,8 @@ DeepSeek 的 layer-major Prefill 門檻可以在模型進階設定中調整。
 
 `PLAN.md` 的 21 個研究方向在 2026-08-27 snapshot 已全部取得 scoped disposition：
 採用、default-off、candidate stop、feasibility rejection，或有本機證據的 prerequisite
-closure。這不表示 deferred training／ANE／approximate model 已實作；各方向的 reopening
+closure。這不表示 deferred training／ANE drafter 已實作；目前 Qwen 的 fixed-shape
+projection 是另一條已實作路線。其餘方向的 reopening
 條件以 requirement tracker 為準。
 
 ## 可信度規則
@@ -124,6 +132,51 @@ closure。這不表示 deferred training／ANE／approximate model 已實作；�
 
 ## 歷史研究
 
+SSD Streaming 的 active 瓶頸整理、目前程式碼對照和分階段執行規則位於
+[`research/SSD_STREAMING_BOTTLENECKS_2026-08-31.md`](../research/SSD_STREAMING_BOTTLENECKS_2026-08-31.md)。
+Phase 1 cache replacement 上限分析已完成。
+五種 workload 的 formal artifact 位於
+[`benchmarks/2026-09-01-expert-cache-oracle-m5-pro.json`](benchmarks/2026-09-01-expert-cache-oracle-m5-pro.json)。
+Phase 2 causal cache policy quick gate 已停止。
+最佳候選只取得 Belady 改善的 41.63% 中位數。
+完整結果位於
+[`benchmarks/2026-09-01-expert-cache-causal-policy-m5-pro.json`](benchmarks/2026-09-01-expert-cache-causal-policy-m5-pro.json)。
+Phase 3 deadline-ready trace 與 default-off Qwen next-layer prefetch gate 已完成。
+候選把 aggregate 暴露 read wait 降低 27.41%。
+Ready-before-deadline rate 只從 0% 提高到 0.52%。
+Logical wasted bytes 沒有增加。
+候選保持 default-off。
+Baseline 位於
+[`benchmarks/2026-09-01-prefetch-deadline-baseline-m5-pro.json`](benchmarks/2026-09-01-prefetch-deadline-baseline-m5-pro.json)。
+候選 gate 位於
+[`benchmarks/2026-09-01-qwen-next-layer-prefetch-gate-m5-pro.json`](benchmarks/2026-09-01-qwen-next-layer-prefetch-gate-m5-pro.json)。
+Phase 4 expert blob 壓縮 microbenchmark 已完成。
+60 個解壓縮結果全部 byte-exact，Peak RSS gate 也通過。
+但是，LZ4 和 LZFSE 都沒有同時通過無 Metal 與有 Metal 的 5% 時間 gate。
+正式結果位於
+[`benchmarks/2026-09-01-expert-blob-compression-m5-pro.json`](benchmarks/2026-09-01-expert-blob-compression-m5-pro.json)。
+Exact track 已停止，不進入 Phase 5 runtime prototype。
+使用者已明確啟動獨立的 Phase 6 approximate 研究。
+`learned-route-drop-lowest-1` 已完成 Phase 6A 至 Phase 6E。
+Phase 6E 使用五種 4K workload、兩個 reversed-order paired waves 和 20 個
+fresh-process 4K／256 runs。
+10 個 paired outputs 都是 256/256 token 相同。
+Aggregate Decode logical expert bytes 減少 15.14%。
+Decode throughput change 中位數是 +8.37%。
+五個 workload 的 Decode p95 change 中位數都沒有 regression。
+2026-09-01 後續使用者決定把 candidate 設為一般 DeepSeek request 的預設模式。
+API、CLI 和 APP request 未指定 mode 時會使用 `learned-route-drop-lowest-1`。
+Client 可以明確指定 `exact`。
+Qwen 和啟用 DSpark 的 DeepSeek 維持 exact。
+研究合約位於
+[`research/APPROXIMATE_MODE_2026-09-01.md`](../research/APPROXIMATE_MODE_2026-09-01.md)。
+Entry artifact 位於
+[`benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json)。
+Component、pilot 和 formal artifacts 分別位於
+[`benchmarks/2026-09-01-approximate-expert-drop-component-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-component-m5-pro.json)、
+[`benchmarks/2026-09-01-approximate-expert-drop-4k32-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-4k32-m5-pro.json) 和
+[`benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json)。
+
 日期型研究草稿已移到 [`research/archive`](../research/archive/README.md)。
 歷史研究保留原始推論與量測。
 歷史研究不描述目前 runtime。
@@ -132,6 +185,10 @@ closure。這不表示 deferred training／ANE／approximate model 已實作；�
 [`research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md`](../research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md)。
 Qwen runtime 的 active 效能研究、採用門檻和 MTP 合約查核計畫位於
 [`research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md`](../research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md)。
+Qwen QSA Grouped-KV 的採用 quick gate 位於
+[`docs/benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json`](benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json)。
+Qwen private ANE Prefill 的探索性 gate 位於
+[`docs/benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json`](benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json)。
 Qwen MTP installed payload 驗證位於
 [`docs/benchmarks/2026-08-30-qwen-q4-mtp-installed-payload-m5-pro.json`](benchmarks/2026-08-30-qwen-q4-mtp-installed-payload-m5-pro.json)。
 Qwen MTP 與固定 Ollama commit 的 reference parity 位於
@@ -178,8 +235,8 @@ DSpark coherent Markov beam 的 proposal contract、greedy-only gate 與 stop de
 DSpark hidden 到 target learned routers 的 fixed-label dataset、top-k recall／union-byte
 gate 與 direct-transfer stop 位於
 [`research/DSPARK_LEARNED_ROUTER_PREDICTOR_2026-08-27.md`](../research/DSPARK_LEARNED_ROUTER_PREDICTOR_2026-08-27.md)。
-Normal block-granular immutable persistent prefix cache 的 format-4 contract、snapshot
-isolation 修正與 full-model functional gate 位於
+Normal block-granular immutable persistent prefix cache 的 format-4 contract、format-5
+mutable-state snapshot isolation 修正與 full-model functional gate 位於
 [`research/BLOCK_PROMPT_CACHE_2026-08-27.md`](../research/BLOCK_PROMPT_CACHE_2026-08-27.md)。
 剩餘 dense drafter、ANE、native trace、physical-I/O 與 non-equivalent model directions 的
 local evidence、scoped stop/defer 與 reopening rules 位於

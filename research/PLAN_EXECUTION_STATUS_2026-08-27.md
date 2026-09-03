@@ -38,6 +38,9 @@ SHA-256
 
 ## Requirement matrix
 
+The `P3-ANE` row records the historical DeepSeek drafter and predictor scope.
+It does not describe the later Qwen fixed-shape `q_proj` ANE Prefill route.
+
 | ID | PLAN direction | Equivalence | Current state and evidence | Reopening or adoption gate |
 | --- | --- | --- | --- | --- |
 | P0-I/O | Physical I/O, useful/wasted prefetch, and bytes per committed token | Exact | **Instrumentation boundary research-complete.** Runtime separates logical, process-wide disk, and expert-file pre-read residency bytes. Six fully nonresident installed ranges pass aligned bypass／cached byte and residency checks. A 4K／32 three-wave candidate gate plus observer wave records output hashes, peak memory, committed-token bytes, process disk bytes, and closed residency partitions. The prerequisite audit confirms no artifact field provides attributable physical-device bytes; local `fs_usage`／`iostat`／`powermetrics` executables do not by themselves establish that attribution. See the [bypass protocol](EXPERT_FILE_CACHE_BYPASS_2026-08-27.md), [full-model gate](../docs/benchmarks/2026-08-27-cache-bypass-dspark-random-hex-4k32-m2-max.json), and [closure audit](PLAN_PREREQUISITE_CLOSURE_2026-08-27.md). | Reopen a physical-device claim only with a lower-level per-request attributable source. Keep logical, process, and residency proxy labels separate; never relabel them physical SSD traffic. |

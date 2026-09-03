@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "exploratory API benchmark",
+  "status": "failed",
+  "recorded_at": "2026-09-02T00:31:08.113228+08:00",
+  "source": {
+    "commit": "f585c2d7fe500d875d7083c92428be18e82afcff",
+    "working_tree_dirty": true,
+    "working_tree_diff_sha256": "3069cc3a097afe5a39b0872a7a54e147a0edbf8031be50e622aa5c7a0b5fb812",
+    "benchmark_script_sha256": "4d974ee698986e307e0546b0e721f5fb758879257e68ab7786bb5cc8da9568f5"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "macos": "26.6.2",
+    "hardware_model": "Mac17,8",
+    "unified_memory_bytes": "68719476736",
+    "python": "3.14.7",
+    "api_base_url": "http://127.0.0.1:11434/v1"
+  },
+  "installed_model": {
+    "manifest_available": true,
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "model_kind": "qwen3.8-flash-next",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "format_version": 2
+  },
+  "server": {
+    "model": "qwen3.8-flash-next-fp8",
+    "source_model": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "started_by_benchmark": false,
+    "runtime_configuration": {
+      "slots": 4096,
+      "read_workers": 4,
+      "prefetch_read_workers": 2,
+      "power_saving_limit_gbps": null,
+      "prefill_step_size": 0,
+      "moe_prefill_step_size": 0,
+      "layer_major_prefill": true,
+      "layer_major_prefill_threshold": 1024,
+      "batched_expert_prefill": true,
+      "prompt_cache_entries": 2,
+      "prompt_cache_memory_gib": 8,
+      "persistent_prompt_cache": true,
+      "fp4_index_cache": true,
+      "expert_page_cache_probe": false,
+      "expert_file_cache_policy": "cached",
+      "expert_file_direct_io_alignment_bytes": 0,
+      "dspark_available": false,
+      "dspark_enabled": false,
+      "dspark_prompt_cache": false,
+      "dspark_hash_prefetch": false,
+      "dspark_adaptive_block": false,
+      "dspark_fallback_enabled": true,
+      "dspark_sequential_verification": false,
+      "dspark_hybrid_verification": false,
+      "dspark_hash_prefetch_scratch_slots": 0,
+      "dspark_confidence_threshold": 0.6,
+      "dspark_slots": 768,
+      "mtp_available": true,
+      "mtp_enabled": false,
+      "mtp_slots": 32,
+      "kv_cache": "MXFP8"
+    }
+  },
+  "workload": {
+    "endpoint": "/v1/completions",
+    "target_input_tokens": [
+      1024,
+      2048,
+      8192,
+      16384
+    ],
+    "runs_per_size": 1,
+    "max_output_tokens": 64,
+    "temperature": 0,
+    "top_p": 1,
+    "poll_interval_seconds": 0.25,
+    "dataset": "nvidia/SPEED-Bench",
+    "dataset_category": "mixed",
+    "dataset_directory": "/Users/Shared/Project/test/llm_ssd/scratch/speed-bench",
+    "dataset_file_sha256": {
+      "throughput_1k.jsonl": "0b5665f61dcbf52dd357d515fd45f9e4c17c68eb902c788c81a4c9271b217377",
+      "throughput_2k.jsonl": "be247367a3ddd3c74b72d03122818d89c6e2e2fe956e6d66099d7ae0c45402a6",
+      "throughput_8k.jsonl": "94f3ab2d3cd456654ee234faf888c459c5451069d6cfab6e051591b288e71739",
+      "throughput_16k.jsonl": "77cbee1b4abc6b205ee9ad918bd8e1290a6514f4cf0ff9dc7db497afd1fffca2"
+    },
+    "prompt": "first user message shortened before the installed model chat template is applied; exact total input token count",
+    "prompt_cache_state": "different input per run; prompt cache not cleared",
+    "filesystem_cache_state": "not purged",
+    "memory_metric": "maximum performance.active_memory_bytes observed during each request",
+    "p95_method": "nearest rank across runs"
+  },
+  "evidence_limits": [
+    "The API does not expose exact generated token IDs.",
+    "output_text_sha256 hashes streamed text, not generated token IDs.",
+    "Memory is MLX active memory, not process RSS."
+  ],
+  "runs": [],
+  "summary": [],
+  "error": "The server is busy. Wait for the current request to finish."
+}

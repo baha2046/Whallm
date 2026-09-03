@@ -31,6 +31,7 @@ working tree。
 - [`benchmarks/2026-08-11-d2-top6-profile-m5-pro.json`](benchmarks/2026-08-11-d2-top6-profile-m5-pro.json)：D2 routed expert top-6 dispatch 與 shader profile gate。
 - [`benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json`](benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json)：D3 相鄰 Decode CSA row 與 `gather` profile gate。
 - [`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)：Qwen 完整安裝、API、4K prompt cache 與 packaged App 驗證。
+- [`benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json`](benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json)：Qwen private ANE Prefill 的 native component、回退與 4,097-token 探索性 ABBA。
 - [`benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json`](benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json)：完整 installed model 的 hash exact prefetch correctness 與 logical-byte smoke。
 - [`benchmarks/2026-08-26-adaptive-block-smoke-m2-max.json`](benchmarks/2026-08-26-adaptive-block-smoke-m2-max.json)：storage-aware adaptive block correctness 與 metric-plumbing smoke。
 - [`benchmarks/2026-08-26-adaptive-block-calibration-wave1-m2-max.json`](benchmarks/2026-08-26-adaptive-block-calibration-wave1-m2-max.json)：五類 128-token 首輪校準；保存已拒絕的 over-trimming policy 與 output-budget metric 問題。
@@ -77,6 +78,11 @@ working tree。
 - [`benchmarks/2026-08-27-dspark-learned-router-frozen-transfer-m2-max.json`](benchmarks/2026-08-27-dspark-learned-router-frozen-transfer-m2-max.json)：6,000-label learned-router direct-transfer gate；四個 DSpark taps × top-6／12／24／48 的 route／union accounting exact，但最佳 top-24 只有 17.15% assignment recall 與 11.15% useful rate，training prerequisite stop。
 - [`benchmarks/2026-08-27-block-prompt-cache-partial-restart-m2-max.json`](benchmarks/2026-08-27-block-prompt-cache-partial-restart-m2-max.json)：normal format-4 content-addressed prefix checkpoint functional gate；兩個 453-token prompts 共享 442 tokens，restart 精確重用 128 tokens 且與 isolated cold branch output hash 相同，immutable payload／metadata、contract、sharing 與 access sidecar 全部通過，非正式效能結果。
 - [`benchmarks/2026-08-27-plan-prerequisite-closure-m2-max.json`](benchmarks/2026-08-27-plan-prerequisite-closure-m2-max.json)：剩餘九個 PLAN directions 的 local feasibility audit；trained/Core ML candidates、approved contracts、current traces、attributable physical-device fields 與 storage-native spec 均不存在，Xcode／system tool availability 分開記錄，全部 scoped stop/defer 與 reopening rules 通過。
+- [`benchmarks/2026-09-01-expert-blob-compression-m5-pro.json`](benchmarks/2026-09-01-expert-blob-compression-m5-pro.json)：DeepSeek FP4 與 Qwen MXFP4 的 LZ4／LZFSE microbenchmark、byte hash、nonresident page probe、Metal contention 和 Phase 4 stop decision。
+- [`benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json)：DeepSeek top-5 learned-routing candidate 的 10-case Phase 6A quality／safety entry smoke；不是效能結果。
+- [`benchmarks/2026-09-01-approximate-expert-drop-component-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-component-m5-pro.json)：Phase 6B fresh-worker next-token logits、route width、logical bytes 和 Peak RSS component gate。
+- [`benchmarks/2026-09-01-approximate-expert-drop-4k32-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-4k32-m5-pro.json)：Phase 6C 五種 4K／32 pilot；10 條 token outputs 完全相同，timing 只作探索。
+- [`benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json`](benchmarks/2026-09-01-approximate-expert-drop-4k256-formal-m5-pro.json)：Phase 6E 五種 workload、兩輪反向順序、20 個 fresh-process 4K／256 formal gate 和人工 parity review。
 - [`benchmarks/prompts/2026-08-26-adaptive-128/manifest.json`](benchmarks/prompts/2026-08-26-adaptive-128/manifest.json)：兩輪五類校準使用的精確 128-token prompt manifest、seed、文字 SHA 與 token SHA；同目錄保存無尾端換行的原始 prompt bytes。
 - [`benchmarks/prompts/2026-08-26-adaptive-4096/manifest.json`](benchmarks/prompts/2026-08-26-adaptive-4096/manifest.json)：重建並逐一匹配歷史 R0 token hash 的五類 4,096-token prompt manifest。
 - [`benchmarks/prompts/2026-08-26-adaptive-discovery-4096/manifest.json`](benchmarks/prompts/2026-08-26-adaptive-discovery-4096/manifest.json)：五類低信心 discovery prompts；保存固定 instruction suffix、文字 SHA 與精確 4,096-token SHA。
@@ -119,10 +125,18 @@ working tree。
 2026-08-28 在 Codex 和 Qwen request 格式修正後，重新執行 Python 測試。
 2026-08-28 在兩個分支合併後，重新執行兩組完整測試。
 2026-08-30 在 sampled MTP 實作後，重新執行兩組完整測試。
+2026-09-01 在 DeepSeek approximate mode 改為預設開啟後，重新執行兩組完整測試。
+2026-09-02 在未載入模型支援即時更新進階設定後，重新執行兩組完整測試。
+2026-09-03 在 Codex 長 namespace tool name、model metadata 與 GitHub issue #5
+persistent prompt-cache snapshot 修正後，重新執行兩組完整測試。
+2026-09-03 在 Qwen Codex tool-first、required 結果驗證與單次重試實作後，
+再次執行兩組完整測試。
+2026-09-04 修正 Responses tool SSE 的重複 parser 誤判，並加入 server log 層級後，
+再次執行兩組完整測試。
 
 ```sh
 make test
-PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
+PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p 'test_*.py'
 ```
 
 下表合併每個 suite 的最近一次結果。
@@ -130,18 +144,41 @@ PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -v
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
 | Swift `DeepSeekRepackTests` | 17 | 0 | 0 |
-| Swift `DeepSeekV4SSDAppTests` | 47 | 0 | 0 |
-| Python runtime 與 server | 254 | 0 | 0 |
-| 合計 | 318 | 0 | 0 |
+| Swift `DeepSeekV4SSDAppTests` | 51 | 0 | 0 |
+| Python runtime 與 server | 294 | 0 | 0 |
+| 合計 | 362 | 0 | 0 |
 
 本次沒有略過測試。
 
-2026-08-30 的目前工作樹已執行 `make package`。
-HEAD 是 `c86532e6585a9a4d0d6d36222049b0721f926701`。
+2026-09-04 的目前工作樹已執行 `make package`。HEAD 是
+`f585c2d7fe500d875d7083c92428be18e82afcff`，並包含目前未提交的 Codex namespace
+tool Alias、Codex model metadata，以及 GitHub issue #5 immutable persistent checkpoint／
+normal format-5 修正，也包含 Qwen Codex tool-first、required 結果驗證與一次受控重試。
+本次封裝也包含 Responses tool SSE 只採用完整 parser 結果的修正，以及 Debug／Info／Error
+server log 層級。
+App 版本和 build 都是 `1.0.0`，使用 ad hoc signature。
+ZIP SHA-256 是
+`cfaa432d474fafc137b72619192b4b29bc82a4a43242d508eb76a1bb2bd142fb`。
+本次沒有 notarize、建立 Git tag 或上傳檔案。
+
+本機 App 與重新解壓的 App 都通過 `codesign --verify --deep --strict`。兩個 App 都包含
+英文、簡體中文與繁體中文 localization，且檔案與 source 一致。兩個 App 分別以三種語言
+在 sandbox 內啟動；sandbox 禁止讀取專案 `.build` 與各自的 Swift resource bundle。
+六次啟動都持續執行，沒有 `L10n` trap，因此確認 localization 先從
+`Contents/Resources` 載入。Mach-O dependency audit 沒有找到專案 `.build` 或
+`/opt/homebrew` absolute dependency。Packaged `libWhallmANE.dylib` SHA-256 是
+`b4c115c5d540e8d3aae8c8e0820ff38df60a35d2742928faf2beb94e44a73cdc`。
+
+2026-09-02 的目前工作樹已執行 `make package`。
+HEAD 是 `f585c2d7fe500d875d7083c92428be18e82afcff`，並包含目前尚未提交的
+DeepSeek approximate mode、SSD streaming 研究變更，以及 APP model catalog 的
+`qwen_next_layer_prefetch=false` contract 修正。此 build 也包含 Chat streaming
+delta 50 ms 合併更新修正、預設啟用的 Qwen QSA Grouped-KV runtime 路徑，
+以及預設啟用的 Qwen private ANE Prefill projection。
 App 版本和 build 都是 `1.0.0`。
 本機 App 使用 ad hoc signature。
 ZIP SHA-256 是
-`06fbef9c0ec684cdf3b15bd68496389c3a3112a1fc2820834f801cc12fb98031`。
+`f9bc6fd2a8b6ae59883f83d4c232546ee76e0423e320b26436716bb5eb558107`。
 本次驗證沒有 notarize、建立 Git tag 或上傳檔案。
 本機 App 和重新解壓的 App 都通過 strict deep signature 驗證。
 兩個 App 都包含英文、簡體中文和繁體中文 localization。
@@ -149,6 +186,27 @@ ZIP SHA-256 是
 隔離啟動檢查也禁止兩個 App 讀取 Swift resource bundle。
 兩個 App 都從 `Contents/Resources` 載入三種 localization。
 兩個 App 在每種語言下都持續執行，且沒有在 `L10n` 初始化時停止。
+Packaged App 包含已簽署的 `Contents/Frameworks/libWhallmANE.dylib`。
+該 dylib 的 SHA-256 是
+`b4c115c5d540e8d3aae8c8e0820ff38df60a35d2742928faf2beb94e44a73cdc`。
+Packaged Python 已使用完整 Qwen installed model 載入 12 個 ANE projection。
+`ane_prefill_ratio=0.5` 的狀態是 active，沒有 interface error。
+實際分配是 ANE 6,144 channels 和 GPU 6,144 channels。
+
+### Qwen private ANE Prefill 探索性 gate
+
+Native 64×64 projection 已直接執行 private `AppleNeuralEngine.framework`。
+相對 CPU 參考的最大絕對誤差是 0.0001411438。
+
+完整 model gate 使用 4,097-token synthetic prompt、1 個 output token、1,152 slots、
+關閉 persistent prompt cache，以及 control、ANE、ANE、control 順序。
+兩個 ANE run 各執行 48 次 evaluate，沒有 fallback。
+四次首個 output token 的 SHA-256 都是
+`b531a2e37cafff6750caed50b5ad3881f984a6b74078caa4380b6d3be8fee412`。
+Paired median Prefill 是 control 101.37 tok/s、ANE 109.82 tok/s。
+第一組受到未清除的 file cache 影響。
+反向順序的穩態結果接近相同。
+因此這是實作與正確性證據，不是正式速度結論。
 
 2026-08-28 的目前工作樹已執行 `make package`。
 該 package 包含 2026-08-28 的 `QwenToolCodec` 修正。
@@ -218,9 +276,10 @@ closure、最小 eligible k selection 與 zero-recall stop。
 - MXFP8 cache chunk、gather、index 和 persistence round-trip。
 - layer-major prefill 和一般 path 的 next-token logits。
 - 記憶體與 persistent prompt cache reuse。
-- Normal format-4 model／RoPE／KV／attention contract、128-token block-chain identity、
+- Normal format-5 model／RoPE／KV／attention contract、128-token block-chain identity、
   suffix-divergence partial restart、immutable payload sharing、frequency-aware eviction、
-  incompatible-contract rejection，以及 MXFP8 active remainder／chunk-list snapshot isolation。
+  incompatible-contract／format-4 rejection，以及 mutable `ArraysCache`、MXFP8 active
+  remainder／chunk-list snapshot isolation。
 - Output token 的 process 累計值。
 - DSpark greedy、sampling、verification、replay 和 fallback 邏輯。
 - DSpark per-layer expert union、verification／replay logical bytes 和
@@ -254,14 +313,22 @@ closure、最小 eligible k selection 與 zero-recall stop。
 - 延遲載入、runtime 重用、關閉後切換、generation request 排隊和累計計數。
 - 手動模型載入與卸載、Bearer 驗證，以及卸載後的 status。
 - DeepSeek layer-major Prefill 門檻預設值、邊界、catalog 編碼、舊設定遷移和正整數驗證。
+- DeepSeek approximate mode 的 strict request validation、Qwen／DSpark rejection、
+  router request-scope restore、prompt-cache mode isolation、persistent-cache exclusion、
+  response 和 status actual-mode reporting。
 - 模型載入期間的 `/healthz` 和 `/api/status` 回應。
-- APP Alias 儲存與遷移、model catalog、Loaded 模型辨識、Chat 模型選擇、訊息模型名稱，以及切換頁面期間持續接收 Chat 回覆。
+- APP Alias 儲存與遷移、完整 RuntimeConfig model catalog、Loaded 模型辨識、Chat 模型選擇、訊息模型名稱、快速 streaming delta 合併，以及切換頁面期間持續接收 Chat 回覆。
+- Server 執行期間的未載入模型進階設定更新、Loaded／Loading 鎖定，以及載入時套用最新 model catalog entry。
 - 未載入、載入中與已載入的 status decoding，以及模型切換後清除 Metric 歷史。
 
 2026-08-28 使用目前合併工作樹重跑下列測試：
 
 - `swift test`：61 項通過。
 - `PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests`：239 項通過。
+
+2026-09-01 完成 expert blob 壓縮與 approximate Phase 6 後重跑 Python tests：
+
+- `PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p 'test_*.py'`：275 項通過。
 
 這些測試多數使用 fixture 或 mock model。
 這些測試不取代 full-model benchmark。
@@ -278,6 +345,67 @@ Qwen `chat_template.jinja`。
 role sequence 矩陣涵蓋 255 組 server 接受的非 tool history。
 installed tokenizer 也通過含 tool history 的 prompt boundary 檢查。
 這次驗證沒有載入完整模型權重，也沒有執行 generation。
+
+2026-09-03 另用 Codex CLI `0.152.1` 重現目前的 Responses request。
+Request 有 15 個 top-level tools，並包含 Codex 內建 app namespace tools。
+修正前，`namespace__name` 最長是 67 個字元；server 在 generation 前以
+`tools.13.function.name` 回傳 HTTP 400。
+修正後，超過 64 字元的 prompt 內部名稱會使用固定 hash Alias。
+完整 Qwen installed model 先產生 `exec_command`，Codex 實際執行一次
+`/bin/zsh -lc pwd`，再把結果送回第二個 Responses request；turn 正常完成，沒有
+`invalid_tool_call`。
+該輪長名稱修正驗證時，Codex 仍因 `/v1/models` 只有 OpenAI 相容的 `data`
+array 而顯示 model metadata fallback warning；該 warning 沒有阻止兩輪 tool flow。
+
+2026-09-03 後續依 Codex `rust-v0.152.1` 的 `ModelsResponse` 和 `ModelInfo`
+schema，讓 `/v1/models` 保留標準 `data` array，並增加 Codex `models` metadata
+array。使用 npm `@openai/codex@0.152.1` 與完整 Qwen installed model 實測：
+`GET /v1/models?client_version=0.152.1` 和 `POST /v1/responses` 都回傳 HTTP 200，
+Codex 沒有再顯示 model metadata fallback warning，Qwen 正常回覆 `OK`。另一輪要求
+Codex 只執行一次 `pwd`；Qwen 產生 tool call、Codex 執行命令並送回 tool result，第二個
+Responses request 完成且輸出正確工作目錄。
+這是功能驗證，不是效能結果。
+
+2026-09-03 的自動 endpoint 測試另覆蓋 Qwen Codex tool-first 行為：首輪
+`tool_choice: auto` 在有 `exec_command` 且沒有 tool result 時改用 `required`；第一次
+只輸出狀態文字時不把該文字送給 client，並重試一次；第二次的有效 `exec_command`
+call 正常送出。另驗證連續兩次缺少 required call 時以
+`tool_choice_not_satisfied` 結束、指定 function 第一次選錯時只重試一次，以及收到
+`function_call_output` 後恢復 `auto` 並可輸出最終答案。
+
+這些案例使用 server 測試 runtime，沒有載入完整 Qwen 權重，也不是完整 Codex CLI
+端到端 generation 證據。
+
+2026-09-04 使用 npm Codex CLI `0.153.0`、最終封裝內的 Python runtime 和完整 Qwen
+installed model，重現使用者的專案 review request。修正前，首輪 `required` response
+雖然完整 parser 已取得 `exec_command`，streaming parser 仍誤判，接著把錯誤 delta
+送到已完成的 message item；Codex 顯示 `OutputTextDelta without active item` 並留下空白。
+只修首輪後，第一個 tool flow 成功，但 tool result 後的 `auto` response 仍會被相同的
+重複判定中止。
+
+最終修正讓所有 Responses tool SSE 都直接採用完整 parser 結果。相同 request 的首個
+response 產生兩個 command call，Codex 都實際執行；收到結果後的 `auto` response 又產生
+兩個 command call，也都實際執行。過程沒有 `invalid_tool_call` 或
+`OutputTextDelta without active item`。第三個 response 因完整 review 還會繼續讀取更多
+檔案而由測試者手動停止；這項驗證覆蓋原本兩個失敗點，不代表完整 review 品質評估。
+
+同一個最終封裝另以 `--log-level debug` 啟動，送入含 nested object 的 JSON request。
+Server Log 完整顯示 compact JSON body 與 HTTP 400 access log。自動測試另驗證預設 Info、
+Error 隱藏 HTTP 2xx 並保留 4xx，以及舊的 server 設定缺少 log 層級時會遷移成 Info。
+
+2026-09-03 也重現並修正 GitHub issue #5。根因不是 128-token block boundary，
+而是 non-layer-major prefill checkpoint 保留 Qwen `ArraysCache.state` 可變 list 的別名；
+後續 final-token evaluation 和 decode 會改寫 checkpoint state，但 metadata 仍保留較短的
+token prefix。修正後 checkpoint 先深複製並 materialize state。Regression test 模擬 mutable
+state 在 callback 後被改寫，並驗證 restart restore 的仍是 callback 當下值。Normal
+persistent format 同時從 4 升到 5；scanner 拒絕 format 4，避免升級後載入磁碟上既有的
+poisoned checkpoint。
+
+完整 Qwen installed model 使用隔離的暫存 cache 目錄驗證 37-token prompt。Disk 上同樣
+產生 36-token checkpoint；cold request、同 process 第二次相同 request，以及 server
+restart 後第三次 request 都完成 64 個 output tokens，文字 SHA-256 都是
+`cb67ebf069f0774e140a48a66062f6ae61a84dde0557604d2448404dc0676f63`，沒有
+`<|endoftext|>` 或 `<|im_start|>`。這是 correctness 驗證，不是效能結果。
 
 ## Installed model 完整驗證
 
@@ -334,6 +462,147 @@ swift run dsv4-repack benchmark \
 8 workers 的 mean read time 最高。
 目前 runtime 保留 4 個一般 read workers 和 2 個 prefetch workers。
 這個預設值來自多次端到端量測，不只來自這次 microbenchmark。
+
+## Expert blob 壓縮 microbenchmark
+
+2026-09-01 在 M5 Pro 執行下列命令：
+
+```sh
+PYTHONPATH=runtime .venv/bin/python Scripts/benchmark_expert_blob_compression.py \
+  --deepseek-model ~/.dsmodel/deepseek-v4-flash-0731.dsv4 \
+  --qwen-model ~/.dsmodel/qwen3.8-flash-next.dsv4 \
+  --output docs/benchmarks/2026-09-01-expert-blob-compression-m5-pro.json \
+  --scratch-directory scratch/expert-blob-compression-2026-09-01 \
+  --samples 9 \
+  --expert-samples 3 \
+  --codecs lz4 lzfse
+```
+
+Benchmark 使用 Apple Compression。
+專案沒有新增第三方 dependency。
+測試包含 64 KiB、256 KiB、1 MiB、4 MiB 和完整 expert blob。
+DeepSeek FP4 和 Qwen MXFP4 各測三個 expert 位置。
+Qwen 的 4 MiB case 會跨相鄰 expert blob。
+完整 expert case 不會跨 expert blob。
+
+每個 baseline 與 candidate 都使用新的 worker process。
+讀取使用 `F_NOCACHE`，並關閉 read-ahead。
+頁面 residency probe 確認 60 個 case 的所有輸入在讀取前都是 nonresident。
+Metal control 使用重複的 2048 x 2048 FP16 MLX matrix multiplication。
+
+| Gate | 結果 |
+| --- | --- |
+| 解壓縮 byte hash 完全相同 | 通過，60/60 |
+| 無 Metal 的 read + decode 改善至少 5% | 未通過 |
+| 有 Metal 的 read + decode 改善至少 5% | 未通過 |
+| Peak RSS 增加不超過 5% | 通過 |
+
+完整 expert blob 的中位數如下。
+時間改善的正值代表較快。負值代表較慢。
+
+| Model | Codec | 儲存減少 | Decode output | 無 Metal 時間改善 | 有 Metal 時間改善 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| DeepSeek FP4 | LZ4 | 2.43% | 21.10 GB/s | -69.91% | -71.24% |
+| DeepSeek FP4 | LZFSE | 7.11% | 1.29 GB/s | -974.74% | -1036.27% |
+| Qwen MXFP4 | LZ4 | 2.47% | 26.11 GB/s | +0.36% | -5.08% |
+| Qwen MXFP4 | LZFSE | 4.92% | 1.22 GB/s | -564.51% | -591.75% |
+
+Phase 4 gate 未通過。
+Runtime 沒有接入壓縮。
+Phase 5 ready／compact／cold cache 不執行。
+
+正式 artifact 位於
+[`benchmarks/2026-09-01-expert-blob-compression-m5-pro.json`](benchmarks/2026-09-01-expert-blob-compression-m5-pro.json)。
+
+`F_NOCACHE` 和 residency probe 不能證明每次讀取都由 physical SSD 提供。
+Metal control 是合成負載，不是完整模型 inference。
+
+## Approximate expert drop entry smoke
+
+2026-09-01 在 M5 Pro 執行：
+
+```sh
+PYTHONPATH=runtime .venv/bin/python Scripts/benchmark_approximate_expert_drop.py \
+  --model ~/.dsmodel/deepseek-v4-flash-0731.dsv4 \
+  --suite docs/benchmarks/prompts/2026-09-01-approximate-entry/manifest.json \
+  --protocol research/APPROXIMATE_MODE_2026-09-01.md \
+  --output docs/benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json
+```
+
+Phase 6A 執行時，candidate 只修改 benchmark process 內的 learned router `top_k`。
+
+| Gate | Exact | Candidate |
+| --- | ---: | ---: |
+| 品質 smoke | 5/5 | 5/5 |
+| 安全 smoke | 5/5 | 5/5 |
+| 相對 exact output token | 不適用 | 10/10 case 完全相同 |
+
+Candidate 的 selected expert 理論減少量是 15.50%。
+這不是 measured SSD bytes。
+Exact 和 candidate 共用一個 loaded runtime 和未平衡 expert cache。
+因此，artifact 內的時間只作描述，不能作效能比較。
+
+Phase 6A 通過。
+Phase 6B 接著使用分離的 fresh workers 執行 component gate。
+
+### Phase 6B 至 Phase 6E
+
+Phase 6B 的 10/10 next-token top-1 相同。
+最大 exact-to-candidate KL divergence 是 0.00009246。
+Logical expert bytes 減少 12.73%。
+Peak RSS 增加 0.83%。
+
+Phase 6C 使用五種 4K／32 workloads。
+10 個 runs 都完成。
+五個 pairs 都是 32/32 token 相同。
+扣除 42 個 full-layer Prefill reads 後，aggregate Decode logical bytes 減少 11.26%。
+這一階段的 timing 只作探索。
+
+Phase 6D 加入 default-off API prototype。
+Phase 6D 驗證時，沒有 `approximation` 欄位會使用 exact。
+DeepSeek 可以明確指定 `learned-route-drop-lowest-1`。
+Qwen、DSpark、malformed mode 和未知 mode 都會拒絕。
+Exact 與 approximate prompt cache 已隔離。
+Approximate prompt cache 不會持久化。
+
+Phase 6E 的重現命令如下：
+
+```sh
+PYTHONPATH=runtime .venv/bin/python Scripts/benchmark_approximate_expert_drop_formal.py run \
+  --model ~/.dsmodel/deepseek-v4-flash-0731.dsv4 \
+  --prompt-manifest docs/benchmarks/prompts/2026-08-26-adaptive-4096/manifest.json \
+  --protocol research/APPROXIMATE_MODE_2026-09-01.md \
+  --safety-artifact docs/benchmarks/2026-09-01-approximate-expert-drop-entry-m5-pro.json \
+  --raw-directory /new/approximate-expert-drop-4k256-formal \
+  --output /new/approximate-expert-drop-4k256-formal.json
+```
+
+Phase 6E 使用兩個 reversed-order waves。
+五種 workload 各執行兩個 exact/candidate pairs。
+總共有 20 個 fresh-process runs。
+
+| Formal gate | 結果 |
+| --- | ---: |
+| 10-pair token agreement | 100% |
+| Aggregate Decode logical expert bytes | -15.14% |
+| Decode throughput change 中位數 | +8.37% |
+| Repeated workload p95 change 中位數 | -1.87% |
+| Code workload p95 change 中位數 | -9.53% |
+| Traditional Chinese workload p95 change 中位數 | -7.95% |
+| Mixed math workload p95 change 中位數 | -9.61% |
+| Tool-like workload p95 change 中位數 | -22.11% |
+
+所有 machine gates 都通過。
+人工 review 確認 10 個 paired texts 逐字相同。
+五個 prompt 是重複型壓力 workload。
+因此，結果只證明這個固定 suite 的相對 parity。
+結果不證明一般能力，也不等於 physical SSD bytes。
+
+Phase 6 完成。
+後續使用者已授權把 candidate 設為一般 DeepSeek request 的預設模式。
+API、CLI 和 APP request 未指定 mode 時使用 `learned-route-drop-lowest-1`。
+明確指定 `exact` 時仍使用完整模式。
+Qwen 和啟用 DSpark 的 DeepSeek 維持 exact。
 
 ## 目前端到端量測
 
@@ -1095,9 +1364,10 @@ time to first token 從 20.89 秒降到 0.56 秒。
 round-trip 測試還原 62 個 quantized pooling cache item。Format v2 現在不再載入，因為它
 沒有足以證明 RoPE／KV／attention 相容性的 contract。
 
-目前 normal format 4 自動測試覆蓋完整 contract、content-address block chain、restart、
-suffix partial match、immutable sharing、frequency-aware eviction、quantized round-trip，
-以及 MXFP8 snapshot isolation。Installed-model functional gate 另驗證 128-token partial
+目前 normal format 5 自動測試覆蓋完整 contract、content-address block chain、restart、
+suffix partial match、immutable sharing、frequency-aware eviction、quantized round-trip、
+mutable-state snapshot isolation、format-4 rejection，以及 MXFP8 snapshot isolation。
+Installed-model functional gate 另驗證 128-token partial
 restart reuse 與 cold branch token parity；詳見下方獨立小節。
 
 ### Ready expert decode
@@ -1459,7 +1729,7 @@ shapes，所以不能把差距宣稱為 QMM-only。Corrected artifact SHA-256 �
 P2 integration candidate 新增 default-off `dspark_prompt_cache`，並以獨立 format 3 entry
 同時保存 target KV、三個 DSpark context states、token prefix、revision 與 target layers。
 當時的 normal format 1／2 與 DSpark format 3 scanners／eviction 分離；normal namespace
-目前已升級為 format 4，DSpark gate 的 format-3 artifact 與 contract 不變。Full-model gate 使用
+當時已升級為 format 4，DSpark gate 的 format-3 artifact 與 contract 不變。Full-model gate 使用
 128-token `repeated` prompt、8 greedy outputs、hybrid v3、fallback/hash/adaptive off、
 persistent on、bypass policy 與全新隔離 cache directory。
 
@@ -1796,7 +2066,7 @@ runtime memory limit 是 48 GiB。
 | Adaptive block prototype | Correctness 通過、目前效能候選拒絕 | 五組 composition exact；bypass-policy 4K／32 repeated adaptive gate 雖使 speculative bytes/committed -42.96%，request +5.02%、Decode -25.58%。預設關閉。 |
 | DSpark coherent candidate path | Structural gate 通過、candidate 停止 | 五組 first-round baseline 全部 target-accepted 5/5；storage weights 選到的兩個 lower-union alternatives 分別只接受 4／1，0/5 通過 continuation。Greedy-only research script，無 runtime setting，sampling 未證明。 |
 | DSpark learned-router predictor | Fixed-label baseline exact、direct transfer 停止 | 6,000 assignments 與 top-k union accounting exact；最佳 top-24 只有 17.15% assignment recall、33.03% union recall、11.15% useful rate，0/40 layers 達 75%。沒有執行 prefetch；trained follow-up 需新資料／split／artifact protocol。 |
-| Remaining PLAN prerequisites | Local audit 通過、scoped stop/defer | 九個 training／ANE／trace／physical-I/O／non-equivalent directions 全部有 local absence evidence 與 reopening rule；Xcode/system tools 可用不等同 candidate 或 measurement readiness。沒有實作或授權 training／approximate mode。 |
+| Remaining PLAN prerequisites | Local audit 通過、scoped stop/defer | 九個 training／DeepSeek dense ANE／trace／physical-I/O／non-equivalent directions 全部有 local absence evidence 與 reopening rule；Xcode/system tools 可用不等同 candidate 或 measurement readiness。沒有實作或授權 training／approximate mode。 |
 | Native MTP-1 baseline | Pinned checkpoint feasibility 拒絕 | Official graph 需要三個 `mtp.*` stages；4,705 tensors 與完整 installed payload 通過 contract／SHA audit，但沒有 self-contained one-stage path。Runtime 不做 checkpoint-faithful 裁層。 |
 | DSpark 96-slot reduced cache | 停止 | 三組 4K／32 exact 且 peak memory 較低；4K／128 也 exact、peak -7.35%，但 draft bytes/committed +83.17%，未通過預先宣告的 +50% gate。保留 768-slot 預設。 |
 | DSpark 淨加速 | 未通過 | 目前 checkout 的 R3 探索性 ABBA 已觸發停止條件。 |

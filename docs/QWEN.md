@@ -243,6 +243,27 @@ runtime 包含下列 text model 元件：
 
 QSA 會把 query 分成最多 4 個 token 的 chunk。
 runtime 不建立完整 262K attention matrix。
+QSA 依兩個 KV heads 分組計算 24 個 query heads。
+runtime 不會把 selected K/V 複製 12 次。
+
+Qwen Prefill 預設啟用 private ANE projection 路線。
+固定 shape 是 1×1,024×2,560。
+12 個 QSA layer 的 `q_proj` 會依 output channels 分割。
+`ane_prefill_ratio` 控制分配給 ANE 的比例。
+值域是 0 到 1，預設是 0.25。
+Runtime 會把比例對齊到 256 個 output channels。
+預設由 GPU 計算前 9,216 個 channels。
+ANE 計算最後 3,072 個 channels。
+兩個結果只做串接。
+
+非 1,024-token chunk 和 Decode 會使用原本的 GPU 路線。
+CLI 和 server 的 `--no-ane-prefill` 可以明確停用 ANE 路線。
+`--ane-prefill-ratio` 可以設定分配比例。
+App 的 Qwen 模型進階設定也可以設定此比例。
+private framework 初始化、compile、load 或 evaluate 回傳錯誤時，runtime 會停用
+ANE，並回退到原本的完整 GPU projection。
+`/api/status` 的 `runtime.ane_prefill_status` 會回報 active、error、evaluations 和
+fallbacks。
 
 `ngram.bin` 使用 read-only memory map。
 runtime 只複製目前 token chunk 所需的 FP8 row。
@@ -269,6 +290,21 @@ Qwen tool call 使用官方 XML 格式。
 完整 parser 和 streaming parser 會驗證相同的 function name 和 arguments。
 
 Codex Responses request 會先轉成 Qwen prompt 所需的格式。
+`GET /v1/models?client_version=...` 同時提供 Codex 所需的 `models` metadata array，
+因此 Codex 可直接找到 Qwen 的 API model ID 或 Alias，而不需套用 fallback metadata。
+
+Codex 首輪帶有 `exec_command`、使用 `tool_choice: auto`，且還沒有
+`function_call_output` 時，server 會在 Qwen prompt 內改用 `required`。這讓 Qwen 先用
+Codex tool 取得專案資料，而不是只輸出「我先看看」後結束。tool result 回傳後，下一輪
+維持 `auto`，可以繼續呼叫 tool 或回答。
+
+`required` 或指定 function 的完整結果會在送給 client 前驗證。第一次沒有符合的 tool
+call 時，server 加入一次修正 instruction 並只重試一次。第二次仍失敗就回傳
+`tool_choice_not_satisfied`；若第二次的 tool call 無法解析，則回傳
+`invalid_tool_call`。第一次的無效文字不會送給 Codex。
+Responses SSE 的 `auto`、`required` 和指定 function 都直接從完整 parser 的結果建立
+文字與 function call event，不再用 streaming parser 做第二次判定。這避免有效的 Qwen
+XML tool call 因兩個 parser 的切分不同而被錯誤改成 `invalid_tool_call`。
 
 | Codex Responses 格式 | Qwen prompt 格式 |
 | --- | --- |
@@ -276,7 +312,7 @@ Codex Responses request 會先轉成 Qwen prompt 所需的格式。
 | 沒有 `user` message 的 history | 在 `system` message 後加入空的 `user` anchor。 |
 | text content item array | 合併成 string。 |
 | top-level function tool | 轉成 OpenAI function tool shape。 |
-| namespace tool | 使用 `namespace__name` 作為 prompt 內的 function name。 |
+| namespace tool | 一般使用 `namespace__name`。合併後超過 64 字元時，prompt 使用固定的 64 字元 hash Alias；API response 和 replay 仍保留原本的 namespace 與 name。 |
 | `web_search` tool | 不加入 prompt。 |
 | `function_call.arguments` JSON string | server 驗證 JSON object。`QwenToolCodec` 在 message 深層複本中解碼成 `dict`。 |
 | `function_call_output.output` string | 轉成 `tool` message content。server 使用 `call_id` 驗證順序。 |
@@ -336,6 +372,7 @@ DeepSeek 仍顯示並使用三個欄位。
 Qwen 不支援 `--dspark`。
 Qwen 可以使用預設關閉的 `--mtp` speculative decoding prototype。
 Qwen3.8 的 Advanced Settings 提供 `Use MTP` 和 `MTP slots`。
+`Slot` 預設為 4,096。
 `Use MTP` 預設關閉，`MTP slots` 預設為 32。
 啟用 MTP 時，App 產生的 model catalog 會設定 `mtp_enabled=true`。
 App 不會變更 Qwen 的 sampling 設定。
@@ -382,12 +419,48 @@ MLX peak memory 是 15,182,206,210 bytes。
 warm prompt cache 重用 4,095 個 token，並在 0.214 秒產生相同 token。
 兩次 output token SHA-256 都是
 `6dfb97632210ac38a071667cf8be7df83a16178e12f1248e45b2a3d24b3b2bd1`。
+
+2026-09-03 針對 GitHub issue #5 的完整模型驗證使用隔離的 persistent cache 目錄。
+37-token prompt 會保存 36-token prefill checkpoint。相同 request 的 cold、同 process
+reuse 與 server restart 後 reuse 都完成 64 個 output tokens，三次文字 SHA-256 都是
+`cb67ebf069f0774e140a48a66062f6ae61a84dde0557604d2448404dc0676f63`，且沒有 Qwen
+chat-template control token。修正保留 1-token replay；根因是 checkpoint 曾保留 Qwen
+`ArraysCache.state` 可變 list 的別名，後續 generation 會改寫 snapshot state。Normal
+persistent cache 升為 format 5 並拒絕 format 4，避免沿用修正前已寫入的 poisoned snapshot。
+
 這些數值是一個 M5 Pro 本機驗證結果。
 這些數值不是效能保證。
+
+2026-09-02 的 4,577-token 快速 gate 重新測試相同 Runtime 的記憶體 prompt
+cache。冷 TTFT 是 121.30 秒。熱 TTFT 是 0.373 秒。
+熱 request 重用 4,576 個 tokens，並產生相同的首個 token。
+同一輪的 QSA chunk 8 和 Attention／MoE 分批都讓 TTFT 變慢。
+Runtime 因此沒有保留這兩個研究分支。
+結果位於
+[`Qwen Prefill 四方向快速 gate`](benchmarks/2026-09-02-qwen-prefill-four-directions-quick-gate-m5-pro.json)。
+
+後續 Grouped-KV QSA quick gate 使用四次交錯的 4,577-token request。
+Paired median TTFT 從 85.36 秒降至 44.88 秒。
+Prefill 從 53.63 提升至 102.00 tok/s。
+Peak memory 從 14.79 GB 降至 12.84 GB。
+四次的首個 output token SHA-256 相同。
+使用者依 quick gate 授權採用。
+Grouped-KV 現在是唯一 QSA runtime 路徑。
+結果位於
+[`Qwen QSA Grouped-KV 採用 quick gate`](benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json)。
+
+Private ANE Prefill 的 4,097-token 探索性 ABBA 執行 12 個 QSA projection。
+每個 ANE run 有 48 次 evaluate，且沒有 fallback。
+四次的首個 output token SHA-256 相同。
+Paired median Prefill 是 control 101.37 tok/s、ANE 109.82 tok/s。
+第一組受到 file cache 執行順序影響，反向順序的穩態結果接近相同。
+因此這個結果不構成正式速度結論。
+結果位於
+[`Private ANE Prefill 探索性 gate`](benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json)。
 
 完整結果位於
 [`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)。
 
 262,144 只代表 checkpoint 合約上限。
-目前完整模型只驗證到 4,096 prompt tokens。
+目前完整模型只驗證到 4,097 prompt tokens。
 MXFP4 routed expert 輸出不保證等同官方 FP8。

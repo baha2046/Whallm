@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import XCTest
 
@@ -212,6 +213,72 @@ final class ChatStreamDecoderTests: XCTestCase {
 
     XCTAssertEqual(session.messages.last?.content, "first second")
     XCTAssertFalse(session.isSending)
+  }
+
+  @MainActor
+  func testRapidStreamingCoalescesMessagePublications() async throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let session = ChatSession(
+      defaults: defaults,
+      stream: { _, _, _, _, _, receive in
+        for _ in 0..<80 {
+          receive(ChatDelta(content: "x", reasoningContent: ""))
+        }
+      }
+    )
+    var messagePublicationCount = 0
+    let observation = session.$messages.dropFirst().sink { _ in
+      messagePublicationCount += 1
+    }
+    defer { observation.cancel() }
+
+    XCTAssertTrue(
+      session.send(
+        text: "Hello",
+        configuration: .localDefault,
+        model: "test-model",
+        thinkingMode: "chat",
+        language: .english
+      ))
+    for _ in 0..<100 where session.isSending {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    XCTAssertFalse(session.isSending)
+    XCTAssertEqual(session.messages.last?.content, String(repeating: "x", count: 80))
+    XCTAssertLessThanOrEqual(messagePublicationCount, 10)
+  }
+
+  @MainActor
+  func testStreamingFlushesPendingTextBeforeReportingAnError() async throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let session = ChatSession(
+      defaults: defaults,
+      stream: { _, _, _, _, _, receive in
+        receive(ChatDelta(content: "partial", reasoningContent: ""))
+        throw NSError(domain: "ChatStreamDecoderTests", code: 1)
+      }
+    )
+
+    XCTAssertTrue(
+      session.send(
+        text: "Hello",
+        configuration: .localDefault,
+        model: "test-model",
+        thinkingMode: "chat",
+        language: .english
+      ))
+    for _ in 0..<100 where session.isSending {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+
+    XCTAssertFalse(session.isSending)
+    XCTAssertEqual(session.messages.last?.content, "partial")
+    XCTAssertNotNil(session.errorMessage)
   }
 }
 

@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "deadline_ready_next_layer_prefetch_gate",
+  "date": "2026-09-01",
+  "status": "aggregate_gate_pass_default_off",
+  "source": {
+    "commit": "f585c2d7fe500d875d7083c92428be18e82afcff",
+    "working_tree_dirty": true,
+    "implementation_files": [
+      "runtime/deepseek_v4_ssd/cli.py",
+      "runtime/deepseek_v4_ssd/generation.py",
+      "runtime/deepseek_v4_ssd/model.py"
+    ],
+    "test_files": [
+      "runtime/tests/test_qwen.py",
+      "runtime/tests/test_runtime.py"
+    ]
+  },
+  "environment": {
+    "machine": "MacBook Pro",
+    "machine_model": "Mac17,8",
+    "chip": "Apple M5 Pro",
+    "memory_bytes": 68719476736,
+    "os": "macOS 26.6.2",
+    "os_build": "25G83",
+    "mlx_version": "0.32.0",
+    "mlx_lm_version": "0.31.3"
+  },
+  "model": {
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "installed_model_revision": "753d0aa57059fad70a5f7e6cc249f25df56bbd34",
+    "layer_count": 48,
+    "expert_count": 512,
+    "selected_expert_count": 10,
+    "expert_blob_bytes": 2611200
+  },
+  "workload": {
+    "baseline_artifact": "docs/benchmarks/2026-09-01-prefetch-deadline-baseline-m5-pro.json",
+    "prompt_manifest": "docs/benchmarks/prompts/2026-09-01-ssd-cache-oracle/manifest.json",
+    "content_cases": 5,
+    "max_tokens": 257,
+    "temperature": 0,
+    "top_p": 1,
+    "slots": 1152,
+    "read_workers": 4,
+    "prefetch_read_workers": 2,
+    "persistent_prompt_cache": false,
+    "expert_file_cache_policy": "cached",
+    "expert_page_cache_probe": false,
+    "process_state": "fresh runtime process for each case",
+    "operating_system_page_cache": "not reset"
+  },
+  "candidate": {
+    "name": "qwen_next_layer_prefetch",
+    "cli_option": "--qwen-next-layer-prefetch",
+    "default_enabled": false,
+    "uses_route_predictor": false,
+    "rules": [
+      "Use the candidate only during Qwen layer-major Prefill.",
+      "Before the first mx.eval for layer N, submit a full expert-layer read for layer N plus 1.",
+      "Do not submit a next-layer read for the final layer.",
+      "Reuse the existing batched-layer buffer and worker path."
+    ]
+  },
+  "correctness": {
+    "all_prompt_and_output_token_hashes_match_baseline": true,
+    "all_layer_major_cases_have_48_events": true,
+    "repeated_control_has_no_batched_prefetch_events": true,
+    "runtime_default_changed": false,
+    "predictor_added": false,
+    "test_command": "PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p 'test_*.py'",
+    "tests_run": 259,
+    "tests_passed": 259
+  },
+  "cases": [
+    {
+      "name": "code",
+      "prompt_token_sha256": "b561236d7fb8b3a974d236c2696773c3c5e73d95ae42d448d8f73b810c5eebc5",
+      "output_token_sha256": "65e533cd4bc4eb0b5046475068c2872b6948db600f8bbdf3b94c45c9fcae58d1",
+      "candidate_trace_sha256": "4f708988f6bcaf524968f268b4bc283174771c64d28ff0cd52fe7729697ade3f",
+      "candidate_metrics_sha256": "f20e3d9cb3341b82fd5f85638f6d3cc944f959864a07119b180a7334afdaffc8",
+      "prefetch_events": 48,
+      "baseline_ready_before_deadline_events": 0,
+      "candidate_ready_before_deadline_events": 0,
+      "baseline_exposed_read_wait_seconds": 5.74020366298646,
+      "candidate_exposed_read_wait_seconds": 4.628837292017124,
+      "exposed_read_wait_reduction_fraction": 0.1936109650839678,
+      "baseline_overlap_p50_seconds": 0.00004274999810149893,
+      "candidate_overlap_p50_seconds": 0.04341464550088858,
+      "baseline_read_duration_p50_seconds": 0.12004533349681878,
+      "candidate_read_duration_p50_seconds": 0.14091293750243494,
+      "baseline_wasted_bytes": 35225088000,
+      "candidate_wasted_bytes": 35225088000,
+      "candidate_peak_memory_bytes": 13186731975,
+      "candidate_observer_run_seconds": 58.43227216699597
+    },
+    {
+      "name": "mixed_math",
+      "prompt_token_sha256": "4a464b7240a6856c0e754ecbeb44f453965b99735adc9610a57509812d0c52fa",
+      "output_token_sha256": "654f8865c27849dca17b06ebfc19ceece2817dfb0eb16b51aa07b4c0a52ab747",
+      "candidate_trace_sha256": "2fe9365088309f5959ff369e1700b91e202650b5dc03356b826bad6f47960ec9",
+      "candidate_metrics_sha256": "e38863eea44c62503c89f6a50c4a2b6c63ae92e4fc390908c3c452c9026fb047",
+      "prefetch_events": 48,
+      "baseline_ready_before_deadline_events": 0,
+      "candidate_ready_before_deadline_events": 1,
+      "baseline_exposed_read_wait_seconds": 5.611719418957364,
+      "candidate_exposed_read_wait_seconds": 3.708732496961602,
+      "exposed_read_wait_reduction_fraction": 0.3391094208251291,
+      "baseline_overlap_p50_seconds": 0.00004368750160210766,
+      "candidate_overlap_p50_seconds": 0.05907056249998277,
+      "baseline_read_duration_p50_seconds": 0.11898002100133453,
+      "candidate_read_duration_p50_seconds": 0.14069870899766102,
+      "baseline_wasted_bytes": 33909043200,
+      "candidate_wasted_bytes": 33909043200,
+      "candidate_peak_memory_bytes": 13191292888,
+      "candidate_observer_run_seconds": 58.53635020899674
+    },
+    {
+      "name": "repeated",
+      "prompt_token_sha256": "03509c74103fc3b93514b7b53f4e3cb906a6a9e19e485e9b0e89965032bf8d9b",
+      "output_token_sha256": "3c2ba089de1e4c699a790d91dc31fda31a0b98f922f395e663972d3087d83850",
+      "candidate_trace_sha256": "c591884123d3efcafb6fcdff6f6820d4c0f4ed4766e69de12cd4d03b94c1bece",
+      "candidate_metrics_sha256": "803290b08cbf77b5375a73813584c05ed446474bed4337f3011efa66f8c19a79",
+      "prefetch_events": 0,
+      "baseline_ready_before_deadline_events": 0,
+      "candidate_ready_before_deadline_events": 0,
+      "baseline_exposed_read_wait_seconds": 0.0,
+      "candidate_exposed_read_wait_seconds": 0.0,
+      "exposed_read_wait_reduction_fraction": null,
+      "baseline_overlap_p50_seconds": null,
+      "candidate_overlap_p50_seconds": null,
+      "baseline_read_duration_p50_seconds": null,
+      "candidate_read_duration_p50_seconds": null,
+      "baseline_wasted_bytes": 0,
+      "candidate_wasted_bytes": 0,
+      "candidate_peak_memory_bytes": 13193064575,
+      "candidate_observer_run_seconds": 43.59572045900131
+    },
+    {
+      "name": "tool_like",
+      "prompt_token_sha256": "bd67af6930e25674c05fd5f76311b7b6a5a964b4c46e6e3cd1d076bd71ed644b",
+      "output_token_sha256": "d43479a91b7f2afbe4b95c817d8c7164b65bc52a029b578a638fc5a6ca183b12",
+      "candidate_trace_sha256": "9a99c62a88ee94dfbdc5acc7cd890b8855d9bef4b9decf723035580710eb3795",
+      "candidate_metrics_sha256": "04df4cdbaf473aeb97322f35373d0120be5cb8cfc1fdb6fbaee5e92458cc565a",
+      "prefetch_events": 48,
+      "baseline_ready_before_deadline_events": 0,
+      "candidate_ready_before_deadline_events": 0,
+      "baseline_exposed_read_wait_seconds": 5.770339250026154,
+      "candidate_exposed_read_wait_seconds": 4.185821125960501,
+      "exposed_read_wait_reduction_fraction": 0.2745970480086541,
+      "baseline_overlap_p50_seconds": 0.000045291501010069624,
+      "candidate_overlap_p50_seconds": 0.05023387450273731,
+      "baseline_read_duration_p50_seconds": 0.1188203545025317,
+      "candidate_read_duration_p50_seconds": 0.1396979375022056,
+      "baseline_wasted_bytes": 33851596800,
+      "candidate_wasted_bytes": 33851596800,
+      "candidate_peak_memory_bytes": 13187351495,
+      "candidate_observer_run_seconds": 55.68999333400279
+    },
+    {
+      "name": "zh_technical",
+      "prompt_token_sha256": "f8bcb9457b3eda1a55a386296cce556e60c2e2696eaecb1e7dfc91690eaeec9c",
+      "output_token_sha256": "c9c92f5ad9cda73ba8a5e99d929b3db9d1771831c74e9630c4ed2de807e36dfe",
+      "candidate_trace_sha256": "0b24a2c560615c2529d64dedfea911afee698d4164c123461782f35841c168ee",
+      "candidate_metrics_sha256": "a550f99baf14a670397e3e5956fa360133944863808ca53c06867f9d875f96c9",
+      "prefetch_events": 48,
+      "baseline_ready_before_deadline_events": 0,
+      "candidate_ready_before_deadline_events": 0,
+      "baseline_exposed_read_wait_seconds": 5.697705583028437,
+      "candidate_exposed_read_wait_seconds": 4.041341708965774,
+      "exposed_read_wait_reduction_fraction": 0.290707171496614,
+      "baseline_overlap_p50_seconds": 0.00004379150050226599,
+      "candidate_overlap_p50_seconds": 0.05357187500339933,
+      "baseline_read_duration_p50_seconds": 0.1207051665041945,
+      "candidate_read_duration_p50_seconds": 0.14128866700048093,
+      "baseline_wasted_bytes": 34627123200,
+      "candidate_wasted_bytes": 34627123200,
+      "candidate_peak_memory_bytes": 13187534818,
+      "candidate_observer_run_seconds": 54.59231287500006
+    }
+  ],
+  "aggregate": {
+    "layer_major_case_count": 4,
+    "prefetch_events": 192,
+    "baseline_ready_before_deadline_events": 0,
+    "candidate_ready_before_deadline_events": 1,
+    "baseline_ready_before_deadline_rate": 0.0,
+    "candidate_ready_before_deadline_rate": 0.005208333333333333,
+    "baseline_exposed_read_wait_seconds": 22.819967914998415,
+    "candidate_exposed_read_wait_seconds": 16.564732623905,
+    "exposed_read_wait_reduction_fraction": 0.2741123613492095,
+    "per_case_exposed_read_wait_reduction_median_fraction": 0.28265210975263405,
+    "per_case_exposed_read_wait_reduction_min_fraction": 0.1936109650839678,
+    "per_case_exposed_read_wait_reduction_max_fraction": 0.3391094208251291,
+    "baseline_overlap_p50_seconds": 0.00004410399924381636,
+    "candidate_overlap_p50_seconds": 0.05246964549951372,
+    "baseline_read_duration_p50_seconds": 0.11969272949863807,
+    "candidate_read_duration_p50_seconds": 0.14063945849920856,
+    "read_duration_increase_fraction": 0.1750041885443746,
+    "baseline_wasted_bytes": 137612851200,
+    "candidate_wasted_bytes": 137612851200,
+    "wasted_bytes_increase_fraction": 0.0
+  },
+  "gates": {
+    "aggregate_ready_before_deadline": {
+      "requirement": "Improve ready-before-deadline rate.",
+      "baseline_rate": 0.0,
+      "candidate_rate": 0.005208333333333333,
+      "status": "pass_narrowly"
+    },
+    "exposed_read_wait": {
+      "requirement": "Improve exposed read wait.",
+      "aggregate_reduction_fraction": 0.2741123613492095,
+      "all_layer_major_cases_improved": true,
+      "status": "pass"
+    },
+    "wasted_prefetch_bytes": {
+      "requirement": "Do not increase wasted prefetch bytes by more than 5%.",
+      "increase_fraction": 0.0,
+      "status": "pass"
+    }
+  },
+  "decision": {
+    "phase_3": "complete",
+    "candidate": "retain_default_off",
+    "runtime_default_changed": false,
+    "next_phase": "Phase 4 expert blob compression microbenchmark",
+    "reason": "The aggregate gate passed, but only one of 192 events became ready before its deadline. Three of four layer-major workloads still had zero ready events."
+  },
+  "limits": [
+    "This gate compares opt-in trace observer runs. It is not a formal throughput result.",
+    "The repeated control observer wall time drifted even though the candidate did not activate. Observer wall time must not be used for adoption.",
+    "Concurrent read and compute increased median read duration by 17.50% in this capture.",
+    "Logical expert bytes are not physical SSD bytes.",
+    "The operating system page cache was not reset or classified.",
+    "Ready-before-deadline improved in only one workload and one event."
+  ],
+  "raw_artifacts": {
+    "baseline_directory": "scratch/ssd-prefetch-deadline-2026-09-01",
+    "candidate_directory": "scratch/ssd-prefetch-next-layer-2026-09-01",
+    "retention": "local scratch"
+  }
+}

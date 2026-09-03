@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-02T14:54:58+08:00",
+  "evidence_kind": "exploratory implementation gate",
+  "formal_performance_result": false,
+  "source_at_measurement": {
+    "commit": "f585c2d7fe500d875d7083c92428be18e82afcff",
+    "working_tree_dirty": true,
+    "tracked_diff_sha256": "73422123474e21d8077740cb1a40ca86d834b1e4d7cf1954c9bb1ab2295eccfc",
+    "native_bridge_source_sha256": "d4b624caa430034a3586a42e38d9d2decd0493fc1f589ae086f957cbcd1d10ec",
+    "native_bridge_binary_sha256": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69"
+  },
+  "checkpoint": {
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "installed_manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64",
+    "os_build": "25G83",
+    "chip": "Apple M5 Pro",
+    "memory_bytes": 68719476736,
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "private_framework": "/System/Library/PrivateFrameworks/AppleNeuralEngine.framework/AppleNeuralEngine"
+  },
+  "workload": {
+    "prompt_description": "the string ' hello' repeated 4097 times",
+    "prompt_text_sha256": "bd9386a0ce6d1b117d26adc9fb59746d324e9e2c552d7ab8398b555d10b038e6",
+    "prompt_tokens": 4097,
+    "prompt_token_sha256": "a4402910398e585e5448d70fdf6b7cb8fd897feaf1cdeb9f483846ff3804db84",
+    "max_output_tokens": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "top_k": 0,
+    "slots": 1152,
+    "read_workers": 4,
+    "prefetch_read_workers": 2,
+    "persistent_prompt_cache": false,
+    "filesystem_cache_state": "not purged",
+    "run_order": ["control-1", "ane-1", "ane-2", "control-2"]
+  },
+  "implementation": {
+    "framework_access": "dlopen plus Objective-C runtime calls to private AppleNeuralEngine.framework",
+    "fixed_shape": [1, 1024, 2560],
+    "qsa_layers": 12,
+    "gpu_output_channels": 9216,
+    "ane_output_channels": 3072,
+    "ane_channel_region": "last 3072 q_proj channels",
+    "merge": "concatenate only; no cross-device reduction",
+    "ane_io_dtype": "FP16",
+    "common_tensor_dtype": "BF16",
+    "warmup_evaluations_per_projection": 3,
+    "tail_and_non_1024_path": "original GPU projection",
+    "interface_error_path": "disable ANE for the loaded model and recompute the full original GPU projection"
+  },
+  "native_component_check": {
+    "shape": [64, 64, 64],
+    "maximum_absolute_error": 0.0001411438,
+    "mean_absolute_error": 0.000031111253,
+    "status": "passed"
+  },
+  "full_model_runs": [
+    {
+      "id": "control-1",
+      "ane_prefill": false,
+      "time_to_first_token_seconds": 46.37105287499435,
+      "prefill_tokens_per_second": 88.35253344461611,
+      "peak_memory_bytes": 13229759352,
+      "ane_evaluations": 0,
+      "ane_fallbacks": 0,
+      "generated_token_ids": [23066],
+      "token_sha256": "b531a2e37cafff6750caed50b5ad3881f984a6b74078caa4380b6d3be8fee412"
+    },
+    {
+      "id": "ane-1",
+      "ane_prefill": true,
+      "time_to_first_token_seconds": 38.56297558300139,
+      "prefill_tokens_per_second": 106.24180157420122,
+      "peak_memory_bytes": 13229759352,
+      "ane_evaluations": 48,
+      "ane_fallbacks": 0,
+      "generated_token_ids": [23066],
+      "token_sha256": "b531a2e37cafff6750caed50b5ad3881f984a6b74078caa4380b6d3be8fee412"
+    },
+    {
+      "id": "ane-2",
+      "ane_prefill": true,
+      "time_to_first_token_seconds": 36.128187291004,
+      "prefill_tokens_per_second": 113.40175932436452,
+      "peak_memory_bytes": 13228755832,
+      "ane_evaluations": 48,
+      "ane_fallbacks": 0,
+      "generated_token_ids": [23066],
+      "token_sha256": "b531a2e37cafff6750caed50b5ad3881f984a6b74078caa4380b6d3be8fee412"
+    },
+    {
+      "id": "control-2",
+      "ane_prefill": false,
+      "time_to_first_token_seconds": 35.81848487499519,
+      "prefill_tokens_per_second": 114.38228094511354,
+      "peak_memory_bytes": 13228755834,
+      "ane_evaluations": 0,
+      "ane_fallbacks": 0,
+      "generated_token_ids": [23066],
+      "token_sha256": "b531a2e37cafff6750caed50b5ad3881f984a6b74078caa4380b6d3be8fee412"
+    }
+  ],
+  "paired_median": {
+    "control_time_to_first_token_seconds": 41.09476887499477,
+    "ane_time_to_first_token_seconds": 37.34558143700269,
+    "time_to_first_token_improvement_fraction": 0.09123271746330157,
+    "control_prefill_tokens_per_second": 101.36740719486482,
+    "ane_prefill_tokens_per_second": 109.82178044928287,
+    "prefill_throughput_gain_fraction": 0.08340327022635274,
+    "output_token_hash_exact": true,
+    "peak_memory_regression": false
+  },
+  "decision": {
+    "implemented": true,
+    "qwen_default_enabled": true,
+    "retain_original_prefill": true,
+    "automatic_interface_error_fallback": true,
+    "speed_conclusion": "inconclusive"
+  },
+  "evidence_limits": [
+    "The operating-system file cache was not purged and the first pair shows strong order sensitivity.",
+    "Only one synthetic 4097-token prompt and one generated token were tested.",
+    "The paired median uses only two runs per route and is not a formal performance result.",
+    "The output check covers greedy token parity, not tensor-exact parity.",
+    "Private AppleNeuralEngine.framework has no compatibility guarantee."
+  ]
+}

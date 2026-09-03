@@ -199,6 +199,9 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `layer_major_prefill` | `true` | 控制 DeepSeek layer-major Prefill。 |
 | `layer_major_prefill_threshold` | 1,024 | DeepSeek 啟用 layer-major Prefill 所需的最少未快取 token 數。APP 可設定此值。 |
 | `batched_expert_prefill` | `true` | full-layer prefill 使用 `gather_qmm`。 |
+| `qwen_next_layer_prefetch` | `false` | Qwen next-layer prefetch 研究開關。APP model catalog 固定設為關閉。 |
+| `ane_prefill` | `true` | Qwen 使用 private `AppleNeuralEngine.framework` 執行固定 shape projection。DeepSeek 不使用此設定。 |
+| `ane_prefill_ratio` | 0.25 | Qwen 分配給 ANE 的 `q_proj` output channels 比例。值域是 0 到 1。 |
 | `fp8_kv_cache` | `true` | 已完成的 compressed cache chunk 使用 MXFP8。 |
 | `fp4_index_cache` | `true` | indexer cache 使用 MXFP4 view。 |
 | `ready_expert_decode` | `true` | decode 依 expert ready 時間提交運算。 |
@@ -208,7 +211,7 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `expert_file_cache_policy` | `cached` | Expert descriptor policy；research-only `bypass` 使用 Darwin `F_NOCACHE` 並停用 read-ahead。 |
 | `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
-| persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 4 依 reuse count 和 access recency 執行 eviction。 |
+| persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 5 依 reuse count 和 access recency 執行 eviction。 |
 | `memory_limit_gib` | 0 | 0 使用模型安全自動上限。Qwen 自動上限不超過 48 GiB。DeepSeek 使用 Metal 建議上限。正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
 | `mtp_enabled` | `false` | 啟用 Qwen MTP speculative decoding prototype。需要 installed MTP sidecar。 |
 | `mtp_slots` | 32 | Qwen MTP 使用獨立 expert cache。最小值是 10。 |
@@ -282,6 +285,23 @@ Qwen 使用不同門檻。
 少於 128 個未快取 token 時，Qwen 使用 selected expert cache。
 短 prompt 不會建立 48 個完整 expert layer buffer。
 128 個或更多未快取 token 時，Qwen 使用 layer-major path。
+
+Qwen 的 `ane_prefill` 預設開啟。
+只有 1,024-token chunk 會進入 ANE 路線。
+`ane_prefill_ratio` 預設是 0.25。
+Runtime 會把比例對齊到 256 個 output channels。
+預設由 GPU 計算前 9,216 個 output channels。
+ANE 同時計算最後 3,072 個 output channels。
+runtime 只串接兩個結果，不執行跨裝置 reduction。
+比例 0 使用完整 GPU projection。
+比例 1 使用完整 ANE projection。
+其他 chunk、Decode 和 ANE 停用狀態會使用原本的完整 GPU projection。
+
+Runtime 會動態載入 private `AppleNeuralEngine.framework`。
+Runtime 會檢查必要的 Objective-C class 和 selector。
+Compile、load 或 evaluate 回傳錯誤時，runtime 會停用該 loaded model 的 ANE 路線。
+Evaluate 失敗的當次 projection 會用原本的完整 GPU projection 重算。
+private framework 沒有 OS 相容性保證。
 該 path 每次只保留一個完整 expert layer buffer。
 
 Stopped adaptive prefill prototype 在當層 attention 完成後只計算一次 router／shared
@@ -329,6 +349,10 @@ indexer 預設另外建立 MXFP4 index cache。
 
 runtime 預設保留兩個記憶體 timeline。
 runtime 把記憶體用量限制在 8 GiB。
+每個記憶體 entry 都包含 `approximation_mode`。
+Exact request 只重用 exact entry。
+`learned-route-drop-lowest-1` request 只重用相同 mode 的 entry。
+Approximate entry 不會寫入 persistent prompt cache。
 
 runtime 預設把最多八個完成 entry 寫到：
 
@@ -336,17 +360,20 @@ runtime 預設把最多八個完成 entry 寫到：
 ~/.dsmodel/prompt-cache/<checkpoint-revision>/
 ```
 
-一般 target-only persistent cache 使用 format 4。每個 identity 從完整 cache contract
+一般 target-only persistent cache 使用 format 5。每個 identity 從完整 cache contract
 開始，依 128-token blocks 建立 SHA-256 parent chain；terminal block key 同時命名 immutable
 metadata 與 quantized safetensors payload。Contract 包含 model ID、checkpoint revision、
 完整 canonical `config.json` SHA-256、顯式 RoPE 欄位、KV／index format、attention
 implementation／window／compression settings、state schema 與 block size。Scanner 會重算
 contract、所有 block descriptors 與 terminal key；任一欄位不符即忽略。舊 normal format
-1／2 因缺少足以證明相容性的 contract，不再載入。
+1／2 因缺少足以證明相容性的 contract 而不再載入；format 4 也不再載入，避免重用可能
+含有 mutable-state alias 的舊 prefill checkpoint。
 
 非 layer-major prefill 會額外保留最多兩個 bounded disk checkpoints：第一個完成的 prefill
-chunk 與最後一個 `prompt[:-1]` checkpoint；完成 request timeline 仍照常保存。新 prompt
-即使在後段 suffix 分岔，也能選擇最長的已保存安全 prefix。相同 contract／tokens 只建立
+chunk 與最後一個 `prompt[:-1]` checkpoint；完成 request timeline 仍照常保存。Checkpoint
+會在 prefill callback 當下深複製並 materialize cache state，避免 Qwen `ArraysCache` 的可變
+state list 被後續 final-token evaluation 或 decode 改寫。新 prompt 即使只剩一個 token 要
+replay，也能選擇最長的已保存安全 prefix。相同 contract／tokens 只建立
 一組 immutable data／metadata；reuse count 與 last-access time 寫在獨立 sidecar，不改寫
 content-addressed payload。Normal eviction 先保留 reuse count 較高者，再比較 access
 recency，因此重複的 system／tool prefix 優先於一次性 suffix。Payload 是 cumulative cache
@@ -354,9 +381,23 @@ checkpoint；目前沒有把每層 KV 切成可獨立 dedupe 的 delta objects�
 
 當 `dspark_prompt_cache=true` 時，runtime 使用獨立的 format 3 namespace；同一 entry 原子
 保存 target cache、三個 DSpark context states、token prefix、revision 與 target layers。
-Format 4 scanner 忽略 DSpark bundle，format 3 scanner 也忽略一般 entry。Runtime 會忽略
+Format 5 scanner 忽略 DSpark bundle，format 3 scanner 也忽略一般 entry。Runtime 會忽略
 無法載入、缺少任一 context、revision／target layers 不符或只有半份檔案的 cache entry。
 兩個 namespace 各自套用 entry 上限與 eviction，不會互相 prune。
+
+### Default approximate routing
+
+一般 DeepSeek API 和 command-line request 預設使用
+`learned-route-drop-lowest-1`。
+Client 可以明確指定 `exact`。
+Qwen 和啟用 DSpark 的 DeepSeek 預設使用 `exact`。
+`GenerationOptions.approximation_mode` 的內部安全預設仍是 `exact`；server 和 CLI
+會依 model kind 與 DSpark 狀態選擇實際預設。
+Runtime 持有 generation lock 時，會暫時把 40 個 learned router 從 top-6 改為 top-5。
+三個 hash router 保持 top-6。
+Runtime 使用 `finally` 還原 learned router，因此正常完成、錯誤和中止都會回到 top-6。
+Qwen 和 DSpark 會拒絕這個 mode。
+APP request 會使用一般 DeepSeek 預設，因此預設執行 approximate mode。
 
 ## DSpark
 
@@ -542,11 +583,13 @@ damaged model 不會進入 model catalog。
 APP 使用權限 `0600` 的暫存檔把 model catalog 傳給 server。
 APP 在 server 停止或啟動失敗後刪除暫存檔。
 
-server 啟動時只驗證 model catalog。
+server 啟動時驗證初始 model catalog。
 server 啟動時不建立 `ModelRuntime`。
 `GET /v1/models` 也不建立 `ModelRuntime`。
 第一個 generation request 會載入 request 指定的 installed model。
+`POST /api/models/configure` 可以更新未載入模型的 model catalog entry。
 `POST /api/models/load` 也可以明確載入指定的 installed model。
+APP 手動載入模型時，會把最新 model catalog entry 一起傳給 server。
 `POST /api/models/unload` 可以明確卸載指定的 installed model。
 server 讓該 installed model 保持載入。
 API model ID 和該模型的 Alias 共用同一個 runtime。
@@ -578,18 +621,26 @@ Model 頁面的選擇只控制模型管理和進階設定。
 該選擇不控制 server 載入的模型。
 每個模型的進階設定頁提供選用的 Alias。
 APP 會驗證 Alias，並自動儲存有效的變更。
-server 執行期間，APP 會停用 Alias 和模型進階設定。
+server 執行期間，APP 只會停用 Loaded 或 Loading 模型的 Alias 和模型進階設定。
+APP 會把未載入模型的有效變更同步到 server。
+這些變更會在模型下次載入時生效。
 server 執行期間完成下載後，使用者必須重新啟動 server。
 
 APP 將 Generate 和 Runtime 設定依 model kind 分開儲存。
 Power Saving Mode 是所有模型共用的設定。
 `ServerConfiguration` 只保存 server 設定。
 `ServerConfiguration` 不保存 installed model path 或 Alias。
+Server 頁面的 Log 層級會保存到 `ServerConfiguration`，並在下次啟動 server 時以
+`--log-level` 傳入。預設 Info；Debug 額外輸出完整 JSON request body；Error 只保留
+HTTP 4xx／5xx access log。
 升級時，APP 會把舊的自訂 `publicModel` 遷移到當時所選模型的 Alias。
 舊的 Qwen 預設名稱不會遷移成 Alias。
 Chat 頁面只列出目前 server model catalog 內的模型。
 Chat 頁面對每個 installed model 只顯示一個選項。
 Alias 存在時，Chat 頁面使用 Alias 作為 request 名稱，並同時顯示 API model ID。
+`ChatSession` 會合併 50 ms 內收到的 streaming deltas，再發布一次訊息更新。
+Generation 完成、失敗或停止時，`ChatSession` 會先發布剩餘 deltas。
+這個設計減少長回覆的文字重排與自動捲動次數。
 切換 Chat 模型不會清除對話。
 `ContentView` 持有 Chat 回覆任務。切換頁面不會中止正在進行的回覆。
 使用者按下 Stop Generating 或關閉 `ContentView` 時，APP 會取消回覆任務。

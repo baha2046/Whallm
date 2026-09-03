@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-01T17:18:48.943832+00:00",
+  "evidence_kind": "exploratory quick gate",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "f585c2d7fe500d875d7083c92428be18e82afcff",
+    "working_tree_dirty": true,
+    "prompt_cache_tracked_diff_sha256_at_run": "d86050d5f32ece6bfd540dbf29fff6ab4c4ce34753f410facc682f312a8313e1",
+    "candidate_cli_artifacts_embed_source_state": false
+  },
+  "checkpoint": {
+    "model_path": "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "installed_manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "python": "3.14.7",
+    "mlx": "0.32.0",
+    "mlx_lm": "0.31.3",
+    "transformers": "5.12.1",
+    "chip": "Apple M5 Pro",
+    "memory_bytes": 68719476736
+  },
+  "workload": {
+    "prompt_file": "docs/benchmarks/prompts/2026-08-26-adaptive-4096/code-4096.txt",
+    "prompt_text_sha256": "8169fd28052803eb2fcb73e15ea415e96d93fb80af6b9a2b56b0d5af61d2920f",
+    "prompt_tokens": 4577,
+    "prompt_token_sha256": "1faf1e20000239ec7cc607c4748536c0c6794e85f6c208e68e3d86f98290a8d1",
+    "max_output_tokens": 1,
+    "temperature": 0,
+    "top_p": 1,
+    "batch_size": 1,
+    "slots": 1152,
+    "read_workers": 4,
+    "prefetch_read_workers": 2,
+    "persistent_prompt_cache": false,
+    "filesystem_cache_state": "not purged"
+  },
+  "raw_artifacts": [
+    {
+      "file": "scratch/qwen-prefill-four-directions-2026-09-02/baseline-code4k1.json",
+      "sha256": "0806f9c4b3328bcb8fc3c62594ade2631a1fcf50df24cf4d1943879267e194c5"
+    },
+    {
+      "file": "scratch/qwen-prefill-four-directions-2026-09-02/qsa8-code4k1.json",
+      "sha256": "27779b319b850089ffa9c820175c3e806c5f27f52d9a437fcea30993083b3272"
+    },
+    {
+      "file": "scratch/qwen-prefill-four-directions-2026-09-02/split-moe4096-code4k1.json",
+      "sha256": "6961f9970ff2c9ea4064efe1c67158631db99d2e3733af9c994f9d7d12297c05"
+    },
+    {
+      "file": "scratch/qwen-prefill-four-directions-2026-09-02/prompt-cache-code4k1.json",
+      "sha256": "5a39d687973721c91f68c0642c6fd6b4168f8a4c645a91276139aeb8e68e15e7"
+    }
+  ],
+  "raw_artifacts_retained": false,
+  "raw_artifacts_cleanup_reason": "user requested project cleanup after the summarized evidence was saved",
+  "results": {
+    "control": {
+      "qsa_query_chunk": 4,
+      "moe_prefill_step_size": 0,
+      "time_to_first_token_seconds": 92.21218920800311,
+      "prefill_tokens_per_second": 49.63552041558906,
+      "peak_memory_bytes": 14794528006,
+      "expert_read_seconds": 5.689182505055214,
+      "request_gather_qmm_calls": 480,
+      "generated_token_ids": [1455],
+      "token_sha256": "257ad493dc36225fcc2b8db98198dd24a3379258a2121f421c965671ca308bf8"
+    },
+    "qsa_query_chunk_8": {
+      "time_to_first_token_seconds": 115.11935783400259,
+      "prefill_tokens_per_second": 39.75873463957163,
+      "peak_memory_bytes": 17472625478,
+      "expert_read_seconds": 6.211363871014328,
+      "request_gather_qmm_calls": 480,
+      "ttft_delta_fraction": 0.24841801092399796,
+      "prefill_throughput_delta_fraction": -0.1989862439906125,
+      "peak_memory_delta_fraction": 0.18101946009456227,
+      "generated_token_ids": [1455],
+      "token_sha256": "257ad493dc36225fcc2b8db98198dd24a3379258a2121f421c965671ca308bf8",
+      "decision": "stop_after_first_candidate"
+    },
+    "split_attention_moe_4096": {
+      "attention_step_size": 1024,
+      "moe_step_size": 4096,
+      "time_to_first_token_seconds": 118.5452109589969,
+      "prefill_tokens_per_second": 38.609741911743015,
+      "peak_memory_bytes": 14888178934,
+      "expert_read_seconds": 6.354852610005764,
+      "request_gather_qmm_calls": 192,
+      "ttft_delta_fraction": 0.28556985770714505,
+      "prefill_throughput_delta_fraction": -0.2221348423775803,
+      "peak_memory_delta_fraction": 0.00633010583115734,
+      "gather_qmm_call_delta_fraction": -0.6,
+      "generated_token_ids": [1455],
+      "token_sha256": "257ad493dc36225fcc2b8db98198dd24a3379258a2121f421c965671ca308bf8",
+      "decision": "stop_after_first_candidate"
+    },
+    "component_profile_observer": {
+      "observer_changes_scheduling": true,
+      "total_seconds": 117.89208575000521,
+      "qsa_attention_seconds": 67.75485066503461,
+      "qsa_fraction_of_observer_total": 0.5747192462835158,
+      "linear_attention_seconds": 3.8661968798405724,
+      "moe_seconds": 37.16549020909588,
+      "moe_fraction_of_observer_total": 0.31525008631967677,
+      "expert_layer_acquire_seconds": 8.515639962963178,
+      "expert_layer_acquire_fraction_of_observer_total": 0.07223249897385756,
+      "expert_read_seconds": 6.354852610005764,
+      "attention_chunks": 240,
+      "moe_chunks": 96,
+      "conclusion": "QSA was the largest recorded section in this observer path"
+    },
+    "same_prompt_in_memory_cache": {
+      "cold": {
+        "time_to_first_token_seconds": 121.29720145800093,
+        "wall_seconds": 121.30073962498864,
+        "prompt_cache_reused_tokens": 0,
+        "peak_memory_bytes": 14794462470,
+        "generated_token_ids": [1455],
+        "token_sha256": "257ad493dc36225fcc2b8db98198dd24a3379258a2121f421c965671ca308bf8"
+      },
+      "warm": {
+        "time_to_first_token_seconds": 0.3733535000064876,
+        "wall_seconds": 0.37861783399421256,
+        "prompt_cache_reused_tokens": 4576,
+        "peak_memory_bytes": 13011921756,
+        "generated_token_ids": [1455],
+        "token_sha256": "257ad493dc36225fcc2b8db98198dd24a3379258a2121f421c965671ca308bf8"
+      },
+      "ttft_speedup": 324.8856685577963,
+      "ttft_reduction_fraction": 0.9969219941143015,
+      "gate_passed": true,
+      "decision": "use_for_repeated_prefixes_only"
+    }
+  },
+  "skipped_runs": [
+    {
+      "candidate": "qsa_query_chunk_16_and_32",
+      "reason": "chunk 8 already regressed TTFT and exceeded the 15 percent peak-memory stop limit"
+    },
+    {
+      "candidate": "combined_qsa_and_split_moe",
+      "reason": "both isolated candidates regressed TTFT"
+    }
+  ],
+  "decision": {
+    "change_default_qsa_query_chunk": false,
+    "change_default_attention_moe_batching": false,
+    "ssd_is_primary_limit_in_observer_path": false,
+    "use_prompt_cache_for_repeated_prefixes": true,
+    "next_exact_research_target": "QSA kernel and graph structure"
+  },
+  "evidence_limits": [
+    "Each non-cache candidate has one control or candidate run only.",
+    "The candidate CLI artifacts do not embed their exact dirty source state.",
+    "The operating-system page cache was not purged.",
+    "The split Attention and MoE observer adds synchronization and changes scheduling.",
+    "The component times are observer wall times, not isolated Metal GPU kernel times.",
+    "The output parity check covers one generated token only.",
+    "The prompt-cache result applies to an exact repeated prefix in one process.",
+    "These results reject clear regressions and identify the next research target; they do not establish a new general throughput value."
+  ]
+}

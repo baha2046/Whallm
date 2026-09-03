@@ -24,6 +24,8 @@
 - decode 使用 ready expert path。
 - compressed KV cache 使用 MXFP8。
 - prompt cache 保存完整 prefix state。
+- Qwen QSA 使用 Grouped-KV 計算，不再把兩個 selected KV heads 複製成 24 個 heads。4K quick gate 的 paired median Prefill 從 53.63 提升至 102.00 tok/s；使用者已授權採用。
+- Qwen 已實作 private ANE Prefill 路線。固定 1,024-token `q_proj` 依 output channels 分給 GPU 與 ANE。原本 GPU 路線保留。private interface 錯誤會自動回退。4,097-token 探索性 ABBA 保持首個 token 相同，但執行順序影響很大，因此沒有正式速度結論。
 - DSpark 可安裝和執行，但 DSpark 預設停用。
 - Hash exact prefetch 與 storage-aware adaptive block 已有預設關閉 prototype；adaptive 原始 score policy 已被拒絕，0.90 高信心護欄修正版已與 hybrid exact verifier 完成五組 correctness／logical-byte composition gate，但尚未通過正式 performance gate。
 - Research-only expert-file page-cache probe 已通過 full-model contract 與 hash-prefetch useful/wasted composition gate；4K `balanced_choice` 的 logical／nonresident useful rate 分別是 23.53%／29.65%。它是 default-off `mincore` proxy，不是 physical SSD counter。
@@ -56,6 +58,15 @@
   DSpark feature taps 的最佳 top-24 direct transfer 只有 17.15% assignment recall、
   33.03% union recall 與 11.15% useful rate；0/40 layers 達 75%。Direct frozen-router
   transfer 已停止，後續需要明確的 dataset／training prerequisite。
+- Expert blob 無損壓縮已完成 60 個 M5 Pro microbenchmark case。所有結果都 byte-exact，
+  Peak RSS 增加不超過 5%。LZ4 和 LZFSE 都沒有同時通過無 Metal 與有 Metal 的 5%
+  時間 gate。Exact track 已停止，runtime 沒有接入壓縮。
+- 獨立 approximate Phase 6 已完成。`learned-route-drop-lowest-1` 通過 10-case entry、
+  fresh-worker component、五種 4K／32 pilot、default-off API 和兩輪五種 4K／256
+  formal gate。正式 10 pairs 都是 256/256 token 相同。Aggregate Decode logical
+  expert bytes 減少 15.14%。Decode throughput change 中位數是 +8.37%。Candidate
+  後續使用者已授權把它設為一般 DeepSeek API、CLI 和 APP request 的預設模式。
+  Client 仍可明確指定 exact。Qwen 和 DSpark 維持 exact。
 
 R0 已建立可重現的多 prompt profiling artifact。
 R2a 已拒絕 2,048-slot 候選設定。
@@ -140,6 +151,8 @@ P1、P2、M1 與 P4 prototype 已移除。
 | P4 | 已移除 | 512-step 候選改變 39/42 個 MoE layer 的 expert route；至少 3.11% 的 assignment 不同 | 未通過正確性 gate。拒絕，不執行正式 ABBA。 |
 | D2 | 無 | dispatch 是 Decode 的 0.121%；shader sample 是 0.456%；涵蓋率校正後是 0.972% | 未通過 3% profile gate。停止，不建立 prototype。 |
 | D3 | 無 | 五種 context 的 row 交集比例中位數是 85.94%；`gather` 涵蓋率校正占比最多是 Decode 的 0.34% | 未通過 90% row gate 與 5% profile gate。停止，不建立 prototype。 |
+| EBC | 無；research script only | DeepSeek FP4 與 Qwen MXFP4 的 60 個 LZ4／LZFSE case 全部 byte-exact，Peak RSS gate 通過；兩個 codec 都沒有同時通過無 Metal 與有 Metal 的 5% 時間 gate | 停止 exact compression track。不建立 ready／compact／cold runtime cache。 |
+| AED | 一般 DeepSeek request 預設 `learned-route-drop-lowest-1`；可明確指定 `exact` | Phase 6A–6E 全部通過；正式 20 個 fresh-process 4K／256 runs 的 10 pairs 都是 256/256 token 相同，Decode logical bytes -15.14%，Decode throughput change 中位數 +8.37%，五種 workload p95 中位數都改善 | 使用者已授權設為 DeepSeek API、CLI 和 APP request 預設。Qwen 和 DSpark 維持 exact。結果是固定 suite 的相對 parity，不是一般能力保證，也不是 physical SSD bytes。 |
 
 此表同時列出探索性結果和 M1 正式結果。
 
@@ -717,6 +730,24 @@ Wave 5 完整資料位於
 | Process disk-I/O counter | request 前後讀取 Darwin process disk-I/O counter。 | metrics delta test 和 macOS 本機 API probe。 |
 
 ## 已測試但未採用
+
+### Expert blob 無損壓縮
+
+本機 M5 Pro 使用 Apple Compression 的 LZ4 和 LZFSE。
+測試讀取 64 KiB、256 KiB、1 MiB、4 MiB 和完整 expert blob。
+DeepSeek FP4 和 Qwen MXFP4 各取三個 expert 位置。
+
+LZ4 對完整 expert blob 只減少 2.43% 至 2.47% 儲存量。
+DeepSeek 的 read + decode 中位數慢 69.91%。
+Qwen 在無 Metal 時快 0.36%，但在有 Metal 時慢 5.08%。
+LZFSE 減少 4.92% 至 7.11% 儲存量，但 read + decode 慢 564.51% 至 1036.27%。
+
+所有 60 個解壓縮結果都通過 byte hash。
+Peak RSS 最大增加低於 5%。
+時間 gate 未通過，所以 runtime 不採用此設計。
+
+完整資料位於
+[`benchmarks/2026-09-01-expert-blob-compression-m5-pro.json`](benchmarks/2026-09-01-expert-blob-compression-m5-pro.json)。
 
 ### 單一 contiguous slot arena
 
