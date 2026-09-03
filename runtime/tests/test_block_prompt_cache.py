@@ -124,8 +124,8 @@ class BlockPromptCacheTests(unittest.TestCase):
             runtime._persist_prompt_cache(
                 _PromptCacheEntry([_FixtureCache(1)], tokens)
             )
-            data_path = next(directory.glob("*.normal.v4.safetensors"))
-            metadata_path = next(directory.glob("*.normal.v4.json"))
+            data_path = next(directory.glob("*.normal.v5.safetensors"))
+            metadata_path = next(directory.glob("*.normal.v5.json"))
             first_data_mtime = data_path.stat().st_mtime_ns
             first_metadata = metadata_path.read_bytes()
 
@@ -134,10 +134,10 @@ class BlockPromptCacheTests(unittest.TestCase):
             )
 
             self.assertEqual(
-                len(list(directory.glob("*.normal.v4.safetensors"))),
+                len(list(directory.glob("*.normal.v5.safetensors"))),
                 1,
             )
-            self.assertEqual(len(list(directory.glob("*.normal.v4.json"))), 1)
+            self.assertEqual(len(list(directory.glob("*.normal.v5.json"))), 1)
             self.assertEqual(data_path.stat().st_mtime_ns, first_data_mtime)
             self.assertEqual(metadata_path.read_bytes(), first_metadata)
 
@@ -220,7 +220,7 @@ class BlockPromptCacheTests(unittest.TestCase):
 
             access = [
                 json.loads(path.read_text(encoding="utf-8"))
-                for path in directory.rglob("*.normal.v4.access")
+                for path in directory.rglob("*.normal.v5.access")
             ]
 
         self.assertEqual(received[0], first_tokens)
@@ -251,6 +251,20 @@ class BlockPromptCacheTests(unittest.TestCase):
             }
 
         self.assertEqual(remaining, {(1,), (3,)})
+
+    def test_scanner_rejects_format_four_snapshots(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            runtime = _runtime(directory)
+            runtime._persist_prompt_cache(
+                _PromptCacheEntry([_FixtureCache(1)], [1, 2])
+            )
+            metadata_path = next(directory.glob("*.normal.v5.json"))
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["format"] = 4
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            self.assertEqual(runtime._scan_persistent_prompt_caches(), [])
 
     def test_scanner_rejects_a_different_kv_contract(self):
         with tempfile.TemporaryDirectory() as temporary:

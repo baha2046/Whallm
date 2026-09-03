@@ -24,6 +24,9 @@ from deepseek_v4_ssd.server import (
     _options,
     _parser,
     _reasoning_settings,
+    _response_internal_tool_name,
+    _response_messages,
+    _validate_approximation_runtime,
 )
 from deepseek_v4_ssd.tool_codec import AssistantTurn, ToolCall
 
@@ -46,6 +49,7 @@ class FakeRuntime:
         fp4_index_cache=True,
         expert_page_cache_probe=False,
         expert_file_cache_policy="cached",
+        dspark_enabled=False,
         dspark_prompt_cache=False,
         dspark_hash_prefetch=False,
         dspark_adaptive_block=False,
@@ -110,6 +114,9 @@ class FakeRuntime:
         self.chunk_paused = threading.Event()
         self.chunk_gate = threading.Event()
         self.response_chunks = None
+        self.response_chunk_batches = None
+        self.parsed_turn_by_text = {}
+        self.stream_call_count = 0
         self.parsed_turn = AssistantTurn("Hello", "", ())
         self.last_messages = None
         self.last_tools = None
@@ -140,14 +147,19 @@ class FakeRuntime:
         self.last_parse_text = text
         if self.parse_error:
             raise ValueError("invalid tool call")
-        return self.parsed_turn
+        return self.parsed_turn_by_text.get(text, self.parsed_turn)
 
     def stream(self, prompt, options):
+        self.stream_call_count += 1
         self.last_options = options
         if self.generation_gate is not None:
             self.generation_entered.set()
             self.generation_gate.wait(timeout=2)
-        chunks = self.response_chunks
+        chunks = (
+            self.response_chunk_batches.pop(0)
+            if self.response_chunk_batches is not None
+            else self.response_chunks
+        )
         if chunks is None:
             text = "plan</think>Hello" if prompt.endswith(THINK_START) else "Hello"
             midpoint = max(1, len(text) // 2)
@@ -209,6 +221,17 @@ class QwenServerSettingsTests(unittest.TestCase):
 
 
 class QwenSamplingServerTests(unittest.TestCase):
+    codex_tool = {
+        "type": "function",
+        "name": "exec_command",
+        "description": "Run a shell command.",
+        "parameters": {
+            "type": "object",
+            "properties": {"cmd": {"type": "string"}},
+            "required": ["cmd"],
+        },
+    }
+
     @classmethod
     def setUpClass(cls):
         cls.runtime = FakeRuntime()
@@ -361,6 +384,218 @@ class QwenSamplingServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(json.loads(body)["error"]["param"], "presence_penalty")
 
+    def test_qwen_request_rejects_approximation(self):
+        status, body = self.request(
+            "/v1/chat/completions",
+            {
+                "model": "qwen3.8-flash-next-fp8",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "approximation": {"mode": "learned-route-drop-lowest-1"},
+            },
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["error"]["param"], "approximation.mode")
+
+    def test_qwen_codex_first_turn_requires_tool_and_retries_once(self):
+        runtime = self.runtime
+        first = "I am checking the project."
+        second = (
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="exec_command">\n'
+            '<｜DSML｜parameter name="cmd" string="true">pwd'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>'
+        )
+        runtime.response_chunk_batches = [[first], [second]]
+        runtime.parsed_turn_by_text = {
+            first: AssistantTurn(first, "", ()),
+            second: AssistantTurn(
+                "",
+                "",
+                (ToolCall("exec_command", '{"cmd":"pwd"}'),),
+            ),
+        }
+        before = runtime.stream_call_count
+        try:
+            status, body = self.request(
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": "Review the project.",
+                    "tools": [self.codex_tool],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200, body)
+            self.assertEqual(runtime.stream_call_count - before, 2)
+            self.assertEqual(runtime.last_tool_choice.mode, "required")
+            self.assertNotIn(
+                first,
+                "".join(
+                    event.get("delta", "")
+                    for event in events
+                    if event["type"] == "response.output_text.delta"
+                ),
+            )
+            self.assertEqual(events[-1]["response"]["status"], "completed")
+            call = events[-1]["response"]["output"][0]
+            self.assertEqual(call["type"], "function_call")
+            self.assertEqual(call["name"], "exec_command")
+            self.assertEqual(runtime.last_messages[0]["role"], "developer")
+        finally:
+            runtime.response_chunk_batches = None
+            runtime.parsed_turn_by_text = {}
+
+    def test_qwen_codex_required_stream_uses_the_validated_tool_call(self):
+        runtime = self.runtime
+        raw = "qwen tool output"
+        runtime.response_chunks = [raw]
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall("exec_command", '{"cmd":"pwd"}'),),
+        )
+
+        class RejectingStreamParser:
+            def feed(self, _):
+                return ()
+
+            def finish(self):
+                return ()
+
+            def matches(self, _):
+                return False
+
+        runtime.make_tool_stream_parser = lambda _: RejectingStreamParser()
+        try:
+            status, body = self.request(
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": "Review the project.",
+                    "tools": [self.codex_tool],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+
+            self.assertEqual(status, 200, body)
+            self.assertEqual(events[-1]["response"]["status"], "completed")
+            call = events[-1]["response"]["output"][0]
+            self.assertEqual(call["type"], "function_call")
+            self.assertEqual(call["name"], "exec_command")
+            self.assertEqual(call["arguments"], '{"cmd":"pwd"}')
+        finally:
+            del runtime.make_tool_stream_parser
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
+    def test_qwen_codex_required_failure_retries_only_once(self):
+        runtime = self.runtime
+        first = "I am checking the project."
+        second = "Still no tool call."
+        runtime.response_chunk_batches = [[first], [second]]
+        runtime.parsed_turn_by_text = {
+            first: AssistantTurn(first, "", ()),
+            second: AssistantTurn(second, "", ()),
+        }
+        before = runtime.stream_call_count
+        try:
+            status, body = self.request(
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": "Review the project.",
+                    "tools": [self.codex_tool],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200, body)
+            self.assertEqual(runtime.stream_call_count - before, 2)
+            self.assertEqual(events[-2]["type"], "error")
+            self.assertEqual(events[-2]["code"], "tool_choice_not_satisfied")
+            self.assertEqual(events[-1]["response"]["status"], "failed")
+        finally:
+            runtime.response_chunk_batches = None
+            runtime.parsed_turn_by_text = {}
+
+    def test_qwen_codex_tool_result_allows_final_answer(self):
+        runtime = self.runtime
+        runtime.response_chunks = ["Review complete."]
+        runtime.parsed_turn = AssistantTurn("Review complete.", "", ())
+        before = runtime.stream_call_count
+        try:
+            status, body = self.request(
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": [
+                        {"role": "user", "content": "Review the project."},
+                        {
+                            "type": "function_call",
+                            "call_id": "call_1",
+                            "name": "exec_command",
+                            "arguments": '{"cmd":"pwd"}',
+                        },
+                        {
+                            "type": "function_call_output",
+                            "call_id": "call_1",
+                            "output": "/tmp/project",
+                        },
+                    ],
+                    "tools": [self.codex_tool],
+                },
+            )
+            response = json.loads(body)
+            self.assertEqual(status, 200, body)
+            self.assertEqual(runtime.stream_call_count - before, 1)
+            self.assertEqual(runtime.last_tool_choice.mode, "auto")
+            self.assertEqual(
+                response["output"][0]["content"][0]["text"],
+                "Review complete.",
+            )
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
+    def test_qwen_non_codex_auto_tool_stays_auto(self):
+        runtime = self.runtime
+        runtime.response_chunks = ["Ask me about the weather."]
+        runtime.parsed_turn = AssistantTurn("Ask me about the weather.", "", ())
+        before = runtime.stream_call_count
+        try:
+            status, body = self.request(
+                "/v1/responses",
+                {
+                    "model": "qwen3.8-flash-next-fp8",
+                    "input": "Hello.",
+                    "tools": [
+                        {
+                            **self.codex_tool,
+                            "name": "get_weather",
+                        }
+                    ],
+                },
+            )
+            self.assertEqual(status, 200, body)
+            self.assertEqual(runtime.stream_call_count - before, 1)
+            self.assertEqual(runtime.last_tool_choice.mode, "auto")
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
 
 class ServerArgumentTests(unittest.TestCase):
     def test_model_and_catalog_are_optional_and_mutually_exclusive(self):
@@ -371,6 +606,15 @@ class ServerArgumentTests(unittest.TestCase):
             _parser().parse_args(
                 ["--model", "/tmp/model", "--model-catalog", "/tmp/catalog.json"]
             )
+
+    def test_log_level_defaults_to_info_and_accepts_all_levels(self):
+        self.assertEqual(_parser().parse_args([]).log_level, "info")
+        for level in ("debug", "info", "error"):
+            with self.subTest(level=level):
+                self.assertEqual(
+                    _parser().parse_args(["--log-level", level]).log_level,
+                    level,
+                )
 
     def test_dspark_prompt_cache_is_research_opt_in(self):
         arguments = _parser().parse_args(["--model", "/tmp/model"])
@@ -449,11 +693,54 @@ class ServerTests(unittest.TestCase):
 
     def test_generation_defaults_match_app_defaults(self):
         options = _options({}, ServerDefaults())
-        self.assertEqual(options, GenerationOptions())
+        expected = GenerationOptions(
+            approximation_mode="learned-route-drop-lowest-1"
+        )
+        self.assertEqual(options, expected)
         self.assertEqual(
             _options({}, ServerDefaults(), thinking_mode="thinking"),
-            GenerationOptions(),
+            expected,
         )
+
+    def test_approximation_option_is_explicit_and_strict(self):
+        candidate = _options(
+            {"approximation": {"mode": "learned-route-drop-lowest-1"}},
+            ServerDefaults(),
+        )
+        self.assertEqual(candidate.approximation_mode, "learned-route-drop-lowest-1")
+        exact = _options(
+            {"approximation": {"mode": "exact"}},
+            ServerDefaults(),
+        )
+        self.assertEqual(exact.approximation_mode, "exact")
+        dspark_default = _options(
+            {},
+            ServerDefaults(),
+            approximation_default="exact",
+        )
+        self.assertEqual(dspark_default.approximation_mode, "exact")
+
+        invalid = (
+            {"approximation": None},
+            {"approximation": "learned-route-drop-lowest-1"},
+            {"approximation": {}},
+            {"approximation": {"mode": "unknown"}},
+            {"approximation": {"mode": "exact", "extra": True}},
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload), self.assertRaises(APIError):
+                _options(payload, ServerDefaults())
+
+    def test_approximation_rejects_dspark_runtime(self):
+        options = GenerationOptions(
+            approximation_mode="learned-route-drop-lowest-1"
+        )
+        runtime = SimpleNamespace(config=SimpleNamespace(dspark_enabled=True))
+
+        with self.assertRaises(APIError) as raised:
+            _validate_approximation_runtime(options, runtime)
+
+        self.assertEqual(raised.exception.param, "approximation.mode")
 
     def test_generation_token_limit_is_272000(self):
         self.assertEqual(_options({"max_tokens": 272_000}, ServerDefaults()).max_tokens, 272_000)
@@ -516,29 +803,42 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 401)
         self.assertEqual(json.loads(body)["error"]["code"], "invalid_api_key")
 
-        status, _, body = self.request("/v1/models")
+        status, _, body = self.request("/v1/models?client_version=0.152.1")
         self.assertEqual(status, 200)
-        models = json.loads(body)["data"]
+        payload = json.loads(body)
+        models = payload["data"]
         self.assertEqual(
             [model["id"] for model in models],
             ["deepseek-v4-flash-0731", "work-model"],
         )
         self.assertEqual(models[0]["owned_by"], models[1]["owned_by"])
 
+        codex_models = payload["models"]
+        self.assertEqual(
+            [model["slug"] for model in codex_models],
+            ["deepseek-v4-flash-0731", "work-model"],
+        )
+        self.assertEqual(codex_models[0]["shell_type"], "unified_exec")
+        self.assertEqual(codex_models[0]["visibility"], "none")
+        self.assertTrue(codex_models[0]["supported_in_api"])
+        self.assertEqual(codex_models[0]["context_window"], 272_000)
+        self.assertEqual(codex_models[0]["input_modalities"], ["text"])
+        self.assertTrue(codex_models[0]["base_instructions"])
+
     def test_model_load_and_unload_require_bearer_key(self):
         runtime = FakeRuntime()
+        loaded_specs = []
+        original = ModelSpec(
+            id="deepseek-v4-flash-0731",
+            alias="work-model",
+            path="/tmp/model",
+            model_kind="deepseek-v4",
+            runtime=RuntimeConfig(),
+            defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
+        )
         manager = ModelManager(
-            [
-                ModelSpec(
-                    id="deepseek-v4-flash-0731",
-                    alias="work-model",
-                    path="/tmp/model",
-                    model_kind="deepseek-v4",
-                    runtime=RuntimeConfig(),
-                    defaults=ModelDefaults(272_000, 0.2, 0.98, 0),
-                )
-            ],
-            runtime_loader=lambda _: runtime,
+            [original],
+            runtime_loader=lambda model: loaded_specs.append(model) or runtime,
             clear_cache=lambda: None,
         )
         server = OpenAIServer(("127.0.0.1", 0), manager, api_key="secret")
@@ -546,13 +846,16 @@ class ServerTests(unittest.TestCase):
         thread.start()
         base = f"http://127.0.0.1:{server.server_port}"
 
-        def request(path, model, *, authenticated=True):
+        def request(path, model, *, configuration=None, authenticated=True):
             headers = {"Content-Type": "application/json"}
             if authenticated:
                 headers["Authorization"] = "Bearer secret"
+            payload = {"model": model}
+            if configuration is not None:
+                payload["configuration"] = configuration
             value = Request(
                 base + path,
-                data=json.dumps({"model": model}).encode(),
+                data=json.dumps(payload).encode(),
                 headers=headers,
                 method="POST",
             )
@@ -572,11 +875,30 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(status, 401)
             self.assertEqual(json.loads(body)["error"]["code"], "invalid_api_key")
 
-            status, body = request("/api/models/load", "work-model")
+            configured = original.to_json()
+            configured["runtime"]["slots"] = 4_096
+            status, body = request(
+                "/api/models/configure",
+                "work-model",
+                configuration=configured,
+                authenticated=False,
+            )
+            self.assertEqual(status, 401)
+
+            status, body = request(
+                "/api/models/configure", "work-model", configuration=configured
+            )
+            self.assertEqual(status, 200)
+
+            configured["runtime"]["slots"] = 2_048
+            status, body = request(
+                "/api/models/load", "work-model", configuration=configured
+            )
             self.assertEqual(status, 200)
             self.assertEqual(
                 json.loads(body)["loaded_model"], "deepseek-v4-flash-0731"
             )
+            self.assertEqual(loaded_specs[0].runtime.slots, 2_048)
 
             status, body = request(
                 "/api/models/unload", "deepseek-v4-flash-0731"
@@ -612,6 +934,60 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(json.loads(chat_body)["model"], "work-model")
         self.assertEqual(json.loads(completion_body)["model"], "work-model")
         self.assertEqual(json.loads(response_body)["model"], "work-model")
+
+    def test_generation_defaults_to_approximation_and_reports_actual_mode(self):
+        status, _, body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "messages": [{"role": "user", "content": "Hi"}],
+            },
+        )
+        response = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            response["approximation"],
+            {"mode": "learned-route-drop-lowest-1"},
+        )
+        self.assertEqual(
+            self.runtime.last_options.approximation_mode,
+            "learned-route-drop-lowest-1",
+        )
+
+    def test_generation_can_explicitly_use_exact_mode(self):
+        status, _, body = self.request(
+            "/v1/chat/completions",
+            method="POST",
+            body={
+                "model": "deepseek-v4-flash-0731",
+                "messages": [{"role": "user", "content": "Hi"}],
+                "approximation": {"mode": "exact"},
+            },
+        )
+        response = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(response["approximation"], {"mode": "exact"})
+        self.assertEqual(self.runtime.last_options.approximation_mode, "exact")
+
+    def test_dspark_runtime_defaults_to_exact_mode(self):
+        previous = self.runtime.config.dspark_enabled
+        self.runtime.config.dspark_enabled = True
+        try:
+            status, _, body = self.request(
+                "/v1/chat/completions",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+            )
+        finally:
+            self.runtime.config.dspark_enabled = previous
+
+        response = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual(response["approximation"], {"mode": "exact"})
 
     def test_streaming_events_preserve_the_requested_alias(self):
         requests = (
@@ -1160,6 +1536,100 @@ class ServerTests(unittest.TestCase):
             runtime.response_chunks = None
             runtime.parse_error = False
 
+    def test_responses_auto_stream_uses_the_complete_validated_tool_call(self):
+        runtime = self.runtime
+        runtime.response_chunks = ["qwen-style tool output"]
+        runtime.parsed_turn = AssistantTurn(
+            "Checking.",
+            "",
+            (ToolCall("get_weather", '{"city":"Taipei"}'),),
+        )
+
+        class RejectingStreamParser:
+            def feed(self, _):
+                return ()
+
+            def finish(self):
+                return ()
+
+            def matches(self, _):
+                return False
+
+        runtime.make_tool_stream_parser = lambda _: RejectingStreamParser()
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "Weather?",
+                    "tools": [{"type": "function", **self.tool["function"]}],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+
+            self.assertEqual(status, 200)
+            self.assertEqual(events[-1]["response"]["status"], "completed")
+            call = events[-1]["response"]["output"][1]
+            self.assertEqual(call["type"], "function_call")
+            self.assertEqual(call["name"], "get_weather")
+            self.assertEqual(call["arguments"], '{"city":"Taipei"}')
+        finally:
+            del runtime.make_tool_stream_parser
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
+    def test_responses_forced_function_retries_wrong_result_once(self):
+        runtime = self.runtime
+        first = "wrong tool"
+        second = "required tool"
+        runtime.response_chunk_batches = [[first], [second]]
+        runtime.parsed_turn_by_text = {
+            first: AssistantTurn(
+                "",
+                "",
+                (ToolCall("get_time", '{}'),),
+            ),
+            second: AssistantTurn(
+                "",
+                "",
+                (ToolCall("get_weather", '{"city":"Taipei"}'),),
+            ),
+        }
+        before = runtime.stream_call_count
+        weather = {"type": "function", **self.tool["function"]}
+        clock = {
+            "type": "function",
+            "name": "get_time",
+            "description": "Get the current time.",
+            "parameters": {"type": "object", "properties": {}},
+        }
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "What is the weather?",
+                    "tools": [weather, clock],
+                    "tool_choice": {"type": "function", "name": "get_weather"},
+                },
+            )
+            response = json.loads(body)
+            self.assertEqual(status, 200, body)
+            self.assertEqual(runtime.stream_call_count - before, 2)
+            self.assertEqual(response["output"][0]["name"], "get_weather")
+            self.assertEqual(runtime.last_tool_choice.mode, "function")
+            self.assertEqual(runtime.last_tool_choice.name, "get_weather")
+        finally:
+            runtime.response_chunk_batches = None
+            runtime.parsed_turn_by_text = {}
+
     def test_responses_accepts_codex_namespace_tools(self):
         runtime = self.runtime
         runtime.response_chunks = [
@@ -1216,6 +1686,101 @@ class ServerTests(unittest.TestCase):
             runtime.response_chunks = None
             runtime.parsed_turn = AssistantTurn("Hello", "", ())
 
+    def test_responses_shortens_long_codex_namespace_tool_names(self):
+        namespace = "mcp__codex_apps__sites"
+        name = "_create_source_repository_write_credential"
+        internal_name = _response_internal_tool_name(name, namespace)
+        self.assertEqual(len(internal_name), 64)
+        self.assertEqual(
+            internal_name,
+            _response_internal_tool_name(name, namespace),
+        )
+        self.assertNotEqual(
+            internal_name,
+            _response_internal_tool_name(name + "_other", namespace),
+        )
+        replay = _response_messages(
+            {
+                "input": [
+                    {
+                        "type": "function_call",
+                        "call_id": "call_1",
+                        "namespace": namespace,
+                        "name": name,
+                        "arguments": '{"repository":"owner/repo"}',
+                    },
+                    {
+                        "type": "function_call_output",
+                        "call_id": "call_1",
+                        "output": "created",
+                    },
+                ]
+            }
+        )
+        self.assertEqual(
+            replay[0]["tool_calls"][0]["function"]["name"],
+            internal_name,
+        )
+
+        runtime = self.runtime
+        runtime.response_chunks = [
+            '\n\n<｜DSML｜tool_calls>\n<｜DSML｜invoke name="'
+            + internal_name
+            + '">\n',
+            '<｜DSML｜parameter name="repository" string="true">owner/repo'
+            '</｜DSML｜parameter>\n</｜DSML｜invoke>\n</｜DSML｜tool_calls>',
+        ]
+        runtime.parsed_turn = AssistantTurn(
+            "",
+            "",
+            (ToolCall(internal_name, '{"repository":"owner/repo"}'),),
+        )
+        try:
+            status, _, body = self.request(
+                "/v1/responses",
+                method="POST",
+                body={
+                    "model": "deepseek-v4-flash-0731",
+                    "input": "Create the credential.",
+                    "tools": [
+                        {
+                            "type": "namespace",
+                            "name": namespace,
+                            "tools": [
+                                {
+                                    "type": "function",
+                                    "name": name,
+                                    "parameters": {
+                                        "type": "object",
+                                        "properties": {
+                                            "repository": {"type": "string"}
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                    "stream": True,
+                },
+            )
+            events = [
+                json.loads(line[6:])
+                for line in body.decode().splitlines()
+                if line.startswith("data: {")
+            ]
+            self.assertEqual(status, 200)
+            self.assertEqual(runtime.last_tools[0]["function"]["name"], internal_name)
+            call = events[-1]["response"]["output"][0]
+            self.assertEqual(call["namespace"], namespace)
+            self.assertEqual(call["name"], name)
+            self.assertEqual(
+                json.loads(call["arguments"]),
+                {"repository": "owner/repo"},
+            )
+        finally:
+            runtime.response_chunks = None
+            runtime.parsed_turn = AssistantTurn("Hello", "", ())
+
     def test_status_reports_live_performance_metrics(self):
         self.request(
             "/v1/chat/completions",
@@ -1267,6 +1832,50 @@ class ServerTests(unittest.TestCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(output.getvalue(), "")
+
+    def test_debug_log_prints_the_complete_request_json(self):
+        previous = self.server.log_level
+        self.server.log_level = "debug"
+        output = StringIO()
+        body = {
+            "model": "deepseek-v4-flash-0731",
+            "input": "debug-request-marker",
+        }
+        try:
+            with redirect_stderr(output):
+                status, _, _ = self.request(
+                    "/v1/responses",
+                    method="POST",
+                    body=body,
+                )
+        finally:
+            self.server.log_level = previous
+
+        log = output.getvalue()
+        self.assertEqual(status, 200)
+        self.assertIn("[DEBUG] request POST /v1/responses: ", log)
+        self.assertIn(json.dumps(body, ensure_ascii=False, separators=(",", ":")), log)
+
+    def test_error_log_hides_successful_requests_and_keeps_failures(self):
+        previous = self.server.log_level
+        self.server.log_level = "error"
+        output = StringIO()
+        try:
+            with redirect_stderr(output):
+                success, _, _ = self.request("/")
+                failure, _, _ = self.request(
+                    "/v1/responses",
+                    method="POST",
+                    body={"model": "deepseek-v4-flash-0731", "input": 123},
+                )
+        finally:
+            self.server.log_level = previous
+
+        log = output.getvalue()
+        self.assertEqual(success, 200)
+        self.assertEqual(failure, 400)
+        self.assertNotIn('\"GET / HTTP/1.1\" 200', log)
+        self.assertIn('\"POST /v1/responses HTTP/1.1\" 400', log)
 
     def test_status_responds_while_generation_is_busy(self):
         gate = threading.Event()

@@ -319,8 +319,9 @@ class _Entry:
 @dataclass(frozen=True)
 class _LayerRead:
     packed: mx.array
-    futures: tuple[Future[float], ...]
+    futures: tuple[Future[_SpeculativeRead], ...]
     experts: tuple[int, ...]
+    submitted: float
 
 
 @dataclass(frozen=True)
@@ -328,6 +329,17 @@ class _SpeculativeRead:
     started: float
     finished: float
     page_cache: PageCacheReadClassification = PageCacheReadClassification()
+
+
+@dataclass
+class _ActivePrefetchTrace:
+    layer: int
+    job: _LayerRead
+    reads: tuple[_SpeculativeRead, ...]
+    deadline: float
+    future_wait_seconds: float
+    used_experts: set[int] = field(default_factory=set)
+    compute_submit: float | None = None
 
 
 class StagedReadyExpert:
@@ -899,6 +911,7 @@ class ExpertCache:
         self._speculative_pool: _SlotPool | None = None
         self._active_speculative_prefetch: _SpeculativeExpertPrefetch | None = None
         self._batched_layer: tuple[int, BatchedExperts] | None = None
+        self._active_prefetch_trace: _ActivePrefetchTrace | None = None
         self._route_trace_path = route_trace_path
         if route_trace_path is not None:
             from .route_trace import RouteTraceRecorder
@@ -1008,6 +1021,11 @@ class ExpertCache:
             yield
 
     def record_routes(self, layer: int, selected: np.ndarray) -> None:
+        active = self._active_prefetch_trace
+        if active is not None and active.layer == layer:
+            active.used_experts.update(
+                int(expert) for expert in np.asarray(selected).reshape(-1)
+            )
         if self._route_trace is not None:
             self._route_trace.record(layer, selected)
 
@@ -1061,6 +1079,15 @@ class ExpertCache:
         current = self._batched_layer
         return current[1] if current is not None and current[0] == layer else None
 
+    def record_compute_submit(self, layer: int) -> None:
+        active = self._active_prefetch_trace
+        if (
+            active is not None
+            and active.layer == layer
+            and active.compute_submit is None
+        ):
+            active.compute_submit = time.perf_counter()
+
     def prefetch_layer(
         self,
         layer: int,
@@ -1098,6 +1125,7 @@ class ExpertCache:
                 selected[start : start + step]
                 for start in range(0, len(selected), step)
             ]
+            submitted = time.perf_counter()
             self._prefetched_layers[layer] = _LayerRead(
                 packed,
                 tuple(
@@ -1110,6 +1138,7 @@ class ExpertCache:
                     for batch in batches
                 ),
                 selected,
+                submitted,
             )
 
     @contextmanager
@@ -1126,8 +1155,15 @@ class ExpertCache:
         self.prefetch_layer(layer, experts)
         with self._lock:
             job = self._prefetched_layers.pop(layer)
+        deadline = time.perf_counter()
         was_ready = all(future.done() for future in job.futures)
-        elapsed = max(future.result() for future in job.futures)
+        wait_started = time.perf_counter()
+        reads = tuple(future.result() for future in job.futures)
+        future_wait_seconds = time.perf_counter() - wait_started
+        elapsed = max(
+            (read.finished - read.started for read in reads),
+            default=0.0,
+        )
         packed = job.packed
         batched = self._pool.batched(packed)
         with self._lock:
@@ -1141,9 +1177,30 @@ class ExpertCache:
             if was_ready:
                 self.metrics.prefetched_layer_hits += 1
         self._batched_layer = (layer, batched)
+        self._active_prefetch_trace = _ActivePrefetchTrace(
+            layer=layer,
+            job=job,
+            reads=reads,
+            deadline=deadline,
+            future_wait_seconds=future_wait_seconds,
+        )
         try:
             yield batched
         finally:
+            active = self._active_prefetch_trace
+            if active is not None and self._route_trace is not None:
+                self._route_trace.record_prefetch_event(
+                    layer=active.layer,
+                    requested_experts=len(active.job.experts),
+                    used_experts=len(active.used_experts),
+                    read_submit=active.job.submitted,
+                    read_start=min(read.started for read in active.reads),
+                    read_complete=max(read.finished for read in active.reads),
+                    expert_deadline=active.deadline,
+                    compute_submit=active.compute_submit,
+                    future_wait_seconds=active.future_wait_seconds,
+                )
+            self._active_prefetch_trace = None
             self._batched_layer = None
 
     def record_adaptive_prefill_decision(
@@ -1805,7 +1862,7 @@ class ExpertCache:
         layer: int,
         packed: mx.array,
         experts: tuple[int, ...],
-    ) -> float:
+    ) -> _SpeculativeRead:
         started = time.perf_counter()
         view = memoryview(packed).cast("B")
         for expert in experts:
@@ -1814,7 +1871,7 @@ class ExpertCache:
                 self._pool.write_views(view, expert),
                 expert * self.model.expert_blob_size,
             )
-        return time.perf_counter() - started
+        return _SpeculativeRead(started, time.perf_counter())
 
     def _pread_views(
         self,

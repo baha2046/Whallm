@@ -245,6 +245,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "layer_major_prefill",
         "persistent_prompt_cache",
         "batched_expert_prefill",
+        "ane_prefill",
         "fp4_index_cache",
         "dspark_enabled",
         "mtp_enabled",
@@ -262,6 +263,12 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         if type(getattr(config, name)) is not bool:
             raise ValueError(f"{name} must be a boolean")
 
+    if (
+        isinstance(config.ane_prefill_ratio, bool)
+        or not isinstance(config.ane_prefill_ratio, (int, float))
+        or not 0 <= config.ane_prefill_ratio <= 1
+    ):
+        raise ValueError("ane_prefill_ratio must be between zero and one")
     if not isinstance(config.dspark_confidence_threshold, (int, float)) or isinstance(
         config.dspark_confidence_threshold, bool
     ) or not 0 <= config.dspark_confidence_threshold <= 1:
@@ -369,12 +376,9 @@ class ModelManager:
         runtime_loader: Callable[[ModelSpec], Any] | None = None,
         clear_cache: Callable[[], None] = mx.clear_cache,
     ):
-        self._models = tuple(models)
+        self._models: tuple[ModelSpec, ...] = ()
         self._by_name: dict[str, ModelSpec] = {}
-        for spec in self._models:
-            self._by_name[spec.id] = spec
-            if spec.alias:
-                self._by_name[spec.alias] = spec
+        self._set_models(models)
         self._runtime_loader = runtime_loader or (
             lambda spec: ModelRuntime.open(spec.path, spec.runtime)
         )
@@ -404,20 +408,64 @@ class ModelManager:
                 )
         return result
 
+    def codex_models(self) -> list[dict[str, Any]]:
+        result = []
+        for spec in self._models:
+            for name in (spec.id, spec.alias):
+                if name is None or (name == spec.id and result and result[-1]["slug"] == name):
+                    continue
+                result.append(
+                    {
+                        "slug": name,
+                        "display_name": name,
+                        "description": f"Local {spec.owner} model served by Whallm.",
+                        "default_reasoning_level": None,
+                        "supported_reasoning_levels": [],
+                        "shell_type": "unified_exec",
+                        "visibility": "none",
+                        "supported_in_api": True,
+                        "priority": 99,
+                        "availability_nux": None,
+                        "upgrade": None,
+                        "include_apps_usage_instructions": False,
+                        "support_verbosity": False,
+                        "default_verbosity": None,
+                        "apply_patch_tool_type": None,
+                        "truncation_policy": {"mode": "bytes", "limit": 10_000},
+                        "context_window": spec.defaults.max_tokens,
+                        "max_context_window": spec.defaults.max_tokens,
+                        "experimental_supported_tools": [],
+                        "input_modalities": ["text"],
+                        "base_instructions": (
+                            "You are a coding agent running in Codex CLI. Follow the "
+                            "developer and user instructions, use the available tools to "
+                            "inspect and modify the workspace, and continue until the "
+                            "request is complete."
+                        ),
+                    }
+                )
+        return result
+
     @contextmanager
     def request(self, name: Any) -> Iterator[ModelRequest]:
-        spec = self._by_name.get(name) if isinstance(name, str) else None
-        if spec is None:
-            raise ModelNotFound(str(name) if name is not None else "")
         with self._generation_lock:
+            spec = self._by_name.get(name) if isinstance(name, str) else None
+            if spec is None:
+                raise ModelNotFound(str(name) if name is not None else "")
             runtime = self._ensure_loaded(spec, name)
             yield ModelRequest(name, spec.id, runtime, spec.defaults)
 
-    def load(self, name: Any) -> None:
-        spec = self._by_name.get(name) if isinstance(name, str) else None
-        if spec is None:
-            raise ModelNotFound(str(name) if name is not None else "")
+    def configure(self, value: Any) -> None:
         with self._generation_lock:
+            self._configure(value)
+
+    def load(self, name: Any, configuration: Any = None) -> None:
+        with self._generation_lock:
+            if configuration is not None:
+                self._configure(configuration)
+            spec = self._by_name.get(name) if isinstance(name, str) else None
+            if spec is None:
+                raise ModelNotFound(str(name) if name is not None else "")
             self._ensure_loaded(spec, name)
 
     def unload(self, name: Any) -> None:
@@ -484,6 +532,24 @@ class ModelManager:
             installed = runtime.installed
             cache = runtime.expert_cache
             cache_metrics = cache.metrics
+            ane_controller = getattr(
+                getattr(runtime, "model", None), "ane_prefill", None
+            )
+            ane_status = (
+                ane_controller.snapshot()
+                if ane_controller is not None
+                else {
+                    "requested": False,
+                    "requested_ratio": 0.0,
+                    "active_ratio": 0.0,
+                    "ane_channels": 0,
+                    "gpu_channels": 0,
+                    "active": False,
+                    "error": None,
+                    "evaluations": 0,
+                    "fallbacks": 0,
+                }
+            )
             return {
                 "model": loaded.public_name,
                 "source_model": runtime.model_id,
@@ -502,6 +568,9 @@ class ModelManager:
                         config.layer_major_prefill_threshold
                     ),
                     "batched_expert_prefill": config.batched_expert_prefill,
+                    "ane_prefill": getattr(config, "ane_prefill", True),
+                    "ane_prefill_ratio": getattr(config, "ane_prefill_ratio", 0.25),
+                    "ane_prefill_status": ane_status,
                     "prompt_cache_entries": config.prompt_cache_entries,
                     "prompt_cache_memory_gib": config.prompt_cache_memory_gib,
                     "persistent_prompt_cache": config.persistent_prompt_cache,
@@ -567,6 +636,38 @@ class ModelManager:
                     del runtime
                     gc.collect()
                     self._clear_cache()
+
+    def _configure(self, value: Any) -> None:
+        model_id = value.get("id") if isinstance(value, dict) else None
+        if not isinstance(model_id, str):
+            raise ModelCatalogError("configuration.id must be a string")
+        with self._state_lock:
+            active = self._loading or self._loaded
+            if active is not None and active.id == model_id:
+                raise ModelCatalogError("the loaded or loading model cannot be configured")
+        found = False
+        raw_models = []
+        for spec in self._models:
+            if spec.id == model_id:
+                raw_models.append(value)
+                found = True
+            else:
+                raw_models.append(spec.to_json())
+        if not found:
+            raise ModelNotFound(model_id)
+        self._set_models(
+            parse_model_catalog({"version": CATALOG_VERSION, "models": raw_models})
+        )
+
+    def _set_models(
+        self, models: tuple[ModelSpec, ...] | list[ModelSpec]
+    ) -> None:
+        self._models = tuple(models)
+        self._by_name = {}
+        for spec in self._models:
+            self._by_name[spec.id] = spec
+            if spec.alias:
+                self._by_name[spec.alias] = spec
 
     def _ensure_loaded(self, spec: ModelSpec, requested_name: str) -> Any:
         with self._state_lock:

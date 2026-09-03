@@ -540,19 +540,33 @@ class QSAAttention(nn.Module):
             if self.args.num_attention_heads % selected_key.shape[1] != 0:
                 raise ValueError("Qwen query heads must be divisible by KV heads")
             repeats = self.args.num_attention_heads // selected_key.shape[1]
-            if repeats > 1:
-                selected_key = mx.repeat(selected_key, repeats, axis=1)
-                selected_value = mx.repeat(selected_value, repeats, axis=1)
             current_query = query[0, :, start:end].transpose(1, 0, 2)
-            scores = (
-                current_query[..., None, :] @ selected_key.swapaxes(-1, -2)
-            ).squeeze(-2) * (self.args.head_dim**-0.5)
-            causal = selected_valid[:, None, :] & (
-                selected[:, None, :] <= absolute[:, None, None]
+            causal = selected_valid & (selected <= absolute[:, None])
+            grouped_query = current_query.reshape(
+                end - start,
+                selected_key.shape[1],
+                repeats,
+                self.args.head_dim,
             )
-            scores = mx.where(causal, scores, mx.finfo(scores.dtype).min)
-            weights = mx.softmax(scores.astype(mx.float32), axis=-1).astype(query.dtype)
-            current = (weights[..., None, :] @ selected_value).squeeze(-2)
+            scores = (
+                grouped_query[..., None, :]
+                @ selected_key[:, :, None].swapaxes(-1, -2)
+            ).squeeze(-2) * (self.args.head_dim**-0.5)
+            scores = mx.where(
+                causal[:, None, None, :],
+                scores,
+                mx.finfo(scores.dtype).min,
+            )
+            weights = mx.softmax(scores.astype(mx.float32), axis=-1).astype(
+                query.dtype
+            )
+            current = (
+                weights[..., None, :] @ selected_value[:, :, None]
+            ).squeeze(-2).reshape(
+                end - start,
+                self.args.num_attention_heads,
+                self.args.head_dim,
+            )
             outputs.append(current.transpose(1, 0, 2)[None])
         return mx.concatenate(outputs, axis=2)
 
@@ -1161,6 +1175,13 @@ def load(
         model.load_weights(list(model.sanitize(weights).items()), strict=True)
         model.dspark = None
         mx.eval(model.parameters())
+        from .ane_prefill import install_qwen_ane_prefill
+
+        model.ane_prefill = install_qwen_ane_prefill(
+            model,
+            getattr(config, "ane_prefill", True),
+            getattr(config, "ane_prefill_ratio", 0.25),
+        )
         return model, cache
     except Exception:
         cache.close()

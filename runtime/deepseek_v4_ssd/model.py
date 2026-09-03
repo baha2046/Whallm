@@ -45,6 +45,9 @@ class RuntimeConfig:
     prompt_cache_directory: str | None = None
     moe_prefill_step_size: int = 0
     batched_expert_prefill: bool = True
+    qwen_next_layer_prefetch: bool = False
+    ane_prefill: bool = True
+    ane_prefill_ratio: float = 0.25
     fp4_index_cache: bool = True
     dspark_enabled: bool = False
     dspark_prompt_cache: bool = False
@@ -281,6 +284,11 @@ def layer_major_prefill(
             continue
 
         prefetch = getattr(expert_cache, "prefetch_layer", None)
+        record_compute_submit = getattr(
+            expert_cache,
+            "record_compute_submit",
+            None,
+        )
         use_batched = bool(
             batched_experts
             and callable(prefetch)
@@ -351,6 +359,8 @@ def layer_major_prefill(
                     raise RuntimeError("adaptive expert prefill has no batched weights")
                 for tile in tiles:
                     output = _finish_adaptive_prefill_tile(layer, tile, batched)
+                    if callable(record_compute_submit):
+                        record_compute_submit(layer_index)
                     mx.eval(output)
                     outputs.append(output)
             hidden = (
@@ -379,6 +389,8 @@ def layer_major_prefill(
                     inputs[:, start:end],
                 )
                 output = deepseek_v4.hc_expand(value, residual, post, combine)
+                if callable(record_compute_submit):
+                    record_compute_submit(layer_index)
                 mx.eval(output)
                 outputs.append(output)
         hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)

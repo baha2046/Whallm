@@ -147,6 +147,7 @@ class ModelCatalogTests(unittest.TestCase):
             ("deepseek-v4", "expert_file_cache_policy", "cold"),
             ("qwen3.8-flash-next", "staged_expert_streaming", True),
             ("qwen3.8-flash-next", "adaptive_expert_prefill_threshold", 0.8),
+            ("qwen3.8-flash-next", "ane_prefill_ratio", 1.1),
         )
         for model_kind, name, value in cases:
             model = raw_model(model_kind)
@@ -230,6 +231,36 @@ class ModelManagerTests(unittest.TestCase):
 
         self.assertIsNone(manager.status_snapshot()["loaded_model"])
         self.assertEqual(events, ["close:deepseek-v4-flash-0731", "clear"])
+
+    def test_unloaded_model_configuration_is_used_by_the_next_load(self):
+        loaded = []
+        manager = ModelManager(
+            [spec("deepseek-v4"), spec("qwen3.8-flash-next")],
+            runtime_loader=lambda model: loaded.append(model)
+            or FakeRuntime(model.id, []),
+            clear_cache=lambda: None,
+        )
+        configuration = raw_model("qwen3.8-flash-next", alias="updated-qwen")
+        configuration["runtime"]["slots"] = 4_096
+
+        manager.load("qwen3.8-flash-next-fp8", configuration)
+
+        self.assertEqual(loaded[0].runtime.slots, 4_096)
+        self.assertEqual(loaded[0].alias, "updated-qwen")
+        self.assertIn("updated-qwen", [model["id"] for model in manager.models()])
+
+    def test_loaded_model_configuration_cannot_change_in_place(self):
+        manager = ModelManager(
+            [spec("deepseek-v4")],
+            runtime_loader=lambda model: FakeRuntime(model.id, []),
+            clear_cache=lambda: None,
+        )
+        manager.load("deepseek-v4-flash-0731")
+        configuration = raw_model("deepseek-v4")
+        configuration["runtime"]["slots"] = 4_096
+
+        with self.assertRaisesRegex(ModelCatalogError, "loaded or loading"):
+            manager.configure(configuration)
 
     def test_switch_closes_and_clears_before_loading_the_next_runtime(self):
         events = []

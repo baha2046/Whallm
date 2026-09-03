@@ -9,7 +9,13 @@ from pathlib import Path
 
 import mlx.core as mx
 
-from .generation import GenerationOptions, ModelRuntime
+from .generation import (
+    APPROXIMATION_MODES,
+    EXACT_APPROXIMATION_MODE,
+    LEARNED_ROUTE_DROP_LOWEST_1,
+    GenerationOptions,
+    ModelRuntime,
+)
 from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .manifest import InstalledModel
 from .model import (
@@ -30,6 +36,24 @@ def _token_sha256(tokens) -> str:
     return hashlib.sha256(",".join(map(str, tokens)).encode()).hexdigest()
 
 
+def _select_approximation_mode(
+    requested: str | None,
+    *,
+    is_qwen: bool,
+    dspark_enabled: bool,
+) -> str:
+    mode = requested
+    if mode is None:
+        mode = (
+            EXACT_APPROXIMATION_MODE
+            if is_qwen or dspark_enabled
+            else LEARNED_ROUTE_DROP_LOWEST_1
+        )
+    if mode != EXACT_APPROXIMATION_MODE and (is_qwen or dspark_enabled):
+        raise ValueError("--approximation is not supported by Qwen or DSpark")
+    return mode
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run an installed model")
     parser.add_argument("--model", required=True)
@@ -40,6 +64,7 @@ def main() -> None:
     parser.add_argument("--temperature", type=float)
     parser.add_argument("--top-p", type=float)
     parser.add_argument("--top-k", type=int)
+    parser.add_argument("--approximation", choices=sorted(APPROXIMATION_MODES))
     parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
     parser.add_argument("--prefetch-read-workers", type=int, default=2)
@@ -59,6 +84,17 @@ def main() -> None:
     parser.add_argument("--no-layer-major-prefill", action="store_true")
     parser.add_argument("--layer-major-prefill-threshold", type=int, default=1_024)
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
+    parser.add_argument(
+        "--no-ane-prefill",
+        action="store_true",
+        help="use the original GPU Prefill path",
+    )
+    parser.add_argument("--ane-prefill-ratio", type=float, default=0.25)
+    parser.add_argument(
+        "--qwen-next-layer-prefetch",
+        action="store_true",
+        help="research only: prefetch the next Qwen expert layer during compute",
+    )
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
     parser.add_argument("--no-persistent-prompt-cache", action="store_true")
@@ -140,6 +176,14 @@ def main() -> None:
         parser.error(str(error))
     if installed.is_qwen and arguments.dspark:
         parser.error("Qwen3.8-Flash-Next does not support --dspark")
+    try:
+        approximation_mode = _select_approximation_mode(
+            arguments.approximation,
+            is_qwen=installed.is_qwen,
+            dspark_enabled=arguments.dspark,
+        )
+    except ValueError as error:
+        parser.error(str(error))
     if arguments.mtp and not installed.is_qwen:
         parser.error("--mtp is supported only by Qwen3.8-Flash-Next")
     if arguments.mtp and not installed.has_mtp:
@@ -209,7 +253,12 @@ def main() -> None:
         )
     if arguments.dspark and arguments.expert_route_trace:
         parser.error("--expert-route-trace currently requires DSpark to be disabled")
-
+    if arguments.qwen_next_layer_prefetch and not installed.is_qwen:
+        parser.error("--qwen-next-layer-prefetch requires Qwen3.8-Flash-Next")
+    if arguments.qwen_next_layer_prefetch and arguments.no_layer_major_prefill:
+        parser.error("--qwen-next-layer-prefetch requires layer-major Prefill")
+    if not 0 <= arguments.ane_prefill_ratio <= 1:
+        parser.error("--ane-prefill-ratio must be between 0 and 1")
     config = RuntimeConfig(
         slots=arguments.slots,
         read_workers=arguments.read_workers,
@@ -221,6 +270,9 @@ def main() -> None:
         layer_major_prefill=not arguments.no_layer_major_prefill,
         layer_major_prefill_threshold=arguments.layer_major_prefill_threshold,
         batched_expert_prefill=not arguments.no_batched_expert_prefill,
+        ane_prefill=not arguments.no_ane_prefill,
+        ane_prefill_ratio=arguments.ane_prefill_ratio,
+        qwen_next_layer_prefetch=arguments.qwen_next_layer_prefetch,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
@@ -260,6 +312,7 @@ def main() -> None:
                 temperature=temperature,
                 top_p=top_p,
                 top_k=top_k,
+                approximation_mode=approximation_mode,
             ),
         ):
             sys.stdout.write(response.text)
@@ -354,6 +407,9 @@ def main() -> None:
             "prefill_attention_chunk_sizes": attention_chunk_sizes,
             "prefill_moe_chunk_sizes": moe_chunk_sizes,
             "batched_expert_prefill": config.batched_expert_prefill,
+            "ane_prefill": config.ane_prefill,
+            "ane_prefill_ratio": config.ane_prefill_ratio,
+            "qwen_next_layer_prefetch": config.qwen_next_layer_prefetch,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
             "expert_page_cache_probe": config.expert_page_cache_probe,

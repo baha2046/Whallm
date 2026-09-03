@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -14,7 +15,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Iterator
 from urllib.parse import urlsplit
 
-from .generation import GenerationOptions, GeneratedPiece, THINK_END
+from .generation import (
+    APPROXIMATION_MODES,
+    EXACT_APPROXIMATION_MODE,
+    LEARNED_ROUTE_DROP_LOWEST_1,
+    GenerationOptions,
+    GeneratedPiece,
+    THINK_END,
+)
 from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .manifest import InstalledModel
 from .model_manager import (
@@ -52,6 +60,7 @@ _QWEN_SAMPLING_DEFAULTS = {
         "repetition_penalty": 1.0,
     },
 }
+_CODEX_SHELL_TOOLS = {"exec_command"}
 
 
 class APIError(Exception):
@@ -139,9 +148,11 @@ class OpenAIServer(ThreadingHTTPServer):
         model_manager: ModelManager,
         *,
         api_key: str | None = None,
+        log_level: str = "info",
     ):
         self.model_manager = model_manager
         self.api_key = api_key
+        self.log_level = log_level
         self.metrics = GenerationMetrics()
         super().__init__(address, OpenAIHandler)
 
@@ -203,6 +214,11 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             action()
         except APIError as error:
             self._json(error.status, error.body())
+        except ModelCatalogError as error:
+            self._json(
+                400,
+                APIError(str(error), param="configuration").body(),
+            )
         except ModelNotFound as error:
             self._json(
                 400,
@@ -264,6 +280,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 {
                     "object": "list",
                     "data": self.app.model_manager.models(),
+                    "models": self.app.model_manager.codex_models(),
                 },
             )
         else:
@@ -289,7 +306,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         elif path == "/api/models/load":
             self._authorize()
             payload = self._request_json()
-            self.app.model_manager.load(payload.get("model"))
+            self.app.model_manager.load(
+                payload.get("model"), payload.get("configuration")
+            )
+            self._json(200, self._status())
+        elif path == "/api/models/configure":
+            self._authorize()
+            payload = self._request_json()
+            self.app.model_manager.configure(payload.get("configuration"))
             self._json(200, self._status())
         elif path == "/api/models/unload":
             self._authorize()
@@ -315,8 +339,10 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             payload,
             model.defaults,
             qwen=qwen,
+            dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode=thinking_mode,
         )
+        _validate_approximation_runtime(options, runtime)
         prompt = runtime.encode_chat(
             messages,
             thinking_mode,
@@ -337,6 +363,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     bool(stream_options.get("include_usage", False)),
                     model.name,
                     runtime,
+                    options.approximation_mode,
                 )
                 return
             self._stream_chat(
@@ -345,6 +372,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 thinking_mode == "thinking",
                 bool(stream_options.get("include_usage", False)),
                 model.name,
+                options.approximation_mode,
             )
             return
 
@@ -375,6 +403,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "object": "chat.completion",
                     "created": int(time.time()),
                     "model": model.name,
+                    "approximation": {"mode": options.approximation_mode},
                     "choices": [
                         {
                             "index": 0,
@@ -401,6 +430,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "object": "chat.completion",
                 "created": int(time.time()),
                 "model": model.name,
+                "approximation": {"mode": options.approximation_mode},
                 "choices": [
                     {
                         "index": 0,
@@ -420,6 +450,8 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         messages = _response_messages(payload)
         tools, tool_choice, response_tools = _response_tool_request(payload)
         qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
+        if _use_qwen_codex_tool_first(qwen, messages, tool_choice, response_tools):
+            tool_choice = ToolChoice("required")
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
             responses_api=True,
@@ -429,8 +461,10 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             request,
             model.defaults,
             qwen=qwen,
+            dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode=thinking_mode,
         )
+        _validate_approximation_runtime(options, runtime)
         _validate_response_request(payload)
         prompt = runtime.encode_chat(
             messages,
@@ -440,7 +474,19 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             reasoning_effort,
         )
         request_id = "resp_" + uuid.uuid4().hex
-        pieces = self.app.track(runtime.stream(prompt, options))
+        if tool_choice.mode in {"required", "function"}:
+            pieces = self._validated_response_pieces(
+                runtime,
+                prompt,
+                messages,
+                tools,
+                tool_choice,
+                reasoning_effort,
+                thinking_mode,
+                options,
+            )
+        else:
+            pieces = self.app.track(runtime.stream(prompt, options))
         tool_calling = bool(tools) and tool_choice.mode != "none"
         if stream:
             self._stream_response(
@@ -450,6 +496,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 options,
                 thinking_mode,
                 tool_calling,
+                tool_choice,
                 response_tools,
                 model.name,
                 runtime,
@@ -489,6 +536,60 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         )
         self._json(200, response)
 
+    def _validated_response_pieces(
+        self,
+        runtime: Any,
+        prompt: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        tool_choice: ToolChoice,
+        reasoning_effort: str,
+        thinking_mode: str,
+        options: GenerationOptions,
+    ) -> Iterator[GeneratedPiece]:
+        current_prompt = prompt
+        parse_failed = False
+        for attempt in range(2):
+            pieces = list(self.app.track(runtime.stream(current_prompt, options)))
+            raw = "".join(piece.text for piece in pieces)
+            try:
+                turn = runtime.parse_chat(raw, thinking_mode)
+            except Exception:
+                parse_failed = True
+            else:
+                parse_failed = False
+                if _tool_choice_satisfied(turn.tool_calls, tool_choice):
+                    yield from pieces
+                    return
+            if attempt == 0:
+                retry_messages = [
+                    {
+                        "role": "developer",
+                        "content": _tool_retry_instruction(tool_choice),
+                    },
+                    *messages,
+                ]
+                current_prompt = runtime.encode_chat(
+                    retry_messages,
+                    thinking_mode,
+                    tools,
+                    tool_choice,
+                    reasoning_effort,
+                )
+        if parse_failed:
+            raise APIError(
+                "The model returned an invalid required tool call after one retry.",
+                status=500,
+                code="invalid_tool_call",
+                error_type="server_error",
+            )
+        raise APIError(
+            "The model did not return the required tool call after one retry.",
+            status=500,
+            code="tool_choice_not_satisfied",
+            error_type="server_error",
+        )
+
     def _stream_response(
         self,
         pieces: Iterator[GeneratedPiece],
@@ -497,6 +598,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         options: GenerationOptions,
         thinking_mode: str,
         tool_calling: bool,
+        tool_choice: ToolChoice,
         response_tools: dict[str, dict[str, str]],
         model_name: str,
         runtime: Any,
@@ -669,14 +771,19 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     delta=delta.arguments,
                 )
 
-        def fail(message: str) -> None:
+        def fail(message: str, code: str = "invalid_tool_call") -> None:
+            nonlocal message_item, message_index, message_text
             notice = f"Whallm could not complete the request: {message}"
             if message_text:
                 notice = "\n\n" + notice
+            if message_item is not None and message_item["status"] == "completed":
+                message_item = None
+                message_index = -1
+                message_text = ""
             send_delta(ToolStreamDelta(content=notice))
             finish_reasoning()
             finish_message()
-            error = {"code": "invalid_tool_call", "message": message}
+            error = {"code": code, "message": message}
             send("error", **error, param=None)
             failed = _response_object(
                 request_id,
@@ -700,34 +807,32 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             status="in_progress",
         )
         send("response.created", response=created)
-        raw_parts: list[str] = []
         if tool_calling:
-            factory = getattr(runtime, "make_tool_stream_parser", None)
-            parser = (
-                factory(thinking_mode)
-                if callable(factory)
-                else ToolStreamParser(thinking_mode)
-            )
-            for piece in pieces:
-                raw_parts.append(piece.text)
-                prompt_tokens = piece.prompt_tokens
-                generated = piece.generation_tokens
-                for delta in parser.feed(piece.text):
-                    send_delta(delta)
-            for delta in parser.finish():
-                send_delta(delta)
             try:
-                turn = runtime.parse_chat("".join(raw_parts), thinking_mode)
+                raw, prompt_tokens, generated, _ = _collect_raw(pieces)
+            except APIError as error:
+                fail(str(error), error.code or "invalid_tool_call")
+                return
+            try:
+                turn = runtime.parse_chat(raw, thinking_mode)
             except Exception:
                 fail("The model returned an invalid tool call.")
                 return
-            if not parser.matches(turn.tool_calls):
-                fail("The streamed tool call failed validation.")
+            if not _tool_choice_satisfied(turn.tool_calls, tool_choice):
+                fail(
+                    "The model did not return the required tool call.",
+                    "tool_choice_not_satisfied",
+                )
                 return
+            send_delta(
+                ToolStreamDelta(
+                    reasoning_content=turn.reasoning_content,
+                    content=turn.content,
+                )
+            )
             for index, call in enumerate(turn.tool_calls):
-                if index not in calls:
-                    send_delta(ToolStreamDelta(tool_index=index, tool_name=call.name))
-                    send_delta(ToolStreamDelta(tool_index=index, arguments=call.arguments))
+                send_delta(ToolStreamDelta(tool_index=index, tool_name=call.name))
+                send_delta(ToolStreamDelta(tool_index=index, arguments=call.arguments))
         else:
             parser = ReasoningParser(thinking_mode == "thinking")
             for piece in pieces:
@@ -767,12 +872,15 @@ class OpenAIHandler(BaseHTTPRequestHandler):
 
     def _completion(self, payload: dict[str, Any], model: ModelRequest) -> None:
         runtime = model.runtime
+        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
         options, stream = self._common(
             payload,
             model.defaults,
-            qwen=getattr(getattr(runtime, "installed", None), "is_qwen", False),
+            qwen=qwen,
+            dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode="chat",
         )
+        _validate_approximation_runtime(options, runtime)
         if payload.get("tools") not in (None, []):
             raise APIError("tools are only supported for chat completions.", param="tools")
         if payload.get("tool_choice") not in (None, "none"):
@@ -786,7 +894,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         request_id = "cmpl-" + uuid.uuid4().hex
         pieces = self.app.track(runtime.stream(prompt, options))
         if stream:
-            self._stream_completion(pieces, request_id, model.name)
+            self._stream_completion(
+                pieces,
+                request_id,
+                model.name,
+                options.approximation_mode,
+            )
             return
         text, _, prompt_tokens, generated, finish = _collect(pieces, False)
         self._json(
@@ -796,6 +909,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "object": "text_completion",
                 "created": int(time.time()),
                 "model": model.name,
+                "approximation": {"mode": options.approximation_mode},
                 "choices": [
                     {
                         "index": 0,
@@ -814,6 +928,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         defaults: ServerDefaults | ModelDefaults,
         *,
         qwen: bool = False,
+        dspark: bool = False,
         thinking_mode: str = "chat",
     ) -> tuple[GenerationOptions, bool]:
         unsupported = {
@@ -852,6 +967,11 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             payload,
             defaults,
             qwen=qwen,
+            approximation_default=(
+                EXACT_APPROXIMATION_MODE
+                if qwen or dspark
+                else LEARNED_ROUTE_DROP_LOWEST_1
+            ),
             thinking_mode=thinking_mode,
         ), stream
 
@@ -862,6 +982,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         thinking: bool,
         include_usage: bool,
         model_name: str,
+        approximation_mode: str,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -870,6 +991,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "object": "chat.completion.chunk",
             "created": created,
             "model": model_name,
+            "approximation": {"mode": approximation_mode},
         }
         self._sse({**base, "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]})
         parser = ReasoningParser(thinking)
@@ -902,6 +1024,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         include_usage: bool,
         model_name: str,
         runtime: Any,
+        approximation_mode: str,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -910,6 +1033,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "object": "chat.completion.chunk",
             "created": created,
             "model": model_name,
+            "approximation": {"mode": approximation_mode},
         }
         self._sse(
             {
@@ -1041,6 +1165,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         pieces: Iterator[GeneratedPiece],
         request_id: str,
         model_name: str,
+        approximation_mode: str,
     ) -> None:
         self._start_sse()
         created = int(time.time())
@@ -1053,6 +1178,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "object": "text_completion",
                     "created": created,
                     "model": model_name,
+                    "approximation": {"mode": approximation_mode},
                     "choices": [
                         {
                             "index": 0,
@@ -1069,6 +1195,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 "object": "text_completion",
                 "created": created,
                 "model": model_name,
+                "approximation": {"mode": approximation_mode},
                 "choices": [
                     {
                         "index": 0,
@@ -1124,6 +1251,10 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             raise APIError("Request body must be valid JSON.") from error
         if not isinstance(value, dict):
             raise APIError("Request body must be a JSON object.")
+        if self.app.log_level == "debug":
+            body = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+            sys.stderr.write(f"[DEBUG] request {self.command} {self.path}: {body}\n")
+            sys.stderr.flush()
         return value
 
     def _start_sse(self) -> None:
@@ -1157,10 +1288,20 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             self.wfile.write(body)
         self.close_connection = True
 
-    def log_message(self, format: str, *args: object) -> None:
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
         if urlsplit(self.path).path == "/api/status":
             return
+        try:
+            status = int(code)
+        except (TypeError, ValueError):
+            status = 500
+        if self.app.log_level == "error" and status < 400:
+            return
+        self.log_message('"%s" %s %s', self.requestline, str(code), str(size))
+
+    def log_message(self, format: str, *args: object) -> None:
         sys.stderr.write(f"{self.client_address[0]} - {format % args}\n")
+        sys.stderr.flush()
 
 
 def _validate_response_request(payload: dict[str, Any]) -> None:
@@ -1395,6 +1536,42 @@ def _response_tool_request(
     return parsed_tools, parsed_choice, response_tools
 
 
+def _use_qwen_codex_tool_first(
+    qwen: bool,
+    messages: list[dict[str, Any]],
+    tool_choice: ToolChoice,
+    response_tools: dict[str, dict[str, str]],
+) -> bool:
+    return (
+        qwen
+        and tool_choice.mode == "auto"
+        and not any(message.get("role") == "tool" for message in messages)
+        and any(
+            tool.get("name") in _CODEX_SHELL_TOOLS
+            for tool in response_tools.values()
+        )
+    )
+
+
+def _tool_choice_satisfied(calls: tuple[Any, ...], choice: ToolChoice) -> bool:
+    if choice.mode == "required":
+        return bool(calls)
+    if choice.mode == "function":
+        return any(call.name == choice.name for call in calls)
+    return True
+
+
+def _tool_retry_instruction(choice: ToolChoice) -> str:
+    if choice.mode == "function":
+        target = f'Call the required "{choice.name}" tool now.'
+    else:
+        target = "Call one of the provided tools now."
+    return (
+        "The previous attempt did not produce the required tool call. "
+        f"{target} Return a tool call, not a status update or final answer."
+    )
+
+
 def _response_text(text: str) -> dict[str, Any]:
     return {"type": "output_text", "annotations": [], "logprobs": [], "text": text}
 
@@ -1431,7 +1608,13 @@ def _response_output(
 
 
 def _response_internal_tool_name(name: str, namespace: str | None) -> str:
-    return f"{namespace}__{name}" if namespace else name
+    if namespace is None:
+        return name
+    qualified = f"{namespace}__{name}"
+    if len(qualified) <= 64:
+        return qualified
+    digest = hashlib.sha256(qualified.encode()).hexdigest()[:32]
+    return f"{qualified[:30]}__{digest}"
 
 
 def _response_tool_call(
@@ -1501,6 +1684,7 @@ def _response_object(
         "instructions": payload.get("instructions"),
         "max_output_tokens": options.max_tokens,
         "model": model,
+        "approximation": {"mode": options.approximation_mode},
         "output": output,
         "parallel_tool_calls": payload.get("parallel_tool_calls", True),
         "previous_response_id": None,
@@ -1540,8 +1724,36 @@ def _options(
     defaults: ServerDefaults | ModelDefaults,
     *,
     qwen: bool = False,
+    approximation_default: str = LEARNED_ROUTE_DROP_LOWEST_1,
     thinking_mode: str = "chat",
 ) -> GenerationOptions:
+    if "approximation" not in payload:
+        approximation_mode = approximation_default
+    else:
+        approximation = payload["approximation"]
+        if not isinstance(approximation, dict):
+            raise APIError("approximation must be an object.", param="approximation")
+        if set(approximation) != {"mode"}:
+            raise APIError(
+                "approximation must contain only mode.",
+                param="approximation",
+            )
+        approximation_mode = approximation.get("mode")
+        if not isinstance(approximation_mode, str):
+            raise APIError(
+                "approximation.mode must be a string.",
+                param="approximation.mode",
+            )
+        if approximation_mode not in APPROXIMATION_MODES:
+            raise APIError(
+                "approximation.mode is not supported.",
+                param="approximation.mode",
+            )
+        if qwen and approximation_mode != EXACT_APPROXIMATION_MODE:
+            raise APIError(
+                "approximation.mode is not supported for Qwen.",
+                param="approximation.mode",
+            )
     max_tokens = payload.get(
         "max_completion_tokens",
         payload.get("max_output_tokens", payload.get("max_tokens", defaults.max_tokens)),
@@ -1590,7 +1802,18 @@ def _options(
         min_p=sampling_defaults["min_p"],
         presence_penalty=sampling_defaults["presence_penalty"],
         repetition_penalty=sampling_defaults["repetition_penalty"],
+        approximation_mode=approximation_mode,
     )
+
+
+def _validate_approximation_runtime(options: GenerationOptions, runtime: Any) -> None:
+    if options.approximation_mode != LEARNED_ROUTE_DROP_LOWEST_1:
+        return
+    if bool(getattr(getattr(runtime, "config", None), "dspark_enabled", False)):
+        raise APIError(
+            "approximation.mode is not supported with DSpark.",
+            param="approximation.mode",
+        )
 
 
 def _tool_request(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], ToolChoice]:
@@ -1885,6 +2108,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument("--api-key", default=os.environ.get("DEEPSEEK_API_KEY"))
+    parser.add_argument(
+        "--log-level",
+        choices=("debug", "info", "error"),
+        default="info",
+    )
     parser.add_argument("--public-model")
     parser.add_argument("--slots", type=int, default=1_152)
     parser.add_argument("--read-workers", type=int, default=4)
@@ -1915,6 +2143,12 @@ def _parser() -> argparse.ArgumentParser:
         help="minimum uncached prompt tokens for DeepSeek layer-major prefill",
     )
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
+    parser.add_argument(
+        "--no-ane-prefill",
+        action="store_true",
+        help="use the original GPU Prefill path",
+    )
+    parser.add_argument("--ane-prefill-ratio", type=float, default=0.25)
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
     parser.add_argument("--no-persistent-prompt-cache", action="store_true")
@@ -2007,6 +2241,8 @@ def main() -> None:
         layer_major_prefill=not arguments.no_layer_major_prefill,
         layer_major_prefill_threshold=arguments.layer_major_prefill_threshold,
         batched_expert_prefill=not arguments.no_batched_expert_prefill,
+        ane_prefill=not arguments.no_ane_prefill,
+        ane_prefill_ratio=arguments.ane_prefill_ratio,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
@@ -2079,6 +2315,11 @@ def main() -> None:
                     "top_k": default_top_k,
                 },
                 ServerDefaults(),
+                approximation_default=(
+                    EXACT_APPROXIMATION_MODE
+                    if installed.is_qwen or arguments.dspark
+                    else LEARNED_ROUTE_DROP_LOWEST_1
+                ),
             )
             model_specs = parse_model_catalog(
                 {
@@ -2113,6 +2354,7 @@ def main() -> None:
             (arguments.host, arguments.port),
             model_manager,
             api_key=arguments.api_key,
+            log_level=arguments.log_level,
         )
         print(f"Ready: http://{arguments.host}:{server.server_port}", flush=True)
         server.serve_forever()

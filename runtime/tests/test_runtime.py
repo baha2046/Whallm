@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import mlx.core as mx
+import numpy as np
 from mlx_lm.models import deepseek_v4
 from mlx_lm.models.cache import CacheList
 
@@ -43,7 +44,9 @@ from deepseek_v4_ssd.generation import (
     GenerationOptions,
     ModelRuntime,
     RuntimeMetrics,
+    _PromptCacheEntry,
     _RawEvalCacheList,
+    _approximation_mode,
     _decode_cache_state,
     _encode_cache_state,
     _persistence_cache_state,
@@ -85,6 +88,92 @@ _mlx_lm_generate = importlib.import_module("mlx_lm.generate")
 
 
 class ModelRuntimeTests(unittest.TestCase):
+    def test_approximation_mode_changes_only_learned_routers_and_restores_them(self):
+        layers = []
+        for index in range(43):
+            gate = SimpleNamespace(top_k=6, hash=index < 3)
+            layers.append(SimpleNamespace(ffn=SimpleNamespace(gate=gate)))
+        runtime = SimpleNamespace(
+            _is_qwen=False,
+            model=SimpleNamespace(
+                model=SimpleNamespace(layers=layers),
+                dspark=None,
+            ),
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "stop"):
+            with _approximation_mode(runtime, "learned-route-drop-lowest-1"):
+                self.assertEqual(
+                    [layer.ffn.gate.top_k for layer in layers[:3]],
+                    [6, 6, 6],
+                )
+                self.assertEqual(
+                    [layer.ffn.gate.top_k for layer in layers[3:]],
+                    [5] * 40,
+                )
+                raise RuntimeError("stop")
+
+        self.assertEqual([layer.ffn.gate.top_k for layer in layers], [6] * 43)
+
+    def test_approximation_mode_rejects_qwen_and_dspark(self):
+        qwen = SimpleNamespace(_is_qwen=True, model=object())
+        with self.assertRaisesRegex(ValueError, "Qwen"):
+            with _approximation_mode(qwen, "learned-route-drop-lowest-1"):
+                pass
+
+        dspark = SimpleNamespace(
+            _is_qwen=False,
+            model=SimpleNamespace(dspark=object()),
+        )
+        with self.assertRaisesRegex(ValueError, "DSpark"):
+            with _approximation_mode(dspark, "learned-route-drop-lowest-1"):
+                pass
+
+    def test_prompt_cache_is_isolated_by_approximation_mode(self):
+        runtime = ModelRuntime.__new__(ModelRuntime)
+        runtime.model = object()
+        runtime._prompt_caches = [
+            _PromptCacheEntry(["exact"], [1, 2], "exact"),
+            _PromptCacheEntry(
+                ["approximate"],
+                [1, 2],
+                "learned-route-drop-lowest-1",
+            ),
+        ]
+        runtime._persistent_prompt_caches = []
+
+        exact = runtime._acquire_prompt_cache([1, 2, 3], "exact")
+        approximate = runtime._acquire_prompt_cache(
+            [1, 2, 3],
+            "learned-route-drop-lowest-1",
+        )
+
+        self.assertEqual(exact.cache, ["exact"])
+        self.assertEqual(approximate.cache, ["approximate"])
+        self.assertEqual(exact.approximation_mode, "exact")
+        self.assertEqual(
+            approximate.approximation_mode,
+            "learned-route-drop-lowest-1",
+        )
+
+    def test_approximate_prompt_cache_is_never_persisted(self):
+        runtime = ModelRuntime.__new__(ModelRuntime)
+        runtime.config = SimpleNamespace(
+            prompt_cache_entries=2,
+            prompt_cache_memory_gib=1,
+        )
+        runtime._prompt_caches = []
+        entry = _PromptCacheEntry(
+            [],
+            [1, 2],
+            "learned-route-drop-lowest-1",
+        )
+
+        with patch.object(runtime, "_persist_prompt_cache") as persist:
+            runtime._store_prompt_cache(entry, persist=True)
+
+        persist.assert_not_called()
+
     def test_layer_major_prefill_uses_configured_deepseek_threshold(self):
         default = SimpleNamespace(layer_major_prefill=True)
         configured = SimpleNamespace(
@@ -601,6 +690,92 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(received, [[1, 2], [3]])
         self.assertEqual(reused, 3)
 
+    def test_persistent_prefill_checkpoint_clones_mutable_cache_state(self):
+        class MutableCache:
+            def __init__(self):
+                self.values = [mx.array([0], dtype=mx.int32)]
+                self.nbytes = 4
+
+            @property
+            def state(self):
+                return self.values
+
+            @state.setter
+            def state(self, value):
+                self.values = value
+
+        prompt_tokens = list(range(48))
+        received = []
+        restored = []
+
+        def generate(_model, _tokenizer, prompt, **options):
+            prompt = list(prompt)
+            received.append(prompt)
+            cache = options["prompt_cache"][0]
+            if len(received) == 1:
+                callback = options["prompt_progress_callback"]
+                callback(0, len(prompt))
+                cache.state[0] = mx.array([47], dtype=mx.int32)
+                callback(len(prompt) - 1, len(prompt))
+                cache.state[0] = mx.array([999], dtype=mx.int32)
+            else:
+                restored.append(int(cache.state[0].item()))
+            yield SimpleNamespace(
+                text="A",
+                token=42,
+                generation_tokens=1,
+                finish_reason="length",
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            installed = SimpleNamespace(
+                root=Path("/tmp/tokenizer"),
+                revision="fixture-revision",
+            )
+            config = SimpleNamespace(
+                prefill_step_size=128,
+                layer_major_prefill=False,
+                prompt_cache_entries=2,
+                prompt_cache_memory_gib=1,
+                persistent_prompt_cache=True,
+                persistent_prompt_cache_entries=8,
+                prompt_cache_directory=directory,
+            )
+            tokenizer = SimpleNamespace(
+                bos_token=None,
+                encode=lambda _prompt, **_options: prompt_tokens,
+            )
+            with (
+                patch(
+                    "deepseek_v4_ssd.generation.load_model",
+                    return_value=(object(), SimpleNamespace(close=lambda: None)),
+                ),
+                patch(
+                    "deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained",
+                    return_value=tokenizer,
+                ),
+                patch(
+                    "deepseek_v4_ssd.generation.make_prompt_cache",
+                    side_effect=lambda _model: [MutableCache()],
+                ),
+                patch(
+                    "deepseek_v4_ssd.generation.stream_generate",
+                    side_effect=generate,
+                ),
+            ):
+                first = ModelRuntime(installed, config)
+                list(first.stream("same", GenerationOptions(max_tokens=1)))
+                first.close()
+
+                second = ModelRuntime(installed, config)
+                list(second.stream("same", GenerationOptions(max_tokens=1)))
+                reused = second.metrics.snapshot()["prompt_cache_reused_tokens"]
+                second.close()
+
+        self.assertEqual(received, [prompt_tokens, [prompt_tokens[-1]]])
+        self.assertEqual(restored, [47])
+        self.assertEqual(reused, 47)
+
     def test_decode_rate_includes_cache_evaluation(self):
         metrics = RuntimeMetrics()
         metrics.start(4, 0, 1, False, CacheMetrics())
@@ -617,6 +792,23 @@ class ModelRuntimeTests(unittest.TestCase):
         self.assertEqual(snapshot["decode_tokens_per_second"], 0.4)
         self.assertEqual(snapshot["decode_latency_p50_seconds"], 2.5)
         self.assertEqual(snapshot["decode_latency_p95_seconds"], 2.5)
+
+    def test_metrics_report_actual_approximation_mode(self):
+        metrics = RuntimeMetrics()
+        metrics.start(
+            4,
+            0,
+            1,
+            False,
+            CacheMetrics(),
+            approximation_mode="learned-route-drop-lowest-1",
+        )
+        metrics.finish(CacheMetrics())
+
+        self.assertEqual(
+            metrics.snapshot()["approximation_mode"],
+            "learned-route-drop-lowest-1",
+        )
 
     def test_metrics_report_process_disk_io_delta(self):
         metrics = RuntimeMetrics()
@@ -718,6 +910,9 @@ class PrefillTests(unittest.TestCase):
         self.assertTrue(RuntimeConfig().ready_expert_decode)
         self.assertFalse(RuntimeConfig().staged_expert_streaming)
         self.assertIsNone(RuntimeConfig().adaptive_expert_prefill_threshold)
+        self.assertFalse(RuntimeConfig().qwen_next_layer_prefetch)
+        self.assertTrue(RuntimeConfig().ane_prefill)
+        self.assertEqual(RuntimeConfig().ane_prefill_ratio, 0.25)
 
     def test_adaptive_expert_prefill_requires_isolated_batched_layer_major_mode(self):
         for config, message in (
@@ -2811,22 +3006,51 @@ class ExpertCacheTests(unittest.TestCase):
             )
 
             for staged in (False, True):
+                trace_path = root / f"prefetch-{staged}.json"
                 with self.subTest(staged=staged), ExpertCache(
                     model,
                     slots=1,
                     read_workers=1,
                     staged_expert_streaming=staged,
+                    route_trace_path=trace_path,
                 ) as cache:
                     cache.prefetch_layer(0)
                     with cache.batched_layer(0) as batched:
                         mx.eval(batched.w1, batched.w3_scales)
+                        cache.record_routes(0, np.array([0], dtype=np.int32))
                         self.assertIs(cache.current_batched(0), batched)
+                        cache.record_compute_submit(0)
                         self.assertEqual(batched.w1.shape, (2, 1, 1))
                         self.assertEqual(
                             batched.w1_scales[:, 0, 0].tolist(), [4, 28]
                         )
                     self.assertIsNone(cache.current_batched(0))
                     self.assertEqual(cache.metrics.bytes_read, len(source))
+
+                trace = json.loads(trace_path.read_text(encoding="utf-8"))
+                event = trace["prefetch_events"][0]
+                self.assertEqual(event["layer"], 0)
+                self.assertEqual(event["requested_experts"], 2)
+                self.assertEqual(event["used_experts"], 1)
+                self.assertEqual(event["useful_bytes"], blob_size)
+                self.assertEqual(event["wasted_bytes"], blob_size)
+                self.assertLessEqual(
+                    event["read_submit_seconds"],
+                    event["read_start_seconds"],
+                )
+                self.assertLessEqual(
+                    event["read_start_seconds"],
+                    event["read_complete_seconds"],
+                )
+                self.assertGreaterEqual(
+                    event["compute_submit_seconds"],
+                    event["expert_deadline_seconds"],
+                )
+                self.assertEqual(
+                    event["ready_by_deadline"],
+                    event["read_complete_seconds"]
+                    <= event["expert_deadline_seconds"],
+                )
 
     def test_selective_batched_layer_reads_union_rows_at_original_offsets(self):
         with tempfile.TemporaryDirectory() as directory:

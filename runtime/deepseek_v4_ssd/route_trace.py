@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from array import array
 from contextlib import contextmanager
 from pathlib import Path
@@ -26,11 +27,68 @@ class RouteTraceRecorder:
         self.expert_count = expert_count
         self.selected_expert_count = selected_expert_count
         self.expert_blob_size = expert_blob_size
+        self._started = time.perf_counter()
         self._phase: str | None = None
         self._prefill = np.zeros((layer_count, expert_count), dtype=np.uint64)
         self._prefill_chunks = [[] for _ in range(layer_count)]
+        self._prefill_cache_accesses: list[dict[str, int | list[int]]] = []
         self._decode = [array("H") for _ in range(layer_count)]
         self._decode_misses = [array("B") for _ in range(layer_count)]
+        self._prefetch_events: list[dict[str, object]] = []
+
+    def record_prefetch_event(
+        self,
+        *,
+        layer: int,
+        requested_experts: int,
+        used_experts: int,
+        read_submit: float,
+        read_start: float,
+        read_complete: float,
+        expert_deadline: float,
+        compute_submit: float | None,
+        future_wait_seconds: float,
+    ) -> None:
+        if not 0 <= layer < self.layer_count:
+            raise ValueError(f"invalid prefetch trace layer: {layer}")
+        if not 0 <= used_experts <= requested_experts <= self.expert_count:
+            raise ValueError("invalid prefetch expert counts")
+        if not read_submit <= read_start <= read_complete:
+            raise ValueError("invalid prefetch read timestamps")
+        if expert_deadline < read_submit:
+            raise ValueError("prefetch deadline is before submission")
+        if compute_submit is not None and compute_submit < expert_deadline:
+            raise ValueError("compute submission is before the expert deadline")
+        unused_experts = requested_experts - used_experts
+        self._prefetch_events.append(
+            {
+                "kind": "batched_layer_prefetch",
+                "layer": layer,
+                "requested_experts": requested_experts,
+                "used_experts": used_experts,
+                "unused_experts": unused_experts,
+                "useful_bytes": used_experts * self.expert_blob_size,
+                "wasted_bytes": unused_experts * self.expert_blob_size,
+                "read_submit_seconds": read_submit - self._started,
+                "read_start_seconds": read_start - self._started,
+                "read_complete_seconds": read_complete - self._started,
+                "expert_deadline_seconds": expert_deadline - self._started,
+                "compute_submit_seconds": (
+                    compute_submit - self._started
+                    if compute_submit is not None
+                    else None
+                ),
+                "overlap_window_seconds": max(0.0, expert_deadline - read_submit),
+                "exposed_read_wait_seconds": max(
+                    0.0,
+                    read_complete - expert_deadline,
+                ),
+                "future_wait_seconds": future_wait_seconds,
+                "ready_by_deadline": read_complete <= expert_deadline,
+                "used": used_experts > 0,
+                "wasted": unused_experts > 0,
+            }
+        )
 
     @contextmanager
     def phase(self, name: str):
@@ -69,6 +127,16 @@ class RouteTraceRecorder:
         selected: list[int],
         missing: list[int],
     ) -> None:
+        if self._phase == "prefill":
+            values = np.asarray(selected, dtype=np.int64)
+            histogram = np.bincount(
+                values,
+                minlength=self.expert_count,
+            ).astype(np.uint64)
+            self._prefill_cache_accesses.append(
+                {"layer": layer, "histogram": histogram.tolist()}
+            )
+            return
         if self._phase != "decode":
             return
         missing_set = set(missing)
@@ -85,8 +153,10 @@ class RouteTraceRecorder:
             "expert_count": self.expert_count,
             "selected_expert_count": self.selected_expert_count,
             "expert_blob_size": self.expert_blob_size,
+            "prefetch_events": self._prefetch_events,
             "prefill_histograms": self._prefill.tolist(),
             "prefill_chunk_histograms": self._prefill_chunks,
+            "prefill_cache_accesses": self._prefill_cache_accesses,
             "decode_routes": [
                 [
                     list(routes[start : start + self.selected_expert_count])

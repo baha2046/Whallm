@@ -5,12 +5,19 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import mlx.core as mx
+import mlx.nn as nn
 import numpy as np
 from mlx_lm.models.cache import ArraysCache, CacheList, KVCache
 
 from deepseek_v4_ssd.expert_cache import ExpertCache
+from deepseek_v4_ssd.ane_prefill import (
+    ANEPrefillController,
+    ANEPrefillLinear,
+    _ane_output_channels,
+)
 from deepseek_v4_ssd.generation import _qwen_layer_major_prefill
 from deepseek_v4_ssd.manifest import (
     QWEN_EXPERT_REGIONS,
@@ -166,6 +173,24 @@ class FakeSamplingMTP(FakeGreedyMTP):
         return mx.array(logits), mx.array(hidden)
 
 
+class FakeANEProjection:
+    def __init__(self, weight, spatial, error=None):
+        self.weight = np.asarray(weight, dtype=np.float16)
+        self.input_channels = self.weight.shape[1]
+        self.output_channels = self.weight.shape[0]
+        self.spatial = spatial
+        self.error = error
+        self.closed = False
+
+    def evaluate(self, value):
+        if self.error is not None:
+            raise RuntimeError(self.error)
+        return value @ self.weight.T
+
+    def close(self):
+        self.closed = True
+
+
 class QwenTests(unittest.TestCase):
     descriptor = NGram(
         "ngram.bin",
@@ -176,6 +201,62 @@ class QwenTests(unittest.TestCase):
         tuple(range(0, 160, 10)),
         tuple(range(11, 27)),
     )
+
+    def test_ane_prefill_ratio_selects_aligned_output_channels(self):
+        self.assertEqual(_ane_output_channels(0), 0)
+        self.assertEqual(_ane_output_channels(0.25), 3_072)
+        self.assertEqual(_ane_output_channels(0.5), 6_144)
+        self.assertEqual(_ane_output_channels(1), 12_288)
+        self.assertEqual(_ane_output_channels(0.333), 4_096)
+        for ratio in (-0.1, 1.1, True):
+            with self.subTest(ratio=ratio), self.assertRaises(ValueError):
+                _ane_output_channels(ratio)
+
+    def test_ane_prefill_splits_output_channels_without_reduction(self):
+        for ane_channels in (2, 6):
+            with self.subTest(ane_channels=ane_channels):
+                linear = nn.Linear(4, 6, bias=False)
+                linear.weight = mx.arange(24, dtype=mx.float32).reshape(6, 4) / 100
+                projection = FakeANEProjection(
+                    np.asarray(linear.weight[-ane_channels:]), spatial=3
+                )
+                controller = ANEPrefillController(True)
+                controller.add(projection)
+                controller.active = True
+                split = ANEPrefillLinear(linear, projection, controller)
+                value = mx.arange(12, dtype=mx.float32).reshape(1, 3, 4) / 10
+
+                expected = linear(value)
+                result = split(value)
+                mx.eval(expected, result)
+
+                np.testing.assert_allclose(
+                    np.asarray(result), np.asarray(expected), rtol=0, atol=5e-4
+                )
+                self.assertEqual(controller.evaluations, 1)
+                self.assertEqual(controller.fallbacks, 0)
+
+    def test_ane_prefill_error_disables_ane_and_retries_original_projection(self):
+        linear = nn.Linear(4, 6, bias=False)
+        linear.weight = mx.arange(24, dtype=mx.float32).reshape(6, 4) / 100
+        projection = FakeANEProjection(
+            np.asarray(linear.weight[-2:]), spatial=3, error="interface changed"
+        )
+        controller = ANEPrefillController(True)
+        controller.add(projection)
+        controller.active = True
+        split = ANEPrefillLinear(linear, projection, controller)
+        value = mx.arange(12, dtype=mx.float32).reshape(1, 3, 4) / 10
+
+        expected = linear(value)
+        result = split(value)
+        mx.eval(expected, result)
+
+        np.testing.assert_array_equal(np.asarray(result), np.asarray(expected))
+        self.assertFalse(controller.active)
+        self.assertEqual(controller.fallbacks, 1)
+        self.assertEqual(controller.error, "interface changed")
+        self.assertTrue(projection.closed)
 
     def test_qwen_manifest_accepts_pinned_mtp_sidecar(self):
         raw = {
@@ -587,6 +668,30 @@ class QwenTests(unittest.TestCase):
         np.testing.assert_allclose(
             np.array(chunked), np.array(complete), rtol=0, atol=1e-6
         )
+
+    def test_qsa_does_not_repeat_kv_heads(self):
+        mx.random.seed(0)
+        args = ModelArgs(
+            hidden_size=16,
+            num_attention_heads=4,
+            num_key_value_heads=2,
+            head_dim=8,
+            indexer_n_heads=2,
+            indexer_kv_heads=1,
+            indexer_head_dim=8,
+            indexer_budget=4,
+            indexer_compress_ratio=2,
+            partial_rotary_factor=0.5,
+            max_position_embeddings=64,
+        )
+        hidden = mx.arange(96, dtype=mx.float32).reshape(1, 6, 16) / 100
+        attention = QSAAttention(args)
+        with patch(
+            "deepseek_v4_ssd.qwen4_exp.mx.repeat",
+            side_effect=AssertionError("grouped KV must not repeat K/V heads"),
+        ):
+            result = attention(hidden, None)
+            mx.eval(result)
 
     def test_qsa_decode_uses_both_caches(self):
         mx.random.seed(0)
@@ -1020,10 +1125,21 @@ class QwenTests(unittest.TestCase):
         class Cache:
             def __init__(self):
                 self.layers = []
+                self.events = []
+                self.compute_layers = set()
+
+            def prefetch_layer(self, layer):
+                self.events.append(("prefetch", layer))
+
+            def record_compute_submit(self, layer):
+                if layer not in self.compute_layers:
+                    self.compute_layers.add(layer)
+                    self.events.append(("compute", layer))
 
             @contextmanager
             def batched_layer(self, layer):
                 self.layers.append(layer)
+                self.events.append(("batched", layer))
                 yield None
 
         layers = [Layer(), Layer()]
@@ -1035,11 +1151,26 @@ class QwenTests(unittest.TestCase):
         cache = Cache()
 
         _qwen_layer_major_prefill(
-            SimpleNamespace(model=core), [1, 2, 3, 4, 5], [None, None], 2, cache
+            SimpleNamespace(model=core),
+            [1, 2, 3, 4, 5],
+            [None, None],
+            2,
+            cache,
+            next_layer_prefetch=True,
         )
 
         self.assertEqual(cache.layers, [0, 1])
         self.assertEqual([layer.calls for layer in layers], [3, 3])
+        self.assertEqual(
+            cache.events,
+            [
+                ("batched", 0),
+                ("prefetch", 1),
+                ("compute", 0),
+                ("batched", 1),
+                ("compute", 1),
+            ],
+        )
 
     def test_short_qwen_prefill_does_not_load_a_complete_expert_layer(self):
         class Cache:

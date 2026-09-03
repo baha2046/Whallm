@@ -46,6 +46,11 @@ _MLX_LM_GENERATION_LOCK = threading.Lock()
 
 THINK_START = "<think>"
 THINK_END = "</think>"
+EXACT_APPROXIMATION_MODE = "exact"
+LEARNED_ROUTE_DROP_LOWEST_1 = "learned-route-drop-lowest-1"
+APPROXIMATION_MODES = frozenset(
+    (EXACT_APPROXIMATION_MODE, LEARNED_ROUTE_DROP_LOWEST_1)
+)
 
 
 def _uses_layer_major_prefill(config: Any, *, is_qwen: bool, token_count: int) -> bool:
@@ -75,6 +80,44 @@ def _route_phase(expert_cache, phase: str):
     return trace_routes(phase) if callable(trace_routes) else nullcontext()
 
 
+@contextmanager
+def _approximation_mode(runtime: Any, mode: str):
+    if mode not in APPROXIMATION_MODES:
+        raise ValueError(f"unsupported approximation mode: {mode}")
+    if mode == EXACT_APPROXIMATION_MODE:
+        yield
+        return
+    if getattr(runtime, "_is_qwen", False):
+        raise ValueError("approximation mode is not supported for Qwen")
+    if getattr(runtime.model, "dspark", None) is not None:
+        raise ValueError("approximation mode is not supported with DSpark")
+
+    core = getattr(runtime.model, "model", runtime.model)
+    layers = getattr(core, "layers", None)
+    if layers is None:
+        raise ValueError("installed model does not expose DeepSeek layers")
+    changed = []
+    hash_layers = 0
+    try:
+        for layer in layers:
+            gate = layer.ffn.gate
+            if getattr(gate, "hash", False):
+                if gate.top_k != 6:
+                    raise ValueError("hash router does not match exact top-k contract")
+                hash_layers += 1
+                continue
+            if gate.top_k != 6:
+                raise ValueError("learned router does not match exact top-k contract")
+            gate.top_k = 5
+            changed.append(gate)
+        if len(changed) != 40 or hash_layers != 3:
+            raise ValueError("installed model layer split does not match approximation contract")
+        yield
+    finally:
+        for gate in changed:
+            gate.top_k = 6
+
+
 @dataclass(frozen=True)
 class GenerationOptions:
     max_tokens: int = 272_000
@@ -84,6 +127,7 @@ class GenerationOptions:
     min_p: float = 0.0
     presence_penalty: float = 0.0
     repetition_penalty: float = 1.0
+    approximation_mode: str = EXACT_APPROXIMATION_MODE
 
 
 @dataclass(frozen=True)
@@ -120,6 +164,7 @@ def _qwen_layer_major_prefill(
     prompt_cache: Any,
     step_size: int,
     expert_cache: Any,
+    next_layer_prefetch: bool = False,
 ) -> mx.array | None:
     """Populate Qwen caches while reading each complete expert layer once."""
     if not token_ids:
@@ -127,6 +172,7 @@ def _qwen_layer_major_prefill(
     core = model.model
     if len(prompt_cache) != len(core.layers):
         raise ValueError("prompt cache does not match the Qwen model layers")
+    record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
     inputs = mx.array(token_ids)[None]
     hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
     for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
@@ -137,11 +183,22 @@ def _qwen_layer_major_prefill(
                 chunk = hidden[:, start:end]
                 chunk_ids = inputs[:, start:end]
                 mask = (
-                    create_ssm_mask(chunk[..., : core.args.hidden_size], layer_cache)
+                    create_ssm_mask(
+                        chunk[..., : core.args.hidden_size],
+                        layer_cache,
+                    )
                     if layer.layer_type == "linear_attention"
                     else None
                 )
                 output = layer(chunk, chunk_ids, mask, layer_cache)
+                if (
+                    next_layer_prefetch
+                    and start == 0
+                    and layer_index + 1 < len(core.layers)
+                ):
+                    expert_cache.prefetch_layer(layer_index + 1)
+                if callable(record_compute_submit):
+                    record_compute_submit(layer_index)
                 eval_prompt_cache([layer_cache], output)
                 outputs.append(output)
         hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
@@ -154,6 +211,7 @@ def _qwen_layer_major_prefill(
 class _PromptCacheEntry:
     cache: Any
     tokens: list[int]
+    approximation_mode: str = EXACT_APPROXIMATION_MODE
 
 
 @dataclass(frozen=True)
@@ -192,7 +250,7 @@ class _PersistentDSparkPromptCacheEntry:
     target_layers: tuple[int, ...]
 
 
-_PROMPT_CACHE_FORMAT = 4
+_PROMPT_CACHE_FORMAT = 5
 _SUPPORTED_PROMPT_CACHE_FORMATS = frozenset((_PROMPT_CACHE_FORMAT,))
 _PROMPT_CACHE_BLOCK_SIZE = 128
 _PROMPT_CACHE_CONTRACT_FORMAT = 1
@@ -438,6 +496,7 @@ class RuntimeMetrics:
         self._accumulated_generation_tokens = 0
         self._prompt_cache_reused_tokens = 0
         self._dspark_prompt_cache_source = "disabled"
+        self._approximation_mode = EXACT_APPROXIMATION_MODE
         self._prefill_step_size = 0
         self._layer_major_prefill = False
         self._request_started = 0.0
@@ -576,6 +635,7 @@ class RuntimeMetrics:
         dspark_enabled: bool = False,
         dspark_cache=None,
         dspark_prompt_cache_source: str = "disabled",
+        approximation_mode: str = EXACT_APPROXIMATION_MODE,
     ) -> None:
         with self._lock:
             self._time_to_first_token_seconds = 0.0
@@ -593,6 +653,7 @@ class RuntimeMetrics:
             self._generation_tokens = 0
             self._prompt_cache_reused_tokens = reused_tokens
             self._dspark_prompt_cache_source = dspark_prompt_cache_source
+            self._approximation_mode = approximation_mode
             self._prefill_step_size = prefill_step_size
             self._layer_major_prefill = layer_major_prefill_enabled
             self._process_disk_io_before = process_disk_io_snapshot()
@@ -1178,6 +1239,7 @@ class RuntimeMetrics:
                 ),
                 "prompt_cache_reused_tokens": self._prompt_cache_reused_tokens,
                 "dspark_prompt_cache_source": self._dspark_prompt_cache_source,
+                "approximation_mode": self._approximation_mode,
                 "completed_request_count": self._completed_request_count,
                 "request_seconds": request_seconds,
                 "time_to_first_token_seconds": self._time_to_first_token_seconds,
@@ -1943,7 +2005,9 @@ class ModelRuntime:
         logits_processors = (
             make_logits_processors(**processor_options) if processor_options else []
         )
-        with self._generation_lock:
+        with self._generation_lock, _approximation_mode(
+            self, options.approximation_mode
+        ):
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
                 available_tokens = getattr(
@@ -1967,15 +2031,27 @@ class ModelRuntime:
                     entry = _PromptCacheEntry(
                         dspark_entry.cache,
                         list(dspark_entry.tokens),
+                        options.approximation_mode,
                     )
                     dspark.restore_cache_state(dspark_entry.context_state)
                 elif mtp is not None:
-                    entry = _PromptCacheEntry(_make_prompt_cache(self.model), [])
+                    entry = _PromptCacheEntry(
+                        _make_prompt_cache(self.model),
+                        [],
+                        options.approximation_mode,
+                    )
                 else:
                     entry = (
-                        _PromptCacheEntry(_make_prompt_cache(self.model), [])
+                        _PromptCacheEntry(
+                            _make_prompt_cache(self.model),
+                            [],
+                            options.approximation_mode,
+                        )
                         if dspark is not None
-                        else self._acquire_prompt_cache(prompt_tokens)
+                        else self._acquire_prompt_cache(
+                            prompt_tokens,
+                            options.approximation_mode,
+                        )
                     )
                 prompt_cache = entry.cache
                 cache_tokens = entry.tokens
@@ -2003,6 +2079,7 @@ class ModelRuntime:
                     dspark_enabled=dspark is not None,
                     dspark_cache=(dspark.expert_cache if dspark is not None else None),
                     dspark_prompt_cache_source=dspark_prompt_cache_source,
+                    approximation_mode=options.approximation_mode,
                 )
                 completed = False
                 prefill_persist_entry = None
@@ -2011,6 +2088,7 @@ class ModelRuntime:
                 def record_prefill_checkpoint(processed: int, total: int) -> None:
                     if (
                         self._prompt_cache_directory is None
+                        or options.approximation_mode != EXACT_APPROXIMATION_MODE
                         or use_layer_major
                         or processed <= 0
                         or processed >= total
@@ -2024,7 +2102,9 @@ class ModelRuntime:
                     if token_count <= reused_tokens:
                         return
                     snapshot_started = time.perf_counter()
-                    state = _persistence_cache_state(prompt_cache)
+                    state = _clone_cache_state(
+                        _persistence_cache_state(prompt_cache)
+                    )
                     arrays = _cache_state_arrays(state)
                     if arrays:
                         mx.eval(*arrays)
@@ -2059,6 +2139,11 @@ class ModelRuntime:
                                     prompt_cache,
                                     step_size,
                                     self.expert_cache,
+                                    getattr(
+                                        self.config,
+                                        "qwen_next_layer_prefetch",
+                                        False,
+                                    ),
                                 )
                         yield from self._stream_mtp(
                             prompt_tokens,
@@ -2080,6 +2165,11 @@ class ModelRuntime:
                                     prompt_cache,
                                     step_size,
                                     self.expert_cache,
+                                    getattr(
+                                        self.config,
+                                        "qwen_next_layer_prefetch",
+                                        False,
+                                    ),
                                 )
                             else:
                                 layer_major_prefill(
@@ -2100,6 +2190,7 @@ class ModelRuntime:
                         prefill_persist_entry = _PromptCacheEntry(
                             copy.deepcopy(prompt_cache),
                             list(prompt_tokens[:-1]),
+                            options.approximation_mode,
                         )
                         self.metrics.record_prompt_cache_snapshot(
                             time.perf_counter() - snapshot_started
@@ -2152,10 +2243,14 @@ class ModelRuntime:
                 finally:
                     self.metrics.finish(self._expert_metrics())
                     if completed and dspark is None and mtp is None:
-                        if prefill_persist_entry is not None:
+                        if (
+                            options.approximation_mode == EXACT_APPROXIMATION_MODE
+                            and prefill_persist_entry is not None
+                        ):
                             self._persist_prompt_cache(prefill_persist_entry)
-                        for snapshot in prefill_persist_snapshots.values():
-                            self._persist_prompt_cache_snapshot(snapshot)
+                        if options.approximation_mode == EXACT_APPROXIMATION_MODE:
+                            for snapshot in prefill_persist_snapshots.values():
+                                self._persist_prompt_cache_snapshot(snapshot)
                         self._store_prompt_cache(entry, persist=True)
 
     def _stream_mtp(
@@ -2361,7 +2456,16 @@ class ModelRuntime:
                 )
                 if self._is_qwen:
                     _qwen_layer_major_prefill(
-                        self.model, tokens[:-1], cache, step_size, self.expert_cache
+                        self.model,
+                        tokens[:-1],
+                        cache,
+                        step_size,
+                        self.expert_cache,
+                        getattr(
+                            self.config,
+                            "qwen_next_layer_prefetch",
+                            False,
+                        ),
                     )
                 else:
                     layer_major_prefill(
@@ -2384,16 +2488,31 @@ class ModelRuntime:
                 )
         return len(tokens) - 1
 
-    def _acquire_prompt_cache(self, prompt_tokens: list[int]) -> _PromptCacheEntry:
+    def _acquire_prompt_cache(
+        self,
+        prompt_tokens: list[int],
+        approximation_mode: str = EXACT_APPROXIMATION_MODE,
+    ) -> _PromptCacheEntry:
         matches = [
             entry
             for entry in self._prompt_caches
-            if len(entry.tokens) < len(prompt_tokens)
+            if entry.approximation_mode == approximation_mode
+            and len(entry.tokens) < len(prompt_tokens)
             and prompt_tokens[: len(entry.tokens)] == entry.tokens
         ]
         if matches:
             entry = max(matches, key=lambda item: len(item.tokens))
-            return _PromptCacheEntry(copy.deepcopy(entry.cache), list(entry.tokens))
+            return _PromptCacheEntry(
+                copy.deepcopy(entry.cache),
+                list(entry.tokens),
+                approximation_mode,
+            )
+        if approximation_mode != EXACT_APPROXIMATION_MODE:
+            return _PromptCacheEntry(
+                _make_prompt_cache(self.model),
+                [],
+                approximation_mode,
+            )
         persistent = [
             entry
             for entry in self._persistent_prompt_caches
@@ -2406,7 +2525,11 @@ class ModelRuntime:
             if loaded is not None:
                 self._record_persistent_prompt_cache_hit(entry)
                 return loaded
-        return _PromptCacheEntry(_make_prompt_cache(self.model), [])
+        return _PromptCacheEntry(
+            _make_prompt_cache(self.model),
+            [],
+            approximation_mode,
+        )
 
     def _dspark_prompt_cache_contract_matches(
         self,
@@ -2556,7 +2679,12 @@ class ModelRuntime:
         persist: bool = False,
     ) -> None:
         self._prompt_caches = [
-            cached for cached in self._prompt_caches if cached.tokens != entry.tokens
+            cached
+            for cached in self._prompt_caches
+            if not (
+                cached.tokens == entry.tokens
+                and cached.approximation_mode == entry.approximation_mode
+            )
         ]
         self._prompt_caches.insert(0, entry)
         maximum = max(1, int(getattr(self.config, "prompt_cache_entries", 2)))
@@ -2568,7 +2696,7 @@ class ModelRuntime:
             self._prompt_caches.pop()
         while len(self._prompt_caches) > 1 and self._prompt_cache_bytes() > memory_limit:
             self._prompt_caches.pop()
-        if persist:
+        if persist and entry.approximation_mode == EXACT_APPROXIMATION_MODE:
             self._persist_prompt_cache(entry)
 
     def _prompt_cache_bytes(self) -> int:
@@ -2681,7 +2809,10 @@ class ModelRuntime:
                 expected_contract_sha256, blocks, cache_key = (
                     _prompt_cache_block_identity(contract, tokens)
                 )
-                access_path = directory / f"{cache_key}.normal.v4.access"
+                access_path = (
+                    directory
+                    / f"{cache_key}.normal.v{_PROMPT_CACHE_FORMAT}.access"
+                )
                 modified_ns = metadata_path.stat().st_mtime_ns
                 reuse_count, last_access_ns = self._read_prompt_cache_access(
                     access_path,
@@ -3027,9 +3158,15 @@ class ModelRuntime:
                 modified_ns = metadata_path.stat().st_mtime_ns
                 reuse_count = 0
                 last_access_ns = modified_ns
-                if mode == "normal" and int(metadata.get("format", 0)) == 4:
+                if (
+                    mode == "normal"
+                    and int(metadata.get("format", 0)) == _PROMPT_CACHE_FORMAT
+                ):
                     cache_key = str(metadata["cacheKey"])
-                    access_path = directory / f"{cache_key}.normal.v4.access"
+                    access_path = (
+                        directory
+                        / f"{cache_key}.normal.v{_PROMPT_CACHE_FORMAT}.access"
+                    )
                     reuse_count, last_access_ns = self._read_prompt_cache_access(
                         access_path,
                         modified_ns,
@@ -3055,7 +3192,11 @@ class ModelRuntime:
                     stale_data.unlink(missing_ok=True)
                 cache_key = stale.get("cacheKey")
                 if mode == "normal" and isinstance(cache_key, str):
-                    stale_access = directory / f"{cache_key}.normal.v4.access"
+                    stale_format = int(stale.get("format", 0))
+                    stale_access = (
+                        directory
+                        / f"{cache_key}.normal.v{stale_format}.access"
+                    )
                     if stale_access.parent == directory:
                         stale_access.unlink(missing_ok=True)
                 stale_metadata.unlink(missing_ok=True)
@@ -3074,6 +3215,9 @@ class ModelRuntime:
         mtp_expert_cache = getattr(self.model, "mtp_expert_cache", None)
         if mtp_expert_cache is not None:
             mtp_expert_cache.close()
+        ane_prefill = getattr(self.model, "ane_prefill", None)
+        if ane_prefill is not None:
+            ane_prefill.close()
         self.expert_cache.close()
 
     def __enter__(self) -> ModelRuntime:

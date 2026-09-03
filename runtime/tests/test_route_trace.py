@@ -15,7 +15,9 @@ class RouteTraceTests(unittest.TestCase):
         recorder = RouteTraceRecorder(1, 4, 2, 10)
         with recorder.phase("prefill"):
             recorder.record(0, np.array([0, 1, 0, 2]))
+            recorder.record_residency(0, [0, 1, 0, 2], [0, 1, 2])
             recorder.record(0, np.array([1, 1, 1, 3]))
+            recorder.record_residency(0, [1, 1, 1, 3], [3])
 
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "routes.json"
@@ -25,6 +27,13 @@ class RouteTraceTests(unittest.TestCase):
         self.assertEqual(
             trace["prefill_chunk_histograms"],
             [[[2, 1, 1, 0], [0, 3, 0, 1]]],
+        )
+        self.assertEqual(
+            trace["prefill_cache_accesses"],
+            [
+                {"layer": 0, "histogram": [2, 1, 1, 0]},
+                {"layer": 0, "histogram": [0, 3, 0, 1]},
+            ],
         )
 
     def test_trace_measures_prefill_hot_set_decode_coverage(self):

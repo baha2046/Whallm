@@ -4,10 +4,49 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from deepseek_v4_ssd.cli import _read_prompt, _token_sha256
+from deepseek_v4_ssd.cli import (
+    _read_prompt,
+    _select_approximation_mode,
+    _token_sha256,
+)
 
 
 class CLITests(unittest.TestCase):
+    def test_approximation_default_is_model_aware_and_exact_can_override(self):
+        self.assertEqual(
+            _select_approximation_mode(
+                None,
+                is_qwen=False,
+                dspark_enabled=False,
+            ),
+            "learned-route-drop-lowest-1",
+        )
+        for is_qwen, dspark_enabled in ((True, False), (False, True)):
+            with self.subTest(is_qwen=is_qwen, dspark_enabled=dspark_enabled):
+                self.assertEqual(
+                    _select_approximation_mode(
+                        None,
+                        is_qwen=is_qwen,
+                        dspark_enabled=dspark_enabled,
+                    ),
+                    "exact",
+                )
+                with self.assertRaises(ValueError):
+                    _select_approximation_mode(
+                        "learned-route-drop-lowest-1",
+                        is_qwen=is_qwen,
+                        dspark_enabled=dspark_enabled,
+                    )
+
+        self.assertEqual(
+            _select_approximation_mode(
+                "exact",
+                is_qwen=False,
+                dspark_enabled=False,
+            ),
+            "exact",
+        )
+
     def test_prompt_file_and_token_hash_are_reproducible(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "prompt.txt"

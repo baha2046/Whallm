@@ -180,7 +180,7 @@ class DSparkPromptCacheTests(unittest.TestCase):
             atomic = runtime._scan_persistent_dspark_prompt_caches(dspark)
 
         self.assertEqual(len(normal), 1)
-        self.assertEqual(normal[0].format, 4)
+        self.assertEqual(normal[0].format, 5)
         self.assertEqual(len(atomic), 1)
         self.assertEqual(atomic[0].format, 3)
 
