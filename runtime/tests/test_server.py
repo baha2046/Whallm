@@ -825,6 +825,43 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(codex_models[0]["input_modalities"], ["text"])
         self.assertTrue(codex_models[0]["base_instructions"])
 
+    def test_status_requires_bearer_key(self):
+        status, _, body = self.request("/api/status", authenticated=False)
+
+        self.assertEqual(status, 401)
+        self.assertEqual(json.loads(body)["error"]["code"], "invalid_api_key")
+
+    def test_generation_routes_require_bearer_key(self):
+        requests = (
+            (
+                "/v1/chat/completions",
+                {
+                    "model": "deepseek-v4-flash-0731",
+                    "messages": [{"role": "user", "content": "Hi"}],
+                },
+            ),
+            (
+                "/v1/responses",
+                {"model": "deepseek-v4-flash-0731", "input": "Hi"},
+            ),
+            (
+                "/v1/completions",
+                {"model": "deepseek-v4-flash-0731", "prompt": "Hi"},
+            ),
+        )
+        for path, body in requests:
+            with self.subTest(path=path):
+                status, _, payload = self.request(
+                    path,
+                    method="POST",
+                    body=body,
+                    authenticated=False,
+                )
+                self.assertEqual(status, 401)
+                self.assertEqual(
+                    json.loads(payload)["error"]["code"], "invalid_api_key"
+                )
+
     def test_model_load_and_unload_require_bearer_key(self):
         runtime = FakeRuntime()
         loaded_specs = []
@@ -1964,6 +2001,23 @@ class EmptyCatalogServerTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join()
         cls.manager.close()
+
+    def test_wildcard_host_binds_all_ipv4_interfaces(self):
+        manager = ModelManager([], clear_cache=lambda: None)
+        server = OpenAIServer(("0.0.0.0", 0), manager)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            self.assertEqual(server.server_address[0], "0.0.0.0")
+            with urlopen(
+                f"http://127.0.0.1:{server.server_port}/healthz", timeout=1
+            ) as response:
+                self.assertEqual(json.loads(response.read()), {"status": "ok"})
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+            manager.close()
 
     def request(self, path, *, body=None):
         data = json.dumps(body).encode() if body is not None else None

@@ -32,6 +32,8 @@ working tree。
 - [`benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json`](benchmarks/2026-08-11-d3-csa-row-profile-m5-pro.json)：D3 相鄰 Decode CSA row 與 `gather` profile gate。
 - [`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)：Qwen 完整安裝、API、4K prompt cache 與 packaged App 驗證。
 - [`benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json`](benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json)：Qwen private ANE Prefill 的 native component、回退與 4,097-token 探索性 ABBA。
+- [`benchmarks/2026-09-04-130402-api-deepseek-v4-flash-0731.json`](benchmarks/2026-09-04-130402-api-deepseek-v4-flash-0731.json)：v1.1.4 DeepSeek mixed SPEED-Bench 1K／2K／8K／16K input、64-token output、每個 input size 三次的探索性 API benchmark。
+- [`benchmarks/2026-09-04-132210-api-qwen3-8-flash-next-fp8.json`](benchmarks/2026-09-04-132210-api-qwen3-8-flash-next-fp8.json)：v1.1.4 Qwen mixed SPEED-Bench 1K／2K／8K／16K input、64-token output、每個 input size 三次的探索性 API benchmark。
 - [`benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json`](benchmarks/2026-08-26-hash-exact-prefetch-smoke-m2-max.json)：完整 installed model 的 hash exact prefetch correctness 與 logical-byte smoke。
 - [`benchmarks/2026-08-26-adaptive-block-smoke-m2-max.json`](benchmarks/2026-08-26-adaptive-block-smoke-m2-max.json)：storage-aware adaptive block correctness 與 metric-plumbing smoke。
 - [`benchmarks/2026-08-26-adaptive-block-calibration-wave1-m2-max.json`](benchmarks/2026-08-26-adaptive-block-calibration-wave1-m2-max.json)：五類 128-token 首輪校準；保存已拒絕的 over-trimming policy 與 output-budget metric 問題。
@@ -309,9 +311,9 @@ closure、最小 eligible k selection 與 zero-recall stop。
 - Chat Completions、Responses、Text Completions、tool 和 SSE。
 - SPEED-Bench prompt 的精確 input token 數和完整 chat template 尾端。
 - Codex Responses request 到 Qwen chat template 的完整 codec 格式轉換。
-- 空 model catalog、API model ID、Alias、未知模型和模型載入失敗重試。
+- 空 model catalog、`0.0.0.0` IPv4 wildcard bind、API model ID、Alias、未知模型和模型載入失敗重試。
 - 延遲載入、runtime 重用、關閉後切換、generation request 排隊和累計計數。
-- 手動模型載入與卸載、Bearer 驗證，以及卸載後的 status。
+- 手動模型載入與卸載、所有 `/v1/*` generation route 和 `/api/status` 的 Bearer 驗證，以及卸載後的 status。
 - DeepSeek layer-major Prefill 門檻預設值、邊界、catalog 編碼、舊設定遷移和正整數驗證。
 - DeepSeek approximate mode 的 strict request validation、Qwen／DSpark rejection、
   router request-scope restore、prompt-cache mode isolation、persistent-cache exclusion、

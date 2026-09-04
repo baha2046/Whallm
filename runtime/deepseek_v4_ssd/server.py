@@ -272,6 +272,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         elif path == "/healthz":
             self._json(200, {"status": "ok"})
         elif path == "/api/status":
+            self._authorize()
             self._json(200, self._status())
         elif path == "/v1/models":
             self._authorize()

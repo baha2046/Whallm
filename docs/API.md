@@ -96,6 +96,10 @@ APP 只會在 installed model 包含 MTP sidecar 時啟用 MTP。
 
 本機 host 可以不設定 API key。
 非本機 host 必須設定 `--api-key` 或 `DEEPSEEK_API_KEY`。
+`0.0.0.0` 是監聽所有 IPv4 網路介面的 bind address，不是其他裝置可使用的目的位址。
+其他裝置必須連線到執行 Whallm 的 Mac 的區域網路 IP，例如
+`http://192.168.1.20:11434`。macOS 詢問區域網路權限時必須允許 Whallm；也必須允許
+macOS firewall 的 incoming connection，且網路不可啟用 client isolation。
 
 server 的 `--log-level` 支援 `debug`、`info` 和 `error`，預設為 `info`。
 `info` 顯示一般 request access log；`error` 只顯示 HTTP 4xx／5xx request；`debug`
@@ -117,7 +121,7 @@ Authorization: Bearer local-key
 | `POST /api/models/unload` | 是 |
 | `GET /` | 否 |
 | `GET /healthz` | 否 |
-| `GET /api/status` | 否 |
+| `GET /api/status` | 是 |
 
 `/api/status` 會回傳本機 `model_path`。
 server 不提供 TLS、CORS 或 rate limit。
