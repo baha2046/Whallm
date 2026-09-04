@@ -240,7 +240,7 @@
 "Log level" = "Log 層級";
 "127.0.0.1 (Local only)" = "127.0.0.1（僅本機）";
 "0.0.0.0 (All networks)" = "0.0.0.0（所有網路）";
-"Choose which devices can connect to the server." = "選擇可連線至伺服器的裝置範圍。";
+"Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0." = "選擇可連線的裝置範圍。從其他裝置連線時，請使用這台 Mac 的區域網路 IP 位址，不要使用 0.0.0.0。";
 "Default 11434. Restart the server after changing it." = "預設為 11434。變更後請重新啟動伺服器。";
 "Model name exposed by the OpenAI-compatible API." = "OpenAI 相容 API 對外提供的模型名稱。";
 "Loads routed experts by layer during prefill." = "預填時依 layer 載入 routed expert。";

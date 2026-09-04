@@ -34,6 +34,8 @@
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Whallm needs local network access so other devices can connect to its API server.</string>
   <key>SUFeedURL</key>
   <string>https://github.com/yanun0323/Whallm/releases/latest/download/appcast.xml</string>
   <key>SUEnableAutomaticChecks</key>

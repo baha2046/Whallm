@@ -19,14 +19,24 @@ verify_signature() {
 
 verify_localizations() {
   local target=$1
+  local usage_description
   local language
+  usage_description=$(/usr/libexec/PlistBuddy \
+    -c 'Print :NSLocalNetworkUsageDescription' "$target/Contents/Info.plist")
+  [[ -n $usage_description ]] || {
+    print -u2 "NSLocalNetworkUsageDescription is missing."
+    exit 1
+  }
   for language in en zh-Hans zh-Hant; do
-    local strings=$target/Contents/Resources/$language.lproj/Localizable.strings
-    [[ -f $strings ]] || {
-      print -u2 "Localization is missing: $strings"
-      exit 1
-    }
-    plutil -lint "$strings" >/dev/null
+    local localization=$target/Contents/Resources/$language.lproj
+    local strings
+    for strings in "$localization/Localizable.strings" "$localization/InfoPlist.strings"; do
+      [[ -f $strings ]] || {
+        print -u2 "Localization is missing: $strings"
+        exit 1
+      }
+      plutil -lint "$strings" >/dev/null
+    done
   done
 }
 

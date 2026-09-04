@@ -240,7 +240,7 @@
 "Log level" = "Log level";
 "127.0.0.1 (Local only)" = "127.0.0.1 (Local only)";
 "0.0.0.0 (All networks)" = "0.0.0.0 (All networks)";
-"Choose which devices can connect to the server." = "Choose which devices can connect to the server.";
+"Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0." = "Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0.";
 "Default 11434. Restart the server after changing it." = "Default 11434. Restart the server after changing it.";
 "Model name exposed by the OpenAI-compatible API." = "Model name exposed by the OpenAI-compatible API.";
 "Loads routed experts by layer during prefill." = "Loads routed experts by layer during prefill.";

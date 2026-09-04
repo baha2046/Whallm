@@ -240,7 +240,7 @@
 "Log level" = "日志级别";
 "127.0.0.1 (Local only)" = "127.0.0.1（仅本机）";
 "0.0.0.0 (All networks)" = "0.0.0.0（所有网络）";
-"Choose which devices can connect to the server." = "选择可连接到服务器的设备范围。";
+"Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0." = "选择可连接的设备范围。从其他设备连接时，请使用这台 Mac 的局域网 IP 地址，不要使用 0.0.0.0。";
 "Default 11434. Restart the server after changing it." = "默认为 11434。更改后请重新启动服务器。";
 "Model name exposed by the OpenAI-compatible API." = "OpenAI 兼容 API 对外提供的模型名称。";
 "Loads routed experts by layer during prefill." = "预填时按层加载路由专家。";

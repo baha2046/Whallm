@@ -647,7 +647,7 @@ private struct ServerView: View {
 
       SettingRow(
         "Listen Address",
-        hint: "Choose which devices can connect to the server.",
+        hint: "Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0.",
         language: language
       ) {
         Picker(L10n.string("Listen Address", language: language), selection: $configuration.host) {
