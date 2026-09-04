@@ -1,0 +1,469 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "exploratory API benchmark",
+  "status": "completed",
+  "recorded_at": "2026-09-04T13:22:10.535856+08:00",
+  "source": {
+    "commit": "b25ae07e9df143dd744405b741628daa5e8705c1",
+    "working_tree_dirty": true,
+    "working_tree_diff_sha256": "30ceaa9931a4980d4f1cf83a2e2e32068527123528f2154b2d9f574e0bbdb402",
+    "benchmark_script_sha256": "4d974ee698986e307e0546b0e721f5fb758879257e68ab7786bb5cc8da9568f5"
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "macos": "26.6.2",
+    "hardware_model": "Mac17,8",
+    "unified_memory_bytes": "68719476736",
+    "python": "3.14.7",
+    "api_base_url": "http://127.0.0.1:11434/v1"
+  },
+  "installed_model": {
+    "manifest_available": true,
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "model_kind": "qwen3.8-flash-next",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "format_version": 2
+  },
+  "server": {
+    "model": "qwen3.8-flash-next-fp8",
+    "source_model": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "started_by_benchmark": false,
+    "runtime_configuration": {
+      "slots": 4096,
+      "read_workers": 4,
+      "prefetch_read_workers": 2,
+      "power_saving_limit_gbps": null,
+      "prefill_step_size": 128,
+      "moe_prefill_step_size": 0,
+      "layer_major_prefill": true,
+      "layer_major_prefill_threshold": 1024,
+      "batched_expert_prefill": true,
+      "ane_prefill": true,
+      "ane_prefill_ratio": 0.25,
+      "ane_prefill_status": {
+        "requested": true,
+        "requested_ratio": 0.25,
+        "active_ratio": 0.25,
+        "ane_channels": 3072,
+        "gpu_channels": 9216,
+        "active": true,
+        "error": null,
+        "evaluations": 0,
+        "fallbacks": 0
+      },
+      "prompt_cache_entries": 1,
+      "prompt_cache_memory_gib": 8,
+      "persistent_prompt_cache": true,
+      "fp4_index_cache": true,
+      "expert_page_cache_probe": false,
+      "expert_file_cache_policy": "cached",
+      "expert_file_direct_io_alignment_bytes": 0,
+      "dspark_available": false,
+      "dspark_enabled": false,
+      "dspark_prompt_cache": false,
+      "dspark_hash_prefetch": false,
+      "dspark_adaptive_block": false,
+      "dspark_fallback_enabled": true,
+      "dspark_sequential_verification": false,
+      "dspark_hybrid_verification": false,
+      "dspark_hash_prefetch_scratch_slots": 0,
+      "dspark_confidence_threshold": 0.6,
+      "dspark_slots": 768,
+      "mtp_available": true,
+      "mtp_enabled": false,
+      "mtp_slots": 32,
+      "kv_cache": "MXFP8"
+    }
+  },
+  "workload": {
+    "endpoint": "/v1/completions",
+    "target_input_tokens": [
+      1024,
+      2048,
+      8192,
+      16384
+    ],
+    "runs_per_size": 3,
+    "max_output_tokens": 64,
+    "temperature": 0,
+    "top_p": 1,
+    "poll_interval_seconds": 0.25,
+    "dataset": "nvidia/SPEED-Bench",
+    "dataset_category": "mixed",
+    "dataset_directory": "/Users/Shared/Project/test/llm_ssd/scratch/speed-bench",
+    "dataset_file_sha256": {
+      "throughput_1k.jsonl": "0b5665f61dcbf52dd357d515fd45f9e4c17c68eb902c788c81a4c9271b217377",
+      "throughput_2k.jsonl": "be247367a3ddd3c74b72d03122818d89c6e2e2fe956e6d66099d7ae0c45402a6",
+      "throughput_8k.jsonl": "94f3ab2d3cd456654ee234faf888c459c5451069d6cfab6e051591b288e71739",
+      "throughput_16k.jsonl": "77cbee1b4abc6b205ee9ad918bd8e1290a6514f4cf0ff9dc7db497afd1fffca2"
+    },
+    "prompt": "first user message shortened before the installed model chat template is applied; exact total input token count",
+    "prompt_cache_state": "different input per run; prompt cache not cleared",
+    "filesystem_cache_state": "not purged",
+    "memory_metric": "maximum performance.active_memory_bytes observed during each request",
+    "p95_method": "nearest rank across runs"
+  },
+  "evidence_limits": [
+    "The API does not expose exact generated token IDs.",
+    "output_text_sha256 hashes streamed text, not generated token IDs.",
+    "Memory is MLX active memory, not process RSS."
+  ],
+  "runs": [
+    {
+      "wall_seconds": 22.59847283398267,
+      "client_first_output_seconds": 15.660681666980963,
+      "input_tokens": 1024,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 15.653356333001284,
+      "prefill_tokens_per_second": 65.41728037207878,
+      "decode_tokens_per_second": 9.38945381488781,
+      "peak_active_memory_bytes": 20943411779,
+      "target_input_tokens": 1024,
+      "run": 1,
+      "speed_bench_question_id": "474852eae1b744aaa6265ca7eda9207a",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_1k.json",
+      "speed_bench_source_id": "7841610",
+      "prompt_text_sha256": "1f9be8d99dfa0363cbf2d9ee7f44a47aabbccb149cb58608253637ce9a20bc71",
+      "prompt_token_sha256": "ab96ab08e58fe8f7ae6f0cdfb559b23e38906f16edf5d8f67ff184c398b11551",
+      "output_text_sha256": "f1f05d61558f60e77e8389eaa4a3323eadde4ad1a1573aa1dff94975b1678ae7"
+    },
+    {
+      "wall_seconds": 20.938678000005893,
+      "client_first_output_seconds": 14.807597542006988,
+      "input_tokens": 1024,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 14.805190249986481,
+      "prefill_tokens_per_second": 69.16493356111619,
+      "decode_tokens_per_second": 10.430586406907045,
+      "peak_active_memory_bytes": 22441796454,
+      "target_input_tokens": 1024,
+      "run": 2,
+      "speed_bench_question_id": "e6d5e1fc5d284a11925e89c76fd798e2",
+      "speed_bench_sub_category": "Math",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "6725e3f7603864c505f3a699",
+      "prompt_text_sha256": "1f5f1354a223896593e131bc0c43328687a4c59f8875341fe84b93b8f40fe9b2",
+      "prompt_token_sha256": "08a12ba8c6b73921ec50cb7b8758176ccf9e9207fa2b5f65d62f5136ebed2fdc",
+      "output_text_sha256": "219a602cdc3f9e34cf6461f5b109890c464852c6c64c425a14848bf6da86083d"
+    },
+    {
+      "wall_seconds": 21.412445083988132,
+      "client_first_output_seconds": 15.175264291989151,
+      "input_tokens": 1024,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 15.173045333009213,
+      "prefill_tokens_per_second": 67.48809995131768,
+      "decode_tokens_per_second": 10.358640450458925,
+      "peak_active_memory_bytes": 22458418010,
+      "target_input_tokens": 1024,
+      "run": 3,
+      "speed_bench_question_id": "1b47017a1292495cac51782127f7d2b2",
+      "speed_bench_sub_category": "Math",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "67234ef248728bb7e8175bf2",
+      "prompt_text_sha256": "49fd4ae8a89f9eb07571e2ee341fff6cda75c2fbe49edbca268c4099fdf45400",
+      "prompt_token_sha256": "b0a02bb951df193a8e185dcb0a065e2aef90e79d7cb0fdd424961a793b1e119c",
+      "output_text_sha256": "519075cc6919ac74bd5fd9f9c624248995899b8fac0b3ff2645b6cce54113104"
+    },
+    {
+      "wall_seconds": 30.92995695801801,
+      "client_first_output_seconds": 23.413957500015385,
+      "input_tokens": 2048,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 23.410755958990194,
+      "prefill_tokens_per_second": 87.48115625089532,
+      "decode_tokens_per_second": 8.515186629287625,
+      "peak_active_memory_bytes": 22771429417,
+      "target_input_tokens": 2048,
+      "run": 1,
+      "speed_bench_question_id": "695d5723f8f446fc94aecbcf1fa93164",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_2k.json",
+      "speed_bench_source_id": "4584373",
+      "prompt_text_sha256": "e719ddbe1e38e270be457b4d8f4c0219dada4e026e27ab9e8a96477bd7d84e71",
+      "prompt_token_sha256": "5dfaaaa4d8dbd6cb9c02ebc4464d7c252ce2ef8a7f183e037f83b043a2f3a16f",
+      "output_text_sha256": "2e9de32a31787251f8bd1f7a9288828533dc989004dec3e3cb73b474ef2cf5be"
+    },
+    {
+      "wall_seconds": 30.836660542001482,
+      "client_first_output_seconds": 24.294133667019196,
+      "input_tokens": 2048,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 24.29073404200608,
+      "prefill_tokens_per_second": 84.31198482756363,
+      "decode_tokens_per_second": 9.782173692840566,
+      "peak_active_memory_bytes": 22826481758,
+      "target_input_tokens": 2048,
+      "run": 2,
+      "speed_bench_question_id": "62b21a792d954d9b9c7d2d4f579e916e",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_2k.json",
+      "speed_bench_source_id": "5450047",
+      "prompt_text_sha256": "d440cb5a1510be4ef33387033aa320523813c42720e732240ed0e341b4771fa3",
+      "prompt_token_sha256": "fc546110aeb1890e9c46c29d84490504b57d73f0fab7ef5aa904fe5ec5026b8a",
+      "output_text_sha256": "971bbaa807c099d85d4346dd9a6663058658a324ba98552ac9f3a99f82e545d2"
+    },
+    {
+      "wall_seconds": 31.418455749982968,
+      "client_first_output_seconds": 24.905686374986544,
+      "input_tokens": 2048,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 24.902161500009242,
+      "prefill_tokens_per_second": 82.24185679621586,
+      "decode_tokens_per_second": 9.832442508445215,
+      "peak_active_memory_bytes": 22626560635,
+      "target_input_tokens": 2048,
+      "run": 3,
+      "speed_bench_question_id": "1b2461a386304983bdc4efa3c667318d",
+      "speed_bench_sub_category": "Other",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "671db266fe1146e348ef1267",
+      "prompt_text_sha256": "341918d84d75187dacad69168d60f46ea8a10574dcffe33b1457123ef0a2cdd1",
+      "prompt_token_sha256": "4be977aba8f86bcff7fd92938931c426f21d7f7aabc444c8d260fada5425c17b",
+      "output_text_sha256": "0a891a26c037cab3a538885bc1be4b0164daba94f74b8f028ccb7a67ec67d52e"
+    },
+    {
+      "wall_seconds": 84.87726583299809,
+      "client_first_output_seconds": 77.74643595798989,
+      "input_tokens": 8192,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 77.73732275000657,
+      "prefill_tokens_per_second": 105.38052649876353,
+      "decode_tokens_per_second": 9.390949233145772,
+      "peak_active_memory_bytes": 23303989624,
+      "target_input_tokens": 8192,
+      "run": 1,
+      "speed_bench_question_id": "0486a69bda2e47dfbdbcac4c4ff7a690",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_8k.json",
+      "speed_bench_source_id": "23948527",
+      "prompt_text_sha256": "0a76c931beed68f5fa0c412b50a6f577d6fa7caa5edfb2fdc03df11fa5841464",
+      "prompt_token_sha256": "f4fe9cc03ecdf75585b5f48dd64911a5c2c0fc9e407bc34f2de3e7753d401125",
+      "output_text_sha256": "b59f0d68e9f2f4acc889384e3bc8ba2e4934fff2f8de2eeaa26d99be5bf25636"
+    },
+    {
+      "wall_seconds": 80.021069874987,
+      "client_first_output_seconds": 73.22001433398691,
+      "input_tokens": 8192,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 73.2124731669901,
+      "prefill_tokens_per_second": 111.89350182604669,
+      "decode_tokens_per_second": 9.916745508923967,
+      "peak_active_memory_bytes": 23432768008,
+      "target_input_tokens": 8192,
+      "run": 2,
+      "speed_bench_question_id": "c86443600a324e40968549460a104240",
+      "speed_bench_sub_category": "Other",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "673a716a177d419c991c9f69",
+      "prompt_text_sha256": "868fc01697eb38619e8e6101100f1e25f28a54df5097a069415410bfebfcf429",
+      "prompt_token_sha256": "63ad03f59ae6daf424fa989bdfa93a23dd4e2582df5844a87d56745ba70ab1ec",
+      "output_text_sha256": "4ee730845af8acebfb302576330dc4250ae99c5b37f96b3b2db3210aa9946a6c"
+    },
+    {
+      "wall_seconds": 81.20990008400986,
+      "client_first_output_seconds": 74.7336187500041,
+      "input_tokens": 8192,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 74.72547454098822,
+      "prefill_tokens_per_second": 109.62794214851786,
+      "decode_tokens_per_second": 10.392580272298177,
+      "peak_active_memory_bytes": 23513727532,
+      "target_input_tokens": 8192,
+      "run": 3,
+      "speed_bench_question_id": "eeea36cfbbb34bf8ad6755052f550b42",
+      "speed_bench_sub_category": "Chemistry",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "67228be893273f2ea4d39e36",
+      "prompt_text_sha256": "951c202e54aa27d8898c32eef25c7bcba6a3e9c6d4375fddd0812998b164387b",
+      "prompt_token_sha256": "ea5bec7cfcc53ef17973f582b94bf416115f091025ec0a999d838a5fdcfbc5e9",
+      "output_text_sha256": "491d18dcd4dd74a975d14082ac08c4e0507e1e8f75cac12c16105c1489fca563"
+    },
+    {
+      "wall_seconds": 157.8940864999895,
+      "client_first_output_seconds": 150.3472724169842,
+      "input_tokens": 16384,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 150.33245283400174,
+      "prefill_tokens_per_second": 108.9851172593541,
+      "decode_tokens_per_second": 8.989921809801597,
+      "peak_active_memory_bytes": 24074424762,
+      "target_input_tokens": 16384,
+      "run": 1,
+      "speed_bench_question_id": "dc52f4146b1e48d783b637d056d899b5",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_16k.json",
+      "speed_bench_source_id": "39575398",
+      "prompt_text_sha256": "ba203086062905fdcf981b529d5f8e2f5b8e21152f2075786ba190ec7bb4ebe0",
+      "prompt_token_sha256": "2c90a78fdec398a1ba3226a77e932650f0acaf7fe8c7a4a983f2a50dc981aa1f",
+      "output_text_sha256": "08a9ccbcc47c2ba18ca6b1b410077323f8944fd62677d4f2fc15fa390cf1f973"
+    },
+    {
+      "wall_seconds": 151.76265420898562,
+      "client_first_output_seconds": 144.66638666699873,
+      "input_tokens": 16384,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 144.65060362502118,
+      "prefill_tokens_per_second": 113.26603269815841,
+      "decode_tokens_per_second": 9.663798183826176,
+      "peak_active_memory_bytes": 24432686826,
+      "target_input_tokens": 16384,
+      "run": 2,
+      "speed_bench_question_id": "837401aee2eb46db9dd51eda41a379a5",
+      "speed_bench_sub_category": "Math",
+      "speed_bench_source": "https://huggingface.co/datasets/cais/hle/tree/021a3d71f516a7ac28ceb8d284969902edf1edeb",
+      "speed_bench_source_id": "676b5d9ef4feb105f601d808",
+      "prompt_text_sha256": "3d58344b43637e5665a40da231e7943d005e827cc5f15164cfc91fad3ba2f4d8",
+      "prompt_token_sha256": "d4689271290220f05ba13cb918d23b37052f5d7c1d6b03158d0fbbdc783112f4",
+      "output_text_sha256": "7bea5ffe84fdef6dd027628385433ea73c057a82be3ce63938356e733e1c295e"
+    },
+    {
+      "wall_seconds": 154.63996845899965,
+      "client_first_output_seconds": 147.20201149999048,
+      "input_tokens": 16384,
+      "output_tokens": 64,
+      "prompt_cache_reused_tokens": 0,
+      "ttft_seconds": 147.18651479197433,
+      "prefill_tokens_per_second": 111.31454551496299,
+      "decode_tokens_per_second": 9.444178775203493,
+      "peak_active_memory_bytes": 24375727516,
+      "target_input_tokens": 16384,
+      "run": 3,
+      "speed_bench_question_id": "f41e9a5ab28d446db25b157080d2e2e9",
+      "speed_bench_sub_category": "NIAH",
+      "speed_bench_source": "http://opencompass.openxlab.space/utils/AdaLEval/stackselect_16k.json",
+      "speed_bench_source_id": "41140975",
+      "prompt_text_sha256": "82a1ca5daecc891edbd6bbe8f1800e17a08fde36fdb5f493a42cff3374b8b969",
+      "prompt_token_sha256": "106a95b697f78be3f6f4fb2c36c19d8d15f3f263d9d82b13434cadbc6439e8d3",
+      "output_text_sha256": "8f9b5c7303d14ea4dd80cccf94092e65ca37cd88d28bec23bbd05fecf4d12c18"
+    }
+  ],
+  "summary": [
+    {
+      "target_input_tokens": 1024,
+      "actual_input_tokens_min": 1024,
+      "actual_input_tokens_max": 1024,
+      "run_count": 3,
+      "metrics": {
+        "wall_seconds": {
+          "peak": 22.59847283398267,
+          "p95": 22.59847283398267
+        },
+        "ttft_seconds": {
+          "peak": 15.653356333001284,
+          "p95": 15.653356333001284
+        },
+        "prefill_tokens_per_second": {
+          "peak": 69.16493356111619,
+          "p95": 69.16493356111619
+        },
+        "decode_tokens_per_second": {
+          "peak": 10.430586406907045,
+          "p95": 10.430586406907045
+        },
+        "peak_active_memory_bytes": {
+          "peak": 22458418010.0,
+          "p95": 22458418010.0
+        }
+      }
+    },
+    {
+      "target_input_tokens": 2048,
+      "actual_input_tokens_min": 2048,
+      "actual_input_tokens_max": 2048,
+      "run_count": 3,
+      "metrics": {
+        "wall_seconds": {
+          "peak": 31.418455749982968,
+          "p95": 31.418455749982968
+        },
+        "ttft_seconds": {
+          "peak": 24.902161500009242,
+          "p95": 24.902161500009242
+        },
+        "prefill_tokens_per_second": {
+          "peak": 87.48115625089532,
+          "p95": 87.48115625089532
+        },
+        "decode_tokens_per_second": {
+          "peak": 9.832442508445215,
+          "p95": 9.832442508445215
+        },
+        "peak_active_memory_bytes": {
+          "peak": 22826481758.0,
+          "p95": 22826481758.0
+        }
+      }
+    },
+    {
+      "target_input_tokens": 8192,
+      "actual_input_tokens_min": 8192,
+      "actual_input_tokens_max": 8192,
+      "run_count": 3,
+      "metrics": {
+        "wall_seconds": {
+          "peak": 84.87726583299809,
+          "p95": 84.87726583299809
+        },
+        "ttft_seconds": {
+          "peak": 77.73732275000657,
+          "p95": 77.73732275000657
+        },
+        "prefill_tokens_per_second": {
+          "peak": 111.89350182604669,
+          "p95": 111.89350182604669
+        },
+        "decode_tokens_per_second": {
+          "peak": 10.392580272298177,
+          "p95": 10.392580272298177
+        },
+        "peak_active_memory_bytes": {
+          "peak": 23513727532.0,
+          "p95": 23513727532.0
+        }
+      }
+    },
+    {
+      "target_input_tokens": 16384,
+      "actual_input_tokens_min": 16384,
+      "actual_input_tokens_max": 16384,
+      "run_count": 3,
+      "metrics": {
+        "wall_seconds": {
+          "peak": 157.8940864999895,
+          "p95": 157.8940864999895
+        },
+        "ttft_seconds": {
+          "peak": 150.33245283400174,
+          "p95": 150.33245283400174
+        },
+        "prefill_tokens_per_second": {
+          "peak": 113.26603269815841,
+          "p95": 113.26603269815841
+        },
+        "decode_tokens_per_second": {
+          "peak": 9.663798183826176,
+          "p95": 9.663798183826176
+        },
+        "peak_active_memory_bytes": {
+          "peak": 24432686826.0,
+          "p95": 24432686826.0
+        }
+      }
+    }
+  ],
+  "completed_at": "2026-09-04T13:36:39.259788+08:00"
+}

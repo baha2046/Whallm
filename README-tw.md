@@ -24,37 +24,42 @@ Whallm 也支援 `Qwen3.8-Flash-Next-FP8` text checkpoint。
 
 | 模型 | 量測到的峰值記憶體 |
 | --- | ---: |
-| `DeepSeek-V4-Flash-0731` | 23.03–35.64 GiB |
-| `Qwen3.8-Flash-Next-FP8` | 15.19–18.92 GiB |
+| `DeepSeek-V4-Flash-0731` | 32.84–35.70 GiB |
+| `Qwen3.8-Flash-Next-FP8` | 20.92–22.75 GiB |
 
-v1.1.0 測試使用 1,024 到 16,384 個 input token 的對話 prompt。
+v1.1.4 測試使用 1,024 到 16,384 個 input token 的對話 prompt。
 這些結果是量測值。這些結果不是最低記憶體需求，也不是效能保證。
 prompt 長度、tool、cache 狀態和 runtime 設定會改變峰值記憶體。
 請參閱[完整 Benchmark](BENCHMARK.md)和[完整驗證紀錄](docs/VALIDATION.md)。
 
 ## Benchmark
 
-v1.1.0 測試在配備 Apple M5 Pro、64 GB 統一記憶體和 1 TB 儲存空間的
-MacBook Pro 執行。兩個模型都使用 `reasoning_effort: low` 和
-`thinking_mode: chat`。TTFT 表示第一個 token 的等待時間。
+v1.1.4 測試在配備 Apple M5 Pro、64 GB 統一記憶體和 1 TB 儲存空間的
+MacBook Pro 執行。測試使用 SPEED-Bench mixed prompts、每個 input size 跑三次，
+output 上限是 64 tokens。三次測試使用 nearest-rank P95 時，P95 等於最大值。
+TTFT 表示第一個 token 的等待時間。括號內是相較 v1.1.0 的改善率；正值表示改善，
+負值表示退步。總時間、TTFT 和記憶體越低越好，Prefill 和 Decode 越高越好。
 
 ### DeepSeek V4 Flash 0731
 
 | Input token | P95 總時間 | P95 TTFT | P95 Prefill | P95 Decode | 峰值記憶體 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 46.72 s | 37.26 s | 20.7 tok/s | 6.7 tok/s | 23.03 GiB |
-| 2,048 | 27.08 s | 16.91 s | 108.1 tok/s | 6.6 tok/s | 33.19 GiB |
-| 8,192 | 47.66 s | 37.96 s | 209.5 tok/s | 6.7 tok/s | 34.74 GiB |
-| 16,384 | 86.01 s | 76.34 s | 212.3 tok/s | 6.7 tok/s | 35.64 GiB |
+| 1,024 | 27.10 s(+42.0%) | 17.75 s(+52.4%) | 59.9 tok/s(+188.7%) | 7.8 tok/s(+15.6%) | 32.84 GiB(−42.6%) |
+| 2,048 | 27.35 s(−1.0%) | 17.60 s(−4.0%) | 117.3 tok/s(+8.5%) | 7.3 tok/s(+11.7%) | 33.26 GiB(−0.2%) |
+| 8,192 | 50.12 s(−5.2%) | 40.47 s(−6.6%) | 206.3 tok/s(−1.5%) | 7.4 tok/s(+10.3%) | 34.50 GiB(+0.7%) |
+| 16,384 | 88.27 s(−2.6%) | 78.61 s(−3.0%) | 209.0 tok/s(−1.5%) | 7.2 tok/s(+8.0%) | 35.70 GiB(−0.2%) |
 
 ### Qwen3.8 Next Flash FP8
 
+v1.1.4 將 slot 數量從 1,152 增加到 4,096，以提高 expert cache 命中率，
+但也會使用更多記憶體。
+
 | Input token | P95 總時間 | P95 TTFT | P95 Prefill | P95 Decode | 峰值記憶體 |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 24.45 s | 17.20 s | 59.8 tok/s | 9.3 tok/s | 15.19 GiB |
-| 2,048 | 40.45 s | 32.63 s | 65.0 tok/s | 8.3 tok/s | 16.41 GiB |
-| 8,192 | 142.39 s | 134.44 s | 61.7 tok/s | 8.3 tok/s | 17.90 GiB |
-| 16,384 | 276.41 s | 267.88 s | 61.8 tok/s | 7.8 tok/s | 18.92 GiB |
+| 1,024 | 22.60 s(+7.6%) | 15.65 s(+9.0%) | 69.2 tok/s(+15.7%) | 10.4 tok/s(+11.6%) | 20.92 GiB(−37.7%) |
+| 2,048 | 31.42 s(+22.3%) | 24.90 s(+23.7%) | 87.5 tok/s(+34.7%) | 9.8 tok/s(+18.1%) | 21.26 GiB(−29.6%) |
+| 8,192 | 84.88 s(+40.4%) | 77.74 s(+42.2%) | 111.9 tok/s(+81.4%) | 10.4 tok/s(+25.0%) | 21.90 GiB(−22.3%) |
+| 16,384 | 157.89 s(+42.9%) | 150.33 s(+43.9%) | 113.3 tok/s(+83.4%) | 9.7 tok/s(+23.9%) | 22.75 GiB(−20.3%) |
 
 prompt、SSD 速度和 cache 狀態會改變效能。請參閱
 [完整 Benchmark](BENCHMARK.md)和[完整驗證紀錄](docs/VALIDATION.md)。
