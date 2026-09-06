@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 import unittest
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,6 +20,7 @@ from deepseek_v4_ssd.ane_prefill import (
     _ane_output_channels,
 )
 from deepseek_v4_ssd.generation import _qwen_layer_major_prefill
+from deepseek_v4_ssd.cancellation import GenerationCancelled, cancellation_scope
 from deepseek_v4_ssd.manifest import (
     QWEN_EXPERT_REGIONS,
     QWEN_MODEL_ID,
@@ -1171,6 +1173,38 @@ class QwenTests(unittest.TestCase):
                 ("compute", 1),
             ],
         )
+
+    def test_qwen_prefill_cancellation_exits_expert_scope_before_next_chunk(self):
+        cancelled = threading.Event()
+        calls = []
+        released = []
+
+        class Layer:
+            layer_type = "full_attention"
+
+            def __call__(self, hidden, *_):
+                calls.append(True)
+                cancelled.set()
+                return hidden + 1
+
+        class Cache:
+            @contextmanager
+            def batched_layer(self, layer):
+                try:
+                    yield
+                finally:
+                    released.append(layer)
+
+        core = SimpleNamespace(
+            args=SimpleNamespace(hidden_size=1, hc_count=2),
+            layers=[Layer(), Layer()],
+            embed_tokens=lambda tokens: tokens[..., None].astype(mx.float32),
+        )
+        with cancellation_scope(cancelled), self.assertRaises(GenerationCancelled):
+            _qwen_layer_major_prefill(SimpleNamespace(model=core), [1, 2, 3, 4],
+                                      [None, None], 2, Cache())
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(released, [0])
 
     def test_short_qwen_prefill_does_not_load_a_complete_expert_layer(self):
         class Cache:

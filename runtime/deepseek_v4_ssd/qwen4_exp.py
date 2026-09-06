@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .cancellation import check_cancelled
+
 import math
 import time
 from dataclasses import dataclass, fields, replace
@@ -805,6 +807,7 @@ class TextModel(nn.Module):
             cache = [None] * len(self.layers)
         mask = create_ssm_mask(hidden[..., : self.args.hidden_size], cache[0])
         for layer, layer_cache in zip(self.layers, cache):
+            check_cancelled()
             hidden = layer(hidden, input_ids, mask, layer_cache)
         return hidden
 
@@ -1006,6 +1009,7 @@ def generate_mtp_tokens(
 
     def prefill_mtp(paired_hidden: mx.array, paired_tokens: mx.array) -> None:
         for start in range(0, paired_tokens.shape[1], mtp_prefill_step):
+            check_cancelled()
             end = min(start + mtp_prefill_step, paired_tokens.shape[1])
             mtp_logits, _ = mtp_model(
                 paired_hidden[:, start:end],
@@ -1035,6 +1039,7 @@ def generate_mtp_tokens(
         processed = 0
     previous_hidden = None
     while processed < len(prompt):
+        check_cancelled()
         count = min(prefill_step_size, len(prompt) - processed)
         token_ids = mx.array([prompt[processed : processed + count]], dtype=mx.int32)
         final_logits, final_hidden = main_model.forward_with_hidden(

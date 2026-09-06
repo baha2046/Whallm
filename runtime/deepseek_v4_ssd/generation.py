@@ -7,7 +7,7 @@ import json
 import os
 import threading
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import closing, contextmanager, nullcontext
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Iterator
@@ -19,6 +19,8 @@ from mlx_lm.models.base import create_ssm_mask
 from mlx_lm.sample_utils import make_logits_processors, make_sampler
 from mlx_lm.tokenizer_utils import TokenizerWrapper
 from transformers import AutoTokenizer
+
+from .cancellation import check_cancelled
 
 from .dspark import DraftResult, VerificationMetrics, generate_tokens
 from .expert_cache import CacheMetrics
@@ -190,9 +192,11 @@ def _qwen_layer_major_prefill(
     inputs = mx.array(token_ids)[None]
     hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
     for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
+        check_cancelled()
         outputs = []
         with expert_cache.batched_layer(layer_index):
             for start in range(0, len(token_ids), step_size):
+                check_cancelled()
                 end = min(start + step_size, len(token_ids))
                 chunk = hidden[:, start:end]
                 chunk_ids = inputs[:, start:end]
@@ -2011,6 +2015,7 @@ class ModelRuntime:
         prompt: str,
         options: GenerationOptions,
     ) -> Iterator[GeneratedPiece]:
+        check_cancelled()
         sampler = make_sampler(
             temp=options.temperature,
             top_p=options.top_p,
@@ -2106,6 +2111,7 @@ class ModelRuntime:
                 prefill_persist_snapshots: dict[int, _PromptCacheSnapshot] = {}
 
                 def record_prefill_checkpoint(processed: int, total: int) -> None:
+                    check_cancelled()
                     if (
                         self._prompt_cache_directory is None
                         or options.approximation_mode != EXACT_APPROXIMATION_MODE
@@ -2236,33 +2242,40 @@ class ModelRuntime:
                                 prompt_progress_callback=record_prefill_checkpoint,
                             )
                         )
-                        first_response = True
-                        while True:
-                            started = time.perf_counter()
-                            try:
-                                phase = "prefill" if first_response else "decode"
-                                with _route_phase(self.expert_cache, phase):
-                                    response = next(responses)
-                            except StopIteration:
-                                break
-                            first_response = False
-                            step_seconds = time.perf_counter() - started
-                            cache_started = time.perf_counter()
-                            eval_prompt_cache(prompt_cache)
-                            cache_seconds = time.perf_counter() - cache_started
-                            self.metrics.record(response, step_seconds, cache_seconds)
-                            if response.finish_reason != "stop":
-                                cache_tokens.append(int(response.token))
-                            if response.finish_reason is not None:
-                                completed = True
-                            yield GeneratedPiece(
-                                text=response.text,
-                                token=response.token,
-                                prompt_tokens=len(prompt_tokens),
-                                generation_tokens=response.generation_tokens,
-                                finish_reason=response.finish_reason,
-                            )
+                        with closing(responses):
+                            first_response = True
+                            while True:
+                                check_cancelled()
+                                started = time.perf_counter()
+                                try:
+                                    phase = "prefill" if first_response else "decode"
+                                    with _route_phase(self.expert_cache, phase):
+                                        response = next(responses)
+                                except StopIteration:
+                                    break
+                                check_cancelled()
+                                first_response = False
+                                step_seconds = time.perf_counter() - started
+                                cache_started = time.perf_counter()
+                                eval_prompt_cache(prompt_cache)
+                                cache_seconds = time.perf_counter() - cache_started
+                                self.metrics.record(response, step_seconds, cache_seconds)
+                                if response.finish_reason != "stop":
+                                    cache_tokens.append(int(response.token))
+                                if response.finish_reason is not None:
+                                    completed = True
+                                yield GeneratedPiece(
+                                    text=response.text,
+                                    token=response.token,
+                                    prompt_tokens=len(prompt_tokens),
+                                    generation_tokens=response.generation_tokens,
+                                    finish_reason=response.finish_reason,
+                                )
                 finally:
+                    if not completed:
+                        # Drain submitted work before another request can reuse
+                        # expert buffers. Never run MLX cleanup on the observer.
+                        mx.synchronize(self._generation_stream)
                     self.metrics.finish(self._expert_metrics())
                     if completed and dspark is None and mtp is None:
                         if (
@@ -2306,46 +2319,49 @@ class ModelRuntime:
                 record_round=self.metrics.record_mtp_round,
             )
         )
-        generation_tokens = 0
-        last_token = 0
-        pending_text = ""
-        finish_reason = "length"
-        while generation_tokens < options.max_tokens:
-            started = time.perf_counter()
-            try:
-                token, _ = next(responses)
-            except StopIteration:
-                break
-            step_seconds = time.perf_counter() - started
-            generation_tokens += 1
-            last_token = token
-            if token in tokenizer.eos_token_ids:
-                finish_reason = "stop"
-                break
-            detokenizer.add_token(token)
-            self.metrics.record_token(generation_tokens, step_seconds, 0.0)
-            if generation_tokens == options.max_tokens:
-                pending_text = detokenizer.last_segment
-                break
+        with closing(responses):
+            generation_tokens = 0
+            last_token = 0
+            pending_text = ""
+            finish_reason = "length"
+            while generation_tokens < options.max_tokens:
+                check_cancelled()
+                started = time.perf_counter()
+                try:
+                    token, _ = next(responses)
+                except StopIteration:
+                    break
+                check_cancelled()
+                step_seconds = time.perf_counter() - started
+                generation_tokens += 1
+                last_token = token
+                if token in tokenizer.eos_token_ids:
+                    finish_reason = "stop"
+                    break
+                detokenizer.add_token(token)
+                self.metrics.record_token(generation_tokens, step_seconds, 0.0)
+                if generation_tokens == options.max_tokens:
+                    pending_text = detokenizer.last_segment
+                    break
+                yield GeneratedPiece(
+                    text=detokenizer.last_segment,
+                    token=token,
+                    prompt_tokens=len(prompt_tokens),
+                    generation_tokens=generation_tokens,
+                    finish_reason=None,
+                )
+            detokenizer.finalize()
+            final_text = detokenizer.last_segment
+            if pending_text and not final_text.startswith(pending_text):
+                final_text = pending_text + final_text
+            self.metrics.record_token(generation_tokens, 0.0, 0.0)
             yield GeneratedPiece(
-                text=detokenizer.last_segment,
-                token=token,
+                text=final_text,
+                token=last_token,
                 prompt_tokens=len(prompt_tokens),
                 generation_tokens=generation_tokens,
-                finish_reason=None,
+                finish_reason=finish_reason,
             )
-        detokenizer.finalize()
-        final_text = detokenizer.last_segment
-        if pending_text and not final_text.startswith(pending_text):
-            final_text = pending_text + final_text
-        self.metrics.record_token(generation_tokens, 0.0, 0.0)
-        yield GeneratedPiece(
-            text=final_text,
-            token=last_token,
-            prompt_tokens=len(prompt_tokens),
-            generation_tokens=generation_tokens,
-            finish_reason=finish_reason,
-        )
 
     def _stream_dspark(
         self,
@@ -2418,50 +2434,53 @@ class ModelRuntime:
                 ),
             )
         )
-        generation_tokens = 0
-        last_token = 0
-        pending_text = ""
-        finish_reason = "length"
-        while generation_tokens < options.max_tokens:
-            started = time.perf_counter()
-            try:
-                token, _, _ = next(responses)
-            except StopIteration:
-                break
-            step_seconds = time.perf_counter() - started
-            generation_tokens += 1
-            last_token = token
-            if token in tokenizer.eos_token_ids:
-                finish_reason = "stop"
-                break
-            detokenizer.add_token(token)
-            self.metrics.record_token(
-                generation_tokens,
-                step_seconds,
-                0.0,
-            )
-            if generation_tokens == options.max_tokens:
-                pending_text = detokenizer.last_segment
-                break
+        with closing(responses):
+            generation_tokens = 0
+            last_token = 0
+            pending_text = ""
+            finish_reason = "length"
+            while generation_tokens < options.max_tokens:
+                check_cancelled()
+                started = time.perf_counter()
+                try:
+                    token, _, _ = next(responses)
+                except StopIteration:
+                    break
+                check_cancelled()
+                step_seconds = time.perf_counter() - started
+                generation_tokens += 1
+                last_token = token
+                if token in tokenizer.eos_token_ids:
+                    finish_reason = "stop"
+                    break
+                detokenizer.add_token(token)
+                self.metrics.record_token(
+                    generation_tokens,
+                    step_seconds,
+                    0.0,
+                )
+                if generation_tokens == options.max_tokens:
+                    pending_text = detokenizer.last_segment
+                    break
+                yield GeneratedPiece(
+                    text=detokenizer.last_segment,
+                    token=token,
+                    prompt_tokens=len(prompt_tokens),
+                    generation_tokens=generation_tokens,
+                    finish_reason=None,
+                )
+            detokenizer.finalize()
+            final_text = detokenizer.last_segment
+            if pending_text and not final_text.startswith(pending_text):
+                final_text = pending_text + final_text
+            self.metrics.record_token(generation_tokens, 0.0, 0.0)
             yield GeneratedPiece(
-                text=detokenizer.last_segment,
-                token=token,
+                text=final_text,
+                token=last_token,
                 prompt_tokens=len(prompt_tokens),
                 generation_tokens=generation_tokens,
-                finish_reason=None,
+                finish_reason=finish_reason,
             )
-        detokenizer.finalize()
-        final_text = detokenizer.last_segment
-        if pending_text and not final_text.startswith(pending_text):
-            final_text = pending_text + final_text
-        self.metrics.record_token(generation_tokens, 0.0, 0.0)
-        yield GeneratedPiece(
-            text=final_text,
-            token=last_token,
-            prompt_tokens=len(prompt_tokens),
-            generation_tokens=generation_tokens,
-            finish_reason=finish_reason,
-        )
 
     def warm_prompt(self, prompt: str) -> int:
         if getattr(self.model, "mtp", None) is not None:

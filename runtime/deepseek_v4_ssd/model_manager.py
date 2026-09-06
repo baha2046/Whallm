@@ -10,6 +10,8 @@ from typing import Any, Callable, Iterator
 
 import mlx.core as mx
 
+from .cancellation import check_cancelled
+
 from .generation import ModelRuntime, RuntimeMetrics
 from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .model import (
@@ -456,12 +458,18 @@ class ModelManager:
 
     @contextmanager
     def request(self, name: Any) -> Iterator[ModelRequest]:
-        with self._generation_lock:
+        while not self._generation_lock.acquire(timeout=0.05):
+            check_cancelled()
+        try:
+            check_cancelled()
             spec = self._by_name.get(name) if isinstance(name, str) else None
             if spec is None:
                 raise ModelNotFound(str(name) if name is not None else "")
             runtime = self._ensure_loaded(spec, name)
+            check_cancelled()
             yield ModelRequest(name, spec.id, runtime, spec.defaults)
+        finally:
+            self._generation_lock.release()
 
     def configure(self, value: Any) -> None:
         with self._generation_lock:

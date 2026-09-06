@@ -6,6 +6,8 @@ import json
 import os
 import re
 import secrets
+import select
+import socket
 import sys
 import threading
 import time
@@ -14,6 +16,8 @@ from dataclasses import asdict, dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Iterator
 from urllib.parse import urlsplit
+
+from .cancellation import GenerationCancelled, cancellation_scope, check_cancelled
 
 from .generation import (
     APPROXIMATION_MODES,
@@ -40,6 +44,7 @@ from .model_manager import (
 from .model import RuntimeConfig, _POWER_SAVING_LIMITS_GBPS
 from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 
+RESPONSE_HEARTBEAT_SECONDS = 10.0
 MAX_REQUEST_BYTES = 1_048_576
 MAX_GENERATION_TOKENS = 272_000
 _QWEN_SAMPLING_DEFAULTS = {
@@ -160,10 +165,16 @@ class OpenAIServer(ThreadingHTTPServer):
         self.metrics.start()
         try:
             for piece in pieces:
+                check_cancelled()
                 self.metrics.record(piece.generation_tokens)
                 yield piece
         finally:
-            self.metrics.finish()
+            try:
+                close = getattr(pieces, "close", None)
+                if close is not None:
+                    close()
+            finally:
+                self.metrics.finish()
 
 
 class ReasoningParser:
@@ -190,6 +201,95 @@ class ReasoningParser:
     def finish(self) -> tuple[str, str]:
         pending, self.pending = self.pending, ""
         return (pending, "") if self.reasoning else ("", pending)
+
+
+class ClientConnection:
+    """Observe EOF/reset independently of SSE output, including queued requests."""
+
+    def __init__(self, connection):
+        self.connection = connection
+        self.cancelled = threading.Event()
+        self.stopped = threading.Event()
+        self.thread = threading.Thread(target=self._observe, daemon=True,
+                                       name="whallm-client-disconnect")
+
+    def _observe(self):
+        while not self.stopped.wait(0.05):
+            try:
+                readable, _, _ = select.select([self.connection], [], [], 0)
+                if readable and not self.connection.recv(1, socket.MSG_PEEK | socket.MSG_DONTWAIT):
+                    self.cancelled.set()
+                    return
+            except BlockingIOError:
+                continue
+            except OSError:
+                self.cancelled.set()
+                return
+
+    def __enter__(self):
+        self.scope = cancellation_scope(self.cancelled)
+        self.scope.__enter__()
+        self.thread.start()
+        return self
+
+    def __exit__(self, *args):
+        self.stopped.set()
+        self.thread.join()
+        self.scope.__exit__(*args)
+
+
+class ResponseEvents:
+    """Keep Responses SSE alive without moving MLX work to another thread."""
+
+    def __init__(self, handler, response: dict[str, Any]):
+        self.handler = handler
+        self.response = response
+        self.sequence = 0
+        self.lock = threading.RLock()
+        self.stopped = threading.Event()
+        self.error: OSError | None = None
+        self.last_sent = time.monotonic()
+        self.thread = threading.Thread(target=self._heartbeat, daemon=True,
+                                       name="whallm-response-heartbeat")
+
+    def check_connection(self) -> None:
+        if self.error is not None:
+            raise self.error
+
+    def send(self, event_type: str, **values: Any) -> None:
+        with self.lock:
+            self.check_connection()
+            if self.stopped.is_set():
+                return
+            try:
+                self.handler._sse({"type": event_type, "sequence_number": self.sequence, **values})
+            except OSError as error:
+                self.error = error
+                self.stopped.set()
+                raise
+            self.sequence += 1
+            self.last_sent = time.monotonic()
+            if event_type in {"response.completed", "response.failed", "response.incomplete"}:
+                self.stopped.set()
+
+    def _heartbeat(self) -> None:
+        while not self.stopped.wait(RESPONSE_HEARTBEAT_SECONDS):
+            try:
+                with self.lock:
+                    if time.monotonic() - self.last_sent >= RESPONSE_HEARTBEAT_SECONDS:
+                        # An SSE comment does not reach every client's event idle timer.
+                        self.send("response.in_progress", response=self.response)
+            except OSError:
+                return
+
+    def __enter__(self):
+        self.send("response.created", response=self.response)
+        self.thread.start()
+        return self
+
+    def __exit__(self, *_):
+        self.stopped.set()
+        self.thread.join()
 
 
 class OpenAIHandler(BaseHTTPRequestHandler):
@@ -240,7 +340,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     error_type="server_error",
                 ).body(),
             )
-        except (BrokenPipeError, ConnectionResetError):
+        except (GenerationCancelled, BrokenPipeError, ConnectionResetError):
             self.close_connection = True
         except Exception as error:
             sys.stderr.write(f"request failed: {error}\n")
@@ -292,17 +392,17 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         if path == "/v1/chat/completions":
             self._authorize()
             payload = self._request_json()
-            with self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
                 self._chat(payload, model)
         elif path == "/v1/responses":
             self._authorize()
             payload = self._request_json()
-            with self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
                 self._responses(payload, model)
         elif path == "/v1/completions":
             self._authorize()
             payload = self._request_json()
-            with self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
                 self._completion(payload, model)
         elif path == "/api/models/load":
             self._authorize()
@@ -487,7 +587,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                 options,
             )
         else:
-            pieces = self.app.track(runtime.stream(prompt, options))
+            pieces = self._response_pieces(runtime.stream(prompt, options))
         tool_calling = bool(tools) and tool_choice.mode != "none"
         if stream:
             self._stream_response(
@@ -551,7 +651,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         current_prompt = prompt
         parse_failed = False
         for attempt in range(2):
-            pieces = list(self.app.track(runtime.stream(current_prompt, options)))
+            pieces = list(self._response_pieces(runtime.stream(current_prompt, options)))
             raw = "".join(piece.text for piece in pieces)
             try:
                 turn = runtime.parse_chat(raw, thinking_mode)
@@ -605,8 +705,60 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         runtime: Any,
     ) -> None:
         self._start_sse()
+        created = _response_object(
+            request_id, model_name, payload, options, [], None, status="in_progress",
+        )
+        with ResponseEvents(self, created) as events:
+            self._active_response_events = events
+            try:
+                self._write_response(
+                    pieces, request_id, payload, options, thinking_mode, tool_calling,
+                    tool_choice, response_tools, model_name, runtime, events.send,
+                )
+            except (GenerationCancelled, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception as error:
+                sys.stderr.write(f"response {request_id} failed: {error}\n")
+                failed = {**created, "status": "failed", "error": {
+                    "code": error.code if isinstance(error, APIError) and error.code else "server_error",
+                    "message": str(error) if isinstance(error, APIError) else "Generation failed. Check the server log.",
+                }}
+                events.send("response.failed", response=failed)
+            finally:
+                close = getattr(pieces, "close", None)
+                if close is not None:
+                    close()
+                self._active_response_events = None
+
+    def _response_pieces(self, pieces: Iterator[GeneratedPiece]) -> Iterator[GeneratedPiece]:
+        tracked = self.app.track(pieces)
+        try:
+            for piece in tracked:
+                events = getattr(self, "_active_response_events", None)
+                if events is not None:
+                    events.check_connection()
+                yield piece
+        finally:
+            tracked.close()
+            close = getattr(pieces, "close", None)
+            if close is not None:
+                close()
+
+    def _write_response(
+        self,
+        pieces: Iterator[GeneratedPiece],
+        request_id: str,
+        payload: dict[str, Any],
+        options: GenerationOptions,
+        thinking_mode: str,
+        tool_calling: bool,
+        tool_choice: ToolChoice,
+        response_tools: dict[str, dict[str, str]],
+        model_name: str,
+        runtime: Any,
+        send,
+    ) -> None:
         output: list[dict[str, Any]] = []
-        sequence = 0
         prompt_tokens = generated = 0
         reasoning_item: dict[str, Any] | None = None
         reasoning_index = -1
@@ -615,11 +767,6 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         message_index = -1
         message_text = ""
         calls: dict[int, tuple[int, dict[str, Any]]] = {}
-
-        def send(event_type: str, **values: Any) -> None:
-            nonlocal sequence
-            self._sse({"type": event_type, "sequence_number": sequence, **values})
-            sequence += 1
 
         def start_reasoning() -> None:
             nonlocal reasoning_item, reasoning_index
@@ -798,16 +945,6 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             failed["error"] = error
             send("response.completed", response=failed)
 
-        created = _response_object(
-            request_id,
-            model_name,
-            payload,
-            options,
-            [],
-            None,
-            status="in_progress",
-        )
-        send("response.created", response=created)
         if tool_calling:
             try:
                 raw, prompt_tokens, generated, _ = _collect_raw(pieces)
