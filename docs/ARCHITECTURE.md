@@ -286,6 +286,18 @@ Qwen 使用不同門檻。
 短 prompt 不會建立 48 個完整 expert layer buffer。
 128 個或更多未快取 token 時，Qwen 使用 layer-major path。
 
+`qwen_grouped_experts` 已採用為 Qwen 預設。開啟時，Qwen 在 MTP 關閉且有 batched expert buffer、
+expert 分配數至少 64 的情況下，先依 expert 排序輸入，再執行原本兩次 MXFP4 QMM，最後還原順序。
+兩次 QMM 都明確使用 `sorted_indices=False`，保留已驗證的運算路徑。
+Individual-expert Decode 與 MTP 不使用這個排序路徑，現有 prompt-cache format 5 不變。
+CLI 提供 `--qwen-grouped-experts`／`--no-qwen-grouped-experts`；model catalog／configure API
+可選填同名 boolean，省略時依 model kind 補值：Qwen 為 `true`，DeepSeek 為 `false`。
+App 的 Qwen 進階設定提供「Prefill 加速」開關，預設開啟。
+`ModelAdvancedSettings.qwenGroupedExperts` 保存選擇，並編碼為 catalog 的 `qwen_grouped_experts`；
+舊 App 設定省略時仍採用 Qwen 預設，明確的 `false` 會保留。
+未載入模型沿用 configure 同步流程，下次載入生效；MTP 開啟或 layer-major prefill 關閉時停用開關。
+目前驗證與適用範圍見 [Qwen 支援](QWEN.md)。
+
 Qwen 的 `ane_prefill` 預設開啟。
 只有 1,024-token chunk 會進入 ANE 路線。
 `ane_prefill_ratio` 預設是 0.25。

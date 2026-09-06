@@ -60,7 +60,11 @@ APP 使用版本化 JSON model catalog 啟動 server。
 }
 ```
 
-實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
+實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
+`qwen_grouped_experts` 可省略，Qwen 預設為 `true`，DeepSeek 為 `false`；提供時必須是 boolean。
+明確傳入 `false` 可關閉。Qwen 開啟 MTP 時此選項不作用。
+App 的 Qwen「Prefill 加速」開關會在 catalog／configure 設定中明確傳入此 boolean。
+其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 `--public-model` 只適用於舊的 `--model` 流程。
 該參數會設定該 installed model 的 Alias。
 
@@ -193,7 +197,11 @@ server 會先驗證並更新 entry，再載入模型。
 }
 ```
 
-實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
+實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
+`qwen_grouped_experts` 可省略，Qwen 預設為 `true`，DeepSeek 為 `false`；提供時必須是 boolean。
+明確傳入 `false` 可關閉。Qwen 開啟 MTP 時此選項不作用。
+App 的 Qwen「Prefill 加速」開關會在 catalog／configure 設定中明確傳入此 boolean。
+其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 Loaded 或 Loading 的模型不能更新 entry。
 未載入模型的更新會在下次載入時生效。
 三個模型管理 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。
