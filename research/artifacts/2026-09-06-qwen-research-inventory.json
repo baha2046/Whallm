@@ -1,0 +1,558 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-05T16:18:59.662443+00:00",
+  "evidence_kind": "read-only source and historical artifact audit; no new inference benchmark",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+    "status_before_research_edits": "",
+    "file_sha256_before_research_doc_edits": {
+      "CONTEXT.md": "4098ce0b33e5e3f99b6cc71b3b1325eee8bdd1575b2c85232d545bdb2868c23f",
+      "docs/README.md": "1ccb6af8c304ab8f97f5692c2d8536efe3a1093695fab5937830147ed19cd885",
+      "docs/QWEN.md": "5d7993469c98c5e984d74c9a9f394ccd8c3224898051a650724fef0f67678f10",
+      "docs/PERFORMANCE.md": "b953e3d9f0868d7aff6814739ba6d702dc843f490c5b7a8696abf69b602d2a42",
+      "docs/RESEARCH.md": "d61b7389f0969d962aac88183dadad069acba6081090e2013dccbab855933d7d",
+      "docs/VALIDATION.md": "d28279eac28929018a3793c72552bd0acae157475a1ada0f0f5ca903369589ee",
+      "research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md": "a5e7786ba30d720c1e311dd80e6f54eb05ba3c2a8cee80da50d1821c75de9391",
+      "research/SSD_STREAMING_BOTTLENECKS_2026-08-31.md": "6aa0dfefa77c3065efc88e960f79349e4a4eb8a0017342eb8adf6dac5080108b",
+      "runtime/deepseek_v4_ssd/qwen4_exp.py": "34dc6eca2f63fa4b062fc74532c6510e93086bf0cfa764f97ef80e3a7e28c95f",
+      "runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+      "runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+      "runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+      "runtime/deepseek_v4_ssd/model.py": "eaebd076eb78c31fb789a70bb59c3dc99ff11be6b4d005995c237d56232c5489",
+      "docs/benchmarks/2026-09-04-132210-api-qwen3-8-flash-next-fp8.json": "17681e9d03184d6148add12ebabb7b19034290b34d46251b26b550bdebb191a6",
+      "docs/benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json": "7001ff5a7a3142fb26bd20002d2ac93d1672f296bc67984d018aaf056ce546d5",
+      "docs/benchmarks/2026-09-02-qwen-private-ane-prefill-exploratory-m5-pro.json": "ff978e5d6fb4e2adaa183716fed3a20ecc10abe306b8ba4e71778464f58b3876",
+      "docs/benchmarks/2026-08-30-qwen-mtp-bounded-prefill-formal-stop-code4k64-m5-pro.json": "1010d4a1e6f957804fca9b92398bc832e88525d4231247892216c3028c0e1576",
+      "docs/benchmarks/2026-08-30-qwen-mtp-block-formal-stop-code4k64-m5-pro.json": "f3f8295b88a4eb379a6cad61d76618b4e17421aa58f5ed08cedecc6e34f58650",
+      "docs/benchmarks/2026-09-01-qwen-next-layer-prefetch-gate-m5-pro.json": "2e1d94d1730cebab179ec4c71c32d1b60245413c31b6e643dd23037bba9b52a0",
+      "docs/benchmarks/2026-09-01-expert-blob-compression-m5-pro.json": "e26566bf4402c7a32ef62eef7477afbc2dcd17711801288eb780f65b366307a2",
+      "docs/benchmarks/2026-08-29-qwen-q2-lfu-simulation-m5-pro.json": "284648fda8c418fe6271e0defdb16edb8853e1eb296bc4430834a7329b32050f",
+      "docs/benchmarks/2026-08-29-qwen-prefill-threshold-rejection-m5-pro.json": "f7709fc0cc82d088bef935f9b1b3f46139b9bf9a14038aa11711a38dbcc98067"
+    },
+    "installed_dependency_sha256": {
+      ".venv/lib/python3.14/site-packages/mlx_lm/models/qwen3_5.py": "f0daa30bba5cb521c8bdfa7093101a544c6a37bbba09bca582288219cb04ae3a",
+      ".venv/lib/python3.14/site-packages/mlx_lm/models/gated_delta.py": "79c8376a51c694b03e54d2f996ced6ea6c8c42868b8571529f97334db165a3e1"
+    }
+  },
+  "current_host": {
+    "chip": "Apple M2 Max",
+    "memory_bytes": 68719476736,
+    "macos": "26.6.2",
+    "os_build": "25G83",
+    "python": "3.14.7",
+    "packages": {
+      "mlx": "0.32.0",
+      "mlx-lm": "0.31.3",
+      "numpy": "2.3.5"
+    }
+  },
+  "installed_model": {
+    "manifest_path": "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4/manifest.json",
+    "manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc",
+    "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+    "revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+    "files_count": 59,
+    "files_size_check": [
+      {
+        "path": "common.bin",
+        "expected_bytes": 9895409152,
+        "actual_bytes": 9895409152,
+        "size_matches": true
+      },
+      {
+        "path": "ngram.bin",
+        "expected_bytes": 51200245760,
+        "actual_bytes": 51200245760,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_00.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_01.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_02.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_03.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_04.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_05.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_06.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_07.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_08.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_09.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_10.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_11.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_12.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_13.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_14.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_15.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_16.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_17.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_18.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_19.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_20.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_21.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_22.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_23.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_24.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_25.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_26.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_27.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_28.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_29.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_30.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_31.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_32.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_33.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_34.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_35.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_36.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_37.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_38.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_39.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_40.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_41.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_42.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_43.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_44.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_45.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_46.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "experts/layer_47.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      },
+      {
+        "path": "config.json",
+        "expected_bytes": 72423,
+        "actual_bytes": 72423,
+        "size_matches": true
+      },
+      {
+        "path": "generation_config.json",
+        "expected_bytes": 202,
+        "actual_bytes": 202,
+        "size_matches": true
+      },
+      {
+        "path": "tokenizer/tokenizer.json",
+        "expected_bytes": 12809320,
+        "actual_bytes": 12809320,
+        "size_matches": true
+      },
+      {
+        "path": "tokenizer/tokenizer_config.json",
+        "expected_bytes": 17928,
+        "actual_bytes": 17928,
+        "size_matches": true
+      },
+      {
+        "path": "tokenizer/chat_template.jinja",
+        "expected_bytes": 8952,
+        "actual_bytes": 8952,
+        "size_matches": true
+      },
+      {
+        "path": "tokenizer/vocab.json",
+        "expected_bytes": 6722759,
+        "actual_bytes": 6722759,
+        "size_matches": true
+      },
+      {
+        "path": "tokenizer/merges.txt",
+        "expected_bytes": 3353259,
+        "actual_bytes": 3353259,
+        "size_matches": true
+      },
+      {
+        "path": "mtp/common.bin",
+        "expected_bytes": 181136896,
+        "actual_bytes": 181136896,
+        "size_matches": true
+      },
+      {
+        "path": "mtp/experts/layer_00.bin",
+        "expected_bytes": 1336934400,
+        "actual_bytes": 1336934400,
+        "size_matches": true
+      }
+    ],
+    "all_sizes_match": true,
+    "weight_file_hashes_recomputed": false,
+    "checkpoint_config_sha256": "99c11efba4012d0f760f4e4831a8d6cafd845044e21d0aa9e6d9e70a15a90a8d",
+    "expert_blob_bytes": 2611200,
+    "layers": 48,
+    "selected_experts": 10,
+    "derived_no_hit_expert_blob_bytes_per_target_step": 1253376000,
+    "derived_ngram_payload_bytes_per_token": 2560,
+    "lm_head": [
+      {
+        "dtype": "BF16",
+        "length": 1271398400,
+        "name": "lm_head.weight",
+        "offset": 0,
+        "shape": [
+          248320,
+          2560
+        ]
+      }
+    ]
+  },
+  "historical_api": {
+    "artifact": "2026-09-04-132210-api-qwen3-8-flash-next-fp8.json",
+    "source": {
+      "commit": "b25ae07e9df143dd744405b741628daa5e8705c1",
+      "working_tree_dirty": true,
+      "working_tree_diff_sha256": "30ceaa9931a4980d4f1cf83a2e2e32068527123528f2154b2d9f574e0bbdb402",
+      "benchmark_script_sha256": "4d974ee698986e307e0546b0e721f5fb758879257e68ab7786bb5cc8da9568f5"
+    },
+    "environment": {
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "macos": "26.6.2",
+      "hardware_model": "Mac17,8",
+      "unified_memory_bytes": "68719476736",
+      "python": "3.14.7",
+      "api_base_url": "http://127.0.0.1:11434/v1"
+    },
+    "evidence_limits": [
+      "The API does not expose exact generated token IDs.",
+      "output_text_sha256 hashes streamed text, not generated token IDs.",
+      "Memory is MLX active memory, not process RSS."
+    ],
+    "per_input_medians_recomputed_from_runs": [
+      {
+        "input_tokens": 1024,
+        "runs": 3,
+        "output_tokens": [
+          64,
+          64,
+          64
+        ],
+        "reused_tokens": [
+          0,
+          0,
+          0
+        ],
+        "median": {
+          "wall_seconds": 21.412445083988132,
+          "ttft_seconds": 15.173045333009213,
+          "prefill_tokens_per_second": 67.48809995131768,
+          "decode_tokens_per_second": 10.358640450458925
+        }
+      },
+      {
+        "input_tokens": 2048,
+        "runs": 3,
+        "output_tokens": [
+          64,
+          64,
+          64
+        ],
+        "reused_tokens": [
+          0,
+          0,
+          0
+        ],
+        "median": {
+          "wall_seconds": 30.92995695801801,
+          "ttft_seconds": 24.29073404200608,
+          "prefill_tokens_per_second": 84.31198482756363,
+          "decode_tokens_per_second": 9.782173692840566
+        }
+      },
+      {
+        "input_tokens": 8192,
+        "runs": 3,
+        "output_tokens": [
+          64,
+          64,
+          64
+        ],
+        "reused_tokens": [
+          0,
+          0,
+          0
+        ],
+        "median": {
+          "wall_seconds": 81.20990008400986,
+          "ttft_seconds": 74.72547454098822,
+          "prefill_tokens_per_second": 109.62794214851786,
+          "decode_tokens_per_second": 9.916745508923967
+        }
+      },
+      {
+        "input_tokens": 16384,
+        "runs": 3,
+        "output_tokens": [
+          64,
+          64,
+          64
+        ],
+        "reused_tokens": [
+          0,
+          0,
+          0
+        ],
+        "median": {
+          "wall_seconds": 154.63996845899965,
+          "ttft_seconds": 147.18651479197433,
+          "prefill_tokens_per_second": 111.31454551496299,
+          "decode_tokens_per_second": 9.444178775203493
+        }
+      }
+    ]
+  },
+  "current_validation": [
+    {
+      "command": "PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -p 'test_qwen*.py'",
+      "tests": 46,
+      "seconds": 0.666,
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -p 'test_block_prompt_cache.py'",
+      "tests": 6,
+      "seconds": 0.027,
+      "result": "passed"
+    }
+  ],
+  "evidence_limits": [
+    "Current host is M2 Max; historical major performance gates identify M5 Pro. Do not merge timings.",
+    "Installed file sizes and manifest hash verified; full weight hashes were not rerun.",
+    "API medians summarize different prompts; not a candidate A/B.",
+    "No new model inference, trace, kernel candidate, quality benchmark or performance result produced."
+  ]
+}
