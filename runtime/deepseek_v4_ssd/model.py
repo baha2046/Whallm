@@ -46,6 +46,7 @@ class RuntimeConfig:
     moe_prefill_step_size: int = 0
     batched_expert_prefill: bool = True
     qwen_next_layer_prefetch: bool = False
+    qwen_grouped_experts: bool = True
     ane_prefill: bool = True
     ane_prefill_ratio: float = 0.25
     fp4_index_cache: bool = True

@@ -325,3 +325,6 @@
 "This Mac meets the recommended hardware setup." = "此 Mac 符合建议的硬件条件。";
 "Unavailable" = "无法获取";
 "Verify or repair the model before starting the server." = "启动 server 前，请先验证或修复模型。";
+
+"Prefill acceleration" = "Prefill 加速";
+"Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load." = "加快提示词处理。需要启用 layer-major prefill，并关闭 MTP。更改会在下次载入模型时生效。";

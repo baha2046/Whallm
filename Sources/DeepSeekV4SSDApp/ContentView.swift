@@ -1782,6 +1782,16 @@ private struct ModelAdvancedView: View {
             hint: "Loads routed experts by layer during prefill.",
             value: $settings.layerMajorPrefill
           )
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            toggleField(
+              "Prefill acceleration",
+              hint:
+                "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load.",
+              value: qwenGroupedExperts
+            )
+            .disabled(!settings.layerMajorPrefill || mtpEnabled.wrappedValue)
+          }
           if modelKind == .deepSeekV4 {
             Divider()
             integerField(
@@ -1890,6 +1900,13 @@ private struct ModelAdvancedView: View {
     Binding(
       get: { settings.anePrefillRatio ?? 0.25 },
       set: { settings.anePrefillRatio = $0 }
+    )
+  }
+
+  private var qwenGroupedExperts: Binding<Bool> {
+    Binding(
+      get: { settings.qwenGroupedExperts ?? true },
+      set: { settings.qwenGroupedExperts = $0 }
     )
   }
 

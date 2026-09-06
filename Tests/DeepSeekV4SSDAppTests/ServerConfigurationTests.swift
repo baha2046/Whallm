@@ -243,6 +243,45 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restoredQwen.layerMajorPrefillThreshold, 1_024)
   }
 
+  @MainActor
+  func testPrefillAccelerationMigratesPersistsAndReachesCatalog() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    var settings = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    XCTAssertEqual(settings.qwenGroupedExperts, true)
+    XCTAssertEqual(ModelAdvancedSettings.defaults(for: .deepSeekV4).qwenGroupedExperts, false)
+    settings.slots = 5_000
+    var old = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+    old.removeValue(forKey: "qwenGroupedExperts")
+    isolated.defaults.set(
+      try JSONSerialization.data(withJSONObject: old),
+      forKey: "modelAdvancedSettings.qwen3.8-flash-next")
+    settings = ModelAdvancedSettings.loadOrDefault(for: .qwen3_8FlashNext, defaults: isolated.defaults)
+    XCTAssertEqual(settings.qwenGroupedExperts, true)
+    XCTAssertEqual(settings.slots, 5_000)
+
+    for enabled in [false, true] {
+      settings.qwenGroupedExperts = enabled
+      settings.save(for: .qwen3_8FlashNext, defaults: isolated.defaults)
+      let restored = ModelAdvancedSettings.loadOrDefault(for: .qwen3_8FlashNext, defaults: isolated.defaults)
+      XCTAssertEqual(restored.qwenGroupedExperts, enabled)
+      let catalog = try ModelLibrary.makeServerCatalog(
+        models: [installedModel(.qwen3_8FlashNext, hasMTP: true)],
+        aliases: [:], settings: [.qwen3_8FlashNext: restored], powerSavingLimitGBps: nil)
+      let object = try XCTUnwrap(
+        try XCTUnwrap(catalog.models.first).jsonObject() as? [String: Any])
+      let runtime = try XCTUnwrap(object["runtime"] as? [String: Any])
+      XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, enabled)
+      XCTAssertEqual(runtime["mtp_enabled"] as? Bool, false)
+    }
+    XCTAssertEqual(settings.normalized(for: .deepSeekV4).qwenGroupedExperts, false)
+    for language in [AppLanguage.english, .simplifiedChinese, .traditionalChinese] {
+      let label = L10n.string("Prefill acceleration", language: language)
+      XCTAssertEqual(label, language == .english ? "Prefill acceleration" : "Prefill 加速")
+    }
+  }
+
   func testSavedAdvancedSettingsWithoutNewFieldsUseTheNewDefaults() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
@@ -417,15 +456,17 @@ final class ServerConfigurationTests: XCTestCase {
         "dspark_fallback_enabled", "dspark_sequential_verification",
         "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
         "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
-        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch",
+        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch", "qwen_grouped_experts",
         "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
+    XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
     let qwenRuntime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
+    XCTAssertEqual(qwenRuntime["qwen_grouped_experts"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
     XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)

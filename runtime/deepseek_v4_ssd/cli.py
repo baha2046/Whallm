@@ -85,6 +85,12 @@ def main() -> None:
     parser.add_argument("--layer-major-prefill-threshold", type=int, default=1_024)
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
     parser.add_argument(
+        "--qwen-grouped-experts",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="group Qwen Prefill rows by expert (default: on for Qwen when MTP is off)",
+    )
+    parser.add_argument(
         "--no-ane-prefill",
         action="store_true",
         help="use the original GPU Prefill path",
@@ -253,6 +259,8 @@ def main() -> None:
         )
     if arguments.dspark and arguments.expert_route_trace:
         parser.error("--expert-route-trace currently requires DSpark to be disabled")
+    if arguments.qwen_grouped_experts and not installed.is_qwen:
+        parser.error("--qwen-grouped-experts requires Qwen3.8-Flash-Next")
     if arguments.qwen_next_layer_prefetch and not installed.is_qwen:
         parser.error("--qwen-next-layer-prefetch requires Qwen3.8-Flash-Next")
     if arguments.qwen_next_layer_prefetch and arguments.no_layer_major_prefill:
@@ -273,6 +281,10 @@ def main() -> None:
         ane_prefill=not arguments.no_ane_prefill,
         ane_prefill_ratio=arguments.ane_prefill_ratio,
         qwen_next_layer_prefetch=arguments.qwen_next_layer_prefetch,
+        qwen_grouped_experts=(
+            installed.is_qwen if arguments.qwen_grouped_experts is None
+            else arguments.qwen_grouped_experts
+        ),
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
@@ -407,6 +419,11 @@ def main() -> None:
             "prefill_attention_chunk_sizes": attention_chunk_sizes,
             "prefill_moe_chunk_sizes": moe_chunk_sizes,
             "batched_expert_prefill": config.batched_expert_prefill,
+            "qwen_grouped_experts": bool(
+                config.qwen_grouped_experts
+                and installed.is_qwen
+                and not config.mtp_enabled
+            ),
             "ane_prefill": config.ane_prefill,
             "ane_prefill_ratio": config.ane_prefill_ratio,
             "qwen_next_layer_prefetch": config.qwen_next_layer_prefetch,

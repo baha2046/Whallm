@@ -325,3 +325,6 @@
 "This Mac meets the recommended hardware setup." = "This Mac meets the recommended hardware setup.";
 "Unavailable" = "Unavailable";
 "Verify or repair the model before starting the server." = "Verify or repair the model before starting the server.";
+
+"Prefill acceleration" = "Prefill acceleration";
+"Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load." = "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load.";

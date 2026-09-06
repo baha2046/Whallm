@@ -3,6 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from deepseek_v4_ssd import cli
 
 from deepseek_v4_ssd.cli import (
     _read_prompt,
@@ -12,6 +16,24 @@ from deepseek_v4_ssd.cli import (
 
 
 class CLITests(unittest.TestCase):
+    def test_qwen_grouping_default_and_explicit_override_reach_runtime(self):
+        for is_qwen, flags, expected in (
+            (True, [], True), (False, [], False),
+            (True, ["--no-qwen-grouped-experts"], False),
+            (True, ["--qwen-grouped-experts"], True),
+        ):
+            with self.subTest(is_qwen=is_qwen, flags=flags):
+                installed = SimpleNamespace(is_qwen=is_qwen, has_mtp=False)
+                with patch("sys.argv", ["cli", "--model", "/unused", "--prompt", "hello", *flags]), \
+                     patch.object(cli.InstalledModel, "open", return_value=installed), \
+                     patch.object(cli.ModelRuntime, "open", side_effect=RuntimeError("config captured")) as opened:
+                    with self.assertRaisesRegex(RuntimeError, "config captured"):
+                        cli.main()
+                    config = opened.call_args.args[1]
+                    self.assertEqual(config.qwen_grouped_experts, expected)
+                    self.assertFalse(config.mtp_enabled)
+
+
     def test_approximation_default_is_model_aware_and_exact_can_override(self):
         self.assertEqual(
             _select_approximation_mode(

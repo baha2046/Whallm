@@ -648,6 +648,12 @@ class ServerArgumentTests(unittest.TestCase):
         )
         self.assertEqual(arguments.expert_file_cache_policy, "bypass")
 
+    def test_qwen_grouping_default_and_off_switch(self):
+        self.assertTrue(_parser().parse_args(["--model", "/tmp/model"]).qwen_grouped_experts)
+        self.assertFalse(_parser().parse_args(
+            ["--model", "/tmp/model", "--no-qwen-grouped-experts"]
+        ).qwen_grouped_experts)
+
     def test_layer_major_prefill_threshold_defaults_to_1024(self):
         arguments = _parser().parse_args(["--model", "/tmp/model"])
         self.assertEqual(arguments.layer_major_prefill_threshold, 1_024)

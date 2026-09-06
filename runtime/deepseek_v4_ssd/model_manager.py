@@ -177,7 +177,7 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
             f"{prefix}.warmup_prompt_path must be a non-empty string or null"
         )
 
-    runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime")
+    runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime", model_kind)
     if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
         raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
     if model_kind != "qwen3.8-flash-next" and runtime.mtp_enabled:
@@ -205,12 +205,16 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
     )
 
 
-def _parse_runtime(value: Any, prefix: str) -> RuntimeConfig:
+def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
     names = {field.name for field in fields(RuntimeConfig)}
-    if not isinstance(value, dict) or set(value) != names:
-        raise ModelCatalogError(f"{prefix} must contain every RuntimeConfig field")
+    required = names - {"qwen_grouped_experts"}
+    if not isinstance(value, dict) or not required <= set(value) <= names:
+        raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
-        config = RuntimeConfig(**value)
+        config = RuntimeConfig(**{
+            "qwen_grouped_experts": model_kind == "qwen3.8-flash-next",
+            **value,
+        })
     except TypeError as error:
         raise ModelCatalogError(f"{prefix} is invalid: {error}") from error
     try:
@@ -245,6 +249,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "layer_major_prefill",
         "persistent_prompt_cache",
         "batched_expert_prefill",
+        "qwen_grouped_experts",
         "ane_prefill",
         "fp4_index_cache",
         "dspark_enabled",

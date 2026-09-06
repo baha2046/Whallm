@@ -390,6 +390,7 @@ final class ModelLibrary: ObservableObject {
           moePrefillStepSize: 0,
           batchedExpertPrefill: true,
           qwenNextLayerPrefetch: false,
+          qwenGroupedExperts: settings.qwenGroupedExperts == true,
           anePrefill: modelKind == .qwen3_8FlashNext,
           anePrefillRatio: settings.anePrefillRatio ?? 0.25,
           fp4IndexCache: true,

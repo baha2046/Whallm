@@ -2145,6 +2145,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
     parser.add_argument(
+        "--qwen-grouped-experts", action=argparse.BooleanOptionalAction, default=True,
+        help="group Qwen Prefill rows by expert (default: on when MTP is off; --model only)",
+    )
+    parser.add_argument(
         "--no-ane-prefill",
         action="store_true",
         help="use the original GPU Prefill path",
@@ -2242,6 +2246,7 @@ def main() -> None:
         layer_major_prefill=not arguments.no_layer_major_prefill,
         layer_major_prefill_threshold=arguments.layer_major_prefill_threshold,
         batched_expert_prefill=not arguments.no_batched_expert_prefill,
+        qwen_grouped_experts=arguments.qwen_grouped_experts,
         ane_prefill=not arguments.no_ane_prefill,
         ane_prefill_ratio=arguments.ane_prefill_ratio,
         prompt_cache_entries=arguments.prompt_cache_entries,
