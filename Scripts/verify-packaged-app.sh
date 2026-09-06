@@ -59,7 +59,7 @@ launch_without_module_bundle_access() {
     local log_path=$verification_root/launch-$language.log
     sandbox-exec -p "$sandbox_profile" \
       "$target/Contents/MacOS/dsv4-app" \
-      -appLanguage "$language" >"$log_path" 2>&1 &
+      --verify-localizations -appLanguage "$language" >"$log_path" 2>&1 &
     local app_pid=$!
     sleep 3
     if ! kill -0 "$app_pid" 2>/dev/null; then
@@ -70,6 +70,14 @@ launch_without_module_bundle_access() {
       sed -n '1,160p' "$log_path" >&2
       exit 1
     fi
+    if ! /usr/bin/grep -Fxq "WHALLM_LOCALIZATION_READY:$language" "$log_path"; then
+      kill -TERM "$app_pid"
+      wait "$app_pid" || true
+      print -u2 "Packaged App did not finish $language L10n initialization."
+      sed -n '1,160p' "$log_path" >&2
+      exit 1
+    fi
+    print "Localization initialized without Keychain: $language"
     kill -TERM "$app_pid"
     wait "$app_pid" || true
   done

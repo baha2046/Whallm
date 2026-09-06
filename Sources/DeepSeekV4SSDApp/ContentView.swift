@@ -7,7 +7,10 @@ struct ContentView: View {
   let checkForUpdates: () -> Void
   @StateObject private var modelLibrary = ModelLibrary()
   @StateObject private var chatSession = ChatSession()
-  @State private var configuration = ServerConfiguration.localDefault
+  // SwiftUI can reconstruct this value repeatedly; defer credential access to .task.
+  @State private var configuration = ServerConfiguration.load(defaults: .standard, apiKey: "")
+  @State private var didLoadConfiguration = false
+  @State private var persistedAPIKey = ""
   @State private var advancedSettings = ModelAdvancedSettings.defaults(for: .deepSeekV4)
   @State private var advancedSettingsModelKind: ModelKind?
   @State private var aliasDraft = ""
@@ -70,6 +73,12 @@ struct ContentView: View {
     .environment(\.locale, selectedLanguage.locale)
     .onDisappear { chatSession.stopGenerating() }
     .task {
+      if !didLoadConfiguration {
+        let loaded = ServerConfiguration.localDefault
+        persistedAPIKey = loaded.apiKey
+        configuration = loaded
+        didLoadConfiguration = true
+      }
       await modelLibrary.scan()
       activateSelectedModel()
       modelLibrary.resumeDownloadIfNeeded()
@@ -78,7 +87,11 @@ struct ContentView: View {
     .onChange(of: modelLibrary.selectedModelKind) { activateSelectedModel() }
     .onChange(of: configuration) {
       configuration.save()
+    }
+    .onChange(of: configuration.apiKey) {
+      guard didLoadConfiguration, configuration.apiKey != persistedAPIKey else { return }
       AppKeychain.saveAPIKey(configuration.apiKey)
+      persistedAPIKey = configuration.apiKey
     }
     .onChange(of: advancedSettings) {
       if let advancedSettingsModelKind {
