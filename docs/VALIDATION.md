@@ -24,11 +24,33 @@ Issue #6 根因調查在同機重現 MLX 0.32.0 的 compiled sampler 背景執�
 JSON 解析符合指定物件；tool 正確輸出 `get_weather({"city":"Taipei"})`，未實際呼叫
 外部工具。命令、環境、source hash、raw token IDs／hash 與全文見
 [機器可讀彙整](benchmarks/2026-09-06-issue6-causal-m2-max/summary.json)。
-未修改已安裝 App，也未完成新版打包、Swift 重跑或發布。
+後續已將修復提交至 `master` 並完成下列本機打包；未替換已安裝 App，未發布。
 詳細因果對照與證據見 [調查紀錄](../research/ISSUE_6_CAUSAL_INVESTIGATION_2026-09-06.md)。
 
 先前 [框架評估](../research/ISSUE_6_FRAMEWORK_ASSESSMENT_2026-09-06.md) 的 vLLM
 離線循環偵測不是文字品質修復；API／penalty 與數值算式候選均未採用。
+
+2026-09-06 Issue #6 **build local 完成**。打包 source commit 是
+`5245d426732a8811d6210a844069131b15aa8039`，branch `master`；App version／build
+均為 `1.1.4`，ad hoc signature，包內 MLX／MLX Metal 均為 `0.32.1`。
+重新執行 Python 308 項通過；Swift 執行 64 項，61 通過、3 項缺少 DeepSeek fixture
+而略過、零失敗。四個先前會等待 Keychain 的案例明確排除，不算通過。
+最初選用 CommandLineTools 的 Swift command 缺少 XCTest，改以完整 Xcode 的
+`DEVELOPER_DIR` 重跑後通過；未修改全域 Xcode 選擇。
+
+`dist/Whallm.app` 與 ZIP 解壓副本均通過 strict deep signature、三語 localization
+檔案與 source hash 比對，以及各三個語言的隔離啟動。共六次啟動均存活三秒，
+sandbox 禁止讀取專案 `.build` 和各副本的 Swift resource bundle；另以實際檔案
+讀取確認 sandbox 確實拒絕兩種路徑。`L10n` 先讀 `.main` 的邏輯與 resource 檔案
+保持一致，未發生 module fallback trap。兩份 App 的 packaged Python 各通過三項
+背景抽樣回歸測試，測試後簽章仍有效。每份 127 個 Mach-O 檔案未發現非系統的
+絕對依賴路徑，兩份 runtime source／native payload 完全一致。
+
+ZIP 大小 `120401377` bytes，SHA-256：
+`fbeb8dfb59c5286d3f46e0587948765e50c01d97ce2e6d2d49bc0db2a99b0f8f`。
+完整命令、各輪 log 與檢查結果見
+[build local artifact](benchmarks/2026-09-06-issue6-build-local/summary.json)。
+沒有建立 tag、notarize、upload 或替換 `/Applications/Whallm.app`。
 
 本文件分開記錄目前驗證和歷史量測。
 以下為本次依賴修正前的自動測試：2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`

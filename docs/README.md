@@ -8,6 +8,8 @@ Qwen 支援核對版本是目前工作樹。
 目前 Python dependency 固定為 MLX **0.32.1**，修正背景執行緒的編譯抽樣器
 無法正常推進亂數狀態的問題；打包會拒絕不符合 pinned 版本的 MLX 環境。
 Issue #6 的重現、修復測試與長文驗證邊界見 [驗證紀錄](VALIDATION.md)。
+修復已整合至 `master`，source commit `5245d42` 的本機 App 1.1.4 與 ZIP 已通過
+簽章、三語隔離啟動及包內抽樣回歸檢查；這不是新的公開 Release。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact

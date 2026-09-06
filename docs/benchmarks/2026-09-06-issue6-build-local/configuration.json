@@ -1,0 +1,18 @@
+{
+  "branch": "master",
+  "base_commit": "bab462f495ec9b070d7546452349623d09c01289",
+  "app_version": "1.1.4",
+  "build_version": "1.1.4",
+  "signing": "ad hoc",
+  "notarization": false,
+  "upload": false,
+  "developer_dir": "/Applications/Xcode.app/Contents/Developer",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "excluded_swift_tests": [
+    "testAPIKeyRoundTripsThroughIsolatedKeychainItem",
+    "testGenerationContinuesAfterLeavingAndReturningToChat",
+    "testRapidStreamingCoalescesMessagePublications",
+    "testStreamingFlushesPendingTextBeforeReportingAnError"
+  ],
+  "exclusion_reason": "Previously observed Keychain waits; no changes to this subsystem. Exclusions are not counted as passing tests."
+}

@@ -130,4 +130,13 @@ installed Python 的 Team ID library validation 擋在 import 階段，四個 ca
 執行外部工具。總計 8 個 HTTP 案例及其完整 raw token IDs hash，見
 [`summary.json`](../docs/benchmarks/2026-09-06-issue6-causal-m2-max/summary.json)。
 不能把 `length`、研究停止、逾時或只是不再重複，當成完整品質通過。
-尚未進行完整 FP8 reference、M5 Pro、DeepSeek 全模型、正式速度／能源或打包驗證。
+原根因調查未進行完整 FP8 reference、M5 Pro、DeepSeek 全模型或正式速度／能源驗證。
+
+## 後續本機打包
+
+使用者隨後要求合併至目前 branch 並 build local，修復已提交到 `master` 的
+`5245d426732a8811d6210a844069131b15aa8039`。本機 App／build 1.1.4 完成 ad hoc
+打包，原 App 與 ZIP 解壓副本均通過簽章、三語隔離啟動及 packaged sampler tests。
+本階段結果與先前開發 Python overlay 驗證分開記錄，見
+[build local artifact](../docs/benchmarks/2026-09-06-issue6-build-local/summary.json)。
+未替換已安裝 App，未建立 tag、notarize 或發布。
