@@ -1,0 +1,2350 @@
+{
+  "source_commit": "ec39204f2afc9aec4386236ffc775ce8d1a9cb7a",
+  "branch": "master",
+  "original": {
+    "signature_before_and_after_sampling": "passed",
+    "version": "1.1.4",
+    "build": "1.1.4",
+    "packages": {
+      "mlx": "0.32.1",
+      "mlx-metal": "0.32.1",
+      "mlx-lm": "0.31.3"
+    },
+    "sampling_tests_passed": 3,
+    "localization_sha256": {
+      "en.lproj/Localizable.strings": "fd76284472aab78caea7348c1382136568773441647d148cdf300102c5277594",
+      "en.lproj/InfoPlist.strings": "464c09c45fcf97f59f2bbbcb17398eda2a1a832f4d6a60be4fba49dcb169817a",
+      "zh-Hans.lproj/Localizable.strings": "1a2537fe34214c42f17861978739962ee6a196cf215fcea86763f401e5df7462",
+      "zh-Hans.lproj/InfoPlist.strings": "e5aeb92fb4343ce5a888cfa5c7131654dfb4a0f575427753607a6f10d1fa417c",
+      "zh-Hant.lproj/Localizable.strings": "890b8da5dd0bb21d95605f434dbbe3c5c29f21fc133e9710e17695977305c966",
+      "zh-Hant.lproj/InfoPlist.strings": "21656bb96396aa321e0c45463b866b06bc5092f3cab4b5b73c19ba6bc76bf96b"
+    },
+    "runtime_source_sha256": {
+      "tests/test_tool_codec.py": "2f55ca30d9aa619dae93c0cef21a6b5da1b7efafe346c6ed4e38116fe0e89ac3",
+      "tests/test_verifier_union_tradeoff_benchmark.py": "136112a3a4d13fece3425fb1d5ad3661cd6852d24f96d0b75a3d183f13a89b7b",
+      "tests/test_profile_prompts.py": "0e4cd9b29e7e8d70f168f86ff1b776ee9068b5f4d95a94e6474aeaccc16a7164",
+      "tests/test_staged_expert_runtime_benchmark.py": "198785583c271ad24bee08594d2473814ab4be9d15f858402737e21ba1825e11",
+      "tests/test_dspark_prompt_cache.py": "65eef4993b5179c8e631ba619459df34751e67d1263a002dfe2272716d21cc10",
+      "tests/test_dspark_candidate_paths_benchmark.py": "951bccbd781a2457676aad73cacf77d6566496f0c54d7dcfedb61211871d6124",
+      "tests/test_mtp1_contract_audit.py": "f7592142ee9f3443c31c60690f6cea511cb54dd80cc722332d31e8ec1c944528",
+      "tests/test_qwen_lfu_simulator.py": "c88ab38844082dceacaabef6f5aa0e06b4015f27a9b62e1b73dee6a48d274976",
+      "tests/test_block_prompt_cache.py": "2f01aad44803234b304811c0c973cd83bcd6501fbd8934a47e58b13106338ab3",
+      "tests/test_model_manager.py": "345ccacbc341df94a29d7d011e3c2dc563ea7e2a4ed9f74659fc6ca0ab66d898",
+      "tests/test_staged_expert_streaming_benchmark.py": "de99379c524a51662444fb0313ce484a1ef7d381dbe5c8875fcf8939bd470e40",
+      "tests/test_qwen_quality_grading.py": "1411e3e1683da8c458f23da133845d8d646776aaff9f78b76074650371cc0fe9",
+      "tests/test_qwen_grouped_decode.py": "cc7eef0c07471dc0dfa445113a48bfea319bd9e37d3e86aab11fa328ca59e852",
+      "tests/test_runtime.py": "0460bdd00c8009ebc19c31b5de977b5e71fca15584daabe52d0d612566eaf1a2",
+      "tests/test_attention_research.py": "9ea5ca638194ce60b358ea770749cf60571325f4a5ca6eda880f83c8b7a9012c",
+      "tests/test_plan_prerequisites_audit.py": "84b3af33f04dc1462f90fbb2c1fa4cfacb470920b95aac56d10ea3372dce3f24",
+      "tests/test_route_trace.py": "ed7d85e5c81815ceae4ec1201f9d494b1825bdc06f6e986e1edd2d859919aa06",
+      "tests/test_adaptive_expert_prefill_runtime_benchmark.py": "21c1e5eafe8b4a88beba497e24eed6a5fc3204b219d0d5816bb98bed04f140cd",
+      "tests/test_research_baseline.py": "b6a3b398d467ed3f43dd82225c4f365c205166ea1e05435429e4c0eafb55d835",
+      "tests/test_hash_prefetch_page_cache_benchmark.py": "6a06f49d83687d2c03b7cb823a96d5cc5dc5eb4172f6deb808df6722fa84c1df",
+      "tests/test_adaptive_expert_prefill_benchmark.py": "86c29c7273d5dbdda8c3ef3ab5cc2cf6e5b2c8bfb1f5de14a0b898966623fdf4",
+      "tests/test_dspark_slots_benchmark.py": "abdf126f16fcf22759bb46c3b429cb982b66aaa16541467c7b5707afd19fe446",
+      "tests/test_qwen_mtp_checkpoint_audit.py": "5ba15bde90396991949e623c018e605ab8ec04827464c9dc6b9d0d2758ad269c",
+      "tests/test_server.py": "ab172888eb0e5708fb877cd31c9b4a46c6da5876957e7cc8d0461c0e8a9546a3",
+      "tests/test_qwen.py": "1b68fadf6fdc7a4d824e1fb29658306436750bf64319846cc7a58639a2e2fbd7",
+      "tests/test_qwen_nohint_validation.py": "73ed6abfc008e9bdb83d3be0eec0a9723964d06b818b2585ab501a34c98435a0",
+      "tests/test_qwen_task_accuracy.py": "8c19f29f0cd2d9fdca31b50cc199bc5e5f8814942f933e85c72029739332395b",
+      "tests/test_expert_blob_compression_benchmark.py": "46b360cee65769bde5dda1bd19da64f0111b93524f5d0385aa6b08e80ac6cd6f",
+      "tests/test_cache_bypass_dspark_benchmark.py": "91340f85c09e95237dd054d47da8c86ee0f7574bbb37099a73e1145d44d8e8cc",
+      "tests/test_qwen_grouped_experts.py": "7d0a4d8301f198fb9b16107ed80fbf3b7b1e7afd3e3bbd7a8c462d660229df3d",
+      "tests/test_expert_file_cache_bypass_benchmark.py": "787ccb0f900c9f526c894ab8403bbddb304ca898ccf9ceda3c2a4d5628b913ac",
+      "tests/test_benchmark_api.py": "3471c7ac2e31e7bad8d1ca57902833463648cc921db88f578234a8bb6476b37d",
+      "tests/test_approximate_expert_drop_benchmark.py": "62d5773de0feafb9975215e9c1f9bead1334b7198ce356c7d2da873813a569b3",
+      "tests/test_shared_base_screen.py": "b7ac17347acfa81d9681022810a23b9c551b47fc47042c14b0218e8d63837461",
+      "tests/test_page_cache_probe_benchmark.py": "da0d85ffd75ac27cc588010902d1848ae6ad0ddec3c723f5e42cfb22c6895355",
+      "tests/test_dspark_prompt_cache_benchmark.py": "3912fbfdf6d222167645e69bb096030ff8561f28c6a85525cdf1838cc3eed40d",
+      "tests/test_cli.py": "96e87a8105a789e8631d9caf10fc3f376f522afd1da6e632ed1212c62c953cb6",
+      "tests/test_sampling.py": "59f01b7ff608dd0e1732072aeabdd2f4f5263d24e3ebd02066906be821e6e798",
+      "tests/test_mtlio_expert_benchmark.py": "635d0116aece989debe221238fbf8d0d145f0f58e01cf5eef9ad9ec0b3b8d442",
+      "tests/test_response_liveness.py": "f8899924b33130e1abbfed18be9b2156f1a6fe0eae9070025cbe718d543167b4",
+      "tests/test_dspark_router_predictor_benchmark.py": "a0a3434d1481845ab50d0467802feac25fa6a8edb662ab2f62207b75e3d2ec6e",
+      "tests/test_block_prompt_cache_benchmark.py": "bb9ca01431b9b034b05b96287c3e2e986ead9cf2c05bd3054f71d26e9b5900d6",
+      "deepseek_v4_ssd/server.py": "b91f40583b715708601b415a85b01c13ba2450c22cefa0daa93901c6b9c59ab1",
+      "deepseek_v4_ssd/generation.py": "406d047a0bd241359304c9f5b08794ade71ba569e66e34496872cf012bb408b7",
+      "deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+      "deepseek_v4_ssd/cancellation.py": "cb0fee03b23bf9f55dcef5e514fb0d2315448c219b95eea6a00720a1440d00ad",
+      "deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+      "deepseek_v4_ssd/model_manager.py": "3240b38f6419be6d0a0cd8cb18de8cd4b524b722c265ec50b186fafc05454901",
+      "deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+      "deepseek_v4_ssd/model.py": "facbeb95785b9d806f362ebeb36ce8e76299894317f42cdb094c3e83a4ee2c36",
+      "deepseek_v4_ssd/expert_cache.py": "435f4b183940372db27043b1284a6a33a6ae04f533b69f0d826ce2f25df8f687",
+      "deepseek_v4_ssd/cli.py": "a76d5c2b67f8d96120c691abc66dfbd1acfdd9dbcf895621b00c499b09bcbee8",
+      "deepseek_v4_ssd/qwen4_exp.py": "4058e983c0939c5f1c3956414ee05694da11ff349ccc1788d093fb9af5e92b70",
+      "deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+      "deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+      "deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+      "deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+      "deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+    },
+    "macho": [
+      {
+        "file": "Contents/Frameworks/Libraries/libcrypto.3.dylib",
+        "sha256": "1f6306744bff8cb8e150575b1c514d7c474e08ad2c673bece311596628ae5fbe",
+        "dependencies": [
+          "@rpath/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libexpat.1.dylib",
+        "sha256": "b3dceb83714acb82ecdef904b5f583cda4bdf0b0e752e120d4d38edf63fecbf4",
+        "dependencies": [
+          "@rpath/libexpat.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/liblzma.5.dylib",
+        "sha256": "ff49aa85b98b089172082727b75e7dce2492515278a990dc31647286b894acd2",
+        "dependencies": [
+          "@rpath/liblzma.5.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libmpdec.4.dylib",
+        "sha256": "8313e2bfd8490a8c7faa35005ff0f12cea28c08cb34f18227a208cef5ec73096",
+        "dependencies": [
+          "@rpath/libmpdec.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libsqlite3.dylib",
+        "sha256": "0f7adf97be9befb7fffcac3f82d1ad62ec2b0b3f2115f21484c0fbdbea1779ee",
+        "dependencies": [
+          "@rpath/libsqlite3.dylib",
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libssl.3.dylib",
+        "sha256": "035036e5f83e1e1a3768b1efcc964ed9b40ff74c420ec014acd39e39fd978f68",
+        "dependencies": [
+          "@rpath/libssl.3.dylib",
+          "@loader_path/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libzstd.1.dylib",
+        "sha256": "9e94d8db24361d5eb0a2f30aca1ab6efbddf2ab6fadc092ea2eae14abcb70e8b",
+        "dependencies": [
+          "@rpath/libzstd.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/Python",
+        "sha256": "8896caf29c1ab9711865eca5f0102d39f3f15de8b71b84d3110c9af150eeb325",
+        "dependencies": [
+          "@rpath/Python.framework/Versions/3.14/Python",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "sha256": "c85b2bd6f2c3020d953b2d3da15fddee73194271e79bd0e6c8a2698f1f1589cc",
+        "dependencies": [
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "@executable_path/../../../../Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "sha256": "e53641d65411aeb6408e0b58ae964b7a56e015447273975894c29b08aa9c0934",
+        "dependencies": [
+          "@executable_path/../Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_asyncio.cpython-314-darwin.so",
+        "sha256": "139c7d62ba828b51ef2e35f4cd8905e95fa01eb092d75038c75b1dd0120419bb",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_bisect.cpython-314-darwin.so",
+        "sha256": "d79778651d42da6aa52b18b28fb5cdc43e6b55bd161e0bf3bc7cd9044b4a7523",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_blake2.cpython-314-darwin.so",
+        "sha256": "2118c3e1565e84df1af1264af8da33fe573e36f3e0ded0ef39fede57f9ed8f5f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_bz2.cpython-314-darwin.so",
+        "sha256": "1a712b27b4b013f50a4cbf6445ced8c14eea6b705b75c24c670ef46cacfa1ae2",
+        "dependencies": [
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_cn.cpython-314-darwin.so",
+        "sha256": "e1a01d155c389851321883225de9bd0720b6d44297feba9504844f78253bc1ec",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_hk.cpython-314-darwin.so",
+        "sha256": "32251720ba3b1ef555fccc91a75b3bd8da618ade8ba9ccddb22055b3ac6f8a48",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_iso2022.cpython-314-darwin.so",
+        "sha256": "32be9943ff7584e3da6ec3bbdab9398734859710ceeac2812fb8e0967a633f6e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_jp.cpython-314-darwin.so",
+        "sha256": "5ea54b6612b88a21791866a60dbb55bc2461b2bb16bb2539168edef20abf2642",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_kr.cpython-314-darwin.so",
+        "sha256": "89bf83bb4e454e0d16ad74c247140fefc4288244b21677946885d8aef7fd08cb",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_tw.cpython-314-darwin.so",
+        "sha256": "fa28aa60dab92fb4a572e084102e3afeda25f4c724b7e2568ae6af6bd26ec531",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_csv.cpython-314-darwin.so",
+        "sha256": "5cc5afb272401920db5e8d13ad229c21de15f6dc37804e28a97ef31b8c590e2f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ctypes.cpython-314-darwin.so",
+        "sha256": "94337a1fbd456ed0e9ba7b7a73892a6446bacc8f68f853e30d3a4dea28b73a00",
+        "dependencies": [
+          "/usr/lib/libffi.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ctypes_test.cpython-314-darwin.so",
+        "sha256": "da810b15246dd8bfa559da07f7add73cbe923f744ca59d76db57212abe59d7c4",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_curses.cpython-314-darwin.so",
+        "sha256": "f205c21546a58b4f519535e8329767d28b2d8fc4335c7f02d23bd59ed0b8c274",
+        "dependencies": [
+          "/usr/lib/libncurses.5.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_curses_panel.cpython-314-darwin.so",
+        "sha256": "5e3504a4d361dd288666a8028826865be6296689b5e4ecdb8ff4c25a2dd98c97",
+        "dependencies": [
+          "/usr/lib/libpanel.5.4.dylib",
+          "/usr/lib/libncurses.5.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_dbm.cpython-314-darwin.so",
+        "sha256": "c6e8dc53ac618ddddb6626b4d748960e59569aacef27273caa6b87c782247015",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_decimal.cpython-314-darwin.so",
+        "sha256": "39e39ea3306b16351433b682444fe9072dc2c9d8c62c0e45d14b30f2ef4bb509",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libmpdec.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_elementtree.cpython-314-darwin.so",
+        "sha256": "507ce8f954c60643de6494c18c5d989a86bca61a6ce25022fc7f638a61748e21",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_hashlib.cpython-314-darwin.so",
+        "sha256": "5ffcc85f48d3694f8c2573b8e9fc88dff4e03ccc0dd2e07eff8b3e05529b032d",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_heapq.cpython-314-darwin.so",
+        "sha256": "094a9ca8faed279bec0855e062c19d957f63482fcff54499a7e15e404ab9b8c5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_hmac.cpython-314-darwin.so",
+        "sha256": "112543a57702c3eb920553752fa75c200c1e29b3fb720e06ee1e88e5e1991ac5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpchannels.cpython-314-darwin.so",
+        "sha256": "0d84c504dcc09b3b1b2b69e2329b8788c517a8a2dc21535f8326da82439d092c",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpqueues.cpython-314-darwin.so",
+        "sha256": "515bdfda6f2c38039a2de1162e228a813cd11c154268e0d2a1d3fca2da59d9e3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpreters.cpython-314-darwin.so",
+        "sha256": "fbfba6d400722db950b6a129fef2b473d94d934c004ce3878fe27bad68d8d0ae",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_json.cpython-314-darwin.so",
+        "sha256": "5abe9c3195fe442d815cb58af7db0dd14b97e57025f4bf95dbd0b5cd18bf7e75",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_lsprof.cpython-314-darwin.so",
+        "sha256": "8d4f117bfb9f4d8ccb2901244b87ae2b06cbe74f061eb9615047208e524ef409",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_lzma.cpython-314-darwin.so",
+        "sha256": "ce576ffce16d19c655f504e764114fa8b8666205047db98db2c9a58cde88cb59",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/liblzma.5.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_md5.cpython-314-darwin.so",
+        "sha256": "dd383138e8d5aafffd002e7d4c3e147d5a4a536944df37b5a468976ba929741d",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_multibytecodec.cpython-314-darwin.so",
+        "sha256": "21e05e12c4fe018323f96af02fc35198c15d79100a501ccf3dc1f5ee6e7328da",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_multiprocessing.cpython-314-darwin.so",
+        "sha256": "07185c96396fe4f92942b8410260d69275c7ad1a21efcb4e63c0abd344929608",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_pickle.cpython-314-darwin.so",
+        "sha256": "7af826327c9ea322498d5152c936084f24e18a83d6e0d3e062ddd8dc633d6868",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_posixshmem.cpython-314-darwin.so",
+        "sha256": "37fe496eb1b084e892c93e262a03512c5eb3f4b22d98c842839b33d676fec102",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_posixsubprocess.cpython-314-darwin.so",
+        "sha256": "6e33ebf6cebfba716e5cc954d470508cb3536fcfe542d78a850f3e5aa99e586b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_queue.cpython-314-darwin.so",
+        "sha256": "5ade394da1c5162d9f2210015980d814e5d89e410183d5d248c576b54bdca317",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_random.cpython-314-darwin.so",
+        "sha256": "a494302184f6f880fa8aa68f361f8200daa44687466fc6fa998986f2a145ac37",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_remote_debugging.cpython-314-darwin.so",
+        "sha256": "851d6c7bca4f89d0e063134591afe020b0e22cd0ca848128b4dd86cffd6498f2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_scproxy.cpython-314-darwin.so",
+        "sha256": "e7a57c3a1ca32556cddbfaa85bfa8ac25da4a447ff0fb9bc7e436cf7e74ee85d",
+        "dependencies": [
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha1.cpython-314-darwin.so",
+        "sha256": "7327959140077ce69fec477e1982cae8304fa2d0f4d1437c7551f9c3d0e2f002",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha2.cpython-314-darwin.so",
+        "sha256": "29d3443699443c76c3722db15a2d9266668c783e03284a4238e350b0391a08fd",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha3.cpython-314-darwin.so",
+        "sha256": "96208abcc3d76c6f902e1ec4e016b389705abdac078542e5829a52c8f1f27d3b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_socket.cpython-314-darwin.so",
+        "sha256": "1a430f91f10e613f2bac7eca45ec88252c7cc5f7b2c56fb9dab3257ae8ab4cff",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sqlite3.cpython-314-darwin.so",
+        "sha256": "110a99855f398c6f99e7b247ea2b952291b367256a861b826de82ffd0bc9f9a2",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libsqlite3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ssl.cpython-314-darwin.so",
+        "sha256": "5b8d62fef92bd858c1a8ab148f05a7a99a21dfa5315c30e725309044a0a19c45",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libssl.3.dylib",
+          "@loader_path/../../../../../../Libraries/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_statistics.cpython-314-darwin.so",
+        "sha256": "61a1f6bf2ac4035b58096e8aca365875c2a980495c66e9677962375bee5a3d1b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_struct.cpython-314-darwin.so",
+        "sha256": "43a2cdde4370c3a009007e10d40d06605f34cfca196ce1b0e004e573b5bbea03",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testbuffer.cpython-314-darwin.so",
+        "sha256": "0f6122f6a6677308972dddc62a07606e5eb7ab57a8801d3f4c6bca9e7195d5f8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testcapi.cpython-314-darwin.so",
+        "sha256": "b314bc6074e6744ec41b71fa4ad1314e60799d701397c63f81786bc17f1e4238",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testclinic.cpython-314-darwin.so",
+        "sha256": "f265ab5ad07a124ca9a216b70a30ee2999305e5269791bf3b8d947e3e4211ac2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testclinic_limited.cpython-314-darwin.so",
+        "sha256": "f9ffee032b69c40920f40259f3298a5367e6a1a7ed5b5a3eaaeaadcc3c0b35a9",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testimportmultiple.cpython-314-darwin.so",
+        "sha256": "a3dfefa577b4fcab561f3205cdb3bdb844b9330caff805f1fb961a6fdb5004c9",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testinternalcapi.cpython-314-darwin.so",
+        "sha256": "e190030a688d2232d46ab3ebef7bcea7af71574bc2b98c79c18cd7e2d3ec63be",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testlimitedcapi.cpython-314-darwin.so",
+        "sha256": "4382c9a833faedac2ad9d441554fd168e29dc149b678f06a9a0bab37f368c140",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testmultiphase.cpython-314-darwin.so",
+        "sha256": "42c86b177802e0493fda02acf9190d6d907329385433bbcf55417a561fa19738",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testsinglephase.cpython-314-darwin.so",
+        "sha256": "f1559654330f77ef236a14a042dc70557341f47e4287a456b0b254c586a43715",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_uuid.cpython-314-darwin.so",
+        "sha256": "829f3810ce9189b0fee5f98780d9df44da39d7e93fdbe65cbd405b9a3b6b4ac8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_xxtestfuzz.cpython-314-darwin.so",
+        "sha256": "05875b7c64ff0ee75d1cbd385e577306f8abbb1cbadee7624321f637676d1c5e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_zoneinfo.cpython-314-darwin.so",
+        "sha256": "bb286171f201fbbed9102a3e81585e11d32c0b028a155cfdd3c47e5c2530cc27",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_zstd.cpython-314-darwin.so",
+        "sha256": "f5b55b546fce27d24e36f123a7864932a7e64e4c485526ba504a25d96a9a04f7",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libzstd.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/array.cpython-314-darwin.so",
+        "sha256": "41ac09225b42780659daa8431e5931013b01d1431b4c8233d2b49eb13714425a",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/binascii.cpython-314-darwin.so",
+        "sha256": "ce883e3dc652c1a42ca3540f2ea419f6d2f477d3e93ecb98f0d11562a3b400ac",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/cmath.cpython-314-darwin.so",
+        "sha256": "37f6bcfcfa92fcf5e1622fd30c4bddd1023514a509871d10ca4916bd4bac73b8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/fcntl.cpython-314-darwin.so",
+        "sha256": "0b7c3dabeb2d6da197402bd7834e3d0adf37640fb9f170f1ce5e1329184629a2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/grp.cpython-314-darwin.so",
+        "sha256": "4a2102760f83469c078ed60d76b188b5f4a2293b0ce3a314cd316427ed483487",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/math.cpython-314-darwin.so",
+        "sha256": "7b8e09ca34564232b383c7bdb6196c8fba1f4a95bc4335b053555195a520a24b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/mmap.cpython-314-darwin.so",
+        "sha256": "c30bc842a6cd243a2c7575ba9e7d55a8f8e8f323787ad831002d7ba9428e6f2a",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/pyexpat.cpython-314-darwin.so",
+        "sha256": "c48a0101c9a2718668169ee387973b2b534d0a5edd61ae34406c12d02fa2f434",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libexpat.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/readline.cpython-314-darwin.so",
+        "sha256": "a73b77ea1657039bc9f21a029799b441c3ab69f7a42ef9a835610b08602cb186",
+        "dependencies": [
+          "/usr/lib/libedit.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/resource.cpython-314-darwin.so",
+        "sha256": "8846fd23de883f4efd663787f7042e1f468a7b9d1af9d9dead374c03331a4602",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/select.cpython-314-darwin.so",
+        "sha256": "02e99de29d60bc1e4b7b05ba2bbc76c1e6be375dd1582d3e7a2bf6594444c466",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/syslog.cpython-314-darwin.so",
+        "sha256": "bc1fe2212f9dc95aa737c7487893335092319c5ef4f4b5f24d21480dfacaf92e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/termios.cpython-314-darwin.so",
+        "sha256": "527c27f6878e1bad7716e4c714314735f70d51ad3e98126b3bca73f8ca28d4fa",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/unicodedata.cpython-314-darwin.so",
+        "sha256": "ae9b79cd9a951ff29911b96602878a9c6d0cb43c4d2f5b947c5c88affd05958b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxlimited.cpython-314-darwin.so",
+        "sha256": "655330509e4917ee9920c5007906382148bf9248a2b7aaa76f9fee2fed7f86ae",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxlimited_35.cpython-314-darwin.so",
+        "sha256": "13c67e1d49cff1e491618eef388e5072bbcaf0a7a343093f1fb9c2e0a31ff305",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxsubtype.cpython-314-darwin.so",
+        "sha256": "8c0b19069e0091b67188a28e2ccfae702fc43a340ce49d851ee520ebef2e4a90",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/zlib.cpython-314-darwin.so",
+        "sha256": "e9b0346a7bb54781d56a84533be3bf546958b68a2d13ba6c58a3b5cc69774868",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate",
+        "sha256": "4b208b34c4cd5fb1b77243c554cf2a2be3e1974fabdf603083b4910332e13992",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libcompression.dylib",
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libxar.1.dylib",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libz.1.dylib",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libcompression.dylib",
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libxar.1.dylib",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle",
+        "sha256": "18a8f429d2c4250d351200ebb1125896acdd6bb85ae23e9c1ef055128d6de68f",
+        "dependencies": [
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libcompression.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit",
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libcompression.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater",
+        "sha256": "8663659aea6c4d6a966def465b4092cb4f1f887ae7f79fc89c33def8b2544589",
+        "dependencies": [
+          "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader",
+        "sha256": "9f1d106c15fb16501ba87b5558bb426db4334cbdb9e1102e609c3f3af7921552",
+        "dependencies": [
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer",
+        "sha256": "abd48615899501caafcf71ae0a6b8278d8fcb3de4eb991c19b2939c34c7adadb",
+        "dependencies": [
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/libWhallmANE.dylib",
+        "sha256": "b4c115c5d540e8d3aae8c8e0820ff38df60a35d2742928faf2beb94e44a73cdc",
+        "dependencies": [
+          "@rpath/libWhallmANE.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface",
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libobjc.A.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/MacOS/dsv4-app",
+        "sha256": "aa0a6361da3c7c99a0fb1300520618073ef59254f18a858a60867e48a351d842",
+        "dependencies": [
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+          "/System/Library/Frameworks/Combine.framework/Versions/A/Combine",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/CryptoKit.framework/Versions/A/CryptoKit",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/SwiftUI.framework/Versions/A/SwiftUI",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/swift/libswiftCore.dylib",
+          "/usr/lib/swift/libswiftCoreFoundation.dylib",
+          "/usr/lib/swift/libswiftCoreImage.dylib",
+          "/usr/lib/swift/libswiftDarwin.dylib",
+          "/usr/lib/swift/libswiftDispatch.dylib",
+          "/usr/lib/swift/libswiftIOKit.dylib",
+          "/usr/lib/swift/libswiftMetal.dylib",
+          "/usr/lib/swift/libswiftOSLog.dylib",
+          "/usr/lib/swift/libswiftObjectiveC.dylib",
+          "/usr/lib/swift/libswiftQuartzCore.dylib",
+          "/usr/lib/swift/libswiftSpatial.dylib",
+          "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib",
+          "/usr/lib/swift/libswiftXPC.dylib",
+          "/usr/lib/swift/libswift_Builtin_float.dylib",
+          "/usr/lib/swift/libswift_Concurrency.dylib",
+          "/usr/lib/swift/libswiftos.dylib",
+          "/usr/lib/swift/libswiftsimd.dylib",
+          "/usr/lib/swift/libswift_errno.dylib"
+        ]
+      },
+      {
+        "file": "Contents/MacOS/python3",
+        "sha256": "1f5d6c2e4f9e7bda107bca8486f871e1f7143193c92b6de47d4bcd31e4001790",
+        "dependencies": [
+          "@executable_path/../Frameworks/Python.framework/Versions/3.14/Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/charset_normalizer/cd.cpython-314-darwin.so",
+        "sha256": "b13d37ace8595777223078eef396b08b5569d8e31a8222d8ffb95e55e4455003",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/charset_normalizer/md.cpython-314-darwin.so",
+        "sha256": "f20b68bcc056b4807e78fc734f83e631f902a8fe260897ed888e60e586ffec52",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/google/_upb/_message.abi3.so",
+        "sha256": "2d49299cf22b909d2c939b3bba5ff94ad582cdc9bff545f645f5307d594793bc",
+        "dependencies": [
+          "bazel-out/k8-opt-ST-9e73343f3d22/bin/python/lib_message_binary.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "bazel-out/k8-opt-ST-d581c5370a66/bin/python/lib_message_binary.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/hf_xet/hf_xet.abi3.so",
+        "sha256": "43cda0360f30649b5de97800edf149dee602fba9a7de18eb66757555900b698b",
+        "dependencies": [
+          "@rpath/hf_xet.abi3.so",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/usr/lib/libobjc.A.dylib",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/markupsafe/_speedups.cpython-314-darwin.so",
+        "sha256": "ae5880884b4e675e902a21ae9717b8f9d100c3c783cdb42d68070f5be2c740aa",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/core.cpython-314-darwin.so",
+        "sha256": "979ac8727b3d23d6c8adc79e0ad85f7f5b904895e896044dc16e70bedd4b2536",
+        "dependencies": [
+          "@rpath/libmlx.dylib",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/lib/libjaccl.dylib",
+        "sha256": "df227d762190dbc41d40c09c20d9e72415efb03c062212f5b9ad0a721b6d8975",
+        "dependencies": [
+          "@rpath/libjaccl.dylib",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/lib/libmlx.dylib",
+        "sha256": "9e54fae2598354aacea9bc4ed5ba23eb43c62140b736854cd0c71200a0ce04e3",
+        "dependencies": [
+          "@rpath/libmlx.dylib",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "@rpath/libjaccl.dylib",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libobjc.A.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_multiarray_tests.cpython-314-darwin.so",
+        "sha256": "d1a6fa63088d25e85f0e9e787f3a566e29892994e4c14ad6d9529eb3441a15b6",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_multiarray_umath.cpython-314-darwin.so",
+        "sha256": "84b0597cf08038a2348892dcf6498356008e82d86c743174938bbf6138410833",
+        "dependencies": [
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_operand_flag_tests.cpython-314-darwin.so",
+        "sha256": "cf4a78ed64f6f0a03e3a5af11104091e20e87aec19b0fc46a1588eb34a5a4971",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_rational_tests.cpython-314-darwin.so",
+        "sha256": "dfbc2a071bb505dc6d353051263589c81bca951c123f53b191bf5278b9fa79e3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_simd.cpython-314-darwin.so",
+        "sha256": "59abe1ebe99e6943ebca66b05629bd929b3c1fedee20a2114cfa15a11d8070c0",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_struct_ufunc_tests.cpython-314-darwin.so",
+        "sha256": "eaae6841431372f47d01d03cbe8c8e59af32bf13487ae5aa39118f6a7fbf57e5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_umath_tests.cpython-314-darwin.so",
+        "sha256": "279e5d4ce394ffcdaa099a6e5bea6ee80639b7dd496234108cb0e4af511214b3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/fft/_pocketfft_umath.cpython-314-darwin.so",
+        "sha256": "e74aa9cfaead5988bda707401570b412a77473942eb02b4ecd84f50a5b46f612",
+        "dependencies": [
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/linalg/_umath_linalg.cpython-314-darwin.so",
+        "sha256": "954ca710c544fc44a727cd59b76b9ee27b62222d8436e463658256abc11026aa",
+        "dependencies": [
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/linalg/lapack_lite.cpython-314-darwin.so",
+        "sha256": "5ec2218c33972acad21fbe54ed0e76a6ffb756227405af4abd15a562a8668fe3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_bounded_integers.cpython-314-darwin.so",
+        "sha256": "098677736251d92bf605d4fcc2c463fc96a8d06ffc81d9eea99e01cfa097068e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_common.cpython-314-darwin.so",
+        "sha256": "a6b8fa14f26d9c9b8350a352ce792187a2528b48b82ce94d09ea12fcba19697f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_generator.cpython-314-darwin.so",
+        "sha256": "8c5be6abdc7a5d37941d9e0ffac294dedf1e627b8222ff83f2d8f791974075be",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_mt19937.cpython-314-darwin.so",
+        "sha256": "1f76c1f36d9408968d0f1c618e9f6ad51c62f8254d372da2759007f2e609b5bf",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_pcg64.cpython-314-darwin.so",
+        "sha256": "48076007291fb1dcb37b53ab02e8a0c3a0a466a4d03e4dc282be7d3b58be9d02",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_philox.cpython-314-darwin.so",
+        "sha256": "f478bfedc5abdac7c6e4925ec96303af4e81d4a0909961685d7bf5818f8936ac",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_sfc64.cpython-314-darwin.so",
+        "sha256": "a00f1551cb7d3d17586606d435a80a72e075b54229ac92ad0aa736656b361add",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/bit_generator.cpython-314-darwin.so",
+        "sha256": "0bbd7a2054c9c2443ec21e9845a9ff33bd01554bf26adcdfde353258b8980c64",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/mtrand.cpython-314-darwin.so",
+        "sha256": "105ebf79c9578b7a4e0c98cb388d696f32375e41fe257ca9c86937d778f1ad79",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/regex/_regex.cpython-314-darwin.so",
+        "sha256": "2fcb03f6cf5e7b9013b1b2b4a0e9f885f2fdc8b11624c90c3b9a631ea68b12af",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/safetensors/_safetensors_rust.abi3.so",
+        "sha256": "2c4bc0bb09a95926134e5731e61d63ee762f66b7570290b1ccc7bfa620d66b62",
+        "dependencies": [
+          "@rpath/safetensors._safetensors_rust.abi3.so",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libiconv.2.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/sentencepiece/_sentencepiece.cpython-314-darwin.so",
+        "sha256": "1c04983da8d19323a7f276396754ab906d3b779a986b34c32c1ffcc86160200f",
+        "dependencies": [
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/tiktoken/_tiktoken.cpython-314-darwin.so",
+        "sha256": "44b20e169a459d15b67729ac77195aad197c99058bb0e175a5d318b27d819143",
+        "dependencies": [
+          "@rpath/_tiktoken.cpython-314-darwin.so",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/tokenizers/tokenizers.abi3.so",
+        "sha256": "6b74c3e8cbe94b0efa019987aff9e25ff0eb545f04172a35900e2a14f9f61d6e",
+        "dependencies": [
+          "@rpath/tokenizers.tokenizers.abi3.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/yaml/_yaml.cpython-314-darwin.so",
+        "sha256": "2410d927de692f1e44ab64cff805f39cf42c8e6881351b1954b7de743bf2bf83",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      }
+    ],
+    "forbidden_absolute_dependencies": []
+  },
+  "extracted": {
+    "signature_before_and_after_sampling": "passed",
+    "version": "1.1.4",
+    "build": "1.1.4",
+    "packages": {
+      "mlx": "0.32.1",
+      "mlx-metal": "0.32.1",
+      "mlx-lm": "0.31.3"
+    },
+    "sampling_tests_passed": 3,
+    "localization_sha256": {
+      "en.lproj/Localizable.strings": "fd76284472aab78caea7348c1382136568773441647d148cdf300102c5277594",
+      "en.lproj/InfoPlist.strings": "464c09c45fcf97f59f2bbbcb17398eda2a1a832f4d6a60be4fba49dcb169817a",
+      "zh-Hans.lproj/Localizable.strings": "1a2537fe34214c42f17861978739962ee6a196cf215fcea86763f401e5df7462",
+      "zh-Hans.lproj/InfoPlist.strings": "e5aeb92fb4343ce5a888cfa5c7131654dfb4a0f575427753607a6f10d1fa417c",
+      "zh-Hant.lproj/Localizable.strings": "890b8da5dd0bb21d95605f434dbbe3c5c29f21fc133e9710e17695977305c966",
+      "zh-Hant.lproj/InfoPlist.strings": "21656bb96396aa321e0c45463b866b06bc5092f3cab4b5b73c19ba6bc76bf96b"
+    },
+    "runtime_source_sha256": {
+      "tests/test_tool_codec.py": "2f55ca30d9aa619dae93c0cef21a6b5da1b7efafe346c6ed4e38116fe0e89ac3",
+      "tests/test_verifier_union_tradeoff_benchmark.py": "136112a3a4d13fece3425fb1d5ad3661cd6852d24f96d0b75a3d183f13a89b7b",
+      "tests/test_profile_prompts.py": "0e4cd9b29e7e8d70f168f86ff1b776ee9068b5f4d95a94e6474aeaccc16a7164",
+      "tests/test_staged_expert_runtime_benchmark.py": "198785583c271ad24bee08594d2473814ab4be9d15f858402737e21ba1825e11",
+      "tests/test_dspark_prompt_cache.py": "65eef4993b5179c8e631ba619459df34751e67d1263a002dfe2272716d21cc10",
+      "tests/test_dspark_candidate_paths_benchmark.py": "951bccbd781a2457676aad73cacf77d6566496f0c54d7dcfedb61211871d6124",
+      "tests/test_mtp1_contract_audit.py": "f7592142ee9f3443c31c60690f6cea511cb54dd80cc722332d31e8ec1c944528",
+      "tests/test_qwen_lfu_simulator.py": "c88ab38844082dceacaabef6f5aa0e06b4015f27a9b62e1b73dee6a48d274976",
+      "tests/test_block_prompt_cache.py": "2f01aad44803234b304811c0c973cd83bcd6501fbd8934a47e58b13106338ab3",
+      "tests/test_model_manager.py": "345ccacbc341df94a29d7d011e3c2dc563ea7e2a4ed9f74659fc6ca0ab66d898",
+      "tests/test_staged_expert_streaming_benchmark.py": "de99379c524a51662444fb0313ce484a1ef7d381dbe5c8875fcf8939bd470e40",
+      "tests/test_qwen_quality_grading.py": "1411e3e1683da8c458f23da133845d8d646776aaff9f78b76074650371cc0fe9",
+      "tests/test_qwen_grouped_decode.py": "cc7eef0c07471dc0dfa445113a48bfea319bd9e37d3e86aab11fa328ca59e852",
+      "tests/test_runtime.py": "0460bdd00c8009ebc19c31b5de977b5e71fca15584daabe52d0d612566eaf1a2",
+      "tests/test_attention_research.py": "9ea5ca638194ce60b358ea770749cf60571325f4a5ca6eda880f83c8b7a9012c",
+      "tests/test_plan_prerequisites_audit.py": "84b3af33f04dc1462f90fbb2c1fa4cfacb470920b95aac56d10ea3372dce3f24",
+      "tests/test_route_trace.py": "ed7d85e5c81815ceae4ec1201f9d494b1825bdc06f6e986e1edd2d859919aa06",
+      "tests/test_adaptive_expert_prefill_runtime_benchmark.py": "21c1e5eafe8b4a88beba497e24eed6a5fc3204b219d0d5816bb98bed04f140cd",
+      "tests/test_research_baseline.py": "b6a3b398d467ed3f43dd82225c4f365c205166ea1e05435429e4c0eafb55d835",
+      "tests/test_hash_prefetch_page_cache_benchmark.py": "6a06f49d83687d2c03b7cb823a96d5cc5dc5eb4172f6deb808df6722fa84c1df",
+      "tests/test_adaptive_expert_prefill_benchmark.py": "86c29c7273d5dbdda8c3ef3ab5cc2cf6e5b2c8bfb1f5de14a0b898966623fdf4",
+      "tests/test_dspark_slots_benchmark.py": "abdf126f16fcf22759bb46c3b429cb982b66aaa16541467c7b5707afd19fe446",
+      "tests/test_qwen_mtp_checkpoint_audit.py": "5ba15bde90396991949e623c018e605ab8ec04827464c9dc6b9d0d2758ad269c",
+      "tests/test_server.py": "ab172888eb0e5708fb877cd31c9b4a46c6da5876957e7cc8d0461c0e8a9546a3",
+      "tests/test_qwen.py": "1b68fadf6fdc7a4d824e1fb29658306436750bf64319846cc7a58639a2e2fbd7",
+      "tests/test_qwen_nohint_validation.py": "73ed6abfc008e9bdb83d3be0eec0a9723964d06b818b2585ab501a34c98435a0",
+      "tests/test_qwen_task_accuracy.py": "8c19f29f0cd2d9fdca31b50cc199bc5e5f8814942f933e85c72029739332395b",
+      "tests/test_expert_blob_compression_benchmark.py": "46b360cee65769bde5dda1bd19da64f0111b93524f5d0385aa6b08e80ac6cd6f",
+      "tests/test_cache_bypass_dspark_benchmark.py": "91340f85c09e95237dd054d47da8c86ee0f7574bbb37099a73e1145d44d8e8cc",
+      "tests/test_qwen_grouped_experts.py": "7d0a4d8301f198fb9b16107ed80fbf3b7b1e7afd3e3bbd7a8c462d660229df3d",
+      "tests/test_expert_file_cache_bypass_benchmark.py": "787ccb0f900c9f526c894ab8403bbddb304ca898ccf9ceda3c2a4d5628b913ac",
+      "tests/test_benchmark_api.py": "3471c7ac2e31e7bad8d1ca57902833463648cc921db88f578234a8bb6476b37d",
+      "tests/test_approximate_expert_drop_benchmark.py": "62d5773de0feafb9975215e9c1f9bead1334b7198ce356c7d2da873813a569b3",
+      "tests/test_shared_base_screen.py": "b7ac17347acfa81d9681022810a23b9c551b47fc47042c14b0218e8d63837461",
+      "tests/test_page_cache_probe_benchmark.py": "da0d85ffd75ac27cc588010902d1848ae6ad0ddec3c723f5e42cfb22c6895355",
+      "tests/test_dspark_prompt_cache_benchmark.py": "3912fbfdf6d222167645e69bb096030ff8561f28c6a85525cdf1838cc3eed40d",
+      "tests/test_cli.py": "96e87a8105a789e8631d9caf10fc3f376f522afd1da6e632ed1212c62c953cb6",
+      "tests/test_sampling.py": "59f01b7ff608dd0e1732072aeabdd2f4f5263d24e3ebd02066906be821e6e798",
+      "tests/test_mtlio_expert_benchmark.py": "635d0116aece989debe221238fbf8d0d145f0f58e01cf5eef9ad9ec0b3b8d442",
+      "tests/test_response_liveness.py": "f8899924b33130e1abbfed18be9b2156f1a6fe0eae9070025cbe718d543167b4",
+      "tests/test_dspark_router_predictor_benchmark.py": "a0a3434d1481845ab50d0467802feac25fa6a8edb662ab2f62207b75e3d2ec6e",
+      "tests/test_block_prompt_cache_benchmark.py": "bb9ca01431b9b034b05b96287c3e2e986ead9cf2c05bd3054f71d26e9b5900d6",
+      "deepseek_v4_ssd/server.py": "b91f40583b715708601b415a85b01c13ba2450c22cefa0daa93901c6b9c59ab1",
+      "deepseek_v4_ssd/generation.py": "406d047a0bd241359304c9f5b08794ade71ba569e66e34496872cf012bb408b7",
+      "deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+      "deepseek_v4_ssd/cancellation.py": "cb0fee03b23bf9f55dcef5e514fb0d2315448c219b95eea6a00720a1440d00ad",
+      "deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+      "deepseek_v4_ssd/model_manager.py": "3240b38f6419be6d0a0cd8cb18de8cd4b524b722c265ec50b186fafc05454901",
+      "deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+      "deepseek_v4_ssd/model.py": "facbeb95785b9d806f362ebeb36ce8e76299894317f42cdb094c3e83a4ee2c36",
+      "deepseek_v4_ssd/expert_cache.py": "435f4b183940372db27043b1284a6a33a6ae04f533b69f0d826ce2f25df8f687",
+      "deepseek_v4_ssd/cli.py": "a76d5c2b67f8d96120c691abc66dfbd1acfdd9dbcf895621b00c499b09bcbee8",
+      "deepseek_v4_ssd/qwen4_exp.py": "4058e983c0939c5f1c3956414ee05694da11ff349ccc1788d093fb9af5e92b70",
+      "deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+      "deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+      "deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+      "deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+      "deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+    },
+    "macho": [
+      {
+        "file": "Contents/Frameworks/Libraries/libcrypto.3.dylib",
+        "sha256": "1f6306744bff8cb8e150575b1c514d7c474e08ad2c673bece311596628ae5fbe",
+        "dependencies": [
+          "@rpath/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libexpat.1.dylib",
+        "sha256": "b3dceb83714acb82ecdef904b5f583cda4bdf0b0e752e120d4d38edf63fecbf4",
+        "dependencies": [
+          "@rpath/libexpat.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/liblzma.5.dylib",
+        "sha256": "ff49aa85b98b089172082727b75e7dce2492515278a990dc31647286b894acd2",
+        "dependencies": [
+          "@rpath/liblzma.5.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libmpdec.4.dylib",
+        "sha256": "8313e2bfd8490a8c7faa35005ff0f12cea28c08cb34f18227a208cef5ec73096",
+        "dependencies": [
+          "@rpath/libmpdec.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libsqlite3.dylib",
+        "sha256": "0f7adf97be9befb7fffcac3f82d1ad62ec2b0b3f2115f21484c0fbdbea1779ee",
+        "dependencies": [
+          "@rpath/libsqlite3.dylib",
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libssl.3.dylib",
+        "sha256": "035036e5f83e1e1a3768b1efcc964ed9b40ff74c420ec014acd39e39fd978f68",
+        "dependencies": [
+          "@rpath/libssl.3.dylib",
+          "@loader_path/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Libraries/libzstd.1.dylib",
+        "sha256": "9e94d8db24361d5eb0a2f30aca1ab6efbddf2ab6fadc092ea2eae14abcb70e8b",
+        "dependencies": [
+          "@rpath/libzstd.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/Python",
+        "sha256": "8896caf29c1ab9711865eca5f0102d39f3f15de8b71b84d3110c9af150eeb325",
+        "dependencies": [
+          "@rpath/Python.framework/Versions/3.14/Python",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python",
+        "sha256": "c85b2bd6f2c3020d953b2d3da15fddee73194271e79bd0e6c8a2698f1f1589cc",
+        "dependencies": [
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "@executable_path/../../../../Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "sha256": "e53641d65411aeb6408e0b58ae964b7a56e015447273975894c29b08aa9c0934",
+        "dependencies": [
+          "@executable_path/../Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_asyncio.cpython-314-darwin.so",
+        "sha256": "139c7d62ba828b51ef2e35f4cd8905e95fa01eb092d75038c75b1dd0120419bb",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_bisect.cpython-314-darwin.so",
+        "sha256": "d79778651d42da6aa52b18b28fb5cdc43e6b55bd161e0bf3bc7cd9044b4a7523",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_blake2.cpython-314-darwin.so",
+        "sha256": "2118c3e1565e84df1af1264af8da33fe573e36f3e0ded0ef39fede57f9ed8f5f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_bz2.cpython-314-darwin.so",
+        "sha256": "1a712b27b4b013f50a4cbf6445ced8c14eea6b705b75c24c670ef46cacfa1ae2",
+        "dependencies": [
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_cn.cpython-314-darwin.so",
+        "sha256": "e1a01d155c389851321883225de9bd0720b6d44297feba9504844f78253bc1ec",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_hk.cpython-314-darwin.so",
+        "sha256": "32251720ba3b1ef555fccc91a75b3bd8da618ade8ba9ccddb22055b3ac6f8a48",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_iso2022.cpython-314-darwin.so",
+        "sha256": "32be9943ff7584e3da6ec3bbdab9398734859710ceeac2812fb8e0967a633f6e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_jp.cpython-314-darwin.so",
+        "sha256": "5ea54b6612b88a21791866a60dbb55bc2461b2bb16bb2539168edef20abf2642",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_kr.cpython-314-darwin.so",
+        "sha256": "89bf83bb4e454e0d16ad74c247140fefc4288244b21677946885d8aef7fd08cb",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_codecs_tw.cpython-314-darwin.so",
+        "sha256": "fa28aa60dab92fb4a572e084102e3afeda25f4c724b7e2568ae6af6bd26ec531",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_csv.cpython-314-darwin.so",
+        "sha256": "5cc5afb272401920db5e8d13ad229c21de15f6dc37804e28a97ef31b8c590e2f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ctypes.cpython-314-darwin.so",
+        "sha256": "94337a1fbd456ed0e9ba7b7a73892a6446bacc8f68f853e30d3a4dea28b73a00",
+        "dependencies": [
+          "/usr/lib/libffi.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ctypes_test.cpython-314-darwin.so",
+        "sha256": "da810b15246dd8bfa559da07f7add73cbe923f744ca59d76db57212abe59d7c4",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_curses.cpython-314-darwin.so",
+        "sha256": "f205c21546a58b4f519535e8329767d28b2d8fc4335c7f02d23bd59ed0b8c274",
+        "dependencies": [
+          "/usr/lib/libncurses.5.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_curses_panel.cpython-314-darwin.so",
+        "sha256": "5e3504a4d361dd288666a8028826865be6296689b5e4ecdb8ff4c25a2dd98c97",
+        "dependencies": [
+          "/usr/lib/libpanel.5.4.dylib",
+          "/usr/lib/libncurses.5.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_dbm.cpython-314-darwin.so",
+        "sha256": "c6e8dc53ac618ddddb6626b4d748960e59569aacef27273caa6b87c782247015",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_decimal.cpython-314-darwin.so",
+        "sha256": "39e39ea3306b16351433b682444fe9072dc2c9d8c62c0e45d14b30f2ef4bb509",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libmpdec.4.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_elementtree.cpython-314-darwin.so",
+        "sha256": "507ce8f954c60643de6494c18c5d989a86bca61a6ce25022fc7f638a61748e21",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_hashlib.cpython-314-darwin.so",
+        "sha256": "5ffcc85f48d3694f8c2573b8e9fc88dff4e03ccc0dd2e07eff8b3e05529b032d",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_heapq.cpython-314-darwin.so",
+        "sha256": "094a9ca8faed279bec0855e062c19d957f63482fcff54499a7e15e404ab9b8c5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_hmac.cpython-314-darwin.so",
+        "sha256": "112543a57702c3eb920553752fa75c200c1e29b3fb720e06ee1e88e5e1991ac5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpchannels.cpython-314-darwin.so",
+        "sha256": "0d84c504dcc09b3b1b2b69e2329b8788c517a8a2dc21535f8326da82439d092c",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpqueues.cpython-314-darwin.so",
+        "sha256": "515bdfda6f2c38039a2de1162e228a813cd11c154268e0d2a1d3fca2da59d9e3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_interpreters.cpython-314-darwin.so",
+        "sha256": "fbfba6d400722db950b6a129fef2b473d94d934c004ce3878fe27bad68d8d0ae",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_json.cpython-314-darwin.so",
+        "sha256": "5abe9c3195fe442d815cb58af7db0dd14b97e57025f4bf95dbd0b5cd18bf7e75",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_lsprof.cpython-314-darwin.so",
+        "sha256": "8d4f117bfb9f4d8ccb2901244b87ae2b06cbe74f061eb9615047208e524ef409",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_lzma.cpython-314-darwin.so",
+        "sha256": "ce576ffce16d19c655f504e764114fa8b8666205047db98db2c9a58cde88cb59",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/liblzma.5.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_md5.cpython-314-darwin.so",
+        "sha256": "dd383138e8d5aafffd002e7d4c3e147d5a4a536944df37b5a468976ba929741d",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_multibytecodec.cpython-314-darwin.so",
+        "sha256": "21e05e12c4fe018323f96af02fc35198c15d79100a501ccf3dc1f5ee6e7328da",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_multiprocessing.cpython-314-darwin.so",
+        "sha256": "07185c96396fe4f92942b8410260d69275c7ad1a21efcb4e63c0abd344929608",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_pickle.cpython-314-darwin.so",
+        "sha256": "7af826327c9ea322498d5152c936084f24e18a83d6e0d3e062ddd8dc633d6868",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_posixshmem.cpython-314-darwin.so",
+        "sha256": "37fe496eb1b084e892c93e262a03512c5eb3f4b22d98c842839b33d676fec102",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_posixsubprocess.cpython-314-darwin.so",
+        "sha256": "6e33ebf6cebfba716e5cc954d470508cb3536fcfe542d78a850f3e5aa99e586b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_queue.cpython-314-darwin.so",
+        "sha256": "5ade394da1c5162d9f2210015980d814e5d89e410183d5d248c576b54bdca317",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_random.cpython-314-darwin.so",
+        "sha256": "a494302184f6f880fa8aa68f361f8200daa44687466fc6fa998986f2a145ac37",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_remote_debugging.cpython-314-darwin.so",
+        "sha256": "851d6c7bca4f89d0e063134591afe020b0e22cd0ca848128b4dd86cffd6498f2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_scproxy.cpython-314-darwin.so",
+        "sha256": "e7a57c3a1ca32556cddbfaa85bfa8ac25da4a447ff0fb9bc7e436cf7e74ee85d",
+        "dependencies": [
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha1.cpython-314-darwin.so",
+        "sha256": "7327959140077ce69fec477e1982cae8304fa2d0f4d1437c7551f9c3d0e2f002",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha2.cpython-314-darwin.so",
+        "sha256": "29d3443699443c76c3722db15a2d9266668c783e03284a4238e350b0391a08fd",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sha3.cpython-314-darwin.so",
+        "sha256": "96208abcc3d76c6f902e1ec4e016b389705abdac078542e5829a52c8f1f27d3b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_socket.cpython-314-darwin.so",
+        "sha256": "1a430f91f10e613f2bac7eca45ec88252c7cc5f7b2c56fb9dab3257ae8ab4cff",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_sqlite3.cpython-314-darwin.so",
+        "sha256": "110a99855f398c6f99e7b247ea2b952291b367256a861b826de82ffd0bc9f9a2",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libsqlite3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_ssl.cpython-314-darwin.so",
+        "sha256": "5b8d62fef92bd858c1a8ab148f05a7a99a21dfa5315c30e725309044a0a19c45",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libssl.3.dylib",
+          "@loader_path/../../../../../../Libraries/libcrypto.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_statistics.cpython-314-darwin.so",
+        "sha256": "61a1f6bf2ac4035b58096e8aca365875c2a980495c66e9677962375bee5a3d1b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_struct.cpython-314-darwin.so",
+        "sha256": "43a2cdde4370c3a009007e10d40d06605f34cfca196ce1b0e004e573b5bbea03",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testbuffer.cpython-314-darwin.so",
+        "sha256": "0f6122f6a6677308972dddc62a07606e5eb7ab57a8801d3f4c6bca9e7195d5f8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testcapi.cpython-314-darwin.so",
+        "sha256": "b314bc6074e6744ec41b71fa4ad1314e60799d701397c63f81786bc17f1e4238",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testclinic.cpython-314-darwin.so",
+        "sha256": "f265ab5ad07a124ca9a216b70a30ee2999305e5269791bf3b8d947e3e4211ac2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testclinic_limited.cpython-314-darwin.so",
+        "sha256": "f9ffee032b69c40920f40259f3298a5367e6a1a7ed5b5a3eaaeaadcc3c0b35a9",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testimportmultiple.cpython-314-darwin.so",
+        "sha256": "a3dfefa577b4fcab561f3205cdb3bdb844b9330caff805f1fb961a6fdb5004c9",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testinternalcapi.cpython-314-darwin.so",
+        "sha256": "e190030a688d2232d46ab3ebef7bcea7af71574bc2b98c79c18cd7e2d3ec63be",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testlimitedcapi.cpython-314-darwin.so",
+        "sha256": "4382c9a833faedac2ad9d441554fd168e29dc149b678f06a9a0bab37f368c140",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testmultiphase.cpython-314-darwin.so",
+        "sha256": "42c86b177802e0493fda02acf9190d6d907329385433bbcf55417a561fa19738",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_testsinglephase.cpython-314-darwin.so",
+        "sha256": "f1559654330f77ef236a14a042dc70557341f47e4287a456b0b254c586a43715",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_uuid.cpython-314-darwin.so",
+        "sha256": "829f3810ce9189b0fee5f98780d9df44da39d7e93fdbe65cbd405b9a3b6b4ac8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_xxtestfuzz.cpython-314-darwin.so",
+        "sha256": "05875b7c64ff0ee75d1cbd385e577306f8abbb1cbadee7624321f637676d1c5e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_zoneinfo.cpython-314-darwin.so",
+        "sha256": "bb286171f201fbbed9102a3e81585e11d32c0b028a155cfdd3c47e5c2530cc27",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_zstd.cpython-314-darwin.so",
+        "sha256": "f5b55b546fce27d24e36f123a7864932a7e64e4c485526ba504a25d96a9a04f7",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libzstd.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/array.cpython-314-darwin.so",
+        "sha256": "41ac09225b42780659daa8431e5931013b01d1431b4c8233d2b49eb13714425a",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/binascii.cpython-314-darwin.so",
+        "sha256": "ce883e3dc652c1a42ca3540f2ea419f6d2f477d3e93ecb98f0d11562a3b400ac",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/cmath.cpython-314-darwin.so",
+        "sha256": "37f6bcfcfa92fcf5e1622fd30c4bddd1023514a509871d10ca4916bd4bac73b8",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/fcntl.cpython-314-darwin.so",
+        "sha256": "0b7c3dabeb2d6da197402bd7834e3d0adf37640fb9f170f1ce5e1329184629a2",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/grp.cpython-314-darwin.so",
+        "sha256": "4a2102760f83469c078ed60d76b188b5f4a2293b0ce3a314cd316427ed483487",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/math.cpython-314-darwin.so",
+        "sha256": "7b8e09ca34564232b383c7bdb6196c8fba1f4a95bc4335b053555195a520a24b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/mmap.cpython-314-darwin.so",
+        "sha256": "c30bc842a6cd243a2c7575ba9e7d55a8f8e8f323787ad831002d7ba9428e6f2a",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/pyexpat.cpython-314-darwin.so",
+        "sha256": "c48a0101c9a2718668169ee387973b2b534d0a5edd61ae34406c12d02fa2f434",
+        "dependencies": [
+          "@loader_path/../../../../../../Libraries/libexpat.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/readline.cpython-314-darwin.so",
+        "sha256": "a73b77ea1657039bc9f21a029799b441c3ab69f7a42ef9a835610b08602cb186",
+        "dependencies": [
+          "/usr/lib/libedit.3.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/resource.cpython-314-darwin.so",
+        "sha256": "8846fd23de883f4efd663787f7042e1f468a7b9d1af9d9dead374c03331a4602",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/select.cpython-314-darwin.so",
+        "sha256": "02e99de29d60bc1e4b7b05ba2bbc76c1e6be375dd1582d3e7a2bf6594444c466",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/syslog.cpython-314-darwin.so",
+        "sha256": "bc1fe2212f9dc95aa737c7487893335092319c5ef4f4b5f24d21480dfacaf92e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/termios.cpython-314-darwin.so",
+        "sha256": "527c27f6878e1bad7716e4c714314735f70d51ad3e98126b3bca73f8ca28d4fa",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/unicodedata.cpython-314-darwin.so",
+        "sha256": "ae9b79cd9a951ff29911b96602878a9c6d0cb43c4d2f5b947c5c88affd05958b",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxlimited.cpython-314-darwin.so",
+        "sha256": "655330509e4917ee9920c5007906382148bf9248a2b7aaa76f9fee2fed7f86ae",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxlimited_35.cpython-314-darwin.so",
+        "sha256": "13c67e1d49cff1e491618eef388e5072bbcaf0a7a343093f1fb9c2e0a31ff305",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/xxsubtype.cpython-314-darwin.so",
+        "sha256": "8c0b19069e0091b67188a28e2ccfae702fc43a340ce49d851ee520ebef2e4a90",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/zlib.cpython-314-darwin.so",
+        "sha256": "e9b0346a7bb54781d56a84533be3bf546958b68a2d13ba6c58a3b5cc69774868",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate",
+        "sha256": "4b208b34c4cd5fb1b77243c554cf2a2be3e1974fabdf603083b4910332e13992",
+        "dependencies": [
+          "/usr/lib/libz.1.dylib",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libcompression.dylib",
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libxar.1.dylib",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/usr/lib/libz.1.dylib",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libcompression.dylib",
+          "/usr/lib/libbz2.1.0.dylib",
+          "/usr/lib/libxar.1.dylib",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle",
+        "sha256": "18a8f429d2c4250d351200ebb1125896acdd6bb85ae23e9c1ef055128d6de68f",
+        "dependencies": [
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libcompression.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit",
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libcompression.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/WebKit.framework/Versions/A/WebKit"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app/Contents/MacOS/Updater",
+        "sha256": "8663659aea6c4d6a966def465b4092cb4f1f887ae7f79fc89c33def8b2544589",
+        "dependencies": [
+          "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Cocoa.framework/Versions/A/Cocoa",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/ApplicationServices",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc/Contents/MacOS/Downloader",
+        "sha256": "9f1d106c15fb16501ba87b5558bb426db4334cbdb9e1102e609c3f3af7921552",
+        "dependencies": [
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc/Contents/MacOS/Installer",
+        "sha256": "abd48615899501caafcf71ae0a6b8278d8fcb3de4eb991c19b2939c34c7adadb",
+        "dependencies": [
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CoreServices.framework/Versions/A/CoreServices",
+          "/System/Library/Frameworks/ServiceManagement.framework/Versions/A/ServiceManagement",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Frameworks/libWhallmANE.dylib",
+        "sha256": "b4c115c5d540e8d3aae8c8e0820ff38df60a35d2742928faf2beb94e44a73cdc",
+        "dependencies": [
+          "@rpath/libWhallmANE.dylib",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/IOSurface.framework/Versions/A/IOSurface",
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libobjc.A.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/MacOS/dsv4-app",
+        "sha256": "aa0a6361da3c7c99a0fb1300520618073ef59254f18a858a60867e48a351d842",
+        "dependencies": [
+          "@rpath/Sparkle.framework/Versions/B/Sparkle",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/AppKit.framework/Versions/C/AppKit",
+          "/System/Library/Frameworks/CFNetwork.framework/Versions/A/CFNetwork",
+          "/System/Library/Frameworks/Combine.framework/Versions/A/Combine",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics",
+          "/System/Library/Frameworks/CryptoKit.framework/Versions/A/CryptoKit",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/System/Library/Frameworks/SwiftUI.framework/Versions/A/SwiftUI",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/swift/libswiftCore.dylib",
+          "/usr/lib/swift/libswiftCoreFoundation.dylib",
+          "/usr/lib/swift/libswiftCoreImage.dylib",
+          "/usr/lib/swift/libswiftDarwin.dylib",
+          "/usr/lib/swift/libswiftDispatch.dylib",
+          "/usr/lib/swift/libswiftIOKit.dylib",
+          "/usr/lib/swift/libswiftMetal.dylib",
+          "/usr/lib/swift/libswiftOSLog.dylib",
+          "/usr/lib/swift/libswiftObjectiveC.dylib",
+          "/usr/lib/swift/libswiftQuartzCore.dylib",
+          "/usr/lib/swift/libswiftSpatial.dylib",
+          "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib",
+          "/usr/lib/swift/libswiftXPC.dylib",
+          "/usr/lib/swift/libswift_Builtin_float.dylib",
+          "/usr/lib/swift/libswift_Concurrency.dylib",
+          "/usr/lib/swift/libswiftos.dylib",
+          "/usr/lib/swift/libswiftsimd.dylib",
+          "/usr/lib/swift/libswift_errno.dylib"
+        ]
+      },
+      {
+        "file": "Contents/MacOS/python3",
+        "sha256": "1f5d6c2e4f9e7bda107bca8486f871e1f7143193c92b6de47d4bcd31e4001790",
+        "dependencies": [
+          "@executable_path/../Frameworks/Python.framework/Versions/3.14/Python",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/charset_normalizer/cd.cpython-314-darwin.so",
+        "sha256": "b13d37ace8595777223078eef396b08b5569d8e31a8222d8ffb95e55e4455003",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/charset_normalizer/md.cpython-314-darwin.so",
+        "sha256": "f20b68bcc056b4807e78fc734f83e631f902a8fe260897ed888e60e586ffec52",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/google/_upb/_message.abi3.so",
+        "sha256": "2d49299cf22b909d2c939b3bba5ff94ad582cdc9bff545f645f5307d594793bc",
+        "dependencies": [
+          "bazel-out/k8-opt-ST-9e73343f3d22/bin/python/lib_message_binary.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "bazel-out/k8-opt-ST-d581c5370a66/bin/python/lib_message_binary.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/hf_xet/hf_xet.abi3.so",
+        "sha256": "43cda0360f30649b5de97800edf149dee602fba9a7de18eb66757555900b698b",
+        "dependencies": [
+          "@rpath/hf_xet.abi3.so",
+          "/System/Library/Frameworks/SystemConfiguration.framework/Versions/A/SystemConfiguration",
+          "/usr/lib/libobjc.A.dylib",
+          "/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Security.framework/Versions/A/Security",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/markupsafe/_speedups.cpython-314-darwin.so",
+        "sha256": "ae5880884b4e675e902a21ae9717b8f9d100c3c783cdb42d68070f5be2c740aa",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/core.cpython-314-darwin.so",
+        "sha256": "979ac8727b3d23d6c8adc79e0ad85f7f5b904895e896044dc16e70bedd4b2536",
+        "dependencies": [
+          "@rpath/libmlx.dylib",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/lib/libjaccl.dylib",
+        "sha256": "df227d762190dbc41d40c09c20d9e72415efb03c062212f5b9ad0a721b6d8975",
+        "dependencies": [
+          "@rpath/libjaccl.dylib",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/mlx/lib/libmlx.dylib",
+        "sha256": "9e54fae2598354aacea9bc4ed5ba23eb43c62140b736854cd0c71200a0ce04e3",
+        "dependencies": [
+          "@rpath/libmlx.dylib",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/System/Library/Frameworks/QuartzCore.framework/Versions/A/QuartzCore",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "@rpath/libjaccl.dylib",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib",
+          "/usr/lib/libobjc.A.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_multiarray_tests.cpython-314-darwin.so",
+        "sha256": "d1a6fa63088d25e85f0e9e787f3a566e29892994e4c14ad6d9529eb3441a15b6",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_multiarray_umath.cpython-314-darwin.so",
+        "sha256": "84b0597cf08038a2348892dcf6498356008e82d86c743174938bbf6138410833",
+        "dependencies": [
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_operand_flag_tests.cpython-314-darwin.so",
+        "sha256": "cf4a78ed64f6f0a03e3a5af11104091e20e87aec19b0fc46a1588eb34a5a4971",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_rational_tests.cpython-314-darwin.so",
+        "sha256": "dfbc2a071bb505dc6d353051263589c81bca951c123f53b191bf5278b9fa79e3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_simd.cpython-314-darwin.so",
+        "sha256": "59abe1ebe99e6943ebca66b05629bd929b3c1fedee20a2114cfa15a11d8070c0",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_struct_ufunc_tests.cpython-314-darwin.so",
+        "sha256": "eaae6841431372f47d01d03cbe8c8e59af32bf13487ae5aa39118f6a7fbf57e5",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/_core/_umath_tests.cpython-314-darwin.so",
+        "sha256": "279e5d4ce394ffcdaa099a6e5bea6ee80639b7dd496234108cb0e4af511214b3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/fft/_pocketfft_umath.cpython-314-darwin.so",
+        "sha256": "e74aa9cfaead5988bda707401570b412a77473942eb02b4ecd84f50a5b46f612",
+        "dependencies": [
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/linalg/_umath_linalg.cpython-314-darwin.so",
+        "sha256": "954ca710c544fc44a727cd59b76b9ee27b62222d8436e463658256abc11026aa",
+        "dependencies": [
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/linalg/lapack_lite.cpython-314-darwin.so",
+        "sha256": "5ec2218c33972acad21fbe54ed0e76a6ffb756227405af4abd15a562a8668fe3",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/Accelerate.framework/Versions/A/Accelerate"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_bounded_integers.cpython-314-darwin.so",
+        "sha256": "098677736251d92bf605d4fcc2c463fc96a8d06ffc81d9eea99e01cfa097068e",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_common.cpython-314-darwin.so",
+        "sha256": "a6b8fa14f26d9c9b8350a352ce792187a2528b48b82ce94d09ea12fcba19697f",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_generator.cpython-314-darwin.so",
+        "sha256": "8c5be6abdc7a5d37941d9e0ffac294dedf1e627b8222ff83f2d8f791974075be",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_mt19937.cpython-314-darwin.so",
+        "sha256": "1f76c1f36d9408968d0f1c618e9f6ad51c62f8254d372da2759007f2e609b5bf",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_pcg64.cpython-314-darwin.so",
+        "sha256": "48076007291fb1dcb37b53ab02e8a0c3a0a466a4d03e4dc282be7d3b58be9d02",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_philox.cpython-314-darwin.so",
+        "sha256": "f478bfedc5abdac7c6e4925ec96303af4e81d4a0909961685d7bf5818f8936ac",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/_sfc64.cpython-314-darwin.so",
+        "sha256": "a00f1551cb7d3d17586606d435a80a72e075b54229ac92ad0aa736656b361add",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/bit_generator.cpython-314-darwin.so",
+        "sha256": "0bbd7a2054c9c2443ec21e9845a9ff33bd01554bf26adcdfde353258b8980c64",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/numpy/random/mtrand.cpython-314-darwin.so",
+        "sha256": "105ebf79c9578b7a4e0c98cb388d696f32375e41fe257ca9c86937d778f1ad79",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/regex/_regex.cpython-314-darwin.so",
+        "sha256": "2fcb03f6cf5e7b9013b1b2b4a0e9f885f2fdc8b11624c90c3b9a631ea68b12af",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/safetensors/_safetensors_rust.abi3.so",
+        "sha256": "2c4bc0bb09a95926134e5731e61d63ee762f66b7570290b1ccc7bfa620d66b62",
+        "dependencies": [
+          "@rpath/safetensors._safetensors_rust.abi3.so",
+          "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+          "/usr/lib/libSystem.B.dylib",
+          "/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation",
+          "/System/Library/Frameworks/Foundation.framework/Versions/C/Foundation",
+          "/usr/lib/libobjc.A.dylib",
+          "/usr/lib/libiconv.2.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/sentencepiece/_sentencepiece.cpython-314-darwin.so",
+        "sha256": "1c04983da8d19323a7f276396754ab906d3b779a986b34c32c1ffcc86160200f",
+        "dependencies": [
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/tiktoken/_tiktoken.cpython-314-darwin.so",
+        "sha256": "44b20e169a459d15b67729ac77195aad197c99058bb0e175a5d318b27d819143",
+        "dependencies": [
+          "@rpath/_tiktoken.cpython-314-darwin.so",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/tokenizers/tokenizers.abi3.so",
+        "sha256": "6b74c3e8cbe94b0efa019987aff9e25ff0eb545f04172a35900e2a14f9f61d6e",
+        "dependencies": [
+          "@rpath/tokenizers.tokenizers.abi3.so",
+          "/usr/lib/libc++.1.dylib",
+          "/usr/lib/libiconv.2.dylib",
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      },
+      {
+        "file": "Contents/Resources/python/site-packages/yaml/_yaml.cpython-314-darwin.so",
+        "sha256": "2410d927de692f1e44ab64cff805f39cf42c8e6881351b1954b7de743bf2bf83",
+        "dependencies": [
+          "/usr/lib/libSystem.B.dylib"
+        ]
+      }
+    ],
+    "forbidden_absolute_dependencies": []
+  },
+  "zip_sha256": "f7607ce93966c208849017d4a7575ab6ab8a2a7da9f21e2d80ecfcd0a4a5416d",
+  "zip_bytes": 120426105
+}

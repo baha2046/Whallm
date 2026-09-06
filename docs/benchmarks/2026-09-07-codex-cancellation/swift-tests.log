@@ -1,0 +1,6 @@
+mkdir -p .build/debug/PackageFrameworks
+ln -sfn "/Users/Shared/Project/product/llm-ssd/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" .build/debug/PackageFrameworks/Sparkle.framework
+swift test --skip (testAPIKeyRoundTripsThroughIsolatedKeychainItem|testGenerationContinuesAfterLeavingAndReturningToChat|testRapidStreamingCoalescesMessagePublications|testStreamingFlushesPendingTextBeforeReportingAnError)
+/bin/sh: -c: line 0: syntax error near unexpected token `('
+/bin/sh: -c: line 0: `swift test --skip (testAPIKeyRoundTripsThroughIsolatedKeychainItem|testGenerationContinuesAfterLeavingAndReturningToChat|testRapidStreamingCoalescesMessagePublications|testStreamingFlushesPendingTextBeforeReportingAnError)'
+make: *** [test] Error 2

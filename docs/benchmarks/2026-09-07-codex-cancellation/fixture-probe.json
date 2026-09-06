@@ -1,0 +1,121 @@
+{
+  "model": "deterministic fixture",
+  "runtime": {
+    "slots": 1152,
+    "read_workers": 4,
+    "prefetch_read_workers": 2,
+    "prefill_step_size": 0,
+    "fp8_kv_cache": true,
+    "memory_limit_gib": 0,
+    "layer_major_prefill": true,
+    "layer_major_prefill_threshold": 1024,
+    "prompt_cache_entries": 2,
+    "prompt_cache_memory_gib": 8,
+    "persistent_prompt_cache": false,
+    "persistent_prompt_cache_entries": 8,
+    "prompt_cache_directory": null,
+    "moe_prefill_step_size": 0,
+    "batched_expert_prefill": true,
+    "qwen_next_layer_prefetch": false,
+    "qwen_grouped_decode": false,
+    "qwen_grouped_experts": true,
+    "ane_prefill": true,
+    "ane_prefill_ratio": 0.25,
+    "fp4_index_cache": true,
+    "dspark_enabled": false,
+    "dspark_prompt_cache": false,
+    "dspark_confidence_threshold": 0.6,
+    "dspark_slots": 768,
+    "mtp_enabled": false,
+    "mtp_slots": 32,
+    "dspark_hash_prefetch": false,
+    "dspark_adaptive_block": false,
+    "dspark_fallback_enabled": true,
+    "dspark_sequential_verification": false,
+    "dspark_hybrid_verification": false,
+    "expert_route_trace": null,
+    "expert_page_cache_probe": false,
+    "expert_file_cache_policy": "cached",
+    "ready_expert_decode": true,
+    "staged_expert_streaming": false,
+    "adaptive_expert_prefill_threshold": null,
+    "power_saving_limit_gbps": null
+  },
+  "machine": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "base_commit": "ec39204f2afc9aec4386236ffc775ce8d1a9cb7a",
+  "codex_version": "codex-cli 0.153.4",
+  "cache_state": "new runtime; persistent prompt cache disabled",
+  "cases": [
+    {
+      "case": "codex_sigint",
+      "exit_code": 1,
+      "idle_seconds_after_sigint": 0.0362431249814108,
+      "pieces_before_interrupt": 0,
+      "pieces_after_interrupt": 0
+    }
+  ],
+  "recovery_after_codex": {
+    "response": {
+      "id": "resp_4fe3de2911244d41a6fa57a1e407cd7d",
+      "object": "response",
+      "created_at": 1788712171.47711,
+      "status": "completed",
+      "completed_at": 1788712171.47711,
+      "error": null,
+      "incomplete_details": null,
+      "instructions": null,
+      "max_output_tokens": 8,
+      "model": "qwen3.8-flash-next-fp8",
+      "approximation": {
+        "mode": "exact"
+      },
+      "output": [
+        {
+          "id": "msg_0c47be53844a4a3b9ba8e43e4ade1f77",
+          "type": "message",
+          "status": "completed",
+          "role": "assistant",
+          "content": [
+            {
+              "type": "output_text",
+              "annotations": [],
+              "logprobs": [],
+              "text": "OK"
+            }
+          ]
+        }
+      ],
+      "parallel_tool_calls": true,
+      "previous_response_id": null,
+      "reasoning": {
+        "effort": "none"
+      },
+      "store": false,
+      "temperature": 0.0,
+      "text": {
+        "format": {
+          "type": "text"
+        }
+      },
+      "tool_choice": "auto",
+      "tools": [],
+      "top_p": 0.8,
+      "truncation": "disabled",
+      "usage": {
+        "input_tokens": 5,
+        "input_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "output_tokens": 1,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 6
+      },
+      "metadata": {}
+    },
+    "output_token_hash": "080a9ed428559ef602668b4c00f114f1a11c3f6b02a435f0bdc154578e4d7f22"
+  },
+  "status": "PASSED"
+}

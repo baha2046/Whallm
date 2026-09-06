@@ -1,0 +1,63 @@
+{
+  "status": "BUILD_LOCAL_PASSED",
+  "source_commit": "ec39204f2afc9aec4386236ffc775ce8d1a9cb7a",
+  "branch": "master",
+  "app_version": "1.1.4",
+  "build_version": "1.1.4",
+  "app": "/Users/Shared/Project/product/llm-ssd/dist/Whallm.app",
+  "zip": "/Users/Shared/Project/product/llm-ssd/dist/Whallm-macOS-arm64.zip",
+  "zip_sha256": "bc294575aa4f5cc56da2c010cf0528c0d26aa18f691429fcf9959fc8a46a4856",
+  "zip_bytes": 120415290,
+  "signing": "ad hoc",
+  "python_tests": {
+    "passed": 330,
+    "failed": 0
+  },
+  "swift_tests": {
+    "executed": 65,
+    "passed": 62,
+    "skipped_missing_fixture": 3,
+    "excluded_keychain_cases": [
+      "testAPIKeyRoundTripsThroughIsolatedKeychainItem",
+      "testGenerationContinuesAfterLeavingAndReturningToChat",
+      "testRapidStreamingCoalescesMessagePublications",
+      "testStreamingFlushesPendingTextBeforeReportingAnError"
+    ],
+    "failed": 0
+  },
+  "bundle_checks": {
+    "signature_original_and_extracted": "passed",
+    "isolated_launch": {
+      "copies": [
+        "original",
+        "extracted"
+      ],
+      "languages": [
+        "en",
+        "zh-Hans",
+        "zh-Hant"
+      ],
+      "count": 6,
+      "survival_seconds_per_launch": 3,
+      "denied": [
+        "project .build",
+        "copy-specific Swift Bundle.module resource bundle"
+      ],
+      "result": "passed"
+    },
+    "localization_main_bundle_precedes_module": "verified source order plus isolated startup with fallback paths denied",
+    "localization_files_match_source": true,
+    "packaged_mlx": "0.32.1",
+    "sampler_tests_original": 3,
+    "sampler_tests_extracted": 3,
+    "native_files_audited_per_copy": 127,
+    "non_system_absolute_dependencies": 0,
+    "runtime_and_native_payloads_match": true
+  },
+  "notarized": false,
+  "uploaded": false,
+  "installed_app_replaced": false,
+  "performance_measured": false,
+  "verification_script_sha256": "cc50a86fda23c6b4e0e6c21f5e1ddd878b7f1a563d3d10c2dfee6ff1da04af06",
+  "package_script_sha256": "35d3691f859d298a6dcb0eedc118272f6b054cf7d869af83d87091bc168ef85b"
+}

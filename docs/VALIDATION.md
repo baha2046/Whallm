@@ -1,5 +1,136 @@
 # 驗證紀錄
 
+## 2026-09-07：最終 build local 與 dist 清理
+
+以 `ec39204` 基礎及既有修復工作樹重新執行測試和 `make package`，App
+version／build 均維持 **1.1.4**。Python **338 通過**；Swift **62 通過、
+3 項 fixture 略過、4 項 Keychain 等待案例排除**，零失敗。
+App 與 ZIP 解壓副本皆通過 strict deep signature、三語共六次明確 L10n
+初始化（禁止存取 `.build` 與 Swift module bundle）、包內抽樣各三項，
+以及各 127 個 Mach-O 的依賴檢查。三語皆優先由 `Contents/Resources` 載入。
+
+驗證後依使用者要求清理 `dist`，僅留下 `Whallm.app` 與
+`Whallm-macOS-arm64.zip`。下方歷史紀錄提及的 `dist` 備份目錄已移除；
+原始驗證資料仍保留在 `docs/benchmarks/`。重新開啟最終 App，維持本次
+build 前的 server 停止狀態，未替換 `/Applications/Whallm.app` 或發布版本。
+ZIP 大小 `120426105` bytes，SHA-256：
+`cb7b8a16b2b254bd25757cc67027c5ca6909d395f829dec95c4ed49bcf0f53ac`。
+命令、source hash、測試和清理清單見
+[最終本機打包紀錄](benchmarks/2026-09-07-final-build-local/summary.json)。
+
+## 2026-09-07：Codex Ctrl+C 取消 Qwen 生成
+
+在串流保活修復上繼續重現：正常 TCP close 後工具生成未於一秒內退出；
+已斷線的排隊請求仍進入模型載入。修復前兩項測試皆失敗，原始 log 已保留。
+新增 request-scoped cancellation、50 ms 連線觀察、可取消的 request lock 等待，
+以及 Qwen Prefill layer／chunk、Decode／MTP 的合作取消檢查。
+所有 MLX 運算與收尾保持在原 generation thread；iterator 關閉且已提交工作
+完成後才釋放 request lock。中途取消不將未完成 generation cache 提升為可重用結果。
+
+Python **338 項通過**，包含正常 close、不依賴保活的工具取消、排隊取消、
+首 token 前取消／下一請求恢復、Qwen chunk 中止及 expert scope 釋放。
+Swift **62 通過、3 項 fixture 略過**，四項既有 Keychain 等待案例排除，
+零失敗；首次 make ARGS quoting 錯誤及修正後 log 分別保留。
+
+本機 M2 Max／64 GiB、MLX 0.32.1、Codex CLI **0.153.4**，獨立 loopback
+server 與隔離 CODEX_HOME，不讀取或更動使用者 API key。使用 1,152 slots、
+預設 Qwen grouped Prefill 開啟、Decode 實驗與 MTP 關閉、persistent cache
+停用的新 runtime，實際將 SIGINT 傳至 Codex 前景程序群組（Ctrl+C 的訊號）：
+
+- 可控制模型於約 **0.036 秒**釋放生成，首 token 前停止。
+- 真實 installed Qwen 於約 **0.078 秒**釋放生成，首 token 前停止。
+- 真實 Qwen 開始輸出後關閉 HTTP 連線，約 **0.008 秒**釋放生成。
+- 上述真實取消後皆未新增輸出 piece；兩次後續請求正常回答 `OK`，
+  token hash 同為 `54f9f9a9d7ec1d59a05429914544c095bae6fedf15abfca4e2a5aac9d06da9d0`。
+
+這些是個別取消／恢復的功能檢查，不是停止延遲上界、效能基準或長期可靠率。
+已執行 kernel、同步 I/O、首次模型載入仍須收尾；proxy 若保留上游連線，
+server 無法單靠 TCP 得知 UI 已停止。MTP 取消檢查未執行實機驗證。
+下方保活修復的「等寫入失敗，再等第一個 token」限制已被本次修復取代。
+原始測試、Codex stdout／stderr、實機配置與恢復輸出見
+[取消驗證資料](benchmarks/2026-09-07-codex-cancellation/qwen-probe.json)。
+
+本次 `make package` 產生 App 1.1.4／ZIP，原件與解壓副本皆通過 strict deep
+signature、英文／簡中／繁中共六次明確 L10n 初始化（拒絕讀取 `.build` 與
+Swift module bundle），包內抽樣回歸各三項及各 127 個 Mach-O 依賴檢查。
+驗證模式不建立 ContentView、不讀 API key。ZIP SHA-256：
+`f7607ce93966c208849017d4a7575ab6ab8a2a7da9f21e2d80ecfcd0a4a5416d`。
+已替換本機 `dist` 並啟動服務，舊包保留於
+`dist/before-codex-cancellation-fix-20260907/`。未替換 `/Applications/Whallm.app`，
+未建立 commit、tag 或公開 release。下方舊紀錄的 Keychain 啟動等待已解除。
+對目前打包 App 的 `127.0.0.1:11434` 再測一次真實 Qwen：輸出中關閉連線，
+約 **0.058 秒**觀察到 server 回到 idle，下一請求正常完成，最終維持 idle。
+此測試保留原有模型設定與認證，API key 僅在測試程序記憶體內使用；資料與
+完整 source hash 見 [本次摘要](benchmarks/2026-09-07-codex-cancellation/summary.json)。
+
+## 2026-09-07：Codex Responses 串流保活修復
+
+在 `ec39204` 基礎工作樹重現四項串流問題：工具結果暫存與 Prefill 等待時
+沒有 SSE 事件、client 已斷線仍產生完整結果、生成錯誤只留下 `response.created`
+後的 EOF。修復前四項測試為 2 failure／2 timeout error；修復後全部通過。
+完整 Python **334 項通過**；Swift **62 通過、3 項 fixture 略過**，另排除
+四項既有 Keychain 等待案例，零失敗。
+
+以本機 Codex CLI **0.153.4**、隔離的 `CODEX_HOME`、明確 272,000 context、
+500 ms SSE idle timeout，搭配每次回覆延遲 1.5 秒的可控制模型測試：
+沒有保活時出現 `idle timeout waiting for SSE`；100 ms 保活時完成
+`exec_command` 的 `printf stream-ok` 及最終答案，兩次模型請求、exit 0。
+正式 runtime 使用 **10 秒**保活，事件為 `response.in_progress`；不改生成算式
+或 MLX 執行緒，也不提早公開未驗證工具參數。
+
+使用者貼出的 `error decoding response body` 原始連線尚未擷取；本輪證明的是
+一條可重現的 idle timeout 路徑，不能宣稱所有 network error 都已消除。
+第一輪 Codex 測試繼承技能且觸發人工測試的 context compaction，保留該紀錄；
+隔離設定後重跑，確認最終答案與工具執行都符合預期。
+
+修復版 App／ZIP 已通過 strict deep signature、原件與解壓副本各三語隔離啟動、
+包內 MLX 0.32.1 抽樣回歸各三項、127 個 Mach-O 的絕對依賴檢查。
+本機 `dist` 已換為此工作樹的修復版，原件保留在
+`dist/before-codex-stream-fix-20260907/`。
+使用者完成 Keychain 授權後，已啟動串流修復版並恢復服務。真實 Qwen 的
+2,226 input／27 output token 工具請求在 55.70 秒完成，收到四次保活，
+SSE 最大事件間隔 10.006 秒，正確回傳 `get_weather({"city":"Taipei"})`；
+未實際執行工具。這是 HTTP Responses 的實機功能檢查，Codex CLI 對照則使用
+可控制模型；不是長時間網路可靠率或正式效能量測。
+
+使用者反映大量 Keychain 提示後，另修正兩個重複存取來源：SwiftUI 重建
+ContentView 時不再讀 API key，第一次 view task 才載入；一般設定變更不再
+存取 Keychain，僅 API key 本身變更才保存。
+打包驗證使用不建立 ContentView 的 `--verify-localizations` 模式，並要求
+實際 L10n lookup 完成後的明確 marker。先前「只確認程序存活」不足以區分
+初始化完成與卡在 Keychain，舊紀錄不構成已通過這個更嚴格 gate 的證據。
+第一版 marker 放在 onAppear，直接啟動的副本沒有建立視窗而未觸發；失敗 log
+已保留，改為 App init 內 lookup 與 marker，後續重新打包驗證。
+新簽章 App 的正常啟動仍可能需要一次 macOS 授權；這不是移除 Keychain 保護。
+最終完整包已完成六次明確 L10n marker 驗證，原件與 ZIP 副本的簽章、包內抽樣
+及依賴檢查均通過。ZIP 大小 `120423726` bytes，SHA-256 為
+`5edf20a7d1df44e38f4810ed81cf620decdb4d6e46a189b92e80e4032a678f5c`。
+最終 App 的 server.py 與上述實機 Qwen 驗證使用的檔案 hash 相同。
+目前完整包已放至本機 `dist`，正常啟動仍等待 macOS Keychain 授權後恢復服務。
+完整命令、source hash、失敗與通過紀錄見
+[串流修復紀錄](benchmarks/2026-09-06-codex-stream/summary.json)。
+
+## 2026-09-06：合併後 build local 完成
+
+以 `master` source commit `ec39204f2afc9aec4386236ffc775ce8d1a9cb7a` 完成
+`make package`，本機 App version／build 均為 `1.1.4`，採 ad hoc signature。
+成品包含 Prefill 加速設定與 MLX／MLX Metal **0.32.1**。
+打包前重跑 Python **330 項通過**；Swift **62 通過、3 項缺少 fixture 略過、
+零失敗**，另排除四個先前會等待 Keychain 的案例，不算通過。
+
+App 與 ZIP 解壓副本均通過 `codesign --verify --deep --strict`，各完成英文、
+簡中、繁中隔離啟動，共六次，各存活三秒。測試禁止讀取專案 `.build` 和
+各副本的 Swift resource bundle，沒有發生 L10n fallback trap；額外讀取控制
+確認 sandbox 的禁止規則生效。確認 L10n 先讀 `.main` 再讀 `.module` 的順序，
+`Contents/Resources` 的三語檔案皆與 source 相同。
+
+兩份成品的包內 Python 各通過三項抽樣回歸測試，測試後簽章仍有效；各 127 個
+Mach-O 檔案未發現非系統的絕對依賴路徑，runtime source 與原生檔案完全一致。
+ZIP 大小 `120415290` bytes，SHA-256：
+`bc294575aa4f5cc56da2c010cf0528c0d26aa18f691429fcf9959fc8a46a4856`。
+命令與原始 log 見 [本機打包紀錄](benchmarks/2026-09-06-merged-build-local/summary.json)。
+未建立 tag、notarize、upload、替換已安裝 App 或重新量測模型效能。
+
 ## 2026-09-06：合併 feat/optimize_qwen 至 master
 
 將遠端 `87ffb59845aef94555fea703b511ab7249cf836b` 合併至本機
@@ -15,8 +146,9 @@ Qwen 預設開啟的 `qwen_grouped_experts` Prefill 加速與預設關閉的
 
 下方保留兩個分支各自的歷史測試、打包與效能紀錄。遠端分支的 MLX 0.32.0／
 M5 Pro 效能結果並非合併後 MLX 0.32.1 的重新量測；本輪沒有執行模型效能測試。
-本輪也未重新打包：本機 `dist` 仍是下述 `5245d42` 的 Issue #6 build，尚未包含
-此次合併的 Prefill 設定介面。未推送遠端或替換已安裝 App。
+合併當時未重新打包，當時本機 `dist` 是下述 `5245d42` 的 Issue #6 build。
+後續已完成上方 `ec39204` 的 build local，包含此次合併的 Prefill 設定介面。
+未推送遠端或替換已安裝 App。
 
 ## Issue #6 重現、修復與合併前本機打包
 

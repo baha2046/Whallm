@@ -606,7 +606,29 @@ Responses 會傳送 typed event。
 - `response.completed`
 
 Responses 不傳送 `[DONE]`。
-server 會在 `response.completed` 後關閉連線。
+server 會在 `response.completed` 或 `response.failed` 後關閉連線。
+
+送出 `response.created` 後，若沒有其他 SSE 事件，server 每約 10 秒送出
+`response.in_progress`，涵蓋 Prefill、工具輸出暫存與必要工具的一次重試。
+保活使用完整 SSE data event；僅傳 SSE comment 不足以重置所有 client 的事件
+idle timer。事件寫入與 `sequence_number` 共用鎖，終止事件後不再送保活。
+MLX 生成仍在原本的 request thread 執行，保活 thread 只負責 SSE。
+
+生成請求讀完 request body 後，獨立的連線觀察 thread 每約 50 ms 檢查 TCP
+EOF／reset，不必等到下一次保活寫入。Codex Ctrl+C 關閉連線時，排隊中的請求
+會退出；生成中的請求在下一個取消檢查點停止。Qwen 的 layer-major Prefill
+在每層／每個 chunk 開始前檢查，一般 Prefill／Decode 在模型層與生成步驟之間
+檢查，MTP Prefill 亦有 chunk 檢查。
+取消後會關閉 iterator，在原 generation thread 等待已提交的 MLX 工作收尾，
+再釋放模型 request lock；未完成的生成結果不保存為可重用 prompt cache。
+這是取消本次生成，不是保存中途狀態供稍後接續。已執行中的 kernel、同步 I/O
+及首次模型載入不能強制中斷，所以 50 ms 是連線觀察間隔，並非停止延遲保證。
+此機制要求 client／proxy 確實關閉上游連線；TCP write-half EOF 也視為取消，
+生成 client 應保持雙向連線至回應結束。連線觀察適用於三種 generation endpoint。
+建立串流後的非預期生成錯誤會傳送 `response.failed`，不再只關閉連線。
+本機 server log 保留原始錯誤，client 收到一般 `server_error` 說明。
+此保活不涵蓋送出 `response.created` 前的模型載入或等待其他 request 的階段，
+也不代表可以修復實體網路斷線。
 
 Responses 的 tool streaming 會先保留單次 generation 的輸出，並在 generation 結束時
 驗證完整 tool block。驗證後的完整 parser 結果是 SSE 的唯一依據，不會再交給

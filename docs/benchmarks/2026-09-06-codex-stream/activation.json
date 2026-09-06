@@ -1,0 +1,11 @@
+{
+  "app": "/Users/Shared/Project/product/llm-ssd/dist/Whallm.app",
+  "zip": "/Users/Shared/Project/product/llm-ssd/dist/Whallm-macOS-arm64.zip",
+  "previous_app_backup": "/Users/Shared/Project/product/llm-ssd/dist/before-codex-stream-fix-20260907/Whallm.app",
+  "previous_zip_backup": "/Users/Shared/Project/product/llm-ssd/dist/before-codex-stream-fix-20260907/Whallm-macOS-arm64.zip",
+  "old_server_pid": 40472,
+  "old_app_pid": 40465,
+  "old_server_idle_before_stop": true,
+  "relocated_signature": "passed",
+  "time": "2026-09-06T23:59:22.936044+08:00"
+}

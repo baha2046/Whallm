@@ -3,16 +3,24 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-06。
+最後核對日期是 2026-09-07。
 Qwen 支援核對版本是目前工作樹。
 目前 Python dependency 固定為 MLX **0.32.1**，修正背景執行緒的編譯抽樣器
 無法正常推進亂數狀態的問題；打包會拒絕不符合 pinned 版本的 MLX 環境。
 Issue #6 的重現、修復測試與長文驗證邊界見 [驗證紀錄](VALIDATION.md)。
-修復已整合至 `master`，source commit `5245d42` 的本機 App 1.1.4 與 ZIP 已通過
-簽章、三語隔離啟動及包內抽樣回歸檢查；這不是新的公開 Release。
-後續已整合 `feat/optimize_qwen` 的 Prefill 加速設定，合併後 Python 330 項通過、
-Swift 62 項通過（3 項 fixture 略過、4 項 Keychain 案例排除）。上述本機 App
-尚未包含此次合併，完整驗證範圍見 [驗證紀錄](VALIDATION.md)。
+修復與 `feat/optimize_qwen` 的 Prefill 加速設定已整合至 `master`。
+source commit `ec39204` 的本機 App 1.1.4 與 ZIP 已通過簽章、三語隔離啟動及
+包內抽樣回歸檢查；這不是新的公開 Release，也未替換已安裝 App。
+此次打包前 Python 330 項通過、Swift 62 項通過（3 項 fixture 略過、4 項
+Keychain 案例排除）。完整驗證範圍見 [驗證紀錄](VALIDATION.md)。
+後續已加入 Codex Responses 串流保活與 Ctrl+C 取消修復，工作樹 Python
+338 項通過。真正 Codex CLI 的慢速模型工具回圈，以及真實 Qwen 的
+Codex SIGINT 取消、HTTP 輸出中取消與後續請求恢復均通過。
+另修正重複 Keychain 存取與打包初始化判定，見同一紀錄。
+本機 `dist` 已換為完整修復包，App 與 ZIP 解壓副本的簽章、六次明確 L10n
+初始化與包內抽樣檢查均通過。2026-09-07 再次完成最終 build local，
+`dist` 僅保留 `Whallm.app` 與對應 ZIP；已移除舊備份及打包暫存目錄。
+本次重新開啟 App，保留 build 前的 server 停止狀態。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact

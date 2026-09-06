@@ -1,0 +1,62 @@
+[
+  {
+    "label": "codex-no-heartbeat",
+    "command": [
+      "codex",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only",
+      "--json",
+      "--color",
+      "never",
+      "--cd",
+      "/var/folders/s9/r9my4q9102l407jyxpr241zr0000gn/T/whallm-codex-probe-u694w3tw",
+      "-m",
+      "qwen3.8-flash-next-fp8",
+      "-c",
+      "model_provider=\"fixture\"",
+      "-c",
+      "model_providers.fixture={name=\"Whallm probe\",base_url=\"http://127.0.0.1:49656/v1\",wire_api=\"responses\",stream_idle_timeout_ms=500,stream_max_retries=0,request_max_retries=0,supports_websockets=false}",
+      "Run printf stream-ok once, then reply stream-ok."
+    ],
+    "exit_code": 1,
+    "seconds": 1.448289250023663,
+    "model_requests": 1,
+    "heartbeat_seconds": 3600,
+    "client_idle_timeout_ms": 500,
+    "model_delay_seconds_per_request": 1.5
+  },
+  {
+    "label": "codex-heartbeat",
+    "command": [
+      "codex",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--skip-git-repo-check",
+      "--sandbox",
+      "read-only",
+      "--json",
+      "--color",
+      "never",
+      "--cd",
+      "/var/folders/s9/r9my4q9102l407jyxpr241zr0000gn/T/whallm-codex-probe-zqjhace2",
+      "-m",
+      "qwen3.8-flash-next-fp8",
+      "-c",
+      "model_provider=\"fixture\"",
+      "-c",
+      "model_providers.fixture={name=\"Whallm probe\",base_url=\"http://127.0.0.1:49671/v1\",wire_api=\"responses\",stream_idle_timeout_ms=500,stream_max_retries=0,request_max_retries=0,supports_websockets=false}",
+      "Run printf stream-ok once, then reply stream-ok."
+    ],
+    "exit_code": 0,
+    "seconds": 7.246292083058506,
+    "model_requests": 4,
+    "heartbeat_seconds": 0.1,
+    "client_idle_timeout_ms": 500,
+    "model_delay_seconds_per_request": 1.5
+  }
+]

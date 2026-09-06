@@ -1,0 +1,79 @@
+{
+  "status": "FIXES_PACKAGED_REAL_QWEN_PASSED_WAITING_FOR_FINAL_APP_KEYCHAIN",
+  "time": "2026-09-07T00:02:32.096655+08:00",
+  "base_commit": "ec39204f2afc9aec4386236ffc775ce8d1a9cb7a",
+  "branch": "master",
+  "source_uncommitted": true,
+  "source_sha256": {
+    "runtime/deepseek_v4_ssd/server.py": "4660c236f86ba7d63423b260388c44e165ca28b59d6270dbacc4350a933bb385",
+    "runtime/tests/test_response_liveness.py": "5a04071296084b6f2b99b530fad400df7a0d7ec4a82c260cafafcb2c0503ebb0",
+    "Sources/DeepSeekV4SSDApp/ContentView.swift": "a3942d929f7f6aa8983afddc462002a95c4e697f857c140919ce79433ece7b9c",
+    "Sources/DeepSeekV4SSDApp/DeepSeekV4SSDApp.swift": "952f6ebe81650fb4fd99f38e97fcd03769ba04f6cd92b0f5bc4ba8a4b7559e47",
+    "Scripts/verify-packaged-app.sh": "ab5a0c14dd29088312e57d16be382bfb0cc6380af90f454cbde95cf5da220d79"
+  },
+  "root_cause_evidence": [
+    "Responses tool output buffers generation and validation with no intervening SSE data events.",
+    "Before fix: two idle timeouts, one generation-not-cancelled failure, one missing-terminal-event failure in four controlled regressions.",
+    "Installed Codex CLI 0.153.4 with 500ms event idle timeout fails when a model response is delayed 1.5 seconds without heartbeats.",
+    "Same Codex client completes an exec_command tool call and final stream-ok answer with 100ms heartbeat, two model requests."
+  ],
+  "fix": {
+    "response_heartbeat_seconds": 10,
+    "event": "response.in_progress",
+    "inference_thread_unchanged": true,
+    "client_disconnect": "cancel and close generator at next yielded result",
+    "runtime_error_terminal": "response.failed"
+  },
+  "tests": {
+    "python_passed": 334,
+    "swift_passed": 62,
+    "swift_fixture_skipped": 3,
+    "swift_keychain_excluded": 4,
+    "liveness_before": {
+      "failures": 2,
+      "errors": 2
+    },
+    "liveness_after_passed": 4,
+    "server_plus_liveness_passed": 66,
+    "codex_probe": "codex-probe.json"
+  },
+  "package": {
+    "command": "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make package OUTPUT_ROOT=/Users/Shared/Project/product/llm-ssd/dist/codex-stream-keychain-fix NOTARY_PROFILE= CODE_SIGN_IDENTITY=- APP_VERSION=1.1.4 BUILD_VERSION=1.1.4",
+    "current_app": "/Users/Shared/Project/product/llm-ssd/dist/Whallm.app",
+    "zip": "/Users/Shared/Project/product/llm-ssd/dist/Whallm-macOS-arm64.zip",
+    "zip_sha256": "5edf20a7d1df44e38f4810ed81cf620decdb4d6e46a189b92e80e4032a678f5c",
+    "zip_bytes": 120423726,
+    "signature_original_and_extracted": "passed",
+    "languages": [
+      "en",
+      "zh-Hans",
+      "zh-Hant"
+    ],
+    "isolated_launches": 6,
+    "mlx": "0.32.1",
+    "sampler_tests_per_copy": 3,
+    "native_files_audited_per_copy": 127,
+    "non_system_absolute_dependencies": 0,
+    "explicit_l10n_markers": 6,
+    "verification_mode_reads_keychain": false
+  },
+  "activation": "activation-final.json",
+  "limits": [
+    "The exact user-reported network error was not captured locally; demonstrated SSE idle timeout is one proven failure path.",
+    "Heartbeat begins after response.created and does not cover pre-stream model load or queue wait.",
+    "A running MLX kernel/prefill is not forcibly interrupted.",
+    "Codex probe attempt 01 used inherited skills and triggered artificial compaction; rerun in an isolated CODEX_HOME with explicit context size completed the intended tool loop.",
+    "Real Qwen test used HTTP Responses; the Codex CLI A/B used a deterministic fake runtime."
+  ],
+  "official_reference": "https://learn.chatgpt.com/docs/config-file/config-reference",
+  "live_qwen": "live-summary.json",
+  "activation_status": "Final combined build has been installed in dist; normal startup awaits macOS Keychain authorization.",
+  "keychain_fix": {
+    "view_reconstruction": "Defer credential read to first view task; state guards subsequent appearances.",
+    "configuration_changes": "Only changed API key values call Keychain save.",
+    "packaging_verification": "Dedicated --verify-localizations mode skips ContentView and requires a marker after real L10n lookup.",
+    "first_verifier_attempt": "Marker attached to onAppear failed because directly launched secondary apps may not create a window; moved lookup and marker to App init.",
+    "normal_startup": "macOS may still request approval for a newly signed App.",
+    "packaged_verification": "Six explicit L10n markers passed for original and extracted App; no ContentView or API-key access in verification mode."
+  }
+}

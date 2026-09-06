@@ -1,0 +1,12 @@
+[
+  {
+    "path": "/Users/Shared/Project/product/llm-ssd/.build/workspace-state.json",
+    "exit_code": 1,
+    "stderr": "cat: /Users/Shared/Project/product/llm-ssd/.build/workspace-state.json: Operation not permitted\n"
+  },
+  {
+    "path": "/Users/Shared/Project/product/llm-ssd/dist/Whallm.app/Contents/Resources/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle/zh-hans.lproj/Localizable.strings",
+    "exit_code": 1,
+    "stderr": "cat: /Users/Shared/Project/product/llm-ssd/dist/Whallm.app/Contents/Resources/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle/zh-hans.lproj/Localizable.strings: Operation not permitted\n"
+  }
+]
