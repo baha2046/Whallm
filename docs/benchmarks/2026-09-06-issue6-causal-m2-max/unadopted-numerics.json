@@ -1,0 +1,20 @@
+{
+  "reason": "Numerical candidates failed long-form acceptance; preserved as research and removed from the production diff.",
+  "files": [
+    {
+      "path": "runtime/deepseek_v4_ssd/qwen4_exp.py",
+      "saved_candidate_sha256": "c21bb7e765a71e8e7614fb1b5266a0c1724461e249a9a57658bea4580692d950",
+      "restored_head_sha256": "dc219e9cafac46e1dd5662697ef0733ded67ffd89960689a80724500967ae981"
+    },
+    {
+      "path": "runtime/tests/test_qwen.py",
+      "saved_candidate_sha256": "37a737179f55bd053c0cd262760ecf6a6f0be76c4d7899a96ae6ee869669ae76",
+      "restored_head_sha256": "27bcc567704789be5d1539881ed0e2409ec43e0a9419357f91f13f9aa7776808"
+    },
+    {
+      "path": "runtime/tests/test_block_prompt_cache.py",
+      "saved_candidate_sha256": "bac6bbed29b625b74902a0e6c50b238289249ad2a1e5c8c7511dc02e9403fdb4",
+      "restored_head_sha256": "2f01aad44803234b304811c0c973cd83bcd6501fbd8934a47e58b13106338ab3"
+    }
+  ]
+}

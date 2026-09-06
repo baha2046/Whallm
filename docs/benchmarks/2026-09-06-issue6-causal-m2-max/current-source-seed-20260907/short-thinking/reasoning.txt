@@ -1,0 +1,104 @@
+The user wants me to rewrite a Japanese text that ends three sentences all with "〜ている" (the progressive/state form). They want me to vary the sentence endings while keeping the meaning the same and making it sound natural in Japanese. They want only the revised text as the answer.
+
+Original:
+「窓の外では雨が降っている。彼女は机に向かっている。机の上には古い手紙が置かれている。」
+
+All three sentences end with ている. I need to vary the endings while keeping meaning.
+
+Let me think of natural alternatives:
+
+1. 「窓の外では雨が降っている」→ 「窓の外では雨が降りしきっている」or 「窓の外では雨が降る」or 「窓の外では、雨が降る」or 「窓の外では雨が降っていた」 - but 降る would imply it's about to rain. Maybe 「窓の外では雨がざあざあ降っている」still ends in ている. Let me think differently. 「窓の外には雨が降っている」→ 「窓の外では、雨の音がする」(you can hear rain) - this changes meaning slightly. Or 「窓の外では、雨が続いている」still ている. Or 「窓の外では、雨が降る」- this could work as a description of ongoing rain in literary style. Or 「窓の外では、雨は降っている」... still ている.
+
+Let me try: 「窓の外では雨が降りしきる」(literary present) or 「窓の外では、雨は降り続けている」... still ている.
+
+Better options:
+- 「窓の外では雨が降っている」→ 「窓の外から、雨の音が聞こえる」(meaning shifts slightly - you hear rain) or 「窓の外には、雨が降る」(literary/narrative present) or 「窓の外では、雨は降りしきる」
+
+- 「彼女は机に向かっている」→ 「彼女は机に向かう」or 「彼女は机に向かった」（completed）or 「彼女は机に向かっていた」or 「彼女は机に向かう」
+
+- 「机の上には古い手紙が置かれている」→ 「机の上には、古い手紙が置いてある」or 「机の上には古い手紙が一枚、置いてある」
+
+Let me try a natural rewrite:
+
+「窓の外では雨が降っている。彼女は机に向かっている。机の上には古い手紙が置かれている。」
+
+Rewrite options:
+- 「窓の外では、雨が降っている。彼女は机に向かっている。机の上には古い手紙が一枚、置いてある。」
+- 「窓の外では雨が降っている。彼女は机に向かう。机の上には、古い手紙が置いてある。」
+
+Let me keep meaning faithful:
+1. 降っている - rain is falling (ongoing) → 降りしきる (literary, ongoing) or just change to something else... Actually, maybe I can keep one ている and change the others.
+
+Let me try:
+「窓の外では雨が降りしきる。彼女は机に向かっている。机の上には、古い手紙が置いてある。」
+
+Or:
+「窓の外では、雨が降っている。彼女は机に向かう。机の上には古い手紙が、一枚置いてある。」
+
+This keeps meaning while varying endings. Let me go with something natural:
+
+「窓の外では雨が降りしきる。彼女は机に向かっている。机の上には、古い手紙が一枚、置いてある。」
+
+Hmm, but 降りしきる is quite literary and might change the tone. Let me think of simpler options.
+
+Actually, for natural Japanese:
+- 降っている → 降っている (keep one) or 降りしきる or 雨の音がする
+- 向かっている → 向かう (narrative present) or 向かっていた (past state)
+- 置かれている → 置いてある (state of completion, very natural for describing an object placed somewhere)
+
+I think a good natural rewrite:
+
+「窓の外では、雨が降っている。彼女は机に向かう。机の上には古い手紙が一枚、置いてある。」
+
+This changes the 2nd and 3rd endings. But maybe I should change all three to show more variety? The user said the endings are monotonous, so changing at least 2 out of 3 should suffice. But changing all 3 might be better.
+
+「窓の外から、雨の音が聞こえる。彼女は机に向かう。机の上には、古い手紙が一枚、置いてある。」
+
+Hmm, 「雨の音が聞こえる」slightly changes meaning from 「雨が降っている」. The original says rain is falling outside the window. 
+
+Let me try: 「窓の外では雨が降る。彼女は机に向かう。机の上には古い手紙が置いてある。」
+
+All three changed, but 降る might imply habitual action. In literary Japanese, present tense can describe ongoing action though.
+
+Or: 「窓の外では、雨が降りしきる。彼女は机に向かっている。机の上には、古い手紙が一枚置いてある。」
+
+I think this is good. Let me go with a version that keeps natural meaning:
+
+「窓の外では雨が降りしきる。彼女は机に向かっている。机の上には、古い手紙が一枚、置いてある。」
+
+Actually, let me reconsider. 「降りしきる」has a more dramatic/literary feel that the original didn't have. The original is simple and understated. Let me match that tone.
+
+「窓の外では、雨が降っている。彼女は机に向かう。机の上には古い手紙が置いてある。」
+
+Here I keep the first one as is (changing one ending to 向かう and another to 置いてある). This preserves meaning perfectly and varies two out of three endings. This feels natural and understated.
+
+Or to vary all three:
+「窓の外から雨音が聞こえる。彼女は机に向かう。机の上には、古い手紙が一枚置いてある。」
+
+I'll go with something that changes all three naturally while preserving meaning:
+
+「窓の外では、雨は降りしきる。彼女は机に向かっている。机の上には、古い手紙が一枚置いてある。」
+
+Hmm, I'll go with:
+
+「窓の外では雨が降っている。彼女は机に向かう。机の上には古い手紙が一枚、置いてある。」
+
+Two endings changed, natural, meaning preserved. This seems good. But the user said all three are ている and it's monotonous. Changing two should address the monotony. But changing all three would be better.
+
+Final answer:
+「窓の外では雨が降りしきる。彼女は机に向かう。机の上には、古い手紙が一枚置いてある。」
+
+Wait - 降りしきる changes tone. Let me just do:
+
+「窓の外では、雨が降っている。彼女は机に向かう。机の上には古い手紙が置いてある。」
+
+This changes #2 to 向かう (narrative present, perfectly fine in Japanese writing) and #3 to 置いてある (natural for describing state of an object being placed). First one keeps 降っている. Two out of three changed, no monotony anymore, meaning preserved. This is the most natural solution.
+
+Actually, to change all three while keeping natural meaning:
+「窓の外では雨の音がする。彼女は机に向かう。机の上には古い手紙が置いてある。」
+
+「雨の音がする」is slightly different from 「雨が降っている」but very close. The scene is essentially the same.
+
+I'll go with changing two (the simplest, most faithful approach):
+
+「窓の外では雨が降っている。彼女は机に向かう。机の上には古い手紙が置いてある。」

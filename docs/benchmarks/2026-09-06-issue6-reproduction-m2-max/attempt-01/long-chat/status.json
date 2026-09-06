@@ -1,0 +1,18 @@
+{
+  "case": "long-chat",
+  "state": "complete",
+  "content_chars": 6052,
+  "reasoning_chars": 0,
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 190,
+    "completion_tokens": 3829,
+    "total_tokens": 4019
+  },
+  "elapsed_seconds": 432.69,
+  "first_text_seconds": 33.38076704205014,
+  "done_event": true,
+  "server_exit_code_after_cleanup": -15,
+  "content_sha256": "9a4019b665a1553a55e908176f43f601241c925d1bb88ee6cbfc7bc4d22a8b1b",
+  "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

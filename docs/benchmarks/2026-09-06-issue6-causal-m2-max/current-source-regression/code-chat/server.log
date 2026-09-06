@@ -1,0 +1,3 @@
+Ready: http://127.0.0.1:49233
+127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -

@@ -1,0 +1,584 @@
+diff --git a/docs/API.md b/docs/API.md
+index b5d35da..ab44ea0 100644
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -281,7 +281,8 @@ Persistent prefill checkpoint 是當下 cache state 的 immutable snapshot；後
+ ### Qwen 模式取樣
+ 
+ Whallm 只對 Qwen 套用模式取樣配置。
+-參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
++Temperature、Top P、Top K 等基礎配置來自
++[Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
+ 
+ | 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+@@ -305,25 +306,33 @@ DeepSeek 仍使用 model catalog 預設值。
+ 正數 `temperature` 會使用 categorical sampling。
+ 明確的 `temperature: 0` 會使用 greedy sampling。
+ 
+-`min_p`、`presence_penalty` 和 `repetition_penalty` 是 Qwen 內部配置。
+-API 不支援公開的 `min_p` 或 `repetition_penalty` request 欄位。
+-API 仍會拒絕非零的 `presence_penalty` request 欄位。
+-Request 內的 `presence_penalty: 0` 不會停用 Qwen 內部配置。
++Qwen 的三種 completion endpoints 都接受下列 request 欄位；明確傳入的值會覆寫預設。
+ 
+-目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+-只檢查 generation call
+-可見的最近 20 個 token。
+-processor 不會檢查 prompt cache 已重用的 prefix。
+-因此，這個 processor 不會檢查完整 prompt。
+-`repetition_penalty=1.0` 是中性值。
+-Whallm 不會為這個值建立 processor。
++| 欄位 | 範圍 | 預設 |
++| --- | --- | --- |
++| `min_p` | 0–1 | 0 |
++| `presence_penalty` | -2–2 | 思考 0；非思考 1.5 |
++| `frequency_penalty` | -2–2 | 0 |
++| `repetition_penalty` | 0.000001–2 | 1 |
++
++欄位須為有限數字；
++字串、布林值、`null` 或超出範圍會回傳 400。
++`presence_penalty: 0` 會停用 presence penalty；`repetition_penalty: 1` 是中性值。
++正 presence penalty 降低已出現 token 的機率，frequency penalty 依出現次數降低，
++repetition penalty 則乘除其分數。它們不保證所有輸入都不重複。
++
++Qwen penalties 檢查**本次回覆全部已生成 token**，包含 reasoning 和正文。
++它們不計算 prompt／先前對話，也不依賴 prompt cache 是否命中。
++Whallm 明確覆寫 pinned `mlx-lm` 的 20-token 視窗，排除最後一個 prompt token，
++並讓 MTP 驗證、分支與回退使用相同的無持久狀態處理。
++這些參數不提供 App 進階設定欄位。
+ 
+ server 明確拒絕下列 request：
+ 
+ - `response_format` 不是 `null` 或 `[]`。
+ - `stop` 不是 `null` 或 `[]`。
+-- 非零的 `frequency_penalty`。
+-- 非零的 `presence_penalty`。
++- DeepSeek 的非零 `frequency_penalty` 或 `presence_penalty`。
++- DeepSeek 的 `min_p` 或 `repetition_penalty` request 欄位。
+ - 任何 `seed`。
+ - `logprobs: true`。
+ - `echo: true`。
+diff --git a/docs/QWEN.md b/docs/QWEN.md
+index 131a410..f27e4da 100644
+--- a/docs/QWEN.md
++++ b/docs/QWEN.md
+@@ -334,7 +334,7 @@ codec 不會偽造被 Responses normalization 移除的 reasoning item。
+ Qwen reasoning effort 使用 `low`、`medium` 和 `xhigh`。
+ API 的 `high` 與 `max` 會對應到 `xhigh`。
+ 
+-取樣參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
++基礎取樣參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
+ 
+ | 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+@@ -354,15 +354,14 @@ Text Completions 固定使用非思考模式。
+ 正數 `temperature` 會使用 categorical sampling。
+ `max_tokens` 行為不變。
+ 
+-`min_p`、`presence_penalty` 和 `repetition_penalty` 不是公開 request 欄位。
+-非思考模式會建立 `presence_penalty=1.5` processor。
+-思考模式不會建立 presence processor。
+-`repetition_penalty=1.0` 不會建立 processor。
+-
+-目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+-只檢查 generation call 可見的最近 20 個 token。
+-processor 不會檢查 prompt cache 已重用的 prefix。
+-因此，這項配置不是完整 prompt 的重複偵測器。
++`min_p`、`presence_penalty`、`frequency_penalty` 和 `repetition_penalty` 都是 Qwen
++公開 request 欄位，範圍與驗證見 [API](API.md#qwen-模式取樣)。
++非思考模式預設 `presence_penalty=1.5`，思考模式預設為 0；frequency penalty 預設為 0。
++明確傳入 `presence_penalty: 0` 可停用；`repetition_penalty=1.0` 不建立 processor。
++Penalty history 包含本次回覆全部已生成的 reasoning／正文 token，不包含 prompt
++或先前對話。它不再使用舊的 20-token 視窗，且不依賴 prompt cache 命中狀態。
++普通 Decode 與 Qwen MTP 使用相同的 processor；MTP 暫時候選不會污染後續分支。
++這是生成配置修正，不是模型能力或所有長輸出品質通過的聲明。
+ 
+ App 的 Qwen 進階設定只顯示 Max tokens。
+ App 不顯示 Temperature、Top P 或 Top K。
+diff --git a/docs/VALIDATION.md b/docs/VALIDATION.md
+index 1454491..eaa2a64 100644
+--- a/docs/VALIDATION.md
++++ b/docs/VALIDATION.md
+@@ -1,5 +1,18 @@
+ # 驗證紀錄
+ 
++2026-09-06 另以已安裝的 Whallm **v1.1.4**（不是目前開發工作樹）完成
++[#6 的四輪探索性重現](../research/ISSUE_6_REPRODUCTION_2026-09-06.md)：
++Qwen thinking 的日文長文在正文第 641 個字元起，連續重複同一短語 187 次後
++由測試者停止。相同題目的 chat 寫出 6,052 字元並自行 `stop`，但結尾仍有重複段落。
++短句改寫兩種模式都完成，thinking 先產生 3,569 字元 reasoning。
++這確認已發布版本的一個正文重複案例；不代表根因、修復、發生率或正式效能已驗證。
++完整輸出與環境見 [重現 artifact](benchmarks/2026-09-06-issue6-reproduction-m2-max/summary.json)。
++
++Issue #6 的後續修復仍在調查中，尚未通過長文品質驗收。2026-09-06 依使用者要求
++暫停生成實驗，完成 [其他框架處理方式的評估](../research/ISSUE_6_FRAMEWORK_ASSESSMENT_2026-09-06.md)。
++其中 vLLM 偵測函式的離線重播只能證明能辨識部分已保存循環，不是修復或跨框架
++全模型推論通過；工作樹內的未完成修復候選也不代表已發布 App 的行為。
++
+ 本文件分開記錄目前驗證和歷史量測。
+ 最新自動測試為 2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`
+ 加上 default-off Qwen grouped Decode 工作樹。Python 305 項通過；Swift 成功編譯，
+diff --git a/runtime/deepseek_v4_ssd/generation.py b/runtime/deepseek_v4_ssd/generation.py
+index 1266076..83fcdf3 100644
+--- a/runtime/deepseek_v4_ssd/generation.py
++++ b/runtime/deepseek_v4_ssd/generation.py
+@@ -141,9 +141,31 @@ class GenerationOptions:
+     min_p: float = 0.0
+     presence_penalty: float = 0.0
+     repetition_penalty: float = 1.0
++    frequency_penalty: float = 0.0
+     approximation_mode: str = EXACT_APPROXIMATION_MODE
+ 
+ 
++def _generation_logits_processors(options: GenerationOptions, *, is_qwen: bool):
++    settings = {}
++    for name, neutral in (("presence", 0), ("repetition", 1), ("frequency", 0)):
++        penalty = getattr(options, f"{name}_penalty")
++        if penalty != neutral:
++            settings[f"{name}_penalty"] = penalty
++            if is_qwen:
++                # mlx-lm uses tokens[-context_size:]; zero means all history.
++                settings[f"{name}_context_size"] = 0
++    processors = make_logits_processors(**settings) if settings else []
++    if not is_qwen:
++        return processors
++    # Both pinned mlx-lm generate_step and Qwen MTP supply the final prompt
++    # token followed by generated tokens. Exclude that prompt anchor. Keeping
++    # this stateless also makes MTP speculative branches/rollback independent.
++    return [
++        lambda tokens, logits, processor=processor: processor(tokens[1:], logits)
++        for processor in processors
++    ]
++
++
+ @dataclass(frozen=True)
+ class GeneratedPiece:
+     text: str
+@@ -311,6 +333,7 @@ def _prompt_cache_contract(installed: InstalledModel, config: RuntimeConfig) ->
+         "format": _PROMPT_CACHE_CONTRACT_FORMAT,
+         "revision": str(getattr(installed, "revision", "")),
+         "modelID": str(getattr(installed, "model_id", "")),
++        **({"qwenNumerics": "fp32-router-gdn-norm-v1"} if getattr(installed, "is_qwen", False) else {}),
+         # Keep legacy cache contracts unchanged when the experiment is off.
+         **({"qwenGroupedDecode": True} if getattr(config, "qwen_grouped_decode", False) else {}),
+         "modelConfigSHA256": _sha256_json(raw_config),
+@@ -2017,14 +2040,7 @@ class ModelRuntime:
+             top_k=options.top_k,
+             min_p=options.min_p,
+         )
+-        processor_options = {}
+-        if options.presence_penalty != 0:
+-            processor_options["presence_penalty"] = options.presence_penalty
+-        if options.repetition_penalty != 1:
+-            processor_options["repetition_penalty"] = options.repetition_penalty
+-        logits_processors = (
+-            make_logits_processors(**processor_options) if processor_options else []
+-        )
++        logits_processors = _generation_logits_processors(options, is_qwen=self._is_qwen)
+         with self._generation_lock, _approximation_mode(
+             self, options.approximation_mode
+         ), _qwen_decode_request(self):
+diff --git a/runtime/deepseek_v4_ssd/qwen4_exp.py b/runtime/deepseek_v4_ssd/qwen4_exp.py
+index 391864f..5108e6b 100644
+--- a/runtime/deepseek_v4_ssd/qwen4_exp.py
++++ b/runtime/deepseek_v4_ssd/qwen4_exp.py
+@@ -11,7 +11,9 @@ import mlx.nn as nn
+ import numpy as np
+ from mlx_lm.models.base import create_ssm_mask
+ from mlx_lm.models.cache import ArraysCache, CacheList, KVCache
+-from mlx_lm.models.qwen3_5 import GatedDeltaNet
++from mlx_lm.models.qwen3_5 import GatedDeltaNet as MLXGatedDeltaNet
++from mlx_lm.models.gated_delta import gated_delta_update
++from mlx.nn.layers.distributed import sum_gradients
+ from mlx_lm.models.rope_utils import initialize_rope
+ 
+ from .expert_cache import ExpertCache, QwenBatchedExperts, QwenExpertWeights
+@@ -83,6 +85,68 @@ class ModelArgs:
+         return args
+ 
+ 
++def _qwen_l2norm(value: mx.array) -> mx.array:
++    value = value.astype(mx.float32)
++    return value * mx.rsqrt(mx.sum(mx.square(value), axis=-1, keepdims=True) + 1e-6)
++
++
++class QwenGatedDeltaNet(MLXGatedDeltaNet):
++    """Qwen4 FP32 L2 normalization and recurrent math, with the MLX kernel.
++
++    Forward adapted from mlx-lm qwen3_5 (Copyright 2026 Apple Inc., MIT).
++    The reference uses sum(x*x) + eps, not mean(x*x) + eps; substituting
++    RMSNorm with the same epsilon changes small query/key vectors materially.
++    """
++
++    def __call__(self, inputs, mask=None, cache=None):
++        batch, length, _ = inputs.shape
++        if self.sharding_group is not None:
++            inputs = sum_gradients(self.sharding_group)(inputs)
++        qkv = self.in_proj_qkv(inputs)
++        z = self.in_proj_z(inputs).reshape(batch, length, self.num_v_heads, self.head_v_dim)
++        b = self.in_proj_b(inputs)
++        a = self.in_proj_a(inputs)
++        previous = cache[0] if cache is not None and cache[0] is not None else mx.zeros(
++            (batch, self.conv_kernel_size - 1, self.conv_dim), dtype=inputs.dtype
++        )
++        if mask is not None:
++            qkv = mx.where(mask[..., None], qkv, 0)
++        conv_input = mx.concatenate([previous, qkv], axis=1)
++        if cache is not None:
++            keep = self.conv_kernel_size - 1
++            if cache.lengths is not None:
++                ends = mx.clip(cache.lengths, 0, length)
++                positions = (ends[:, None] + mx.arange(keep))[..., None]
++                cache[0] = mx.take_along_axis(conv_input, positions, axis=1)
++            else:
++                cache[0] = mx.contiguous(conv_input[:, -keep:])
++        conv_out = nn.silu(self.conv1d(conv_input))
++        q, k, v = [
++            part.reshape(batch, length, heads, dim)
++            for part, heads, dim in zip(
++                mx.split(conv_out, [self.key_dim, 2 * self.key_dim], axis=-1),
++                [self.num_k_heads, self.num_k_heads, self.num_v_heads],
++                [self.head_k_dim, self.head_k_dim, self.head_v_dim],
++            )
++        ]
++        q = _qwen_l2norm(q) * (self.head_k_dim ** -0.5)
++        k = _qwen_l2norm(k)
++        state = cache[1] if cache is not None else None
++        out, state = gated_delta_update(
++            q, k, v.astype(mx.float32), a.astype(mx.float32), b,
++            self.A_log, self.dt_bias.astype(mx.float32), state, mask,
++            use_kernel=not self.training,
++        )
++        if cache is not None:
++            cache[1] = state
++            cache.advance(length)
++        out = self.norm(out.astype(inputs.dtype), z)
++        out = self.out_proj(out.reshape(batch, length, -1))
++        if self.sharding_group is not None:
++            out = mx.distributed.all_sum(out, group=self.sharding_group)
++        return out
++
++
+ class GroupRMSNorm(nn.Module):
+     def __init__(self, dimensions: int, group_size: int | None, eps: float):
+         super().__init__()
+@@ -102,7 +166,7 @@ class GroupRMSNorm(nn.Module):
+             output = (normalized * weight).astype(value.dtype)
+         else:
+             output = mx.fast.rms_norm(value, self.weight, self.eps)
+-        return output.reshape(original_shape)
++        return output.reshape(original_shape).astype(value.dtype)
+ 
+ 
+ class RMSNormGated(nn.Module):
+@@ -112,8 +176,10 @@ class RMSNormGated(nn.Module):
+         self.eps = eps
+ 
+     def __call__(self, value: mx.array, gate: mx.array | None = None) -> mx.array:
+-        output = mx.fast.rms_norm(value, self.weight, self.eps)
+-        return output if gate is None else output * mx.sigmoid(gate)
++        output = mx.fast.rms_norm(value, None, self.eps) * self.weight
++        return output if gate is None else (
++            output.astype(mx.float32) * mx.sigmoid(gate.astype(mx.float32))
++        ).astype(value.dtype)
+ 
+ 
+ class GatedResidual(nn.Module):
+@@ -695,7 +761,10 @@ class SparseMoE(nn.Module):
+         self.layer = layer
+ 
+     def __call__(self, value: mx.array) -> mx.array:
+-        probabilities = mx.softmax(self.gate(value), axis=-1, precise=True)
++        # Match Qwen's reference router: keep softmax and top-k normalization
++        # in float32. Casting probabilities to BF16 first creates false ties
++        # and can select different experts even for distinct router logits.
++        probabilities = mx.softmax(self.gate(value).astype(mx.float32), axis=-1)
+         indices = mx.argpartition(probabilities, kth=-self.top_k, axis=-1)[..., -self.top_k :]
+         scores = mx.take_along_axis(probabilities, indices, axis=-1)
+         if self.norm_topk_prob:
+@@ -719,7 +788,7 @@ class DecoderLayer(nn.Module):
+         super().__init__()
+         self.layer_type = args.layer_types[layer]
+         if self.layer_type == "linear_attention":
+-            self.linear_attn = GatedDeltaNet(args)
++            self.linear_attn = QwenGatedDeltaNet(args)
+             self.linear_attn.norm = RMSNormGated(
+                 args.linear_value_head_dim, args.rms_norm_eps
+             )
+@@ -839,7 +908,7 @@ class Model(nn.Module):
+             if "conv1d.weight" in key and value.ndim == 3 and value.shape[-1] != 1:
+                 value = value.moveaxis(2, 1)
+             if key.endswith(norm_suffixes):
+-                value = value + 1
++                value = value.astype(mx.float32) + 1
+             sanitized[key] = value
+         return sanitized
+ 
+@@ -916,7 +985,7 @@ class MTPModel(nn.Module):
+                 continue
+             key = key.removeprefix("mtp.")
+             if key.endswith(norm_suffixes):
+-                value = value + 1
++                value = value.astype(mx.float32) + 1
+             sanitized[key] = value
+         return sanitized
+ 
+diff --git a/runtime/deepseek_v4_ssd/server.py b/runtime/deepseek_v4_ssd/server.py
+index 9caca8a..90cf3ed 100644
+--- a/runtime/deepseek_v4_ssd/server.py
++++ b/runtime/deepseek_v4_ssd/server.py
+@@ -940,8 +940,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
+             if value is not None and value != []:
+                 raise APIError(f"{name} is not supported.", param=name)
+         for name in ("frequency_penalty", "presence_penalty"):
+-            if payload.get(name) not in (None, 0, 0.0):
++            if not qwen and payload.get(name) not in (None, 0, 0.0):
+                 raise APIError(f"{name} is not supported.", param=name)
++        if not qwen:
++            for name in ("min_p", "repetition_penalty"):
++                if name in payload:
++                    raise APIError(f"{name} is supported only for Qwen.", param=name)
+         if payload.get("seed") is not None:
+             raise APIError("seed is not supported.", param="seed")
+         if payload.get("logprobs") not in (None, False):
+@@ -1795,14 +1799,24 @@ def _options(
+     top_k = payload.get("top_k", sampling_defaults["top_k"])
+     if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= 248_320:
+         raise APIError("top_k must be between 0 and 248320.", param="top_k")
++    penalties = {}
++    if qwen:
++        for name, minimum, maximum, default in (
++            ("min_p", 0, 1, sampling_defaults["min_p"]),
++            ("presence_penalty", -2, 2, sampling_defaults["presence_penalty"]),
++            ("frequency_penalty", -2, 2, 0.0),
++            ("repetition_penalty", 0.000001, 2, sampling_defaults["repetition_penalty"]),
++        ):
++            penalties[name] = _number(payload.get(name, default), name, minimum=minimum, maximum=maximum)
+     return GenerationOptions(
+         max_tokens=max_tokens,
+         temperature=temperature,
+         top_p=top_p,
+         top_k=top_k,
+-        min_p=sampling_defaults["min_p"],
+-        presence_penalty=sampling_defaults["presence_penalty"],
+-        repetition_penalty=sampling_defaults["repetition_penalty"],
++        min_p=penalties.get("min_p", sampling_defaults["min_p"]),
++        presence_penalty=penalties.get("presence_penalty", sampling_defaults["presence_penalty"]),
++        repetition_penalty=penalties.get("repetition_penalty", sampling_defaults["repetition_penalty"]),
++        frequency_penalty=penalties.get("frequency_penalty", 0.0),
+         approximation_mode=approximation_mode,
+     )
+ 
+diff --git a/runtime/tests/test_block_prompt_cache.py b/runtime/tests/test_block_prompt_cache.py
+index 82d4ae0..652fabf 100644
+--- a/runtime/tests/test_block_prompt_cache.py
++++ b/runtime/tests/test_block_prompt_cache.py
+@@ -277,6 +277,17 @@ class BlockPromptCacheTests(unittest.TestCase):
+ 
+             self.assertEqual(second._scan_persistent_prompt_caches(), [])
+ 
++    def test_qwen_router_fix_rejects_cache_from_old_numeric_path(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            directory = Path(temporary)
++            legacy = _runtime(directory)
++            legacy._persist_prompt_cache(_PromptCacheEntry([_FixtureCache(1)], [1, 2]))
++            fixed = _runtime(directory)
++            fixed.installed.is_qwen = True
++            self.assertEqual(fixed._scan_persistent_prompt_caches(), [])
++            fixed._persist_prompt_cache(_PromptCacheEntry([_FixtureCache(1)], [1, 2]))
++            self.assertEqual(len(fixed._scan_persistent_prompt_caches()), 1)
++
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/runtime/tests/test_qwen.py b/runtime/tests/test_qwen.py
+index dc929f5..3eadbef 100644
+--- a/runtime/tests/test_qwen.py
++++ b/runtime/tests/test_qwen.py
+@@ -38,6 +38,9 @@ from deepseek_v4_ssd.qwen4_exp import (
+     QSAAttention,
+     RMSNormGated,
+     SparseMoE,
++    QwenGatedDeltaNet,
++    _qwen_l2norm,
++    GroupRMSNorm,
+     generate_mtp_tokens,
+     ngram_ids,
+     qsa_causal_block_mask,
+@@ -192,6 +195,68 @@ class FakeANEProjection:
+ 
+ 
+ class QwenTests(unittest.TestCase):
++    def test_group_norm_keeps_activation_dtype_with_float32_offset_weights(self):
++        for group in (None, 2):
++            norm = GroupRMSNorm(4, group, 1e-6)
++            norm.weight = mx.array([1.001, 0.997, 1.005, 1.003], dtype=mx.float32)
++            values = mx.array([[0.1, 0.2, -0.3, 0.4]], dtype=mx.bfloat16)
++            actual = norm(values)
++            raw = np.array(values.astype(mx.float32)).reshape(1, -1, group or 4)
++            expected = raw / np.sqrt(np.square(raw).mean(axis=-1, keepdims=True) + 1e-6)
++            expected = expected.reshape(1, 4) * np.array(norm.weight)
++            expected = mx.array(expected).astype(mx.bfloat16).astype(mx.float32)
++            self.assertEqual(actual.dtype, mx.bfloat16)
++            np.testing.assert_array_equal(np.array(actual.astype(mx.float32)), np.array(expected))
++
++    def test_delta_l2norm_uses_sum_epsilon_in_float32_for_small_keys(self):
++        values = mx.full((1, 2, 1, 128), 0.0001, dtype=mx.bfloat16)
++        raw = np.array(values.astype(mx.float32))
++        expected = raw / np.sqrt(np.square(raw).sum(axis=-1, keepdims=True) + 1e-6)
++        actual = _qwen_l2norm(values)
++        self.assertEqual(actual.dtype, mx.float32)
++        np.testing.assert_allclose(np.array(actual), expected, rtol=1e-6, atol=1e-7)
++
++    def test_delta_float32_kernel_preserves_chunked_decode_state(self):
++        from mlx.utils import tree_flatten
++        from mlx_lm.models.cache import ArraysCache
++
++        mx.random.seed(6)
++        args = ModelArgs(hidden_size=8, linear_num_value_heads=1, linear_num_key_heads=1,
++                         linear_key_head_dim=128, linear_value_head_dim=4)
++        model = QwenGatedDeltaNet(args)
++        model.load_weights([(k, v.astype(mx.bfloat16)) for k, v in tree_flatten(model.parameters())])
++        model.norm = RMSNormGated(4, 1e-6)
++        model.norm.weight = mx.ones((4,), dtype=mx.bfloat16)
++        model.eval()
++        inputs = mx.random.normal((1, 3, 8)).astype(mx.bfloat16)
++        full_cache, step_cache = ArraysCache(size=2), ArraysCache(size=2)
++        full = model(inputs, cache=full_cache)
++        steps = mx.concatenate([model(inputs[:, i:i+1], cache=step_cache) for i in range(3)], axis=1)
++        self.assertEqual(full.dtype, mx.bfloat16)
++        self.assertEqual(full_cache[1].dtype, mx.float32)
++        np.testing.assert_allclose(np.array(full.astype(mx.float32)), np.array(steps.astype(mx.float32)), atol=0.002, rtol=0.02)
++        np.testing.assert_allclose(np.array(full_cache[1]), np.array(step_cache[1]), atol=0.002, rtol=0.02)
++
++    def test_router_preserves_float32_probabilities_until_top_k_selection(self):
++        args = ModelArgs(hidden_size=2, num_experts=16, num_experts_per_tok=3,
++                         moe_intermediate_size=2, shared_expert_intermediate_size=2)
++        module = SparseMoE(args, 0, SimpleNamespace())
++        values = np.random.default_rng(6).permutation(np.linspace(-0.01, 0.01, 16))
++        logits = mx.array(values).astype(mx.bfloat16)[None, None]
++        selected = []
++        module.gate = lambda _: logits
++        module.shared_expert = lambda value: mx.zeros_like(value)
++        module.shared_expert_gate = lambda value: mx.zeros((*value.shape[:-1], 1))
++
++        def experts(value, indices):
++            selected.extend(indices.reshape(-1).tolist())
++            return mx.ones((*indices.shape, value.shape[-1]), dtype=value.dtype)
++
++        module.experts = experts
++        mx.eval(module(mx.ones((1, 1, 2), dtype=mx.bfloat16)))
++        expected = np.argsort(np.array(logits.astype(mx.float32)).reshape(-1))[-3:]
++        self.assertEqual(set(selected), set(expected.tolist()))
++
+     descriptor = NGram(
+         "ngram.bin",
+         "F8_E4M3",
+diff --git a/runtime/tests/test_runtime.py b/runtime/tests/test_runtime.py
+index 83aa817..2a268fe 100644
+--- a/runtime/tests/test_runtime.py
++++ b/runtime/tests/test_runtime.py
+@@ -215,7 +215,11 @@ class ModelRuntimeTests(unittest.TestCase):
+             finish_reason="stop",
+         )
+         sampler = object()
+-        presence_processor = object()
++        processor_histories = []
++
++        def presence_processor(tokens, logits):
++            processor_histories.append(tokens.tolist())
++            return logits
+         received_options = {}
+ 
+         def fake_stream_generate(*_args, **options):
+@@ -269,12 +273,11 @@ class ModelRuntimeTests(unittest.TestCase):
+                 top_k=20,
+                 min_p=0.0,
+             )
+-            make_logits_processors.assert_called_once_with(presence_penalty=1.5)
++            make_logits_processors.assert_called_once_with(presence_penalty=1.5, presence_context_size=0)
+             self.assertIs(received_options["sampler"], sampler)
+-            self.assertEqual(
+-                received_options["logits_processors"],
+-                [presence_processor],
+-            )
++            self.assertEqual(len(received_options["logits_processors"]), 1)
++            received_options["logits_processors"][0](mx.array([99, 2, 3]), mx.zeros((1, 100)))
++            self.assertEqual(processor_histories, [[2, 3]])
+ 
+             make_sampler.reset_mock()
+             make_logits_processors.reset_mock()
+diff --git a/runtime/tests/test_server.py b/runtime/tests/test_server.py
+index c66f03c..95c08c0 100644
+--- a/runtime/tests/test_server.py
++++ b/runtime/tests/test_server.py
+@@ -356,6 +356,7 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 "min_p": 0.4,
+                 "presence_penalty": 0,
+                 "repetition_penalty": 1.2,
++                "frequency_penalty": 0.3,
+             },
+         )
+         self.assertEqual(status, 200, body)
+@@ -366,13 +367,14 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 temperature=0,
+                 top_p=0.6,
+                 top_k=7,
+-                min_p=0.0,
++                min_p=0.4,
+                 presence_penalty=0.0,
+-                repetition_penalty=1.0,
++                repetition_penalty=1.2,
++                frequency_penalty=0.3,
+             ),
+         )
+ 
+-    def test_qwen_request_rejects_nonzero_presence_penalty(self):
++    def test_qwen_request_accepts_nonzero_presence_penalty(self):
+         status, body = self.request(
+             "/v1/chat/completions",
+             {
+@@ -381,8 +383,40 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 "presence_penalty": 1.5,
+             },
+         )
+-        self.assertEqual(status, 400)
+-        self.assertEqual(json.loads(body)["error"]["param"], "presence_penalty")
++        self.assertEqual(status, 200, body)
++        self.assertEqual(self.runtime.last_options.presence_penalty, 1.5)
++
++    def test_qwen_penalty_validation_on_all_endpoints(self):
++        for path, inputs in (
++            ("/v1/chat/completions", {"messages": [{"role": "user", "content": "Hi"}]}),
++            ("/v1/responses", {"input": "Hi"}),
++            ("/v1/completions", {"prompt": "Hi"}),
++        ):
++            for name, invalid in (
++                ("presence_penalty", [True, None, "1", -2.1, 2.1, float("nan"), float("inf")]),
++                ("frequency_penalty", [False, None, "1", -2.1, 2.1]),
++                ("repetition_penalty", [True, None, "1", 0, -1, 2.1]),
++                ("min_p", [False, None, "1", -0.1, 1.1]),
++            ):
++                for value in invalid:
++                    with self.subTest(path=path, name=name, value=value):
++                        status, body = self.request(path, {"model": "qwen3.8-flash-next-fp8", **inputs, name: value})
++                        self.assertEqual(status, 400, body)
++                        self.assertEqual(json.loads(body)["error"]["param"], name)
++
++    def test_qwen_explicit_penalties_work_on_all_endpoints(self):
++        for path, inputs in (
++            ("/v1/chat/completions", {"messages": [{"role": "user", "content": "Hi"}], "stream": True}),
++            ("/v1/responses", {"input": "Hi"}),
++            ("/v1/completions", {"prompt": "Hi"}),
++        ):
++            status, body = self.request(path, {"model": "qwen3.8-flash-next-fp8", **inputs,
++                                             "presence_penalty": 0, "frequency_penalty": -0.2,
++                                             "repetition_penalty": 1.05, "min_p": 0.1})
++            self.assertEqual(status, 200, body)
++            options = self.runtime.last_options
++            self.assertEqual((options.presence_penalty, options.frequency_penalty, options.repetition_penalty, options.min_p),
++                             (0, -0.2, 1.05, 0.1))
+ 
+     def test_qwen_request_rejects_approximation(self):
+         status, body = self.request(

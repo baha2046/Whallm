@@ -1,0 +1,10 @@
+{
+  "case": "long-chat",
+  "state": "cancelled-after-diagnostic",
+  "content_chars": 48,
+  "reasoning_chars": 0,
+  "finish_reason": null,
+  "usage": null,
+  "elapsed_seconds": 45.42,
+  "first_text_seconds": 35.1609962079674
+}

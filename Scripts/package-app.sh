@@ -23,6 +23,22 @@ fi
 TRANSFORMERS_VERBOSITY=error \
   $python_executable -c 'import mlx, numpy, sentencepiece, tiktoken, transformers'
 
+# Packaging copies the selected environment; changing requirements alone does
+# not update it. Reject a stale MLX runtime before creating an affected App.
+$python_executable - "$project_root/requirements.txt" <<'PY'
+import importlib.metadata
+from pathlib import Path
+import sys
+
+expected = next(line.split("==", 1)[1] for line in
+                Path(sys.argv[1]).read_text().splitlines() if line.startswith("mlx=="))
+for package in ("mlx", "mlx-metal"):
+    actual = importlib.metadata.version(package)
+    if actual != expected:
+        raise SystemExit(f"{package}=={actual}; packaging requires {expected}. "
+                         "Install requirements.txt in the selected Python environment first.")
+PY
+
 python_version=$($python_executable -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 python_framework=$($python_executable -c 'import pathlib, sys; print(pathlib.Path(sys.base_prefix).parents[1])')
 site_packages=$($python_executable -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')

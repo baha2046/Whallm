@@ -1,0 +1,19 @@
+{"phase": "incremental", "generated_tokens": 0, "elapsed_seconds": 13.84}
+{"phase": "incremental", "generated_tokens": 128, "elapsed_seconds": 29.98}
+{"phase": "incremental", "progress": 256}
+{"phase": "incremental", "progress": 384}
+{"phase": "incremental", "generated_tokens": 512, "elapsed_seconds": 68.25}
+{"phase": "incremental", "progress": 640}
+{"phase": "incremental", "progress": 768}
+{"phase": "incremental", "progress": 896}
+{"phase": "incremental", "progress": 1024}
+{"phase": "incremental", "progress": 1152}
+{"phase": "incremental", "generated_tokens": 1280, "elapsed_seconds": 140.08}
+{"phase": "fresh-prefill", "generated_tokens": 0}
+{"generated_tokens": 0, "prefix_tokens": 188, "logits": {"max_abs": 0.0, "rms": 0.0, "relative_l2": 0.0}, "incremental_top1": 760, "fresh_top1": 760, "incremental_top1_text": "The", "fresh_top1_text": "The", "probability_l1": 0.0, "incremental_top1_probability": 0.9998462200164795, "fresh_top1_probability": 0.9998462200164795}
+{"phase": "fresh-prefill", "generated_tokens": 128}
+{"generated_tokens": 128, "prefix_tokens": 316, "logits": {"max_abs": 0.9921875, "rms": 0.16625554859638214, "relative_l2": 0.06387410312891006}, "incremental_top1": 19, "fresh_top1": 19, "incremental_top1_text": "4", "fresh_top1_text": "4", "probability_l1": 9.295901008954388e-07, "incremental_top1_probability": 0.9999977350234985, "fresh_top1_probability": 0.9999982118606567}
+{"phase": "fresh-prefill", "generated_tokens": 512}
+{"generated_tokens": 512, "prefix_tokens": 700, "logits": {"max_abs": 0.40625, "rms": 0.07404172420501709, "relative_l2": 0.03746491298079491}, "incremental_top1": 188375, "fresh_top1": 188375, "incremental_top1_text": "つき", "fresh_top1_text": "つき", "probability_l1": 0.017583483830094337, "incremental_top1_probability": 0.7827649712562561, "fresh_top1_probability": 0.7755969166755676}
+{"phase": "fresh-prefill", "generated_tokens": 1280}
+{"generated_tokens": 1280, "prefix_tokens": 1468, "logits": {"max_abs": 0.46875, "rms": 0.06825148314237595, "relative_l2": 0.03382625803351402}, "incremental_top1": 95954, "fresh_top1": 95954, "incremental_top1_text": "所", "fresh_top1_text": "所", "probability_l1": 0.06562956422567368, "incremental_top1_probability": 0.2652371823787689, "fresh_top1_probability": 0.2580658495426178}

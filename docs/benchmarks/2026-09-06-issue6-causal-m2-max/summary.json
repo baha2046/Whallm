@@ -1,0 +1,294 @@
+{
+  "kind": "Issue #6 bounded correctness/quality validation; timings are exploratory, not a performance benchmark",
+  "source_base_commit": "bab462f495ec9b070d7546452349623d09c01289",
+  "decision": "Adopt MLX 0.32.1 for the locally reproduced compiled-sampler RNG defect",
+  "completed_http_cases": 8,
+  "long_cases_naturally_stopped": 3,
+  "automatic_sustained_repeat_findings": 0,
+  "checks": {
+    "code_function_and_three_inputs": "passed after removing Markdown code fence",
+    "code_raw_only_format": "not met; fenced code returned",
+    "json_exact_object": "passed",
+    "tool_call": "get_weather with city Taipei; not executed externally"
+  },
+  "limits": [
+    "Substitute prompt, original issue prompt unavailable.",
+    "One seed per current-source case; first thinking case uses frozen release runtime with a different seed.",
+    "One novel undershot requested length; other wording/timeline imperfections remain.",
+    "No full language-quality acceptance or failure-rate claim.",
+    "No updated packaged App, M5 Pro, DeepSeek full model, or formal speed/energy validation."
+  ],
+  "cases": [
+    {
+      "path": "mlx0321-seed-20260906-retry/long-thinking",
+      "seed": 20260906,
+      "case": "long-thinking",
+      "state": "complete",
+      "content_chars": 3947,
+      "reasoning_chars": 1336,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 2949,
+        "total_tokens": 3137
+      },
+      "elapsed_seconds": 323.64,
+      "first_text_seconds": 31.620700875064358,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "b7bb7330e9396f269e367cd91b94bc87f3390a27f1b7998ae5319f0a7c49e22d",
+      "reasoning_sha256": "a2b80f1817dc09f458923d64eb3e0c32f9061e73db9e140a522fcc7a786c8df5",
+      "recorded_token_count_including_stop": 2949,
+      "recorded_token_ids_sha256": "e8a7bfd0564f45139338e22dbe02891559d3497e7be42c8e8fed46d2b5014b01",
+      "content_analysis": {
+        "chars": 3947,
+        "sha256": "b7bb7330e9396f269e367cd91b94bc87f3390a27f1b7998ae5319f0a7c49e22d",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 1336,
+        "sha256": "a2b80f1817dc09f458923d64eb3e0c32f9061e73db9e140a522fcc7a786c8df5",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-seed-20260907/long-chat",
+      "seed": 20260907,
+      "case": "long-chat",
+      "state": "complete",
+      "content_chars": 5544,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 190,
+        "completion_tokens": 3459,
+        "total_tokens": 3649
+      },
+      "elapsed_seconds": 377.68,
+      "first_text_seconds": 32.27134345902596,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "62ed792151be65497d47f2780fa27adfffb94dca75b7231b4e2ecf0c3bb0bce8",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recorded_token_count_including_stop": 3459,
+      "recorded_token_ids_sha256": "c13f5e937a1949cb495c931a38d88104f317b14f2f1a07711268dc86d44f54de",
+      "content_analysis": {
+        "chars": 5544,
+        "sha256": "62ed792151be65497d47f2780fa27adfffb94dca75b7231b4e2ecf0c3bb0bce8",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-seed-20260907/short-thinking",
+      "seed": 20260907,
+      "case": "short-thinking",
+      "state": "complete",
+      "content_chars": 40,
+      "reasoning_chars": 4629,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 75,
+        "completion_tokens": 1639,
+        "total_tokens": 1714
+      },
+      "elapsed_seconds": 188.55,
+      "first_text_seconds": 23.211989208008163,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "f2b82fb6e3786d77ece0a82b812480083c8f2f87827f70411789b67273ccce22",
+      "reasoning_sha256": "c50727a80b5bcb4b35dd649353f855fdcdd791d1aefb76b5bff5c145c15d45f0",
+      "recorded_token_count_including_stop": 1639,
+      "recorded_token_ids_sha256": "e6452945cac30689ab6237f78654a94842b994a7c8c589c06720c06e5a0945c0",
+      "content_analysis": {
+        "chars": 40,
+        "sha256": "f2b82fb6e3786d77ece0a82b812480083c8f2f87827f70411789b67273ccce22",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 4629,
+        "sha256": "c50727a80b5bcb4b35dd649353f855fdcdd791d1aefb76b5bff5c145c15d45f0",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-seed-20260907/short-chat",
+      "seed": 20260907,
+      "case": "short-chat",
+      "state": "complete",
+      "content_chars": 39,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 77,
+        "completion_tokens": 24,
+        "total_tokens": 101
+      },
+      "elapsed_seconds": 25.29,
+      "first_text_seconds": 22.0890797090251,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "0765dec5107ef62dca6a5c9968fc54d84accd95f322aa1f1269dbf939815aad0",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recorded_token_count_including_stop": 24,
+      "recorded_token_ids_sha256": "27b881e4dfe27c380fa18e3e0f442fe7094bab8d9b3492da4922b392e8df9c83",
+      "content_analysis": {
+        "chars": 39,
+        "sha256": "0765dec5107ef62dca6a5c9968fc54d84accd95f322aa1f1269dbf939815aad0",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-seed-20260907/long-thinking",
+      "seed": 20260907,
+      "case": "long-thinking",
+      "state": "complete",
+      "content_chars": 5556,
+      "reasoning_chars": 1620,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 4004,
+        "total_tokens": 4192
+      },
+      "elapsed_seconds": 420.77,
+      "first_text_seconds": 23.85472933400888,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "4b5a82eb9facd324742567bdf661f0a4b9461fa7e238a53b7455819cc76383c1",
+      "reasoning_sha256": "c77b082c3ab4a1efc8a85d2e632c2c5dbf3d5750335b66f93cc914d5b4c4c7dc",
+      "recorded_token_count_including_stop": 4004,
+      "recorded_token_ids_sha256": "3959ee42d6b70be81844c77d8e4f21bf442eb201ae42fbd4eec81e8f2ffdec9d",
+      "content_analysis": {
+        "chars": 5556,
+        "sha256": "4b5a82eb9facd324742567bdf661f0a4b9461fa7e238a53b7455819cc76383c1",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 1620,
+        "sha256": "c77b082c3ab4a1efc8a85d2e632c2c5dbf3d5750335b66f93cc914d5b4c4c7dc",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-regression/code-chat",
+      "seed": 20260907,
+      "case": "code-chat",
+      "state": "complete",
+      "content_chars": 126,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 60,
+        "completion_tokens": 51,
+        "total_tokens": 111
+      },
+      "elapsed_seconds": 28.68,
+      "first_text_seconds": 21.775167416082695,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "8e7736e4438e0f0a05ccea150d7df272989d8332ac14a0e8096fba21b3a8b1f4",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recorded_token_count_including_stop": 51,
+      "recorded_token_ids_sha256": "8172df4218fa809c48eb5abd66151abf11102976df93bab2b3be288a7c088289",
+      "content_analysis": {
+        "chars": 126,
+        "sha256": "8e7736e4438e0f0a05ccea150d7df272989d8332ac14a0e8096fba21b3a8b1f4",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-regression/json-chat",
+      "seed": 20260907,
+      "case": "json-chat",
+      "state": "complete",
+      "content_chars": 28,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 35,
+        "completion_tokens": 14,
+        "total_tokens": 49
+      },
+      "elapsed_seconds": 18.51,
+      "first_text_seconds": 16.09426733397413,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "284830b7a99cbbff2527a85535db609b960f8f48f2e909179cdc2c5315d3d19d",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recorded_token_count_including_stop": 14,
+      "recorded_token_ids_sha256": "4cdc90a5e21d7324c435028f982c3ff2cb9bdd1526c04a4ce6c602148762d2a2",
+      "content_analysis": {
+        "chars": 28,
+        "sha256": "284830b7a99cbbff2527a85535db609b960f8f48f2e909179cdc2c5315d3d19d",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "path": "current-source-regression/weather-tool",
+      "seed": 20260907,
+      "case": "weather-tool",
+      "state": "complete",
+      "content_chars": 0,
+      "reasoning_chars": 0,
+      "finish_reason": "tool_calls",
+      "usage": {
+        "prompt_tokens": 335,
+        "completion_tokens": 27,
+        "total_tokens": 362
+      },
+      "elapsed_seconds": 27.96,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recorded_token_count_including_stop": 27,
+      "recorded_token_ids_sha256": "d2caeb4487379d37a45d5f3d1c2cba0e6189ac7325eba469a97ba31fb29069a6",
+      "content_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    }
+  ]
+}

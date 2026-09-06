@@ -1,0 +1,49 @@
+{
+  "method": "exact adjacent repeats: unit 1-512 chars, at least 4 repeats and 120 total chars; nonadjacent lines >=30 chars repeated >=3 times; requires human interpretation",
+  "cases": [
+    {
+      "case": "long-chat",
+      "state": "generating",
+      "content_chars": 0,
+      "reasoning_chars": 0,
+      "finish_reason": null,
+      "usage": null,
+      "elapsed_seconds": 3.02,
+      "path": "docs/benchmarks/2026-09-06-issue6-reproduction-m2-max/attempt-01/long-chat"
+    },
+    {
+      "case": "long-thinking",
+      "state": "incomplete-stream",
+      "content_chars": 2136,
+      "reasoning_chars": 1932,
+      "finish_reason": null,
+      "usage": null,
+      "elapsed_seconds": 214.82,
+      "first_text_seconds": 34.091991832945496,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "9815dde754baffc076ffddd9cc316d70b11e13d32b0c4b95b8377d9d76cb69cd",
+      "reasoning_sha256": "45ffb2b2eec6e776eee218fec2f15967487c7f4588afee8d98cafba17badac11",
+      "path": "docs/benchmarks/2026-09-06-issue6-reproduction-m2-max/attempt-01/long-thinking",
+      "reasoning_analysis": {
+        "chars": 1932,
+        "sha256": "45ffb2b2eec6e776eee218fec2f15967487c7f4588afee8d98cafba17badac11",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "content_analysis": {
+        "chars": 2136,
+        "sha256": "9815dde754baffc076ffddd9cc316d70b11e13d32b0c4b95b8377d9d76cb69cd",
+        "sustained_verbatim_repeats": [
+          {
+            "start_char_zero_based": 640,
+            "end_char_exclusive": 2136,
+            "unit_chars": 8,
+            "repeats": 187,
+            "unit": "三番目に初めて、"
+          }
+        ],
+        "duplicate_lines": []
+      }
+    }
+  ]
+}

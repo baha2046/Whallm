@@ -1,0 +1,13 @@
+{
+  "case": "long-chat",
+  "state": "incomplete-stream",
+  "content_chars": 3185,
+  "reasoning_chars": 0,
+  "finish_reason": null,
+  "usage": null,
+  "elapsed_seconds": 243.9,
+  "first_text_seconds": 32.4080487920437,
+  "server_exit_code_after_cleanup": -15,
+  "content_sha256": "25a7d654871b633bf75aac0803cf60e6e602058b4b8622a1bf089c178d557cda",
+  "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

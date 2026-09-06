@@ -1,0 +1,142 @@
+diff --git a/runtime/deepseek_v4_ssd/generation.py b/runtime/deepseek_v4_ssd/generation.py
+index 1266076..e0225a2 100644
+--- a/runtime/deepseek_v4_ssd/generation.py
++++ b/runtime/deepseek_v4_ssd/generation.py
+@@ -141,9 +141,61 @@ class GenerationOptions:
+     min_p: float = 0.0
+     presence_penalty: float = 0.0
+     repetition_penalty: float = 1.0
++    frequency_penalty: float = 0.0
++    no_repeat_ngram_size: int = 0
+     approximation_mode: str = EXACT_APPROXIMATION_MODE
+ 
+ 
++def _generation_logits_processors(options: GenerationOptions, *, is_qwen: bool):
++    settings = {}
++    for name, neutral in (("presence", 0), ("repetition", 1), ("frequency", 0)):
++        penalty = getattr(options, f"{name}_penalty")
++        if penalty != neutral:
++            settings[f"{name}_penalty"] = penalty
++            if is_qwen:
++                # mlx-lm uses tokens[-context_size:]; zero means all history.
++                settings[f"{name}_context_size"] = 0
++    processors = make_logits_processors(**settings) if settings else []
++    if not is_qwen:
++        return processors
++    # Both pinned mlx-lm generate_step and Qwen MTP supply the final prompt
++    # token followed by generated tokens. Exclude that prompt anchor. Keeping
++    # this stateless also makes MTP speculative branches/rollback independent.
++    generated_processors = [
++        lambda tokens, logits, processor=processor: processor(tokens[1:], logits)
++        for processor in processors
++    ]
++    if options.no_repeat_ngram_size:
++        generated_processors.append(_no_repeat_generated_ngram(options.no_repeat_ngram_size))
++    return generated_processors
++
++
++def _no_repeat_generated_ngram(size: int):
++    """Block an already generated token sequence, without CPU sync or mutable state."""
++    if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 256:
++        raise ValueError("no_repeat_ngram_size must be between 1 and 256")
++
++    def process(tokens, logits):
++        generated = tokens[1:]
++        if len(generated) < size:
++            return logits
++        if size == 1:
++            return logits.at[:, generated].add(-float("inf"))
++        # Compare every prior (size - 1)-token prefix with the current suffix.
++        # Strides are in elements, and this overlapping view never crosses the
++        # source array. Each matching continuation would repeat a full n-gram.
++        prefixes = mx.as_strided(
++            generated,
++            shape=(len(generated) - size + 1, size - 1),
++            strides=(1, 1),
++        )
++        matches = mx.all(prefixes == generated[-(size - 1):], axis=1)
++        adjustment = mx.where(matches, -float("inf"), 0).astype(logits.dtype)
++        return logits.at[:, generated[size - 1:]].add(adjustment)
++
++    return process
++
++
+ @dataclass(frozen=True)
+ class GeneratedPiece:
+     text: str
+@@ -2017,14 +2069,7 @@ class ModelRuntime:
+             top_k=options.top_k,
+             min_p=options.min_p,
+         )
+-        processor_options = {}
+-        if options.presence_penalty != 0:
+-            processor_options["presence_penalty"] = options.presence_penalty
+-        if options.repetition_penalty != 1:
+-            processor_options["repetition_penalty"] = options.repetition_penalty
+-        logits_processors = (
+-            make_logits_processors(**processor_options) if processor_options else []
+-        )
++        logits_processors = _generation_logits_processors(options, is_qwen=self._is_qwen)
+         with self._generation_lock, _approximation_mode(
+             self, options.approximation_mode
+         ), _qwen_decode_request(self):
+diff --git a/runtime/deepseek_v4_ssd/server.py b/runtime/deepseek_v4_ssd/server.py
+index 9caca8a..f77b193 100644
+--- a/runtime/deepseek_v4_ssd/server.py
++++ b/runtime/deepseek_v4_ssd/server.py
+@@ -56,7 +56,7 @@ _QWEN_SAMPLING_DEFAULTS = {
+         "top_p": 0.95,
+         "top_k": 20,
+         "min_p": 0.0,
+-        "presence_penalty": 0.0,
++        "presence_penalty": 1.5,
+         "repetition_penalty": 1.0,
+     },
+ }
+@@ -940,8 +940,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
+             if value is not None and value != []:
+                 raise APIError(f"{name} is not supported.", param=name)
+         for name in ("frequency_penalty", "presence_penalty"):
+-            if payload.get(name) not in (None, 0, 0.0):
++            if not qwen and payload.get(name) not in (None, 0, 0.0):
+                 raise APIError(f"{name} is not supported.", param=name)
++        if not qwen:
++            for name in ("min_p", "repetition_penalty", "no_repeat_ngram_size"):
++                if name in payload:
++                    raise APIError(f"{name} is supported only for Qwen.", param=name)
+         if payload.get("seed") is not None:
+             raise APIError("seed is not supported.", param="seed")
+         if payload.get("logprobs") not in (None, False):
+@@ -1795,14 +1799,29 @@ def _options(
+     top_k = payload.get("top_k", sampling_defaults["top_k"])
+     if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= 248_320:
+         raise APIError("top_k must be between 0 and 248320.", param="top_k")
++    penalties = {}
++    no_repeat_ngram_size = 0
++    if qwen:
++        no_repeat_ngram_size = payload.get("no_repeat_ngram_size", 32)
++        if type(no_repeat_ngram_size) is not int or not 0 <= no_repeat_ngram_size <= 256:
++            raise APIError("no_repeat_ngram_size must be an integer between 0 and 256.", param="no_repeat_ngram_size")
++        for name, minimum, maximum, default in (
++            ("min_p", 0, 1, sampling_defaults["min_p"]),
++            ("presence_penalty", -2, 2, sampling_defaults["presence_penalty"]),
++            ("frequency_penalty", -2, 2, 0.0),
++            ("repetition_penalty", 0.000001, 2, sampling_defaults["repetition_penalty"]),
++        ):
++            penalties[name] = _number(payload.get(name, default), name, minimum=minimum, maximum=maximum)
+     return GenerationOptions(
+         max_tokens=max_tokens,
+         temperature=temperature,
+         top_p=top_p,
+         top_k=top_k,
+-        min_p=sampling_defaults["min_p"],
+-        presence_penalty=sampling_defaults["presence_penalty"],
+-        repetition_penalty=sampling_defaults["repetition_penalty"],
++        min_p=penalties.get("min_p", sampling_defaults["min_p"]),
++        presence_penalty=penalties.get("presence_penalty", sampling_defaults["presence_penalty"]),
++        repetition_penalty=penalties.get("repetition_penalty", sampling_defaults["repetition_penalty"]),
++        frequency_penalty=penalties.get("frequency_penalty", 0.0),
++        no_repeat_ngram_size=no_repeat_ngram_size,
+         approximation_mode=approximation_mode,
+     )
+ 

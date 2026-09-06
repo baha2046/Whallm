@@ -1,0 +1,82 @@
+{
+  "tag": "v1.1.4",
+  "tag_commit": "b25ae07e9df143dd744405b741628daa5e8705c1",
+  "files": [
+    {
+      "path": "runtime/deepseek_v4_ssd/__init__.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/ane_prefill.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/cli.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/dspark.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/expert_cache.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/fp8_cache.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/generation.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/io_metrics.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/manifest.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/model.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/model_manager.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/qwen4_exp.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/route_trace.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/server.py",
+      "installed_exists": true,
+      "matches_tag": true
+    },
+    {
+      "path": "runtime/deepseek_v4_ssd/tool_codec.py",
+      "installed_exists": true,
+      "matches_tag": true
+    }
+  ],
+  "all_match": true
+}

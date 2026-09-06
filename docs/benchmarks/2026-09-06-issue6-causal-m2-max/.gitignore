@@ -1,0 +1,3 @@
+**/prompt-cache/
+**/cache-*.safetensors
+/mlx-0.32.1/

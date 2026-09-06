@@ -1,0 +1,17 @@
+Collecting mlx==0.32.1
+  Using cached mlx-0.32.1-cp314-cp314-macosx_26_0_arm64.whl.metadata (5.9 kB)
+Collecting mlx-metal==0.32.1
+  Using cached mlx_metal-0.32.1-py3-none-macosx_26_0_arm64.whl.metadata (5.1 kB)
+Using cached mlx-0.32.1-cp314-cp314-macosx_26_0_arm64.whl (618 kB)
+Using cached mlx_metal-0.32.1-py3-none-macosx_26_0_arm64.whl (62.3 MB)
+Installing collected packages: mlx-metal, mlx
+  Attempting uninstall: mlx-metal
+    Found existing installation: mlx-metal 0.32.0
+    Uninstalling mlx-metal-0.32.0:
+      Successfully uninstalled mlx-metal-0.32.0
+  Attempting uninstall: mlx
+    Found existing installation: mlx 0.32.0
+    Uninstalling mlx-0.32.0:
+      Successfully uninstalled mlx-0.32.0
+
+Successfully installed mlx-0.32.1 mlx-metal-0.32.1

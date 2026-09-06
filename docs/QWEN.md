@@ -352,6 +352,9 @@ Text Completions 固定使用非思考模式。
 明確的 `temperature`、`top_p` 和 `top_k` 會覆寫模式配置。
 明確的 `temperature: 0` 會使用 greedy sampling。
 正數 `temperature` 會使用 categorical sampling。
+Runtime 固定使用 MLX 0.32.1；0.32.0 的 compiled sampler 在背景執行緒可能
+固定使用同一個亂數樣本，造成重複或無法結束。此依賴修正保留既有抽樣設定，
+不加入強制截斷或額外重複懲罰。驗證範圍見 [Issue #6 紀錄](VALIDATION.md)。
 `max_tokens` 行為不變。
 
 `min_p`、`presence_penalty` 和 `repetition_penalty` 不是公開 request 欄位。

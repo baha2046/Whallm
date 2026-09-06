@@ -1,0 +1,98 @@
+The user wants me to rewrite a Japanese text that has repetitive "〜ている" endings to make it more natural and varied while keeping the meaning intact.
+
+Original text:
+「窓の外では雨が降っている。彼女は机に向かっている。机の上には古い手紙が置かれている。」
+
+The problem is all three sentences end with "〜ている" (are doing/are in a state of).
+
+I need to vary the sentence endings while keeping the meaning. Let me think of alternatives:
+
+1. 窓の外では雨が降っている。→ 窓の外では雨が降っていた。/ 窓の外には雨が降っていた。/ 窓の外から雨が聞こえる。/ 窓の外では雨が降っていた。
+
+2. 彼女は机に向かっている。→ 彼女は机に向かっていた。/ 彼女は机に向かっていた。/ 彼女は机に向かっていた。
+
+3. 机の上には古い手紙が置かれている。→ 机の上には古い手紙が置かれていた。/ 机の上には古い手紙が置かれていた。
+
+Wait, if I change to past tense (ていた), that changes the meaning (aspect). The original uses present/ongoing aspect (ている).
+
+Let me think of other ways to vary without changing meaning:
+
+1. 窓の外では雨が降っている。→ 窓の外から雨が聞こえる。/ 窓の外には雨が降っていた。/ 窓の外では雨が降っていた。
+
+Actually, to keep the meaning (present ongoing), I could use:
+- 降っている → 降っていた (narrative past, still feels ongoing in a scene description)
+- 向かっている → 向かっていた (narrative past)
+- 置かれている → 置かれていた (narrative past)
+
+Or more variety:
+- 窓の外では雨が降っていた。/ 窓の外から雨が聞こえる。/ 窓の外には雨が降っていた。
+- 彼女は机に向かっていた。/ 彼女は机に向かっていた。/ 彼女は机に向かっていた。
+- 机の上には古い手紙が置かれていた。/ 机の上には古い手紙が置かれていた。/ 机の上には古い手紙が置かれていた。
+
+Let me try to vary more creatively while keeping meaning:
+
+Option 1 (narrative past style, common in novels):
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれていた。」
+
+This still feels a bit repetitive (っていた ×3).
+
+Option 2 (more variety):
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれていた。」
+
+Option 3 (even more variety):
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+Hmm, let me think more creatively:
+
+Option 4:
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれていた。」
+
+Option 5 (more literary variety):
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+Option 6 (maximum variety while keeping meaning):
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+Actually, let me reconsider. The meaning should be preserved. The scene describes a current moment (present tense). 
+
+- 雨が降っている = rain is falling (present ongoing)
+- 机に向かっている = she is facing/working at her desk (present ongoing)
+- 手紙が置かれている = a letter is placed (present state)
+
+Ways to vary while keeping meaning:
+1. 窓の外では雨が降っていた (narrative past - still feels like a scene) / 窓の外から雨が聞こえる (from hearing) / 窓の外には雨が降っていた
+2. 彼女は机に向かっていた (narrative past) / 彼女は机に向かっていた / 彼女は机に向かっていた
+3. 机の上には古い手紙が置かれていた (narrative past) / 机の上には古い手紙が置かれている (present state) / 机の上には古い手紙が置かれていた
+
+Let me go for a natural literary style with variety:
+
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+This gives three different endings: 聞こえる (v+る), 向かっていた (v+っていた), 置かれている (v+れている).
+
+Actually, "聞こえる" slightly changes meaning (from hearing to seeing). Let me be more careful.
+
+Alternative approach - keeping all as scene description but varying grammar:
+
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+This has っていた, っていた, れている - still two っていた.
+
+Better:
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+Hmm, let me try:
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+Or more literary:
+「窓の外では雨が降っていた。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+I think a good balanced approach that feels natural in Japanese literary writing:
+
+「窓の外から雨が聞こえる。彼女は机に向かっていた。机の上には古い手紙が置かれている。」
+
+This feels natural, varied, and preserves meaning well. The scene feels like a narrator describing a moment.
+
+Actually, let me reconsider once more. "聞こえる" implies hearing, while "降っている" implies seeing/observing rain. But in a scene description, hearing rain outside a window is perfectly natural and conveys similar meaning (rain is falling outside).
+
+I'll go with a version that feels most natural in Japanese prose writing.

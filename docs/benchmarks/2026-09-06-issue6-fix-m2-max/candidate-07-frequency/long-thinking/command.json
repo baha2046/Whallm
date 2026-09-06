@@ -1,0 +1,16 @@
+[
+  "/Applications/Whallm.app/Contents/MacOS/python3",
+  "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/2026-09-06-issue6-fix-m2-max/candidate-07-frequency/long-thinking/recording_server.py",
+  "--model",
+  "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+  "--host",
+  "127.0.0.1",
+  "--port",
+  "62586",
+  "--slots",
+  "8192",
+  "--prompt-cache-entries",
+  "2",
+  "--prompt-cache-directory",
+  "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/2026-09-06-issue6-fix-m2-max/candidate-07-frequency/long-thinking/prompt-cache"
+]

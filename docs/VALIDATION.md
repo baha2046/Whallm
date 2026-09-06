@@ -1,7 +1,37 @@
 # 驗證紀錄
 
+2026-09-06 另以已安裝的 Whallm **v1.1.4**（不是目前開發工作樹）完成
+[#6 的四輪探索性重現](../research/ISSUE_6_REPRODUCTION_2026-09-06.md)：
+Qwen thinking 的日文長文在正文第 641 個字元起，連續重複同一短語 187 次後
+由測試者停止。相同題目的 chat 寫出 6,052 字元並自行 `stop`，但結尾仍有重複段落。
+短句改寫兩種模式都完成，thinking 先產生 3,569 字元 reasoning。
+這確認已發布版本的一個正文重複案例；不代表根因、修復、發生率或正式效能已驗證。
+完整輸出與環境見 [重現 artifact](benchmarks/2026-09-06-issue6-reproduction-m2-max/summary.json)。
+
+Issue #6 根因調查在同機重現 MLX 0.32.0 的 compiled sampler 背景執行緒缺陷：
+固定分布抽樣 32 次，亂數 state 完全不前進。換成 MLX 0.32.1 後正常前進，
+相同 seed 的主／背景執行緒輸出一致；保留 0.32.0、僅取消 categorical sampler
+編譯的隔離控制亦恢復正常。與 [上游缺陷](https://github.com/ml-explore/mlx-lm/issues/1675)
+和 [上游修復](https://github.com/ml-explore/mlx/pull/3828) 相符。
+目前工作樹更新 pinned MLX 為 0.32.1，加入打包版本檢查與三項抽樣回歸測試；
+完整 Python suite **308 項通過**，舊版可觀察到四個 failure（含 subtests）。
+本輪 M2 Max 開發環境的 **8 個 HTTP 案例正常結束**：三篇長文（兩個 thinking、
+一個 chat）、兩個短句、程式碼、JSON、tool call。三篇長文正文分別 3,947、5,556、
+5,544 字元，均自然 `stop`，沒有 token cap／逾時／循環中止；全文檢查與重複掃描
+未見持續循環。第一篇使用 frozen v1.1.4 runtime＋新版 MLX，其他使用目前 source。
+仍有一篇字數偏短、用字／時間線瑕疵；程式碼功能通過三組輸入，但多了 Markdown
+圍欄。這是抽樣根因與本輪循環／終止檢查通過，**不是完整文字品質驗收或發生率估計**。
+JSON 解析符合指定物件；tool 正確輸出 `get_weather({"city":"Taipei"})`，未實際呼叫
+外部工具。命令、環境、source hash、raw token IDs／hash 與全文見
+[機器可讀彙整](benchmarks/2026-09-06-issue6-causal-m2-max/summary.json)。
+未修改已安裝 App，也未完成新版打包、Swift 重跑或發布。
+詳細因果對照與證據見 [調查紀錄](../research/ISSUE_6_CAUSAL_INVESTIGATION_2026-09-06.md)。
+
+先前 [框架評估](../research/ISSUE_6_FRAMEWORK_ASSESSMENT_2026-09-06.md) 的 vLLM
+離線循環偵測不是文字品質修復；API／penalty 與數值算式候選均未採用。
+
 本文件分開記錄目前驗證和歷史量測。
-最新自動測試為 2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`
+以下為本次依賴修正前的自動測試：2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`
 加上 default-off Qwen grouped Decode 工作樹。Python 305 項通過；Swift 成功編譯，
 排除四項 Keychain-dependent 案例後，64 項執行、61 通過、三項缺少 DeepSeek fixture
 而略過、零失敗。全套 Swift 曾在 `SecItemCopyMatching` 等待，未宣稱全套通過。
@@ -150,7 +180,7 @@ make test
 PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p 'test_*.py'
 ```
 
-下表合併每個 suite 的最近一次結果。
+下表保留 2026-09-04 的 suite 結果；最新 Python 308 項與 Swift 驗證邊界見本頁開頭。
 
 | Suite | 通過 | 失敗 | 略過 |
 | --- | ---: | ---: | ---: |
@@ -159,7 +189,7 @@ PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p '
 | Python runtime 與 server | 294 | 0 | 0 |
 | 合計 | 362 | 0 | 0 |
 
-本次沒有略過測試。
+該輪沒有略過測試。
 
 2026-09-04 的目前工作樹已執行 `make package`。HEAD 是
 `f585c2d7fe500d875d7083c92428be18e82afcff`，並包含目前未提交的 Codex namespace

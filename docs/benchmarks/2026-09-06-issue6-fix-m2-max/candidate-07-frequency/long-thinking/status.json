@@ -1,0 +1,18 @@
+{
+  "case": "long-thinking",
+  "state": "complete",
+  "content_chars": 1699,
+  "reasoning_chars": 2203,
+  "finish_reason": "stop",
+  "usage": {
+    "prompt_tokens": 188,
+    "completion_tokens": 1466,
+    "total_tokens": 1654
+  },
+  "elapsed_seconds": 193.05,
+  "first_text_seconds": 33.479536458035,
+  "done_event": true,
+  "server_exit_code_after_cleanup": -15,
+  "content_sha256": "75b9a7b1e49c22ae1a921076599c4a75bc7cace36d3239f71c4056f24444c57a",
+  "reasoning_sha256": "d149f308dbd262a8194b47dd984922b6d35dcf1e2c4f7b857cf241ba71bb4632"
+}

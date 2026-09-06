@@ -1,0 +1,303 @@
+diff --git a/docs/API.md b/docs/API.md
+index b5d35da..ab44ea0 100644
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -281,7 +281,8 @@ Persistent prefill checkpoint 是當下 cache state 的 immutable snapshot；後
+ ### Qwen 模式取樣
+ 
+ Whallm 只對 Qwen 套用模式取樣配置。
+-參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
++Temperature、Top P、Top K 等基礎配置來自
++[Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
+ 
+ | 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+@@ -305,25 +306,33 @@ DeepSeek 仍使用 model catalog 預設值。
+ 正數 `temperature` 會使用 categorical sampling。
+ 明確的 `temperature: 0` 會使用 greedy sampling。
+ 
+-`min_p`、`presence_penalty` 和 `repetition_penalty` 是 Qwen 內部配置。
+-API 不支援公開的 `min_p` 或 `repetition_penalty` request 欄位。
+-API 仍會拒絕非零的 `presence_penalty` request 欄位。
+-Request 內的 `presence_penalty: 0` 不會停用 Qwen 內部配置。
++Qwen 的三種 completion endpoints 都接受下列 request 欄位；明確傳入的值會覆寫預設。
+ 
+-目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+-只檢查 generation call
+-可見的最近 20 個 token。
+-processor 不會檢查 prompt cache 已重用的 prefix。
+-因此，這個 processor 不會檢查完整 prompt。
+-`repetition_penalty=1.0` 是中性值。
+-Whallm 不會為這個值建立 processor。
++| 欄位 | 範圍 | 預設 |
++| --- | --- | --- |
++| `min_p` | 0–1 | 0 |
++| `presence_penalty` | -2–2 | 思考 0；非思考 1.5 |
++| `frequency_penalty` | -2–2 | 0 |
++| `repetition_penalty` | 0.000001–2 | 1 |
++
++欄位須為有限數字；
++字串、布林值、`null` 或超出範圍會回傳 400。
++`presence_penalty: 0` 會停用 presence penalty；`repetition_penalty: 1` 是中性值。
++正 presence penalty 降低已出現 token 的機率，frequency penalty 依出現次數降低，
++repetition penalty 則乘除其分數。它們不保證所有輸入都不重複。
++
++Qwen penalties 檢查**本次回覆全部已生成 token**，包含 reasoning 和正文。
++它們不計算 prompt／先前對話，也不依賴 prompt cache 是否命中。
++Whallm 明確覆寫 pinned `mlx-lm` 的 20-token 視窗，排除最後一個 prompt token，
++並讓 MTP 驗證、分支與回退使用相同的無持久狀態處理。
++這些參數不提供 App 進階設定欄位。
+ 
+ server 明確拒絕下列 request：
+ 
+ - `response_format` 不是 `null` 或 `[]`。
+ - `stop` 不是 `null` 或 `[]`。
+-- 非零的 `frequency_penalty`。
+-- 非零的 `presence_penalty`。
++- DeepSeek 的非零 `frequency_penalty` 或 `presence_penalty`。
++- DeepSeek 的 `min_p` 或 `repetition_penalty` request 欄位。
+ - 任何 `seed`。
+ - `logprobs: true`。
+ - `echo: true`。
+diff --git a/docs/QWEN.md b/docs/QWEN.md
+index 131a410..f27e4da 100644
+--- a/docs/QWEN.md
++++ b/docs/QWEN.md
+@@ -334,7 +334,7 @@ codec 不會偽造被 Responses normalization 移除的 reasoning item。
+ Qwen reasoning effort 使用 `low`、`medium` 和 `xhigh`。
+ API 的 `high` 與 `max` 會對應到 `xhigh`。
+ 
+-取樣參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
++基礎取樣參數來自 [Qwen 官方模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8#best-practices)。
+ 
+ | 模式 | `temperature` | `top_p` | `top_k` | `min_p` | `presence_penalty` | `repetition_penalty` |
+ | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+@@ -354,15 +354,14 @@ Text Completions 固定使用非思考模式。
+ 正數 `temperature` 會使用 categorical sampling。
+ `max_tokens` 行為不變。
+ 
+-`min_p`、`presence_penalty` 和 `repetition_penalty` 不是公開 request 欄位。
+-非思考模式會建立 `presence_penalty=1.5` processor。
+-思考模式不會建立 presence processor。
+-`repetition_penalty=1.0` 不會建立 processor。
+-
+-目前 [pinned `mlx-lm` 的 presence processor](https://github.com/Blaizzy/mlx-lm/blob/5c10538136b9038b9626c134612b08afc18d697a/mlx_lm/sample_utils.py#L315-L338)
+-只檢查 generation call 可見的最近 20 個 token。
+-processor 不會檢查 prompt cache 已重用的 prefix。
+-因此，這項配置不是完整 prompt 的重複偵測器。
++`min_p`、`presence_penalty`、`frequency_penalty` 和 `repetition_penalty` 都是 Qwen
++公開 request 欄位，範圍與驗證見 [API](API.md#qwen-模式取樣)。
++非思考模式預設 `presence_penalty=1.5`，思考模式預設為 0；frequency penalty 預設為 0。
++明確傳入 `presence_penalty: 0` 可停用；`repetition_penalty=1.0` 不建立 processor。
++Penalty history 包含本次回覆全部已生成的 reasoning／正文 token，不包含 prompt
++或先前對話。它不再使用舊的 20-token 視窗，且不依賴 prompt cache 命中狀態。
++普通 Decode 與 Qwen MTP 使用相同的 processor；MTP 暫時候選不會污染後續分支。
++這是生成配置修正，不是模型能力或所有長輸出品質通過的聲明。
+ 
+ App 的 Qwen 進階設定只顯示 Max tokens。
+ App 不顯示 Temperature、Top P 或 Top K。
+diff --git a/runtime/deepseek_v4_ssd/generation.py b/runtime/deepseek_v4_ssd/generation.py
+index 1266076..d22e2b2 100644
+--- a/runtime/deepseek_v4_ssd/generation.py
++++ b/runtime/deepseek_v4_ssd/generation.py
+@@ -141,9 +141,31 @@ class GenerationOptions:
+     min_p: float = 0.0
+     presence_penalty: float = 0.0
+     repetition_penalty: float = 1.0
++    frequency_penalty: float = 0.0
+     approximation_mode: str = EXACT_APPROXIMATION_MODE
+ 
+ 
++def _generation_logits_processors(options: GenerationOptions, *, is_qwen: bool):
++    settings = {}
++    for name, neutral in (("presence", 0), ("repetition", 1), ("frequency", 0)):
++        penalty = getattr(options, f"{name}_penalty")
++        if penalty != neutral:
++            settings[f"{name}_penalty"] = penalty
++            if is_qwen:
++                # mlx-lm uses tokens[-context_size:]; zero means all history.
++                settings[f"{name}_context_size"] = 0
++    processors = make_logits_processors(**settings) if settings else []
++    if not is_qwen:
++        return processors
++    # Both pinned mlx-lm generate_step and Qwen MTP supply the final prompt
++    # token followed by generated tokens. Exclude that prompt anchor. Keeping
++    # this stateless also makes MTP speculative branches/rollback independent.
++    return [
++        lambda tokens, logits, processor=processor: processor(tokens[1:], logits)
++        for processor in processors
++    ]
++
++
+ @dataclass(frozen=True)
+ class GeneratedPiece:
+     text: str
+@@ -2017,14 +2039,7 @@ class ModelRuntime:
+             top_k=options.top_k,
+             min_p=options.min_p,
+         )
+-        processor_options = {}
+-        if options.presence_penalty != 0:
+-            processor_options["presence_penalty"] = options.presence_penalty
+-        if options.repetition_penalty != 1:
+-            processor_options["repetition_penalty"] = options.repetition_penalty
+-        logits_processors = (
+-            make_logits_processors(**processor_options) if processor_options else []
+-        )
++        logits_processors = _generation_logits_processors(options, is_qwen=self._is_qwen)
+         with self._generation_lock, _approximation_mode(
+             self, options.approximation_mode
+         ), _qwen_decode_request(self):
+diff --git a/runtime/deepseek_v4_ssd/server.py b/runtime/deepseek_v4_ssd/server.py
+index 9caca8a..90cf3ed 100644
+--- a/runtime/deepseek_v4_ssd/server.py
++++ b/runtime/deepseek_v4_ssd/server.py
+@@ -940,8 +940,12 @@ class OpenAIHandler(BaseHTTPRequestHandler):
+             if value is not None and value != []:
+                 raise APIError(f"{name} is not supported.", param=name)
+         for name in ("frequency_penalty", "presence_penalty"):
+-            if payload.get(name) not in (None, 0, 0.0):
++            if not qwen and payload.get(name) not in (None, 0, 0.0):
+                 raise APIError(f"{name} is not supported.", param=name)
++        if not qwen:
++            for name in ("min_p", "repetition_penalty"):
++                if name in payload:
++                    raise APIError(f"{name} is supported only for Qwen.", param=name)
+         if payload.get("seed") is not None:
+             raise APIError("seed is not supported.", param="seed")
+         if payload.get("logprobs") not in (None, False):
+@@ -1795,14 +1799,24 @@ def _options(
+     top_k = payload.get("top_k", sampling_defaults["top_k"])
+     if isinstance(top_k, bool) or not isinstance(top_k, int) or not 0 <= top_k <= 248_320:
+         raise APIError("top_k must be between 0 and 248320.", param="top_k")
++    penalties = {}
++    if qwen:
++        for name, minimum, maximum, default in (
++            ("min_p", 0, 1, sampling_defaults["min_p"]),
++            ("presence_penalty", -2, 2, sampling_defaults["presence_penalty"]),
++            ("frequency_penalty", -2, 2, 0.0),
++            ("repetition_penalty", 0.000001, 2, sampling_defaults["repetition_penalty"]),
++        ):
++            penalties[name] = _number(payload.get(name, default), name, minimum=minimum, maximum=maximum)
+     return GenerationOptions(
+         max_tokens=max_tokens,
+         temperature=temperature,
+         top_p=top_p,
+         top_k=top_k,
+-        min_p=sampling_defaults["min_p"],
+-        presence_penalty=sampling_defaults["presence_penalty"],
+-        repetition_penalty=sampling_defaults["repetition_penalty"],
++        min_p=penalties.get("min_p", sampling_defaults["min_p"]),
++        presence_penalty=penalties.get("presence_penalty", sampling_defaults["presence_penalty"]),
++        repetition_penalty=penalties.get("repetition_penalty", sampling_defaults["repetition_penalty"]),
++        frequency_penalty=penalties.get("frequency_penalty", 0.0),
+         approximation_mode=approximation_mode,
+     )
+ 
+diff --git a/runtime/tests/test_runtime.py b/runtime/tests/test_runtime.py
+index 83aa817..2a268fe 100644
+--- a/runtime/tests/test_runtime.py
++++ b/runtime/tests/test_runtime.py
+@@ -215,7 +215,11 @@ class ModelRuntimeTests(unittest.TestCase):
+             finish_reason="stop",
+         )
+         sampler = object()
+-        presence_processor = object()
++        processor_histories = []
++
++        def presence_processor(tokens, logits):
++            processor_histories.append(tokens.tolist())
++            return logits
+         received_options = {}
+ 
+         def fake_stream_generate(*_args, **options):
+@@ -269,12 +273,11 @@ class ModelRuntimeTests(unittest.TestCase):
+                 top_k=20,
+                 min_p=0.0,
+             )
+-            make_logits_processors.assert_called_once_with(presence_penalty=1.5)
++            make_logits_processors.assert_called_once_with(presence_penalty=1.5, presence_context_size=0)
+             self.assertIs(received_options["sampler"], sampler)
+-            self.assertEqual(
+-                received_options["logits_processors"],
+-                [presence_processor],
+-            )
++            self.assertEqual(len(received_options["logits_processors"]), 1)
++            received_options["logits_processors"][0](mx.array([99, 2, 3]), mx.zeros((1, 100)))
++            self.assertEqual(processor_histories, [[2, 3]])
+ 
+             make_sampler.reset_mock()
+             make_logits_processors.reset_mock()
+diff --git a/runtime/tests/test_server.py b/runtime/tests/test_server.py
+index c66f03c..95c08c0 100644
+--- a/runtime/tests/test_server.py
++++ b/runtime/tests/test_server.py
+@@ -356,6 +356,7 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 "min_p": 0.4,
+                 "presence_penalty": 0,
+                 "repetition_penalty": 1.2,
++                "frequency_penalty": 0.3,
+             },
+         )
+         self.assertEqual(status, 200, body)
+@@ -366,13 +367,14 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 temperature=0,
+                 top_p=0.6,
+                 top_k=7,
+-                min_p=0.0,
++                min_p=0.4,
+                 presence_penalty=0.0,
+-                repetition_penalty=1.0,
++                repetition_penalty=1.2,
++                frequency_penalty=0.3,
+             ),
+         )
+ 
+-    def test_qwen_request_rejects_nonzero_presence_penalty(self):
++    def test_qwen_request_accepts_nonzero_presence_penalty(self):
+         status, body = self.request(
+             "/v1/chat/completions",
+             {
+@@ -381,8 +383,40 @@ class QwenSamplingServerTests(unittest.TestCase):
+                 "presence_penalty": 1.5,
+             },
+         )
+-        self.assertEqual(status, 400)
+-        self.assertEqual(json.loads(body)["error"]["param"], "presence_penalty")
++        self.assertEqual(status, 200, body)
++        self.assertEqual(self.runtime.last_options.presence_penalty, 1.5)
++
++    def test_qwen_penalty_validation_on_all_endpoints(self):
++        for path, inputs in (
++            ("/v1/chat/completions", {"messages": [{"role": "user", "content": "Hi"}]}),
++            ("/v1/responses", {"input": "Hi"}),
++            ("/v1/completions", {"prompt": "Hi"}),
++        ):
++            for name, invalid in (
++                ("presence_penalty", [True, None, "1", -2.1, 2.1, float("nan"), float("inf")]),
++                ("frequency_penalty", [False, None, "1", -2.1, 2.1]),
++                ("repetition_penalty", [True, None, "1", 0, -1, 2.1]),
++                ("min_p", [False, None, "1", -0.1, 1.1]),
++            ):
++                for value in invalid:
++                    with self.subTest(path=path, name=name, value=value):
++                        status, body = self.request(path, {"model": "qwen3.8-flash-next-fp8", **inputs, name: value})
++                        self.assertEqual(status, 400, body)
++                        self.assertEqual(json.loads(body)["error"]["param"], name)
++
++    def test_qwen_explicit_penalties_work_on_all_endpoints(self):
++        for path, inputs in (
++            ("/v1/chat/completions", {"messages": [{"role": "user", "content": "Hi"}], "stream": True}),
++            ("/v1/responses", {"input": "Hi"}),
++            ("/v1/completions", {"prompt": "Hi"}),
++        ):
++            status, body = self.request(path, {"model": "qwen3.8-flash-next-fp8", **inputs,
++                                             "presence_penalty": 0, "frequency_penalty": -0.2,
++                                             "repetition_penalty": 1.05, "min_p": 0.1})
++            self.assertEqual(status, 200, body)
++            options = self.runtime.last_options
++            self.assertEqual((options.presence_penalty, options.frequency_penalty, options.repetition_penalty, options.min_p),
++                             (0, -0.2, 1.05, 0.1))
+ 
+     def test_qwen_request_rejects_approximation(self):
+         status, body = self.request(

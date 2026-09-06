@@ -1,0 +1,112 @@
+The user wants me to write a Japanese novel's first chapter, approximately 5000 characters, set in an autumn seaside town. The protagonist is Haruka (遥), a translator who returns to her hometown after 10 years to sort through her deceased grandmother's bookstore, where she finds a letter from an unknown sender.
+
+The four scenes in order:
+1. Arriving at a rainy station, reuniting with childhood friend Shu (修).
+2. Sorting through the old bookstore, reflecting on memories with grandmother.
+3. Finding a letter tucked in a book, learning about a promise grandmother kept hidden.
+4. At dusk at the harbor, talking with Shu, deciding to visit the person of that promise tomorrow.
+
+Requirements:
+- About 5000 characters (Japanese)
+- Novel prose, not synopsis
+- Natural dialogue
+- Specific scenery descriptions
+- Character emotional changes
+- Each scene with sufficient length
+
+Let me write this carefully in literary Japanese, making it feel like a real novel chapter. I'll aim for rich sensory details, internal monologue, and natural dialogue. The tone should be literary, contemplative, with autumn seaside atmosphere.
+
+Let me structure this:
+- Scene 1 (~1200 chars): Rain, station, reunion with Shu. Establish Haruka's emotional state returning after 10 years.
+- Scene 2 (~1500 chars): The bookstore, sorting through books, memories of grandmother. Sensory details of the old shop.
+- Scene 3 (~1200 chars): Finding the letter in a book. The revelation of a hidden promise.
+- Scene 4 (~1100 chars): Harbor at dusk, conversation with Shu, decision to visit tomorrow.
+
+I'll write in literary Japanese with proper novel formatting - using 「」for dialogue, descriptive prose, internal thoughts. Let me make the characters feel real and the setting vivid.
+
+Let me write this now, aiming for approximately 5000 Japanese characters total.
+</think>
+
+# 第一章 潮の記憶
+
+## 一
+
+十月の雨は、海から上がってくる。
+
+列車が最後のトンネルを抜けたとき、車窓の向こうに灰色の海が見えた。遥は額をガラスに押しつけ、その景色をしばらく見つめていた。十年だ。東京で翻訳の仕事に明け暮れて、気づけば十年が経っていた。祖母の死を告げる電話は、真夜中に鳴った。受話器から漏れた父の声を聞きながら、遥は机の上に広げた原稿を閉じた。三百年前のフランス語の散文が、途端に意味を失った。
+
+最寄りの駅で降りたとき、雨はすでに本降りに変わっていた。傘を差しても、潮を孕んだ風が横から吹きつけてくる。改札を出ると、コンクリートの床に水たまりがいくつもできていて、蛍光灯の光がゆらゆらと揺れていた。
+
+「遥ちゃん」
+
+振り返ると、傘を持った男が立っていた。三十半ばの、やや痩せた顔。目元の皺だけが、昔のままだった。
+
+「修……」
+
+「十年ぶりだな。東京の言葉で喋るようになったか？」
+
+遥は笑おうとして、うまくいかなかった。修が差し出した傘の下に入ると、彼の肩が濡れていた。自分の傘を二つ用意してきたのに、片方を修に渡して、もう片方は使わずに済んだ。
+
+「駅まで迎えに来なくてよかったのに」
+
+「ばあさんが生前、お前が帰ったら必ず駅まで行けって言ってたんだ」修は歩きながら言った。「いつか、お前が何かを抱えて帰ってくる。そのとき、この町で最初に会える人間であれと」
+
+遥は答えなかった。靴底が水たまりを踏む音が、やけに大きく聞こえた。
+
+駅前の通りは以前より狭く感じられた。古い商店街のシャッターが半分閉まっていて、それでも「さかもと酒店」の看板だけは赤く生きていた。海側の坂を下りると、潮の匂いが濃くなる。修は特に何も言わず、ただ隣を歩いた。それが、十年ぶりの再会にふさわしい沈黙だった。
+
+## 二
+
+祖母の書店は、港から三本目の路地に入るとあった。木造の二階建てで、正面の看板には「潮文堂」と書かれている。十年間閉まっていたはずなのに、ガラス戸の曇りが、まるで昨日まで客が出入りしていたかのように見えた。
+
+鍵を開けると、カビと古紙の匂いが一気に押し寄せてきた。遥は咳き込みながら、電気のスイッチを入れた。蛍光灯が二つ、三つと点いて、店内の埃が光の中で舞い上がる。木棚が壁に沿って並び、背表紙の色褪せた本がびっしりと詰まっていた。
+
+「十年だ」と、遥は呟いた。「この本たちは十年、誰にも読まれなかった」
+
+修が奥から段ボール箱を三つ持ってきた。遥は棚の本を一冊ずつ引き抜き、状態を確認しながら箱に入れていく。ある本を開くと、祖母が鉛筆で引いた傍線が見えた。『海は記憶を溶かす』（中村汀女、一九七三年）の頁に、細い線で引かれた句。「潮騒は 十年の沈黙を 数える」。祖母が六十三歳のときに引いた傍線だ。
+
+棚の奥に、祖母の古いデスクがあった。引き出しを開けると、万年筆と、干からびた金平糖の包み紙と、遥が小学校三年のときに描いた絵が出てきた。海辺の町を描いた水彩画で、祖母が「潮文堂」という看板を店の入口に描き足してくれていた。絵の裏に、祖母の字で「遥が来月帰る」とだけ書いてある。日付は七年前だった。
+
+遥は絵を胸に押しつけ、しばらく動けなかった。祖母は毎週、このデスクに座って帳簿をつけていた。遥が中学生のとき、夏休みの読書感想文を祖母に見せると、「翻訳ってのはね」と言った。「作者が言いたかったことを、別の言葉で言うんじゃない。作者が言えなかったことを、初めて声にするんだ」
+
+そのとき祖母の指先は、本を積む作業で乾ききっていた。遥はその乾いた指を、今でも覚えている。
+
+「おばあちゃん」声に出して呼んでみた。返事はない。ただ、窓の外で雨が屋根を叩く音だけが聞こえた。
+
+## 三
+
+片付けは午後四時を過ぎても終わらなかった。棚の最上段に届く本を引き抜こうとして、遥は踏み台を引いた。そのとき、一冊の古い文庫本が棚の隙間に挟まっているのに気づいた。
+
+引き抜くと、表紙に『海辺のカルテ』（一九八五年刊）とあった。遥は祖母が翻訳家だったことを知っている。この本も、祖母が若かりし頃に読んだものだろう。ページをめくると、百二十七頁と百二十八頁の間に、封筒が挟まっていた。
+
+白い封筒。宛名はない。差出人もない。ただ、裏面に祖母の字で「開くな」とだけ書いてある。
+
+遥は封筒を握りしめた。祖母の字だ。あの、帳簿に書くときの、少し右に傾いた字。だが「開くな」と書いておきながら、なぜ本に挟んで残したのか。捨てるなら捨てたはずだ。
+
+指が震えた。開けていいのか。祖母の遺言のような言葉ではないか。だが、遥は自分の指が封筒の端を剥がしていることに気づいた。
+
+中には一枚の便箋が入っていた。万年筆で書かれた、流れるような字。祖母のものではなかった。
+
+「汀子さまへ」
+
+祖母の名前だった。手紙は短かった。
+
+「あの約束を、まだ覚えていますか。潮が満ちる夜に、港の灯台で待ち合わせると言った約束を。私はもう、その夜に行くことができません。ですが、もしこの町に潮文堂が残っているなら、あなたがまだその約束を忘れないでいてくれると信じています。いつか、この手紙を読む人が現れたなら、その人に代わって確かめてください。約束は、まだ果たされていないのだと」
+
+日付は一九九三年の十一月だった。祖母が五十五歳のとき。遥が小学五年で、まだこの町にいた頃だ。
+
+「約束」遥は呟いた。「灯台で、誰と」
+
+手紙の署名には、ただ「Ｋ」と一文字だけあった。祖母が誰かと、あの灯台で待ち合わせをしていた。十年以上も前の約束を、祖母は本に挟んで、誰にも言わずに持っていた。
+
+遥は便箋をもう一度読んだ。「約束は、まだ果たされていないのだと」。祖母は死に際に、この手紙を誰かに読ませるつもりだったのか。それとも、ただ捨てられなかっただけなのか。
+
+踏み台から降りると、膝が笑った。修が奥から顔を出した。
+
+「どうした？」
+
+「……なんでもない」遥は手紙を封筒に戻し、ポケットに入れた。だが胸の奥で、何かが静かに動き始めていた。
+
+## 四
+
+片付けを切り上げたのは、午後六時

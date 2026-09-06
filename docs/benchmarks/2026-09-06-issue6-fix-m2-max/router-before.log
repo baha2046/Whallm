@@ -1,0 +1,16 @@
+======================================================================
+FAIL: test_router_preserves_float32_probabilities_until_top_k_selection (runtime.tests.test_qwen.QwenTests.test_router_preserves_float32_probabilities_until_top_k_selection)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/Shared/Project/product/llm-ssd/runtime/tests/test_qwen.py", line 213, in test_router_preserves_float32_probabilities_until_top_k_selection
+    self.assertEqual(set(selected), set(expected.tolist()))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Items in the first set but not the second:
+12
+Items in the second set but not the first:
+4
+
+----------------------------------------------------------------------
+Ran 1 test in 0.180s
+
+FAILED (failures=1)

@@ -1,0 +1,15 @@
+{
+  "packages": {
+    "mlx": "0.32.1",
+    "mlx-metal": "0.32.1",
+    "mlx-lm": "0.31.3",
+    "numpy": "2.3.5",
+    "transformers": "5.12.1"
+  },
+  "overlay_binary_sha256": {
+    "mlx/core.cpython-314-darwin.so": "19b7324d344ef5fa7cfbb78920913eee89d272bae22af87223369e36122e64dc",
+    "mlx/lib/libjaccl.dylib": "9cfd72679ff35c593a1d46fd30d995cc4a131eed15733617efb1118001e74084",
+    "mlx/lib/libmlx.dylib": "afb1939edc96dc10e452132e4e665276fe0c48bf8cdc1a69286feb8a14de1da0",
+    "mlx/lib/mlx.metallib": "c010569c4ab35aa89ee5753613e89c35785d5ebdfbf67bdbd5c81a7b1849bd44"
+  }
+}

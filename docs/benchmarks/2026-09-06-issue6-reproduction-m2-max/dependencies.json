@@ -1,0 +1,1 @@
+{"python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]", "packages": {"mlx": "0.32.0", "mlx-lm": "0.31.3", "numpy": "2.3.5", "transformers": "5.12.1"}}

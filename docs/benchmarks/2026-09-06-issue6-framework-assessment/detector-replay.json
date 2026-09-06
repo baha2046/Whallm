@@ -1,0 +1,62 @@
+{
+  "kind": "Offline replay of the two pinned vLLM detector functions; no vLLM model inference",
+  "configuration": {
+    "min_pattern_size": 1,
+    "max_pattern_size": 64,
+    "min_count": 8
+  },
+  "configuration_status": "Exploratory choice, not upstream default or accepted Whallm setting",
+  "source_sha256": "1ed988044eb8028c77ede875bd1a5fd05ff6998b455d61e3997d6a3d7fc1c3a7",
+  "cases": [
+    {
+      "case": "candidate-04-router",
+      "token_source": "recorded raw generated token IDs; includes reasoning",
+      "token_count": 3308,
+      "first_detection_at_generated_token_one_based": 554,
+      "token_ids_sha256": "8d30b1d07ed86e65b61453217456ced2ecd7bc3af9c9e6d8cd0d9df7b8cddb5a",
+      "detection_tail_decoded": "が半分降りていて、雨で濡れた路面が薄く光っていた。\n\n「遥ちゃん、こっちこっち」\n\n声がした。雨で歪んだ世界の向こうから、黒い傘が一つ、こちらに向かって移動してくる。身長は変わっていないのに、顔が十歳分だけ老けている。頬が痩せ、顎に角ができて、それでも目だけは、あの夏、堤防で一緒にカニを獲ったときのままだった。\n\n「修」\n\n「十年ぶりだな。で、で、で、でででででででで"
+    },
+    {
+      "case": "candidate-06-numerics",
+      "token_source": "recorded raw generated token IDs; includes reasoning",
+      "token_count": 2504,
+      "first_detection_at_generated_token_one_based": 1404,
+      "token_ids_sha256": "19adca09bb98a2ccbe96911ee8008ec8e70621451ff93a825634b277ef70e356",
+      "detection_tail_decoded": "ある。田中。田中。田中。あの姓の人間が、この町には何組いることか。\n\n店の中を見渡す。レジの左手に絵本棚。右手に文庫の棚。奥の壁際に、母の膝の周りに座った子供向けの絵本を読むための和室の続き間があった。あの間（ま）の障子には、母の絵の絵本カバーの絵が貼られたままになっていた。絵の絵本カバーの絵の絵の絵の絵の絵の絵の絵の絵"
+    },
+    {
+      "case": "candidate-07-frequency",
+      "token_source": "recorded raw generated token IDs; includes reasoning",
+      "token_count": 1465,
+      "first_detection_at_generated_token_one_based": 1089,
+      "token_ids_sha256": "7e8886d6599ad57bfbcbe14fc4f50aeb9d4ac459e75ee5a2b43a5b856fa1b55e",
+      "detection_tail_decoded": "祖母の書店の看板が雨の中で滲んでいたのを覚えている。「海風書房」。五十年間、この町にある本屋だった。五十年前から五十年間、祖母が一人で切り盛りし、五十年前から五十年前までは祖父が営んでいたのだと祖母は言っていた。五十年前から五十年前までは祖父が営んでいたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていたのだと祖母は言っていた"
+    },
+    {
+      "case": "candidate-08-chat-sampling-retry",
+      "token_source": "recorded raw generated token IDs; includes reasoning",
+      "token_count": 788,
+      "first_detection_at_generated_token_one_based": null,
+      "token_ids_sha256": "7421d78bee8c5bbb155cea6699425a7f1a9e97901d364eef81200467ef625cdb"
+    },
+    {
+      "case": "baseline-long-chat-body",
+      "token_source": "retokenized saved body; not original raw decode IDs",
+      "token_count": 3827,
+      "first_detection_at_generated_token_one_based": null,
+      "token_ids_sha256": "d7bdda0bae968beb0ee170a6fdbed5e12abdc2f033c7fdd7ab96b6ec9c0c6136"
+    },
+    {
+      "case": "intentional-repeat-12-lines",
+      "token_source": "synthetic intentional repetition; not model output",
+      "token_count": 84,
+      "first_detection_at_generated_token_one_based": 56,
+      "token_ids_sha256": "6f6c77a25eda2627f9d17749fed6a5aa60d79239f20322bb9cff240306220c93"
+    }
+  ],
+  "limits": [
+    "Does not test prevention, answer quality, serving latency, or false-positive rate.",
+    "Candidate 08 was interrupted for framework assessment; undetected partial output is not a quality pass.",
+    "Intentional repetitions need opt-out or application-specific policy."
+  ]
+}

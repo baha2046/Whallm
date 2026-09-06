@@ -5,6 +5,9 @@ Whallm 的舊名稱是 DeepSeekV4SSD。
 
 最後核對日期是 2026-09-06。
 Qwen 支援核對版本是目前工作樹。
+目前 Python dependency 固定為 MLX **0.32.1**，修正背景執行緒的編譯抽樣器
+無法正常推進亂數狀態的問題；打包會拒絕不符合 pinned 版本的 MLX 環境。
+Issue #6 的重現、修復測試與長文驗證邊界見 [驗證紀錄](VALIDATION.md)。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact
@@ -362,11 +365,12 @@ context states。128-token `repeated` prompt 的首次／memory／restart-persis
 P2 MTLIO native gate 對 1／6／32／128 個 canonical expert ranges 執行 `preadv`、
 MTLIO bytes、shared buffer 與 private buffer，共 16 列 8,930,721,792 bytes，所有
 candidate／reference hashes exact。Shared/private 的 external shared-event → GPU wait
-與取消 destination admission 也通過；但 installed MLX 0.32.0 的公開介面沒有外部
+與取消 destination admission 也通過；但當時測試的 MLX 0.32.0 公開介面沒有外部
 `MTLSharedEvent` dependency handoff。32／128 aggregate exploratory timing 也沒有達到
 10% 門檻。Runtime integration 因此停止，現有四 worker `preadv` 路徑不變。Artifact
 位於 [`MTLIO gate`](benchmarks/2026-08-27-mtlio-expert-streaming-m2-max.json)；OS page
 cache 未 purge，這不是正式效能或 physical-SSD 結果。
+本次為 Issue #6 更新 MLX 0.32.1，未重跑這項 native handoff 研究。
 
 P2 staged streaming 先在 fixed arenas 完成 36 組 paired samples；4／8-row
 optimistic shapes 的 complete wall 分別改善 10.74%／13.67%，byte、六個 region hashes

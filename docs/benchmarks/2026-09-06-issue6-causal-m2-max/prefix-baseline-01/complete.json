@@ -1,0 +1,10 @@
+{
+  "elapsed_seconds": 217.16171291610226,
+  "checkpoints": [
+    0,
+    128,
+    512,
+    1280
+  ],
+  "status": "diagnostic complete; requires interpretation"
+}

@@ -1,0 +1,17 @@
+{
+  "case": "weather-tool",
+  "state": "complete",
+  "content_chars": 0,
+  "reasoning_chars": 0,
+  "finish_reason": "tool_calls",
+  "usage": {
+    "prompt_tokens": 335,
+    "completion_tokens": 27,
+    "total_tokens": 362
+  },
+  "elapsed_seconds": 27.96,
+  "done_event": true,
+  "server_exit_code_after_cleanup": -15,
+  "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

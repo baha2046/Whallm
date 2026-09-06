@@ -1,4 +1,5 @@
-mlx==0.32.0
+# 0.32.1 fixes compiled sampling using stale random state in server threads.
+mlx==0.32.1
 mlx-lm @ git+https://github.com/Blaizzy/mlx-lm@5c10538136b9038b9626c134612b08afc18d697a
 numpy==2.3.5
 sentencepiece==0.2.2

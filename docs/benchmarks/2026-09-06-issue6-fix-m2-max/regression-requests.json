@@ -1,0 +1,94 @@
+{
+  "code-chat": {
+    "model": "qwen3.8-flash-next-fp8",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Write a Python function named sum_even(values) that returns the sum of the even integers in values. Include a test for [1, 2, 3, 4] returning 6. Return only Python code, no explanation."
+      }
+    ],
+    "reasoning_effort": "none",
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 512,
+    "temperature": 0
+  },
+  "json-chat": {
+    "model": "qwen3.8-flash-next-fp8",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Return only this JSON object, with no markdown: {\"ok\":true,\"values\":[1,2,3]}"
+      }
+    ],
+    "reasoning_effort": "none",
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 512,
+    "temperature": 0
+  },
+  "repetition-optout-chat": {
+    "model": "qwen3.8-flash-next-fp8",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Output exactly 12 identical lines. Each line must be: alpha beta gamma delta epsilon.\nDo not add numbering, markdown or explanation."
+      }
+    ],
+    "reasoning_effort": "none",
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 512,
+    "temperature": 0,
+    "presence_penalty": 0,
+    "no_repeat_ngram_size": 0
+  },
+  "weather-tool": {
+    "model": "qwen3.8-flash-next-fp8",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the weather in Taipei? Call get_weather for Taipei."
+      }
+    ],
+    "reasoning_effort": "none",
+    "stream": true,
+    "stream_options": {
+      "include_usage": true
+    },
+    "max_tokens": 512,
+    "temperature": 0,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Get current weather for a city.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ]
+          }
+        }
+      }
+    ],
+    "tool_choice": {
+      "type": "function",
+      "function": {
+        "name": "get_weather"
+      }
+    }
+  }
+}

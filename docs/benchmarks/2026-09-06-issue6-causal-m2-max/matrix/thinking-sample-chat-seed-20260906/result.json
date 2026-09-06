@@ -1,0 +1,13 @@
+{
+  "finish_reason": "length",
+  "state": "complete",
+  "detected_loop": null,
+  "generated_tokens": 2047,
+  "prompt_tokens": 188,
+  "content_chars": 2533,
+  "reasoning_chars": 1831,
+  "elapsed_seconds": 237.5972523340024,
+  "first_text_seconds": 29.634396124980412,
+  "raw_sha256": "218c4f5ecb791893d7af22baddfea8fd381ad7b6e966e225511fbf89e21974bb",
+  "token_ids_sha256": "77791b9d8053414ced0c469e0b3398a8792a968df393b4296d159cdba2fee174"
+}

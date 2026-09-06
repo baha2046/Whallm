@@ -1,0 +1,37 @@
+{
+  "kind": "exploratory issue-6 quality reproduction",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "macos": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+  "hardware": "Hardware:\n\n    Hardware Overview:\n\n      Model Name: Mac Studio\n      Model Identifier: Mac14,13\n      Model Number: Z17Z000Z8TA/A\n      Chip: Apple M2 Max\n      Total Number of Cores: 12 (8 Performance and 4 Efficiency)\n      Memory: 64 GB\n      System Firmware Version: 18000.161.10\n      OS Loader Version: 18000.161.10\n      ",
+  "app_version": "1.1.4",
+  "project_commit": "bab462f495ec9b070d7546452349623d09c01289",
+  "runtime_source": "/Users/Shared/Project/product/llm-ssd/docs/benchmarks/2026-09-06-issue6-fix-m2-max/candidate-04-source",
+  "driver_sha256": "febddefc9af4db471c4b39443349eefa88a26c43ec9df005c81d17f44e467574",
+  "source_hashes": {
+    "deepseek_v4_ssd/server.py": "f026af38dc7c6a588195256e7c7aaa690bbc298b755690372e49940b40786d94",
+    "deepseek_v4_ssd/generation.py": "cff3a4c0cce63971c646029fbc097dba0544ebea7def89504d56ba030d1252cd",
+    "deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+    "deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+    "deepseek_v4_ssd/model_manager.py": "10593392e04255aa93703461ae426e132d396f39e400dc29f647ea79aa167aba",
+    "deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+    "deepseek_v4_ssd/model.py": "cfa90520224e36c9d88b52a48d2aeab582f4e206db0d6780dca09bafbed62740",
+    "deepseek_v4_ssd/expert_cache.py": "435f4b183940372db27043b1284a6a33a6ae04f533b69f0d826ce2f25df8f687",
+    "deepseek_v4_ssd/cli.py": "641f2d2175ae118c3a3fff7ac3dda746cc830501fc0a722c4d2b88b8af984e37",
+    "deepseek_v4_ssd/qwen4_exp.py": "131201607b7a0418e7921dd0271bbbb3c786714e042a77216d354050ec277995",
+    "deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+    "deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+    "deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+    "deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+    "deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+  },
+  "model_path": "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+  "manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc",
+  "cache": "fresh server and empty private persistent prompt cache for every case; OS page cache not purged; disk not RAM disk",
+  "limitations": [
+    "Original issue prompts are unavailable; substitute Japanese prompts.",
+    "Single stochastic sample per case; API seed unsupported, no seed injected.",
+    "API text hashes are not generated token ID hashes; timings are exploratory.",
+    "No full model checksum audit repeated."
+  ],
+  "timeout_seconds": 900
+}

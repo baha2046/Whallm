@@ -1,0 +1,13 @@
+{
+  "case": "long-thinking",
+  "state": "incomplete-stream",
+  "content_chars": 649,
+  "reasoning_chars": 1291,
+  "finish_reason": null,
+  "usage": null,
+  "elapsed_seconds": 253.4,
+  "first_text_seconds": 34.70352954103146,
+  "server_exit_code_after_cleanup": -15,
+  "content_sha256": "4e7acc8b51ee8672175a079b543d2e3ccb820c4ca603f8f8f1c45c4d99422f3c",
+  "reasoning_sha256": "4876f610fb88edc32f0d0077e011cf367255ca6d6a62203a4c26a3d57025f79a"
+}

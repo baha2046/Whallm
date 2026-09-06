@@ -82,6 +82,7 @@ launch_without_module_bundle_access() {
 
 verify_signature "$app_path"
 verify_localizations "$app_path"
+launch_without_module_bundle_access "$app_path"
 
 ditto -x -k "$zip_path" "$verification_root/extracted"
 extracted_app=$verification_root/extracted/Whallm.app

@@ -1,0 +1,129 @@
+{
+  "method": "exact adjacent repeats: unit 1-512 chars, at least 4 repeats and 120 total chars; nonadjacent lines >=30 chars repeated >=3 times; requires human interpretation",
+  "cases": [
+    {
+      "case": "long-chat",
+      "state": "complete",
+      "content_chars": 5544,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 190,
+        "completion_tokens": 3459,
+        "total_tokens": 3649
+      },
+      "elapsed_seconds": 377.68,
+      "first_text_seconds": 32.27134345902596,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "62ed792151be65497d47f2780fa27adfffb94dca75b7231b4e2ecf0c3bb0bce8",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "docs/benchmarks/2026-09-06-issue6-causal-m2-max/current-source-seed-20260907/long-chat",
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "content_analysis": {
+        "chars": 5544,
+        "sha256": "62ed792151be65497d47f2780fa27adfffb94dca75b7231b4e2ecf0c3bb0bce8",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "case": "long-thinking",
+      "state": "complete",
+      "content_chars": 5556,
+      "reasoning_chars": 1620,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 188,
+        "completion_tokens": 4004,
+        "total_tokens": 4192
+      },
+      "elapsed_seconds": 420.77,
+      "first_text_seconds": 23.85472933400888,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "4b5a82eb9facd324742567bdf661f0a4b9461fa7e238a53b7455819cc76383c1",
+      "reasoning_sha256": "c77b082c3ab4a1efc8a85d2e632c2c5dbf3d5750335b66f93cc914d5b4c4c7dc",
+      "path": "docs/benchmarks/2026-09-06-issue6-causal-m2-max/current-source-seed-20260907/long-thinking",
+      "reasoning_analysis": {
+        "chars": 1620,
+        "sha256": "c77b082c3ab4a1efc8a85d2e632c2c5dbf3d5750335b66f93cc914d5b4c4c7dc",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "content_analysis": {
+        "chars": 5556,
+        "sha256": "4b5a82eb9facd324742567bdf661f0a4b9461fa7e238a53b7455819cc76383c1",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "case": "short-chat",
+      "state": "complete",
+      "content_chars": 39,
+      "reasoning_chars": 0,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 77,
+        "completion_tokens": 24,
+        "total_tokens": 101
+      },
+      "elapsed_seconds": 25.29,
+      "first_text_seconds": 22.0890797090251,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "0765dec5107ef62dca6a5c9968fc54d84accd95f322aa1f1269dbf939815aad0",
+      "reasoning_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "docs/benchmarks/2026-09-06-issue6-causal-m2-max/current-source-seed-20260907/short-chat",
+      "reasoning_analysis": {
+        "chars": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "content_analysis": {
+        "chars": 39,
+        "sha256": "0765dec5107ef62dca6a5c9968fc54d84accd95f322aa1f1269dbf939815aad0",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    },
+    {
+      "case": "short-thinking",
+      "state": "complete",
+      "content_chars": 40,
+      "reasoning_chars": 4629,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 75,
+        "completion_tokens": 1639,
+        "total_tokens": 1714
+      },
+      "elapsed_seconds": 188.55,
+      "first_text_seconds": 23.211989208008163,
+      "done_event": true,
+      "server_exit_code_after_cleanup": -15,
+      "content_sha256": "f2b82fb6e3786d77ece0a82b812480083c8f2f87827f70411789b67273ccce22",
+      "reasoning_sha256": "c50727a80b5bcb4b35dd649353f855fdcdd791d1aefb76b5bff5c145c15d45f0",
+      "path": "docs/benchmarks/2026-09-06-issue6-causal-m2-max/current-source-seed-20260907/short-thinking",
+      "reasoning_analysis": {
+        "chars": 4629,
+        "sha256": "c50727a80b5bcb4b35dd649353f855fdcdd791d1aefb76b5bff5c145c15d45f0",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      },
+      "content_analysis": {
+        "chars": 40,
+        "sha256": "f2b82fb6e3786d77ece0a82b812480083c8f2f87827f70411789b67273ccce22",
+        "sustained_verbatim_repeats": [],
+        "duplicate_lines": []
+      }
+    }
+  ]
+}
