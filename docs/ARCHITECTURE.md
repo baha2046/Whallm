@@ -200,6 +200,7 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `layer_major_prefill_threshold` | 1,024 | DeepSeek 啟用 layer-major Prefill 所需的最少未快取 token 數。APP 可設定此值。 |
 | `batched_expert_prefill` | `true` | full-layer prefill 使用 `gather_qmm`。 |
 | `qwen_next_layer_prefetch` | `false` | Qwen next-layer prefetch 研究開關。APP model catalog 固定設為關閉。 |
+| `qwen_grouped_decode` | `false` | Qwen resident grouped QMM 實驗開關；需要 MTP 關閉。CLI 可 opt-in，APP catalog 固定關閉。目前每個 arena 最多 1,024 slots，後續依 common bytes 與已配置 slots 規劃大小；request 結束時同步 generation stream。 |
 | `ane_prefill` | `true` | Qwen 使用 private `AppleNeuralEngine.framework` 執行固定 shape projection。DeepSeek 不使用此設定。 |
 | `ane_prefill_ratio` | 0.25 | Qwen 分配給 ANE 的 `q_proj` output channels 比例。值域是 0 到 1。 |
 | `fp8_kv_cache` | `true` | 已完成的 compressed cache chunk 使用 MXFP8。 |

@@ -178,6 +178,8 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
         )
 
     runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime")
+    if runtime.qwen_grouped_decode and (model_kind != "qwen3.8-flash-next" or runtime.mtp_enabled):
+        raise ModelCatalogError("grouped Decode requires Qwen with MTP disabled")
     if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
         raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
     if model_kind != "qwen3.8-flash-next" and runtime.mtp_enabled:
@@ -207,6 +209,8 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
 
 def _parse_runtime(value: Any, prefix: str) -> RuntimeConfig:
     names = {field.name for field in fields(RuntimeConfig)}
+    if isinstance(value, dict) and set(value) == names - {"qwen_grouped_decode"}:
+        value = {**value, "qwen_grouped_decode": False}
     if not isinstance(value, dict) or set(value) != names:
         raise ModelCatalogError(f"{prefix} must contain every RuntimeConfig field")
     try:
@@ -257,6 +261,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "dspark_hybrid_verification",
         "expert_page_cache_probe",
         "ready_expert_decode",
+        "qwen_grouped_decode",
         "staged_expert_streaming",
     }
     for name in boolean_names:

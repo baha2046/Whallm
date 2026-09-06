@@ -96,6 +96,10 @@ def main() -> None:
         help="research only: prefetch the next Qwen expert layer during compute",
     )
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
+    parser.add_argument(
+        "--qwen-grouped-decode", action="store_true",
+        help="experimental Qwen Decode with resident grouped QMM (MTP disabled)",
+    )
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
     parser.add_argument("--no-persistent-prompt-cache", action="store_true")
     parser.add_argument("--prompt-cache-directory")
@@ -273,6 +277,7 @@ def main() -> None:
         ane_prefill=not arguments.no_ane_prefill,
         ane_prefill_ratio=arguments.ane_prefill_ratio,
         qwen_next_layer_prefetch=arguments.qwen_next_layer_prefetch,
+        qwen_grouped_decode=arguments.qwen_grouped_decode,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
         persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
@@ -410,6 +415,7 @@ def main() -> None:
             "ane_prefill": config.ane_prefill,
             "ane_prefill_ratio": config.ane_prefill_ratio,
             "qwen_next_layer_prefetch": config.qwen_next_layer_prefetch,
+            "qwen_grouped_decode": config.qwen_grouped_decode,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
             "expert_page_cache_probe": config.expert_page_cache_probe,

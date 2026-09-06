@@ -608,31 +608,32 @@ class StreamingExperts(nn.Module):
 
     def __call__(self, value: mx.array, indices: mx.array) -> mx.array:
         batched = self.cache.current_batched(self.layer)
+        if (
+            batched is None
+            and getattr(self.cache, "qwen_decode_active", False)
+            and value.size // value.shape[-1] == 1
+        ):
+            selected = np.asarray(indices, dtype=np.int32)
+            pages = self.cache.qwen_grouped_weights(
+                self.layer, selected.reshape(-1).tolist()
+            )
+            if len(pages) == 1:
+                batched, physical, _ = pages[0]
+                indices = mx.array(physical, dtype=mx.uint32).reshape(indices.shape)
+            else:
+                outputs, positions = [], []
+                for weights, physical, order in pages:
+                    mapped = mx.array(physical, dtype=mx.uint32).reshape(*indices.shape[:-1], -1)
+                    outputs.append(self._grouped(value, mapped, weights))
+                    positions.extend(order)
+                self.cache.record_gather_qmm(2 * len(pages))
+                return mx.take(
+                    mx.concatenate(outputs, axis=-2),
+                    mx.array(np.argsort(positions)), axis=-2,
+                )
         if isinstance(batched, QwenBatchedExperts):
-            source = mx.expand_dims(value, (-2, -3))
-            projected = mx.gather_qmm(
-                source,
-                batched.gate_up,
-                batched.gate_up_scales,
-                rhs_indices=indices,
-                transpose=True,
-                group_size=32,
-                bits=4,
-                mode="mxfp4",
-            )
-            gate, up = mx.split(projected, 2, axis=-1)
-            output = mx.gather_qmm(
-                nn.silu(gate) * up,
-                batched.down,
-                batched.down_scales,
-                rhs_indices=indices,
-                transpose=True,
-                group_size=32,
-                bits=4,
-                mode="mxfp4",
-            )
             self.cache.record_gather_qmm(2)
-            return output.squeeze(-2)
+            return self._grouped(value, indices, batched)
 
         selected = np.asarray(indices, dtype=np.int32)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
@@ -653,6 +654,32 @@ class StreamingExperts(nn.Module):
         grouped = mx.concatenate(outputs, axis=0)
         restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
         return restored.reshape(*selected.shape, -1)
+
+    @staticmethod
+    def _grouped(value, indices, batched):
+        source = mx.expand_dims(value, (-2, -3))
+        projected = mx.gather_qmm(
+            source,
+            batched.gate_up,
+            batched.gate_up_scales,
+            rhs_indices=indices,
+            transpose=True,
+            group_size=32,
+            bits=4,
+            mode="mxfp4",
+        )
+        gate, up = mx.split(projected, 2, axis=-1)
+        output = mx.gather_qmm(
+            nn.silu(gate) * up,
+            batched.down,
+            batched.down_scales,
+            rhs_indices=indices,
+            transpose=True,
+            group_size=32,
+            bits=4,
+            mode="mxfp4",
+        )
+        return output.squeeze(-2)
 
 
 class SparseMoE(nn.Module):
@@ -758,9 +785,13 @@ class Model(nn.Module):
         self.args = args
         self.model_type = args.model_type
         self.model = TextModel(args, cache, ngram_store)
+        self._expert_cache = cache
         self.lm_head = nn.Linear(args.hidden_size, args.vocab_size, bias=False)
 
     def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
+        if self._expert_cache.qwen_grouped_decode:
+            with self._expert_cache.qwen_decode_step(input_ids.size):
+                return self.lm_head(self.model(input_ids, cache))
         return self.lm_head(self.model(input_ids, cache))
 
     def forward_with_hidden(
@@ -1156,6 +1187,7 @@ def load(
         read_limiter=read_limiter,
         page_cache_probe=getattr(config, "expert_page_cache_probe", False),
         file_cache_policy=getattr(config, "expert_file_cache_policy", "cached"),
+        qwen_grouped_decode=getattr(config, "qwen_grouped_decode", False),
     )
     try:
         scale_name = (

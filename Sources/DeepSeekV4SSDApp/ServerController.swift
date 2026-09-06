@@ -583,6 +583,7 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let moePrefillStepSize: Int
       let batchedExpertPrefill: Bool
       let qwenNextLayerPrefetch: Bool
+      let qwenGroupedDecode: Bool = false
       let anePrefill: Bool
       let anePrefillRatio: Double
       let fp4IndexCache: Bool
@@ -622,6 +623,7 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case moePrefillStepSize = "moe_prefill_step_size"
         case batchedExpertPrefill = "batched_expert_prefill"
         case qwenNextLayerPrefetch = "qwen_next_layer_prefetch"
+        case qwenGroupedDecode = "qwen_grouped_decode"
         case anePrefill = "ane_prefill"
         case anePrefillRatio = "ane_prefill_ratio"
         case fp4IndexCache = "fp4_index_cache"
@@ -670,6 +672,7 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(moePrefillStepSize, forKey: .moePrefillStepSize)
         try values.encode(batchedExpertPrefill, forKey: .batchedExpertPrefill)
         try values.encode(qwenNextLayerPrefetch, forKey: .qwenNextLayerPrefetch)
+        try values.encode(qwenGroupedDecode, forKey: .qwenGroupedDecode)
         try values.encode(anePrefill, forKey: .anePrefill)
         try values.encode(anePrefillRatio, forKey: .anePrefillRatio)
         try values.encode(fp4IndexCache, forKey: .fp4IndexCache)

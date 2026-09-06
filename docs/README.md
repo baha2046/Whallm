@@ -3,7 +3,7 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-04。
+最後核對日期是 2026-09-06。
 Qwen 支援核對版本是目前工作樹。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
@@ -185,6 +185,19 @@ Component、pilot 和 formal artifacts 分別位於
 [`research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md`](../research/EXTERNAL_TECHNICAL_CLAIM_AUDIT_2026-08-10.md)。
 Qwen runtime 的 active 效能研究、採用門檻和 MTP 合約查核計畫位於
 [`research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md`](../research/QWEN_RUNTIME_OPTIMIZATION_2026-08-29.md)。
+2026-09-06 的現況查核、成功／失敗經驗、論文支持的新 Prefill／Decode 假設和
+研究路線與第一輪拒絕證據位於
+[`Qwen Prefill／Decode 新研究`](../research/QWEN_PREFILL_DECODE_RESEARCH_2026-09-06.md)。
+使用者已選擇轉攻 Decode，後續成本分解、resident grouped QMM 原型與 gate 位於
+[`Qwen Decode 研究`](../research/QWEN_DECODE_RESEARCH_2026-09-06.md)。
+後續 default-off runtime、4,096-slot 分區 arena 與多 request gate 位於
+[`Qwen Decode 整合研究`](../research/QWEN_DECODE_INTEGRATION_2026-09-06.md)。
+最新分區版本因長工具 Decode +4.58% 未達預定 5% gate 而停止，保持預設關閉，
+使用者已選 B：保留原門檻，接續 [跨區塊 kernel 研究](../research/QWEN_DECODE_KERNEL_2026-09-06.md)。
+新 kernel 已通過 M2 Max 的 14 個效能波次：Decode +9.59–16.42%、request 縮短
+2.35–5.12%，輸出一致，cold memory 與 lifecycle 也通過。它只由 research runner
+啟用，尚未整合到原 CLI flag；M5 Pro、能耗與產品採用未完成。
+研究原型與診斷量測不代表已採用的 runtime 預設。
 Qwen QSA Grouped-KV 的採用 quick gate 位於
 [`docs/benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json`](benchmarks/2026-09-02-qwen-qsa-grouped-kv-adoption-quick-gate-m5-pro.json)。
 Qwen private ANE Prefill 的探索性 gate 位於

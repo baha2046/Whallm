@@ -1311,6 +1311,55 @@ Tested adaptive prefill post-attention schedule 也已完成並停止；full-lay
 
 研究不得先假設瓶頸。
 
+## Qwen A 第一輪：2026-09-06，M2 Max
+
+Direct selected-row QSA Prefill kernel 僅存在獨立 research runner，未採用。
+雖然 real-input component median 約降低 36%，code／64 與 mixed_math／256
+greedy outputs 相同，tool_like／256 在第 34 個 output token 出現差異。
+原版 control 重跑 256 tokens 完全一致，因此按預先 exact-token gate 停止。
+兩個只替換 QK 或 PV 的 hybrid 也未通過 real-input tensor-exact screening。
+
+這不是正式速度提升或語意品質下降的證明。單次完整模型 timing、component
+diagnostic、歷史 M5 Pro 結果分開保存。Runtime defaults 與 weights 沒有變更。
+詳見 [研究與下一輪決策](../research/QWEN_PREFILL_DECODE_RESEARCH_2026-09-06.md)
+及 [原始結果與 hashes](benchmarks/2026-09-06-qwen-a-first-round-m2-max/summary.json)。
+
+## Qwen Decode grouped QMM：2026-09-06，M2 Max
+
+研究用 slot arena 保留 canonical blobs、router top-10、read workers 與 eviction，
+以跨 slot 的 strided views 執行 resident grouped QMM。以下數字是第一輪獨立原型；
+後續已加入 default-off runtime 整合，詳見本節末的整合研究。
+143-input／64-output code workload 的 ABBA／BAAB 共八次 greedy outputs 全部一致；
+兩波 Decode median 分別改善 11.18%／11.91%，完整 request 縮短 3.52%／3.94%。
+TTFT 約 +0.43%／+0.12%，token P95 約 -8.03%／-9.18%，expert bytes 完全相同，
+peak MLX allocation 沒有增加。條件是 M2 Max、1,152 slots、fresh process、persistent
+prompt cache 關閉，OS cache 未清空。
+
+這個結果不推翻舊 ready-expert 路徑的單一 arena 慢 10.1% 結論；本輪同時改成
+grouped QMM，支持的是此組合及已量測範圍。其他 workload 的單次配對只作相容性
+screening；不能代表多 request／warm-restart cache、App 4,096 slots 或 M5 Pro。
+這不是所有場景都快 11% 或能耗降低的證明。
+
+詳見 [Decode 研究](../research/QWEN_DECODE_RESEARCH_2026-09-06.md) 與
+[可重現結果及原始證據](benchmarks/2026-09-06-qwen-decode-arena-m2-max/summary.json)。
+後續 [整合研究](../research/QWEN_DECODE_INTEGRATION_2026-09-06.md) 已完成分區 arena、
+每 request 的 Prefill／Decode 邊界、取消後同步及獨立 prompt-cache contract；
+M2 Max 的 4,096-slot lifecycle 已通過。2,048-slot 區塊的長輸出有速度收益，卻在
+極短冷請求出現 MLX peak +29.85% 而停止。固定 512-slot 區塊則只改善 Decode
+3.28%，也停止採用。按常駐資料量規劃五個區塊後，cold memory、lifecycle 與短 code
+通過，但長工具 Decode +4.58% 低於預定 5% gate，已停止剩餘矩陣。使用者選 B，
+維持原門檻並投入 [跨區塊 kernel 研究](../research/QWEN_DECODE_KERNEL_2026-09-06.md)。預設仍關閉。
+完整失敗與配對證據位於
+[整合 artifact](benchmarks/2026-09-06-qwen-decode-integration-m2-max/summary.json)。
+
+選 B 後的新 cross-arena kernel 直接讀取多個 resident buffers，保持原 MXFP4
+與加權次序；14 個 M2 Max 正式效能波次全通過，Decode +9.59–16.42%、request
+縮短 2.35–5.12%。另有 cold／lifecycle 與獨立 raw-metrics audit 通過。
+這是 research-only 的本機結果，並未改變 CLI flag 背後實作；M5 Pro 重現、
+production integration 與能耗仍未完成。來源與限制見
+[kernel 報告](../research/QWEN_DECODE_KERNEL_2026-09-06.md)，完整資料見
+[333 份證據索引](benchmarks/2026-09-06-qwen-cross-arena-kernel-m2-max/summary.json)。
+
 ## 一手來源
 
 - [固定 checkpoint config](https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/7872f01b1d1fe23eabc4c98b48bffcef5a386062/config.json)

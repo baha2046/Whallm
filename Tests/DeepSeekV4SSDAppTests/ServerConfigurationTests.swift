@@ -417,14 +417,16 @@ final class ServerConfigurationTests: XCTestCase {
         "dspark_fallback_enabled", "dspark_sequential_verification",
         "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
         "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
-        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch",
+        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch", "qwen_grouped_decode",
         "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
+    XCTAssertEqual(runtime["qwen_grouped_decode"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
     let qwenRuntime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
+    XCTAssertEqual(qwenRuntime["qwen_grouped_decode"] as? Bool, false)
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")

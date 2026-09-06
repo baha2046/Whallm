@@ -148,12 +148,29 @@ class ModelCatalogTests(unittest.TestCase):
             ("qwen3.8-flash-next", "staged_expert_streaming", True),
             ("qwen3.8-flash-next", "adaptive_expert_prefill_threshold", 0.8),
             ("qwen3.8-flash-next", "ane_prefill_ratio", 1.1),
+            ("deepseek-v4", "qwen_grouped_decode", True),
+            ("qwen3.8-flash-next", "qwen_grouped_decode", "true"),
         )
         for model_kind, name, value in cases:
             model = raw_model(model_kind)
             model["runtime"][name] = value
             with self.subTest(name=name), self.assertRaises(ModelCatalogError):
                 parse_model_catalog({"version": 1, "models": [model]})
+
+    def test_grouped_decode_accepts_qwen_and_rejects_mtp(self):
+        model = raw_model("qwen3.8-flash-next")
+        model["runtime"]["qwen_grouped_decode"] = True
+        parsed = parse_model_catalog({"version": 1, "models": [model]})
+        self.assertTrue(parsed[0].runtime.qwen_grouped_decode)
+        model["runtime"]["mtp_enabled"] = True
+        with self.assertRaises(ModelCatalogError):
+            parse_model_catalog({"version": 1, "models": [model]})
+
+    def test_catalog_without_new_grouped_decode_field_preserves_legacy_default(self):
+        model = raw_model("qwen3.8-flash-next")
+        del model["runtime"]["qwen_grouped_decode"]
+        parsed = parse_model_catalog({"version": 1, "models": [model]})
+        self.assertFalse(parsed[0].runtime.qwen_grouped_decode)
 
     def test_layer_major_prefill_threshold_must_be_positive(self):
         model = raw_model("deepseek-v4")

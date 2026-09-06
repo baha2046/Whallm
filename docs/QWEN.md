@@ -462,5 +462,43 @@ Paired median Prefill 是 control 101.37 tok/s、ANE 109.82 tok/s。
 [`benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json`](benchmarks/2026-08-27-qwen3.8-flash-next-fp8-m5-pro.json)。
 
 262,144 只代表 checkpoint 合約上限。
-目前完整模型只驗證到 4,097 prompt tokens。
+前述完整模型 correctness gates 以固定 4K workloads 為主；部分 prompt 經 Qwen
+tokenizer 後實際為 4,577 tokens，不能以檔名判定 token 數。
+另有 [2026-09-04 API exploratory benchmark](benchmarks/2026-09-04-132210-api-qwen3-8-flash-next-fp8.json)
+完成最高 16,384 input tokens／64 output tokens 的執行。
+該 API artifact 只有 output text hash，沒有 generated token IDs；它不是長 context
+品質、官方 reference parity 或候選配對效能驗證。
 MXFP4 routed expert 輸出不保證等同官方 FP8。
+
+## Grouped Decode 實驗
+
+CLI `--qwen-grouped-decode` 或 model catalog `runtime.qwen_grouped_decode=true`
+使用 resident expert 的分區 arena 與 grouped QMM。預設仍為 `false`，APP 也固定
+傳送 `false`；MTP 與其他 model kind 會被拒絕。Canonical expert blob、top-10、LFU
+及 Prefill 路徑維持既有合約。目前每個 arena 最多 1,024 slots，按需建立各區塊。
+第一區塊最多 1,024 slots；後續依 canonical common bytes 的 90% 與已配置 slots，
+以 14% 增長預算、32 slots 對齊規劃。此 installed model／4,096 slots 的配置為
+`[1024, 640, 736, 832, 864]`；這是研究候選，未採用。
+原 2,048-slot 區塊雖有長輸出速度收益，但極短冷請求的 MLX peak memory +29.8%，
+未通過記憶體 gate，不能採用。
+固定 512-slot 區塊修復該 cold memory gate，但短 code Decode 只改善 3.28%，
+未通過 5% gate，也停止採用。
+最新分區方案通過 cold memory 與多輪／取消／重啟 gate，但長工具情境 Decode
+只改善 4.58%，低於預定 5% gate，已停止剩餘效能矩陣。使用者選 B，維持門檻並接續跨區塊 kernel 研究。
+完整證據位於
+[整合 benchmark](benchmarks/2026-09-06-qwen-decode-integration-m2-max/summary.json)。
+
+後續 cross-arena kernel 在 M2 Max 的 14 個正式波次全數通過原門檻：Decode
++9.59–16.42%、request 縮短 2.35–5.12%，56 次正式 requests 的輸出相同；
+12 次 cold requests 的 peak 增幅最高 11.50%，16 次 lifecycle requests 也通過。
+此新 kernel **只由 research runner 啟用**，上述 CLI flag 仍執行原分頁 QMM。
+尚無 M5 Pro 重現、能耗或 production integration 結果；不能以此開 App 預設。
+詳見 [kernel 研究](../research/QWEN_DECODE_KERNEL_2026-09-06.md) 與
+[原始證據](benchmarks/2026-09-06-qwen-cross-arena-kernel-m2-max/summary.json)。
+
+每次 request 明確扣除未快取 Prefill tokens，包含一個 token 的 Prefill chunk，
+之後才啟用 grouped Decode。完成或取消時等待該 generation stream 結束，防止下一個
+request 覆寫仍使用中的 slot。實驗 prompt-cache contract 額外標記
+`qwenGroupedDecode=true`，不與一般模式共享 cache；一般模式的既有 contract 不變。
+目前研究及驗證進度見
+[整合研究](../research/QWEN_DECODE_INTEGRATION_2026-09-06.md)。

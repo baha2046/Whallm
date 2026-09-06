@@ -81,6 +81,20 @@ def _route_phase(expert_cache, phase: str):
 
 
 @contextmanager
+def _qwen_decode_request(runtime):
+    if not getattr(runtime.config, "qwen_grouped_decode", False):
+        yield
+        return
+    with runtime.expert_cache.qwen_decode_request():
+        try:
+            yield
+        finally:
+            # Drain mlx-lm's lookahead before cancellation or a new request can
+            # overwrite physical slots on this runtime's generation stream.
+            mx.synchronize(runtime._generation_stream)
+
+
+@contextmanager
 def _approximation_mode(runtime: Any, mode: str):
     if mode not in APPROXIMATION_MODES:
         raise ValueError(f"unsupported approximation mode: {mode}")
@@ -297,6 +311,8 @@ def _prompt_cache_contract(installed: InstalledModel, config: RuntimeConfig) -> 
         "format": _PROMPT_CACHE_CONTRACT_FORMAT,
         "revision": str(getattr(installed, "revision", "")),
         "modelID": str(getattr(installed, "model_id", "")),
+        # Keep legacy cache contracts unchanged when the experiment is off.
+        **({"qwenGroupedDecode": True} if getattr(config, "qwen_grouped_decode", False) else {}),
         "modelConfigSHA256": _sha256_json(raw_config),
         "rope": {key: raw_config.get(key) for key in rope_keys},
         "kvFormat": {
@@ -1898,6 +1914,10 @@ class ModelRuntime:
         self._revision = getattr(installed, "revision", "")
         self._manifest_format = getattr(installed, "format_version", 1)
         self.config = config
+        if getattr(config, "qwen_grouped_decode", False) and (
+            not self._is_qwen or getattr(config, "mtp_enabled", False)
+        ):
+            raise ValueError("grouped Decode requires Qwen with MTP disabled")
         self.metrics = RuntimeMetrics()
         self._codec: ToolCodec | None = None
         self._prompt_caches: list[_PromptCacheEntry] = []
@@ -2007,7 +2027,7 @@ class ModelRuntime:
         )
         with self._generation_lock, _approximation_mode(
             self, options.approximation_mode
-        ):
+        ), _qwen_decode_request(self):
             with mx.stream(self._generation_stream):
                 prompt_tokens = self._encode_prompt(prompt)
                 available_tokens = getattr(
@@ -2201,6 +2221,8 @@ class ModelRuntime:
                         )
                         generation_prompt = generation_prompt[-1:]
                     with _use_mlx_lm_generation_stream(self._generation_stream):
+                        if getattr(self.config, "qwen_grouped_decode", False):
+                            self.expert_cache.set_qwen_decode_prefill(len(generation_prompt))
                         responses = iter(
                             stream_generate(
                                 self.model,

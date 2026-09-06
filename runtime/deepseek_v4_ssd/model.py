@@ -46,6 +46,7 @@ class RuntimeConfig:
     moe_prefill_step_size: int = 0
     batched_expert_prefill: bool = True
     qwen_next_layer_prefetch: bool = False
+    qwen_grouped_decode: bool = False
     ane_prefill: bool = True
     ane_prefill_ratio: float = 0.25
     fp4_index_cache: bool = True
@@ -820,6 +821,8 @@ def load_model(
     config: RuntimeConfig = RuntimeConfig(),
 ):
     _validate_adaptive_expert_prefill_config(config)
+    if config.qwen_grouped_decode and (not installed_model.is_qwen or config.mtp_enabled):
+        raise ValueError("grouped Decode requires Qwen with MTP disabled")
     if (
         config.power_saving_limit_gbps is not None
         and config.power_saving_limit_gbps not in _POWER_SAVING_LIMITS_GBPS

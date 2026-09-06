@@ -1,7 +1,16 @@
 # 驗證紀錄
 
 本文件分開記錄目前驗證和歷史量測。
-目前自動測試使用 2026-08-28 的合併工作樹。
+最新自動測試為 2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`
+加上 default-off Qwen grouped Decode 工作樹。Python 305 項通過；Swift 成功編譯，
+排除四項 Keychain-dependent 案例後，64 項執行、61 通過、三項缺少 DeepSeek fixture
+而略過、零失敗。全套 Swift 曾在 `SecItemCopyMatching` 等待，未宣稱全套通過。
+CLI／APP capacity、cold allocation、multi-request／cancel／restart 與各失敗設計的
+完整 logs、source snapshots、commands、token IDs／hashes 位於
+[2026-09-06 整合 artifact](benchmarks/2026-09-06-qwen-decode-integration-m2-max/summary.json)。
+最新候選的長工具 Decode +4.58% 未達預定 5% gate，停止採用並維持預設關閉。
+
+下文較早的自動測試使用 2026-08-28 的合併工作樹。
 較早的 Qwen 支援測試紀錄使用 base commit
 `9e7f2f377662e59a44275ff632f5c434adc2d5c4` 和本文件描述的工作樹變更。
 較早的 DeepSeek runtime 研究測試紀錄使用 base commit
@@ -2354,3 +2363,24 @@ GPU timing。任何 prerequisite 狀態改變時都必須用新 output 重跑，
 不要只保存 `tokens_per_second`。
 請同時保存 prompt token、`prompt_token_sha256`、generated token、
 `token_sha256` 和 runtime metrics。
+
+
+## 2026-09-06 Qwen cross-arena kernel：M2 Max 研究驗證
+
+[完整證據索引](benchmarks/2026-09-06-qwen-cross-arena-kernel-m2-max/summary.json)
+與 [研究條件／來源](../research/QWEN_DECODE_KERNEL_2026-09-06.md)。
+14 個 fresh-process ABBA／BAAB 波次、56 次效能 requests、11,264 個正式 output
+tokens：配對與跨波次 outputs exact；逐波重算 Decode 至少 +5%、TTFT 至多 +5%、
+p95 至多 +10%、MLX peak 至多 +15%、expert bytes 至多 +5%，全數通過。
+實際 Decode +9.59–16.42%、request 縮短 2.35–5.12%、TTFT 最大增幅 +2.60%；
+p95 每輪下降，expert bytes 相同。
+
+另有 12 次 cold allocation requests（peak 最大 +11.50%）、16 次 lifecycle／
+restart requests，以及三層真實 capture／八組排列 component gates。獨立 audit
+核對最終 kernel、runtime、runner hashes、ANE active／無 fallback、新 kernel
+實際執行次數、全部 output 長度與跨 request 前綴，通過。未清 OS 或 Metal compiler
+cache；cold allocation 單次 latency 不是正式 throughput 結論。
+
+本輪僅新增 research 程式，未改 production runtime；research Python 語法檢查
+通過，未重跑先前 305 項 Python suite。M5 Pro、能耗與 production integration
+均未完成。原 CLI grouped flag 不會啟用新 kernel，App 預設仍關閉。

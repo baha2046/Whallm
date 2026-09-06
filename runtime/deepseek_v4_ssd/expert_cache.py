@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+from bisect import bisect_right
 import heapq
 import os
 import threading
@@ -833,6 +834,85 @@ class _StagedSlotPool(_SlotPool):
         self._loaded[slot] = 0
 
 
+class _QwenArenaSlotPool(_SlotPool):
+    """Canonical blobs in bounded arenas; views never flatten over 2**31 words."""
+
+    PAGE_SLOTS = 1024
+
+    def __init__(self, model: InstalledModel, slots: int) -> None:
+        if not model.is_qwen or model.expert_blob_size % 4:
+            raise ValueError("Qwen arena requires aligned Qwen expert blobs")
+        super().__init__(model, slots)
+        self.page_slots = min(self.PAGE_SLOTS, (2**31 - 1) // (model.expert_blob_size // 4))
+        if self.page_slots < 1:
+            raise ValueError("Qwen expert blob exceeds MLX's view dimension limit")
+        # Bound unused reservation relative to common tensors and filled pages.
+        # Use 90% of canonical common bytes as a conservative planning floor,
+        # and a 14% growth budget with 32-slot rounding. Cold gates remain required.
+        # The first page is capped separately: one full Qwen step uses 480 slots.
+        common_floor = sum(tensor.length for tensor in model.common_tensors) * 9 // 10
+        self.page_starts: list[int] = []
+        self.page_counts: list[int] = []
+        start = 0
+        while start < slots:
+            limit = self.page_slots
+            if start:
+                budget = 14 * (common_floor + start * model.expert_blob_size) // (100 * model.expert_blob_size)
+                limit = min(limit, max(1, (budget + 31) // 32 * 32))
+            count = min(limit, slots - start)
+            self.page_starts.append(start)
+            self.page_counts.append(count)
+            start += count
+        self.arenas: dict[int, mx.array] = {}
+        self.grouped: dict[int, QwenBatchedExperts] = {}
+
+    def _location(self, slot: int) -> tuple[int, int]:
+        page = bisect_right(self.page_starts, slot) - 1
+        return page, slot - self.page_starts[page]
+
+    def prepare(self, slots: list[int]) -> None:
+        for page in sorted({self._location(slot)[0] for slot in slots}):
+            if page not in self.arenas:
+                count = self.page_counts[page]
+                arena = mx.empty((count, self._model.expert_blob_size // 4), dtype=mx.uint32)
+                mx.eval(arena)
+                proxy = _SlotPool(replace(self._model, expert_count=count), 0)
+                grouped = proxy.batched(arena)
+                mx.eval(*vars(grouped).values())
+                self.arenas[page], self.grouped[page] = arena, grouped
+        created = []
+        for slot in slots:
+            if self._slots[slot] is None:
+                page, index = self._location(slot)
+                words = self._model.expert_blob_size // 4
+                # Ordinary array[index] slicing can copy; CPU writes must alias.
+                self._slots[slot] = mx.as_strided(
+                    self.arenas[page], shape=(words,), strides=(1,), offset=index * words
+                ).view(mx.uint8)
+                created.append(self._slots[slot])
+        if created:
+            mx.eval(*created)
+        for slot in slots:
+            if self._views[slot] is None:
+                page, index = self._location(slot)
+                base = np.asarray(self.arenas[page]).ctypes.data
+                array = self._slots[slot]
+                if np.asarray(array).ctypes.data != base + index * self._model.expert_blob_size:
+                    raise RuntimeError("Qwen slot view does not alias its arena")
+                self._views[slot] = memoryview(array)
+
+    def grouped_for_slots(self, slots: list[int]):
+        pages: dict[int, tuple[list[int], list[int]]] = {}
+        for position, slot in enumerate(slots):
+            if not self._loaded[slot]:
+                raise RuntimeError("grouped Qwen weights contain an unloaded slot")
+            page, index = self._location(slot)
+            positions, indices = pages.setdefault(page, ([], []))
+            positions.append(position)
+            indices.append(index)
+        return [(self.grouped[page], indices, positions) for page, (positions, indices) in pages.items()]
+
+
 class ExpertCache:
     """A fixed-size, layer-aware LFU slot pool for routed expert weights."""
 
@@ -850,7 +930,10 @@ class ExpertCache:
         page_cache_probe: bool = False,
         file_cache_policy: str = "cached",
         staged_expert_streaming: bool = False,
+        qwen_grouped_decode: bool = False,
     ) -> None:
+        if qwen_grouped_decode and (not installed_model.is_qwen or staged_expert_streaming):
+            raise ValueError("grouped Decode requires Qwen without staged streaming")
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
         if read_workers < 1:
@@ -872,6 +955,10 @@ class ExpertCache:
         self.page_cache_probe = page_cache_probe
         self.file_cache_policy = file_cache_policy
         self.staged_expert_streaming = staged_expert_streaming
+        self.qwen_grouped_decode = qwen_grouped_decode
+        self.qwen_decode_active = False
+        self._qwen_decode_request = False
+        self._qwen_prefill_remaining: int | None = None
         filesystem = os.statvfs(self.expert_directory)
         self.direct_io_alignment = (
             int(filesystem.f_frsize or filesystem.f_bsize)
@@ -886,7 +973,7 @@ class ExpertCache:
         self._pool = (
             _StagedSlotPool(installed_model, slots)
             if staged_expert_streaming
-            else _SlotPool(installed_model, slots)
+            else (_QwenArenaSlotPool if qwen_grouped_decode else _SlotPool)(installed_model, slots)
         )
         self._entries: dict[tuple[int, int], _Entry] = {}
         self._free_slots = list(reversed(range(slots)))
@@ -978,6 +1065,52 @@ class ExpertCache:
     def resident_count(self) -> int:
         with self._lock:
             return len(self._entries)
+
+    @contextmanager
+    def qwen_decode_request(self):
+        """Scope the final Prefill token and Decode dispatch to one request."""
+        if not self.qwen_grouped_decode:
+            yield
+            return
+        if self._qwen_decode_request:
+            raise RuntimeError("Qwen Decode requests must be serialized")
+        self._qwen_decode_request = True
+        self._qwen_prefill_remaining = None
+        try:
+            yield
+        finally:
+            self.qwen_decode_active = False
+            self._qwen_decode_request = False
+            self._qwen_prefill_remaining = None
+
+    def set_qwen_decode_prefill(self, token_count: int) -> None:
+        if not self._qwen_decode_request or token_count < 1:
+            raise RuntimeError("Qwen Decode requires a request and its uncached prompt")
+        self._qwen_prefill_remaining = token_count
+
+    @contextmanager
+    def qwen_decode_step(self, token_count: int):
+        self.qwen_decode_active = (
+            self._qwen_decode_request and token_count == 1 and self._qwen_prefill_remaining == 0
+        )
+        if self._qwen_decode_request and self._qwen_prefill_remaining is not None:
+            self._qwen_prefill_remaining = max(0, self._qwen_prefill_remaining - token_count)
+        try:
+            yield
+        finally:
+            self.qwen_decode_active = False
+
+    def qwen_grouped_weights(
+        self, layer: int, expert_ids: list[int]
+    ):
+        if not self.qwen_decode_active or not isinstance(self._pool, _QwenArenaSlotPool):
+            raise RuntimeError("grouped Qwen weights require an active Decode step")
+        # The caller materializes dependent router indices before any slot reuse.
+        # Preserve the existing reservation, reads, metrics and LFU decisions.
+        self.get_many(layer, expert_ids)
+        with self._lock:
+            physical = [self._entries[(layer, expert)].slot for expert in expert_ids]
+            return self._pool.grouped_for_slots(physical)
 
     def resident_expert_keys(
         self,
