@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "current_route_offline_policy_screen",
+  "formal_performance_result": false,
+  "source": {
+    "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+    "files_sha256": {
+      "runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+      "runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+      "runtime/deepseek_v4_ssd/cli.py": "a56e72c084b587e4d7a5a44dc09c54336b44d4de7b3f212ff61e7fa0003b47eb",
+      "runtime/deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+      "runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+      "runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+      "runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+      "runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+      "runtime/deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+      "runtime/deepseek_v4_ssd/model.py": "eaebd076eb78c31fb789a70bb59c3dc99ff11be6b4d005995c237d56232c5489",
+      "runtime/deepseek_v4_ssd/model_manager.py": "a0e13b342a3e2ae23e174bb2555538311e066977f7e5b98466ae9f7214879b4b",
+      "runtime/deepseek_v4_ssd/qwen4_exp.py": "34dc6eca2f63fa4b062fc74532c6510e93086bf0cfa764f97ef80e3a7e28c95f",
+      "runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+      "runtime/deepseek_v4_ssd/server.py": "1c81323a7367c67366309a33d175d61fcfd9711fefc12093f58ed1c1e1f0a929",
+      "runtime/deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc",
+      "Scripts/benchmark_research_baseline.py": "172a845ba787cd1bad95d599044c00b56b9e7cf6f3def718152976f01e6b5a10",
+      "Scripts/prepare_r0_prompts.py": "6fc268df107ce46a99cc5a44568ab73405894761087d603e547d86faea7e8836",
+      "research/PREFILL_DECODE_B_ROUND1_2026-09-05.md": "b63c929bd0cc73b9f94da5facec251e2b793195f29b31e8421e3adacf9acbf31"
+    }
+  },
+  "baseline_sha256": "d039df1c2be71567056d942d03a16a28ca23b7d1900af111a8986e69a267b545",
+  "script_sha256": "4781ede7874fe25a3ad2ff4aa187e4bebd216a0b8570c9a115421aa31dd7e645",
+  "simulator_sha256": "cc970ea9b5f039c7091ef811d8877f1a04f6ccc4a84df2f70a47a5d9440be2e1",
+  "slots": 4096,
+  "cases": [
+    {
+      "case": "repeated-4096",
+      "trace_sha256": "0241bb44fc642e3dc1838b82b89a489de8b1f091929b557cc20cc68734027a50",
+      "recorded_misses": 5363,
+      "current": {
+        "policy": "current",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 117037,
+        "misses": 5363,
+        "evictions": 2085,
+        "decays": 3,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "candidate": {
+        "policy": "prefill_guided_24",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 117047,
+        "misses": 5353,
+        "evictions": 2075,
+        "decays": 10,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "miss_reduction_fraction": 0.0018646280067126098,
+      "logical_byte_reduction": 26112000
+    },
+    {
+      "case": "code-4096",
+      "trace_sha256": "31e31b75932ff28c7b374a06ad62ab3fec96d42da9bbc48ba60bddda54161316",
+      "recorded_misses": 35636,
+      "current": {
+        "policy": "current",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 86764,
+        "misses": 35636,
+        "evictions": 32292,
+        "decays": 3,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "candidate": {
+        "policy": "prefill_guided_24",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 87235,
+        "misses": 35165,
+        "evictions": 31821,
+        "decays": 10,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "miss_reduction_fraction": 0.01321697160175106,
+      "logical_byte_reduction": 1229875200
+    },
+    {
+      "case": "zh_technical-4096",
+      "trace_sha256": "73ab41274ef9f3d80992b787ed00adb0dc8af3b97ad85db78863e1bac6a419a1",
+      "recorded_misses": 23001,
+      "current": {
+        "policy": "current",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 99399,
+        "misses": 23001,
+        "evictions": 19674,
+        "decays": 3,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "candidate": {
+        "policy": "prefill_guided_24",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 97811,
+        "misses": 24589,
+        "evictions": 21262,
+        "decays": 10,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "miss_reduction_fraction": -0.06904047650102174,
+      "logical_byte_reduction": -4146585600
+    },
+    {
+      "case": "mixed_math-4096",
+      "trace_sha256": "b70b3b8dabae5eab2fba95dfe7be845df629994de367f206251a529ce58562e8",
+      "recorded_misses": 28331,
+      "current": {
+        "policy": "current",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 94069,
+        "misses": 28331,
+        "evictions": 24979,
+        "decays": 3,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "candidate": {
+        "policy": "prefill_guided_24",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 90770,
+        "misses": 31630,
+        "evictions": 28278,
+        "decays": 10,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "miss_reduction_fraction": -0.11644488369630435,
+      "logical_byte_reduction": -8614348800
+    },
+    {
+      "case": "tool_like-4096",
+      "trace_sha256": "b1cc4976e96924bbc4d6484c9c806f29798ed72041aeb2b1f6112b32b3e7dbd6",
+      "recorded_misses": 32186,
+      "current": {
+        "policy": "current",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 90214,
+        "misses": 32186,
+        "evictions": 28847,
+        "decays": 3,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "candidate": {
+        "policy": "prefill_guided_24",
+        "prefill_cache_calls": 96,
+        "decode_tokens": 255,
+        "hits": 86388,
+        "misses": 36012,
+        "evictions": 32673,
+        "decays": 10,
+        "resident_experts": 4096,
+        "uses_future_routes": false
+      },
+      "miss_reduction_fraction": -0.11887155906294655,
+      "logical_byte_reduction": -9990451200
+    }
+  ],
+  "gate": {
+    "non_repeated_median_miss_reduction": -0.09274268009866304,
+    "passed": false,
+    "minimum_median": 0.05,
+    "maximum_per_workload_regression": 0.02
+  },
+  "decision": "stop_this_policy_at_4096_slots",
+  "limits": [
+    "No candidate runtime speed measurement.",
+    "Synthetic prompts and 256 output tokens; not long-session validation.",
+    "Candidate uses Prefill and observed Decode only; no future route oracle.",
+    "Miss savings cannot be read as latency savings."
+  ]
+}

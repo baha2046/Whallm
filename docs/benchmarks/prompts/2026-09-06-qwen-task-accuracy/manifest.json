@@ -1,0 +1,62 @@
+[
+  {
+    "case": "code-01",
+    "file": "code-01.prompt.txt",
+    "text_sha256": "ca58bc38885e1caef594182967c0de47df48c466163da8ff81a3eb48c65fa9e6"
+  },
+  {
+    "case": "math-01",
+    "file": "math-01.prompt.txt",
+    "text_sha256": "78a9e1c2e509c01dc697e06b344d87695f5a4df5645203ec4b896f02d4813470"
+  },
+  {
+    "case": "zh-01",
+    "file": "zh-01.prompt.txt",
+    "text_sha256": "e2daca453575b7ec706682cc86e810532c9d112d115a60541f9cd69c0799c01e"
+  },
+  {
+    "case": "tool-01",
+    "file": "tool-01.prompt.txt",
+    "text_sha256": "6e9f76bad8be7477f8e229f29078d154c338c7b72dc91d41a63104ac0a20a482"
+  },
+  {
+    "case": "code-02",
+    "file": "code-02.prompt.txt",
+    "text_sha256": "1927cde66a3561e47b9cfb8f45802b2436821739a66aa78bb47d64f418c28dff"
+  },
+  {
+    "case": "math-02",
+    "file": "math-02.prompt.txt",
+    "text_sha256": "001fec14753f3004afe59aa14e4cc6909ea639ff72902b0da92cbfa79cafe824"
+  },
+  {
+    "case": "zh-02",
+    "file": "zh-02.prompt.txt",
+    "text_sha256": "8157fe41a0b39a6c9c3d62c12516f54c22c6213fcc84adc76dd7a6c9115559ca"
+  },
+  {
+    "case": "tool-02",
+    "file": "tool-02.prompt.txt",
+    "text_sha256": "0c3dc0e458d9778f385cd1f4410f27e47097bfb744c01cd59df6f47f195b731c"
+  },
+  {
+    "case": "code-03",
+    "file": "code-03.prompt.txt",
+    "text_sha256": "808e1a3d4849fe01ec92daea943cb10adae3b2fb52ea140c85e919777a589aa3"
+  },
+  {
+    "case": "math-03",
+    "file": "math-03.prompt.txt",
+    "text_sha256": "2061340c8904df3d1aa31e509da43b4cf4ec5889a9237037622f514efc564b52"
+  },
+  {
+    "case": "zh-03",
+    "file": "zh-03.prompt.txt",
+    "text_sha256": "77d28d94f8106a973253ed69ae04727d8d7efd4af0cbf1bf12f580e8fb289a69"
+  },
+  {
+    "case": "tool-03",
+    "file": "tool-03.prompt.txt",
+    "text_sha256": "ff49d6e6556996e2150ea3c5f5f962210c5779c788b134efa015e90ebdba7116"
+  }
+]

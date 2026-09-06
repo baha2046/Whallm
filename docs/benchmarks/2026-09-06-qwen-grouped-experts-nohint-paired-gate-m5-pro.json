@@ -1,0 +1,166 @@
+{
+  "evidence_kind": "paired_synthetic_workload_screen",
+  "formal_performance_result": false,
+  "artifact_sha256": "a4029767f3ec44b02f85555ec08bc5fea970380c34204872251b4f00312311b9",
+  "script_sha256": "82d26caf8990a8564aec7fef91ce55069a7aaf1472401a6d30e8457fef35f370",
+  "summary": {
+    "pairs": [
+      {
+        "wave": 0,
+        "case": "repeated-4096",
+        "ttft_reduction": 0.11397139222149233,
+        "decode_change": -0.0012839836037491503,
+        "p95_change": -0.00033840582371880146,
+        "mlx_memory_change": -2.6340201509711392e-05,
+        "rss_change": 0.003272975272315737,
+        "token_sha256": "1ba018b08ffcfccd361132da02a01ad4520e836b252f8cfec6eab639cd332bff"
+      },
+      {
+        "wave": 0,
+        "case": "code-4096",
+        "ttft_reduction": 0.14381839436599675,
+        "decode_change": -0.03886492680167464,
+        "p95_change": 0.020481621378466652,
+        "mlx_memory_change": -2.7212320051317462e-05,
+        "rss_change": -0.003938123321844289,
+        "token_sha256": "872ec85e0e9a896e10e50b67723c310f1b8ad1ec0bd1265a6b8e4ba8032d82ab"
+      },
+      {
+        "wave": 0,
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.16290728886365913,
+        "decode_change": -0.002487376086189319,
+        "p95_change": 0.0016626824952477026,
+        "mlx_memory_change": -2.6342680783164596e-05,
+        "rss_change": 0.0032768738731168146,
+        "token_sha256": "8498f94dcaba38c3adbb3a71160f0951d12f2f03cdea88444361439799dba0fe"
+      },
+      {
+        "wave": 0,
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.1620029994008262,
+        "decode_change": 0.024014186313122687,
+        "p95_change": -0.009779514104905962,
+        "mlx_memory_change": -1.4517062107977097e-06,
+        "rss_change": 3.084201793068786e-06,
+        "token_sha256": "17fa8071b54392949715c752d296d5f74a78aad55c2dc6f493251f64641f4456"
+      },
+      {
+        "wave": 0,
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.15951590985593855,
+        "decode_change": 0.011657610969856291,
+        "p95_change": -0.007069542021385211,
+        "mlx_memory_change": -1.0265318616142771e-05,
+        "rss_change": 0.0031940064003479485,
+        "token_sha256": "187e82231f087085a03db45d45875edb418ef55a2213674692c5e06bba6909a9"
+      },
+      {
+        "wave": 1,
+        "case": "repeated-4096",
+        "ttft_reduction": 0.11551656336336613,
+        "decode_change": -0.0012358565449074321,
+        "p95_change": -0.004363982506104702,
+        "mlx_memory_change": -2.711509814379287e-05,
+        "rss_change": 0.0006967716248049705,
+        "token_sha256": "1ba018b08ffcfccd361132da02a01ad4520e836b252f8cfec6eab639cd332bff"
+      },
+      {
+        "wave": 1,
+        "case": "code-4096",
+        "ttft_reduction": 0.17077374531862954,
+        "decode_change": -0.005062875908423359,
+        "p95_change": 0.0005427855713278085,
+        "mlx_memory_change": -2.140122182514581e-05,
+        "rss_change": -4.470682727208963e-05,
+        "token_sha256": "872ec85e0e9a896e10e50b67723c310f1b8ad1ec0bd1265a6b8e4ba8032d82ab"
+      },
+      {
+        "wave": 1,
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.160628337637448,
+        "decode_change": 0.004390728490400342,
+        "p95_change": -0.00533013354789913,
+        "mlx_memory_change": -1.9269425219570202e-05,
+        "rss_change": 3.0062321505042178e-05,
+        "token_sha256": "8498f94dcaba38c3adbb3a71160f0951d12f2f03cdea88444361439799dba0fe"
+      },
+      {
+        "wave": 1,
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.13956880891963497,
+        "decode_change": -0.02804827452718428,
+        "p95_change": 0.020440728482976844,
+        "mlx_memory_change": -2.5372002152801443e-05,
+        "rss_change": -3.3153865547919104e-05,
+        "token_sha256": "17fa8071b54392949715c752d296d5f74a78aad55c2dc6f493251f64641f4456"
+      },
+      {
+        "wave": 1,
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.15756018707418518,
+        "decode_change": -0.01672538477440133,
+        "p95_change": 0.007175249901955727,
+        "mlx_memory_change": -2.6921040496286075e-05,
+        "rss_change": 4.780265829040786e-05,
+        "token_sha256": "187e82231f087085a03db45d45875edb418ef55a2213674692c5e06bba6909a9"
+      }
+    ],
+    "per_case": [
+      {
+        "case": "repeated-4096",
+        "ttft_reduction": 0.11474397779242923,
+        "decode_change": -0.0012599200743282912,
+        "p95_change": -0.002351194164911752,
+        "mlx_memory_change": -2.672764982675213e-05,
+        "rss_change": 0.0019848734485603536
+      },
+      {
+        "case": "code-4096",
+        "ttft_reduction": 0.15729606984231315,
+        "decode_change": -0.021963901355048998,
+        "p95_change": 0.01051220347489723,
+        "mlx_memory_change": -2.4306770938231637e-05,
+        "rss_change": -0.0019914150745581893
+      },
+      {
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.16176781325055356,
+        "decode_change": 0.0009516762021055114,
+        "p95_change": -0.0018337255263257135,
+        "mlx_memory_change": -2.28060530013674e-05,
+        "rss_change": 0.0016534680973109284
+      },
+      {
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.15078590416023058,
+        "decode_change": -0.0020170441070307965,
+        "p95_change": 0.005330607189035441,
+        "mlx_memory_change": -1.3411854181799576e-05,
+        "rss_change": -1.5034831877425159e-05
+      },
+      {
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.15853804846506186,
+        "decode_change": -0.0025338869022725197,
+        "p95_change": 5.2853940285257917e-05,
+        "mlx_memory_change": -1.8593179556214423e-05,
+        "rss_change": 0.0016209045293191782
+      }
+    ],
+    "primary_median_ttft_reduction": 0.1579170591536875,
+    "checks": {
+      "ttft": true,
+      "decode": true,
+      "p95": true,
+      "memory": true
+    },
+    "passed": true,
+    "decision": "eligible_for_heldout_validation"
+  },
+  "limits": [
+    "Only two pairs per synthetic workload; no independent held-out adoption result.",
+    "Per-workload gates use the median of the two paired relative changes.",
+    "OS cache and system noise remain possible confounders."
+  ]
+}

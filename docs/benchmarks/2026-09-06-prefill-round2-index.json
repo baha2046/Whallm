@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-06",
+  "evidence_kind": "prefill_research_round2_index",
+  "formal_performance_result": false,
+  "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+  "files_sha256": {
+    "docs/benchmarks/2026-09-06-qwen-attention-moe-component-profile-m5-pro.json": "3eda31bb0212ec17e9856ae0880bf73311912921935afa7dc2dace059a13bb0e",
+    "docs/benchmarks/2026-09-06-qwen-qsa-chunk-pilot-m5-pro.json": "c6d25bc49750019a893a9cb443ddb2f8ca0c4c028de01baec46691cec6d4a480",
+    "docs/benchmarks/2026-09-06-qwen-qsa-chunk-paired-runs-m5-pro.json": "d7b5c3d11ffd7e854cf6d728f5575b70b17392fba71585d5520389d44dc73326",
+    "docs/benchmarks/2026-09-06-qwen-qsa-chunk-paired-gate-m5-pro.json": "aa7e9d7715d9df01bb40ee348c7c3da07317b7bd4e833707db83e2080645bdb5",
+    "docs/benchmarks/2026-09-06-qwen-qsa-chunk-protocol.md": "a1cc49ce5a1c22e6fd05c750ff338a2f36148c1aab2ae6d27a5f12f96c5bbf47",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-initial-m5-pro.json": "05d618921b0b624ae62a8935d07c44b49fc76547b11fa4a9bd4017b7cd992c4f",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-numerical-diagnosis-m5-pro.json": "8edc92b7914b69132ee699877e60308fe7858770c9686870b311c54ed84d9c19",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-nohint-pilot-m5-pro.json": "30f010a862d2d5f02a25b1ed1397084bf3b1e4e9ca54c6f90b55cdb733605478",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-nohint-paired-runs-m5-pro.json": "a4029767f3ec44b02f85555ec08bc5fea970380c34204872251b4f00312311b9",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-nohint-paired-gate-m5-pro.json": "71c0933a177a03b294b2011e73120b01b6fb3aca8c13132255a1cf8937bc3788",
+    "docs/benchmarks/2026-09-06-qwen-grouped-experts-nohint-protocol.md": "17babf010d3aaf2c7bde4296dc638b1156a8e61de7a370d6ac2a236c9837e770",
+    "docs/benchmarks/source/2026-09-06-prefill-research/qsa-driver.py": "609cf556001a93106f900e685057cbe886596dd386e194a5448ec7d1843ebccb",
+    "docs/benchmarks/source/2026-09-06-prefill-research/qsa-analyzer.py": "5c8af4ee2e943af51ed770f03f03836030e9fdeec74bc9da89047a5a15ca038f",
+    "docs/benchmarks/source/2026-09-06-prefill-research/grouped-initial.py": "dd7f557fb0f03a2a1609ab87abf46262083f11e278cdd517206018e0722956c0"
+  },
+  "checks": {
+    "qsa": {
+      "runs": 20,
+      "paired_output_hashes_match": true,
+      "paired_logical_bytes_match": true
+    },
+    "sorted_nohint": {
+      "runs": 20,
+      "paired_output_hashes_match": true,
+      "paired_logical_bytes_match": true
+    },
+    "cpu_unit_tests_passed": 9,
+    "python_compilation_passed": true,
+    "research_links_resolve": true,
+    "no_benchmark_process_remaining": true
+  },
+  "dispositions": {
+    "qsa_chunk16": "stop_at_2_64_percent_below_5_percent_gate",
+    "sorted_experts_hint_on": "failed_token_parity_numerical_difference_quality_not_evaluated",
+    "sorted_experts_hint_off": "passed_15_79_percent_ttft_screen_heldout_long_context_cache_contract_pending"
+  },
+  "limits": [
+    "40 paired synthetic-workload runs do not establish independent adoption quality.",
+    "No runtime or model default has changed.",
+    "Historical script snapshots are retained to resolve hashes recorded before research-script revisions."
+  ]
+}

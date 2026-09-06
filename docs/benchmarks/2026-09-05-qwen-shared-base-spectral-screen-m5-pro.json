@@ -1,0 +1,362 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "installed_weight_fixed_anchor_spectral_screen",
+  "formal_performance_result": false,
+  "manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc",
+  "trace_sha256": "31e31b75932ff28c7b374a06ad62ab3fec96d42da9bbc48ba60bddda54161316",
+  "script_sha256": "7e09dec261c790ab21200101e375ba6bdd836dbd6c42638c0441813bb5188aa7",
+  "numpy_version": "2.3.5",
+  "model_id": "Qwen/Qwen3.8-Flash-Next-FP8",
+  "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+  "selection": "Layers 0,23,47; anchor is most frequent expert in first 128 code Decode steps; member co-occurs most often with anchor. Frozen before reading weights.",
+  "ranks": [
+    0,
+    16,
+    32,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512,
+    640,
+    1024,
+    1280
+  ],
+  "cases": [
+    {
+      "layer": 0,
+      "anchor": 93,
+      "member": 7,
+      "anchor_blob_sha256": "128d93a4cd59943c2661f8b7029ea469d6e3bb6dd0c71f5376a1128190b7b1f4",
+      "member_blob_sha256": "78f9971199954e2b9465985b2effb6ae73fd9405f958ff7240e1fd797d67ca88",
+      "calibration_cooccurrences": 9,
+      "heldout_same_code_cooccurrences": 15,
+      "projections": {
+        "gate_up": {
+          "shape": [
+            1280,
+            2560
+          ],
+          "weight_cosine": 0.001276401337236166,
+          "residual_norm_over_weight_norm": 1.491599678993225,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.49159967718186,
+            "16": 1.4521784996306446,
+            "32": 1.4198758240728646,
+            "64": 1.3602103997094779,
+            "96": 1.3048025867380537,
+            "128": 1.2522758005741543,
+            "192": 1.1540211999986512,
+            "256": 1.063240929295272,
+            "384": 0.8977348020941175,
+            "512": 0.7492760188319603,
+            "640": 0.613973076729783,
+            "1024": 0.265267871736461,
+            "1280": 0.0
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 0.9999999996153428,
+            "16": 0.968694972835457,
+            "32": 0.9445783672213904,
+            "64": 0.9017811073213411,
+            "96": 0.8625279689860164,
+            "128": 0.8256550093825091,
+            "192": 0.7574234098876662,
+            "256": 0.6946412354165467,
+            "384": 0.5816013204679467,
+            "512": 0.4812235636781018,
+            "640": 0.390985351779573,
+            "1024": 0.16502961313566392,
+            "1280": 0.0
+          }
+        },
+        "down": {
+          "shape": [
+            2560,
+            640
+          ],
+          "weight_cosine": -0.0009053177782334387,
+          "residual_norm_over_weight_norm": 1.4570503234863281,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.4570503525595069,
+            "16": 1.408252145040687,
+            "32": 1.3675031622982659,
+            "64": 1.2909962216617354,
+            "96": 1.2185644153014417,
+            "128": 1.1488666066956885,
+            "192": 1.0157039025940995,
+            "256": 0.8882196023906448,
+            "384": 0.6432739536798353,
+            "512": 0.39537093346244034,
+            "640": 4.256328039455544e-08
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 1.0000000001544727,
+            "16": 0.9644276298171033,
+            "32": 0.9358077399491639,
+            "64": 0.8829792508120006,
+            "96": 0.8331829516687124,
+            "128": 0.7853640707074377,
+            "192": 0.6940191802227204,
+            "256": 0.606902837125869,
+            "384": 0.4391639221405085,
+            "512": 0.26975969705587416,
+            "640": 5.425774932358985e-08
+          }
+        }
+      }
+    },
+    {
+      "layer": 23,
+      "anchor": 387,
+      "member": 147,
+      "anchor_blob_sha256": "dd9b1a496c1a9e8c6f0bbd8138603bf824650b934985565fdfb2ab6843aeba68",
+      "member_blob_sha256": "e62be499ac48d3b85bebfdc2c9ee8ccec29fa9785fc470c99a2b67fea8814486",
+      "calibration_cooccurrences": 23,
+      "heldout_same_code_cooccurrences": 72,
+      "projections": {
+        "gate_up": {
+          "shape": [
+            1280,
+            2560
+          ],
+          "weight_cosine": 0.0011591322254389524,
+          "residual_norm_over_weight_norm": 1.402943730354309,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.4029437301325354,
+            "16": 1.3726350015272006,
+            "32": 1.3456115523870118,
+            "64": 1.2951948293462914,
+            "96": 1.247679625650597,
+            "128": 1.2023120480012293,
+            "192": 1.1164234378702746,
+            "256": 1.035436385251738,
+            "384": 0.8852240132820389,
+            "512": 0.747085050487529,
+            "640": 0.6185721166728043,
+            "1024": 0.27401486110520823,
+            "1280": 9.328777444631312e-08
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 0.9999999985920848,
+            "16": 0.9777756574396089,
+            "32": 0.9584550322352038,
+            "64": 0.9225514756146311,
+            "96": 0.8887365548952051,
+            "128": 0.8563741117873663,
+            "192": 0.7951391011394529,
+            "256": 0.7374021723924661,
+            "384": 0.630068929581944,
+            "512": 0.5313351677830964,
+            "640": 0.4395102778032909,
+            "1024": 0.19429780937320007,
+            "1280": 0.0
+          }
+        },
+        "down": {
+          "shape": [
+            2560,
+            640
+          ],
+          "weight_cosine": -0.0006143818609416485,
+          "residual_norm_over_weight_norm": 1.4047162532806396,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.4047163141505254,
+            "16": 1.3571313486001464,
+            "32": 1.3161151356486438,
+            "64": 1.2402440550607226,
+            "96": 1.1691795404067666,
+            "128": 1.101461666096469,
+            "192": 0.9723407682452825,
+            "256": 0.8496319996002797,
+            "384": 0.6143050103771405,
+            "512": 0.37758142128820443,
+            "640": 0.0
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 0.9999999987749065,
+            "16": 0.9670729255839297,
+            "32": 0.9388899550406132,
+            "64": 0.8859282011541518,
+            "96": 0.8358660800357542,
+            "128": 0.7878696454183524,
+            "192": 0.6959876128580548,
+            "256": 0.6081886111421595,
+            "384": 0.4396105722578732,
+            "512": 0.2700448812607581,
+            "640": 6.283149827056385e-08
+          }
+        }
+      }
+    },
+    {
+      "layer": 47,
+      "anchor": 333,
+      "member": 323,
+      "anchor_blob_sha256": "fe5ded7a29d5d9c6886a95b96f0ed2b16106192bcc3fdcf8658259e74f87dd47",
+      "member_blob_sha256": "3118931efbba92bd7ecc8f5cabdf67e69913c50086309151f8c563d3fe5feee0",
+      "calibration_cooccurrences": 48,
+      "heldout_same_code_cooccurrences": 60,
+      "projections": {
+        "gate_up": {
+          "shape": [
+            1280,
+            2560
+          ],
+          "weight_cosine": 0.004105279687792063,
+          "residual_norm_over_weight_norm": 1.4141565561294556,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.4141567551169778,
+            "16": 1.3734762543108747,
+            "32": 1.3436028091169037,
+            "64": 1.2885321101150213,
+            "96": 1.2371576013458323,
+            "128": 1.1884258182813017,
+            "192": 1.0969995263549102,
+            "256": 1.0116944498384843,
+            "384": 0.85542846189807,
+            "512": 0.714608267860445,
+            "640": 0.5857645593707017,
+            "1024": 0.25243113128989203,
+            "1280": 5.311609040322534e-08
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 1.0000000000096059,
+            "16": 0.9652333051339087,
+            "32": 0.9421664478837157,
+            "64": 0.9002572758958016,
+            "96": 0.8614256683488702,
+            "128": 0.824773402661856,
+            "192": 0.7561508861535182,
+            "256": 0.6923998544321692,
+            "384": 0.5762951860080192,
+            "512": 0.47303431837579124,
+            "640": 0.38108924261329624,
+            "1024": 0.15686229186052936,
+            "1280": 0.0
+          }
+        },
+        "down": {
+          "shape": [
+            2560,
+            640
+          ],
+          "weight_cosine": 0.0012290922459214926,
+          "residual_norm_over_weight_norm": 1.4366098642349243,
+          "best_fixed_anchor_relative_frobenius_error": {
+            "0": 1.4366098369146778,
+            "16": 1.393647218734538,
+            "32": 1.353852347805768,
+            "64": 1.2782882067455894,
+            "96": 1.2060636523224317,
+            "128": 1.1363957342173765,
+            "192": 1.0030185386966928,
+            "256": 0.8752540816834709,
+            "384": 0.6304217482023448,
+            "512": 0.3848343459933861,
+            "640": 6.874652636033322e-08
+          },
+          "best_zero_anchor_relative_frobenius_error": {
+            "0": 0.9999999979896697,
+            "16": 0.9702473189607753,
+            "32": 0.9427878163795754,
+            "64": 0.890430760632908,
+            "96": 0.8404107573522397,
+            "128": 0.7921517845039664,
+            "192": 0.6991915654384805,
+            "256": 0.6100066010501616,
+            "384": 0.43790571437994547,
+            "512": 0.2650949470727612,
+            "640": 3.8133711661879724e-08
+          }
+        }
+      }
+    }
+  ],
+  "storage_assumptions": {
+    "group_size": 8,
+    "factor_dtype": "FP16",
+    "native_blob_bytes": 2611200,
+    "native_anchor_amortized": true,
+    "metadata_bytes": "excluded; optimistic lower bound"
+  },
+  "limits": [
+    "One pair in each of three layers, chosen from a single synthetic code workload.",
+    "Fixed unaligned anchor; no permutation alignment, clustering search, activation whitening or fine-tuning.",
+    "SVD error is the best unweighted rank-r error for that fixed residual; factor rounding excluded.",
+    "Group-of-eight storage is a hypothetical amortization, not eight measured members.",
+    "No capability, generated-output, SSD latency or compressed-kernel speed result.",
+    "No rejection of the full LorExperts method or of activation-aware compression."
+  ],
+  "storage_curve": [
+    {
+      "rank": 0,
+      "native_anchor_average_bytes": 326400.0,
+      "fp16_anchor_average_bytes": 1228800.0,
+      "native_anchor_reduction_fraction": 0.875
+    },
+    {
+      "rank": 16,
+      "native_anchor_average_bytes": 551680.0,
+      "fp16_anchor_average_bytes": 1454080.0,
+      "native_anchor_reduction_fraction": 0.7887254901960784
+    },
+    {
+      "rank": 32,
+      "native_anchor_average_bytes": 776960.0,
+      "fp16_anchor_average_bytes": 1679360.0,
+      "native_anchor_reduction_fraction": 0.7024509803921568
+    },
+    {
+      "rank": 64,
+      "native_anchor_average_bytes": 1227520.0,
+      "fp16_anchor_average_bytes": 2129920.0,
+      "native_anchor_reduction_fraction": 0.5299019607843137
+    },
+    {
+      "rank": 96,
+      "native_anchor_average_bytes": 1678080.0,
+      "fp16_anchor_average_bytes": 2580480.0,
+      "native_anchor_reduction_fraction": 0.35735294117647054
+    },
+    {
+      "rank": 128,
+      "native_anchor_average_bytes": 2128640.0,
+      "fp16_anchor_average_bytes": 3031040.0,
+      "native_anchor_reduction_fraction": 0.18480392156862746
+    },
+    {
+      "rank": 192,
+      "native_anchor_average_bytes": 3029760.0,
+      "fp16_anchor_average_bytes": 3932160.0,
+      "native_anchor_reduction_fraction": -0.16029411764705892
+    },
+    {
+      "rank": 256,
+      "native_anchor_average_bytes": 3930880.0,
+      "fp16_anchor_average_bytes": 4833280.0,
+      "native_anchor_reduction_fraction": -0.5053921568627451
+    },
+    {
+      "rank": 384,
+      "native_anchor_average_bytes": 5733120.0,
+      "fp16_anchor_average_bytes": 6635520.0,
+      "native_anchor_reduction_fraction": -1.1955882352941178
+    },
+    {
+      "rank": 512,
+      "native_anchor_average_bytes": 7535360.0,
+      "fp16_anchor_average_bytes": 8437760.0,
+      "native_anchor_reduction_fraction": -1.8857843137254902
+    },
+    {
+      "rank": 640,
+      "native_anchor_average_bytes": 9337600.0,
+      "fp16_anchor_average_bytes": 10240000.0,
+      "native_anchor_reduction_fraction": -2.575980392156863
+    }
+  ],
+  "status": "completed"
+}

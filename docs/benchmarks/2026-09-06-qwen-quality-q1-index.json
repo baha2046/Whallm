@@ -1,0 +1,218 @@
+{
+  "formal_performance_result": false,
+  "decision": "confirmed_regression_stop",
+  "attempted_pairs": 27,
+  "valid_pairs": 26,
+  "confirmation_requests": 2,
+  "remaining_cases_not_run": 5,
+  "files": {
+    "docs/benchmarks/2026-09-06-qwen-quality-q1-gate-m5-pro.json": {
+      "sha256": "0612cd872270352db95aea3c76d10700d687287588d49a7de8ca7f2ba3d45be6",
+      "bytes": 1126348
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1.json": {
+      "sha256": "d76e3702fc1c20d3512317e0ad6c2d85d9c5fe24b79ca810802bb072729965f2",
+      "bytes": 36150
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/analyze_qwen_quality.py": {
+      "sha256": "d89c48ef95b8a097708dfaf8ea7eb0bb61510ad9ca23936a94170f170f90ed94",
+      "bytes": 7103
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/benchmark_qwen_task_accuracy.py": {
+      "sha256": "0c44238f11bc1ba78dbe3737697d8a895bd9f1bc5ee9ff46a8853d53f1c4d322",
+      "bytes": 8961
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/benchmark_research_baseline.py": {
+      "sha256": "172a845ba787cd1bad95d599044c00b56b9e7cf6f3def718152976f01e6b5a10",
+      "bytes": 10213
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/confirm_qwen_quality_regression.py": {
+      "sha256": "8868a14af2374af3c3e1416a47074e0ec364c93d983f1949781a4005b235a28c",
+      "bytes": 4154
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/grade_qwen_quality.py": {
+      "sha256": "db5c4a0ef89c7b03424241957df3a235def4e59d2d9aa410715d99eed036883b",
+      "bytes": 2761
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/prepare_qwen_quality_suite.py": {
+      "sha256": "9a8fa95dd48afa1f8384b3af84e5d1631669b59dba9ad2a9da896caf03cd1151",
+      "bytes": 9789
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/prepare_r0_prompts.py": {
+      "sha256": "6fc268df107ce46a99cc5a44568ab73405894761087d603e547d86faea7e8836",
+      "bytes": 3853
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/Scripts/research_qwen_sorted_experts.py": {
+      "sha256": "7940e951616c543f8f2974a99122048a9cb8aabbbd7683d2950f4ec036e90db6",
+      "bytes": 3050
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/code050-seeded-check.json": {
+      "sha256": "d3f487d37c83d4c82ba925e9109d0f41590894039e10f6d98fc7a0fe47bd17a4",
+      "bytes": 628
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/gsm8k-LICENSE": {
+      "sha256": "86bbb73e855821d7c401912fd4bf82e34313e6e3b6fd6f909f2b6cc9e209a53b",
+      "bytes": 1062
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/gsm8k-source.json": {
+      "sha256": "03efc8fce78bf0d63fc3b7ff9197d10888b40f458ac77280844ded13a029e926",
+      "bytes": 323
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/humaneval-LICENSE": {
+      "sha256": "bcba3de214851cce46ed5af42d6698044616eeace887c3231bc7a20474ab639e",
+      "bytes": 1083
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/humaneval-source.json": {
+      "sha256": "48e7dd190eaa861e0f52460d8f371d1b357e2e897f1d31121634c67cf8f945df",
+      "bytes": 299
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/research/QWEN_QUALITY_Q1_2026-09-06.md": {
+      "sha256": "c9f4744318bfd8820f56e544f61ef9b6139b9779b9d9f1bf58e9df0e7a73e479",
+      "bytes": 4785
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/research/QWEN_QUALITY_Q1_GRADING_NOTE_2026-09-06.md": {
+      "sha256": "6f376377eb7eb7b60e91aec71ffb9228d1cb8c64e8e16c0d02e413bbf852470a",
+      "bytes": 1084
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/results-at-grading-note.json": {
+      "sha256": "8923e3580c74d5d7f159b18fec436f1aae4bff1776e34396be13a198ff4da6db",
+      "bytes": 280034
+    },
+    "docs/benchmarks/source/2026-09-06-qwen-quality-q1/runtime/tests/test_qwen_quality_grading.py": {
+      "sha256": "1411e3e1683da8c458f23da133845d8d646776aaff9f78b76074650371cc0fe9",
+      "bytes": 1998
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-039.prompt.txt": {
+      "sha256": "7d4918fcb508f847bbd288d7979128a8fa85fd506046c26a99be388a27e03d9f",
+      "bytes": 16303
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-044.prompt.txt": {
+      "sha256": "39e697d6ee4885c78c4c3207637c4e64327c5681b27c7545996f7a27b924649d",
+      "bytes": 16343
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-050.prompt.txt": {
+      "sha256": "ab0a5181bf26521b699b55c6f9fe86e10922425a5b88a59c791e005079a87079",
+      "bytes": 16408
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-056.prompt.txt": {
+      "sha256": "b8002ab98959c20d883aac61a664fe39f8ed24de47d3d065cb792cec5085c7de",
+      "bytes": 16423
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-057.prompt.txt": {
+      "sha256": "700fc4cae2607f5645b0ea9e48851c2bc87ae5ff413d1bd4837c269b1d3c1e82",
+      "bytes": 16330
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-095.prompt.txt": {
+      "sha256": "bd5723c7f36d2a8df639577a26b39b25bdb7cc690b93c55c0ef5a89f155e2b98",
+      "bytes": 16399
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-151.prompt.txt": {
+      "sha256": "f86df7ae5b3fec05addcfbc159342426b160062ad8f33918c622b5e0a493695e",
+      "bytes": 16334
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/code-154.prompt.txt": {
+      "sha256": "e1e7c141ae7d780888cdca2c54a47d6046080f406df878c764f6bd9cbc774264",
+      "bytes": 16392
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/manifest.json": {
+      "sha256": "002a7b8dfa20b2715333caa42b6f28e8029b2e981c10b03bf3d59ba91cb2df6c",
+      "bytes": 4139
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-0394.prompt.txt": {
+      "sha256": "e4ae1dacaa899f39e93d2fab5d16430463a1a3e2603d3120728281f7f272ea37",
+      "bytes": 16409
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-0644.prompt.txt": {
+      "sha256": "83dd2d8831b48595c3b52f43eab10e20a9a98030c4ab9d74280bbe6a11a463c5",
+      "bytes": 16402
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-0678.prompt.txt": {
+      "sha256": "a3d9b5bfde80995c17ec897087fab36583241de405f0e016cd2c3d36fd09ae76",
+      "bytes": 16405
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-0757.prompt.txt": {
+      "sha256": "dbd519de1f4217fc151ca6ad692e9067c1a8d5f74d332e817142026fd7393104",
+      "bytes": 16465
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-0926.prompt.txt": {
+      "sha256": "ab6a4a5ea6afe0a4b2178553dfc9849f7d51b79cb88f50f8788f50fc88f99ffe",
+      "bytes": 16404
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-1146.prompt.txt": {
+      "sha256": "498a0c843a7c01cd89f78f8698b907ccf8f908ab04632b30cb58fbab5c8a68e8",
+      "bytes": 16390
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-1178.prompt.txt": {
+      "sha256": "00fbfb03dbbf2c534cc23f0caf9ad69946a9cc3e125d7434f319a44fb612133d",
+      "bytes": 16417
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/math-1181.prompt.txt": {
+      "sha256": "c50abe9ab7d443f2361de14a3936bf822950db1b93cec729a06431b47bfa32a2",
+      "bytes": 16395
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-01.prompt.txt": {
+      "sha256": "f8d237dcd2a9a037b7dbb2096d7ebb8e46f0268a235b9918f955f57a8227a01d",
+      "bytes": 16410
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-02.prompt.txt": {
+      "sha256": "550547735814e9225f7c6c06a0c2ffbb6172d8f5260ace7093d94f3281295108",
+      "bytes": 16426
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-03.prompt.txt": {
+      "sha256": "7b529524f66b1f9f527e6adfc8a10f19ed2dc9bc23d2126d69df3d8d1a977b86",
+      "bytes": 16425
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-04.prompt.txt": {
+      "sha256": "f5d77b1e9309b9f6850ef9a4296c7682c9f919b1cf1466112608d2e807c276c5",
+      "bytes": 16442
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-05.prompt.txt": {
+      "sha256": "d8985be4e5b4c976ee9a49c14630f01bbbaec35a3ea136cd064a85b8b9a3234f",
+      "bytes": 16424
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-06.prompt.txt": {
+      "sha256": "6ee75418572434142736d0a19e9df288bac0a99abb376bd4b367ab2d3710e5dc",
+      "bytes": 16459
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-07.prompt.txt": {
+      "sha256": "d12bffe8f1745d82d9b2ccc9b2b51ae35c66641c82629c9d770b8f5b6ff4a6e0",
+      "bytes": 16267
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/tool-08.prompt.txt": {
+      "sha256": "0e619fbbf35fbc01fc4093ce8c87783b7f00936884257e7e200b5f39b120773d",
+      "bytes": 16462
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-01.prompt.txt": {
+      "sha256": "4a23cf4e35a0252676a405bb4f10b566c78f3c78da72492f29592c78bba8fdf4",
+      "bytes": 16373
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-02.prompt.txt": {
+      "sha256": "f2e36a8140b6dc3dfab53c256565aa4e711ab018b5a72dcbd80513c1b5f8d6c4",
+      "bytes": 16419
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-03.prompt.txt": {
+      "sha256": "a956208d0c77bd713d63d62b06bdee354f8c24c5a3627c55370ba64025bf7d44",
+      "bytes": 16376
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-04.prompt.txt": {
+      "sha256": "1bb6b499ae219ccedbcf7fe7e888c3a340a4d3e992653a53c4a7d4a246836a59",
+      "bytes": 16422
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-05.prompt.txt": {
+      "sha256": "e3372d359127d30c36aa16e848cdbb6e9307e959ee338ae1008a57e48ecd497f",
+      "bytes": 16443
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-06.prompt.txt": {
+      "sha256": "0757128efd232fae7b3f5ce9c8130f7a2626062ce3377759dde8f8c8e140f901",
+      "bytes": 16387
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-07.prompt.txt": {
+      "sha256": "a57678267a7c12a167e7ac6124c091ee0ea73695e88112deb6f47e01f77fac2b",
+      "bytes": 16407
+    },
+    "docs/benchmarks/prompts/2026-09-06-qwen-quality-q1/zh-08.prompt.txt": {
+      "sha256": "b0add5e97624dcabfd91303ff6630c693e482d2f97b6160cd38771036c584a6f",
+      "bytes": 16376
+    }
+  }
+}

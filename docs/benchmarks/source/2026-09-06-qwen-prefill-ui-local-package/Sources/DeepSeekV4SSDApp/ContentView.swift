@@ -1,0 +1,2987 @@
+import AppKit
+import DeepSeekRepack
+import SwiftUI
+
+struct ContentView: View {
+  @ObservedObject var server: ServerController
+  let checkForUpdates: () -> Void
+  @StateObject private var modelLibrary = ModelLibrary()
+  @StateObject private var chatSession = ChatSession()
+  @State private var configuration = ServerConfiguration.localDefault
+  @State private var advancedSettings = ModelAdvancedSettings.defaults(for: .deepSeekV4)
+  @State private var advancedSettingsModelKind: ModelKind?
+  @State private var aliasDraft = ""
+  @State private var aliasError: String?
+  @State private var modelNavigationPath: [String] = []
+  @AppStorage("selectedAppPage") private var selectedPage = AppPage.server
+  @AppStorage(L10n.preferenceKey) private var languageCode = AppLanguage.appDefault.rawValue
+
+  var body: some View {
+    NavigationSplitView {
+      List(selection: $selectedPage) {
+        Section {
+          ForEach(AppPage.primaryPages) { page in
+            Label(page.title(language: selectedLanguage), systemImage: page.icon)
+              .padding(.vertical, 6)
+              .tag(page)
+          }
+        }
+        Section(L10n.string("General", language: selectedLanguage)) {
+          Label(
+            AppPage.settings.title(language: selectedLanguage),
+            systemImage: AppPage.settings.icon
+          )
+          .padding(.vertical, 6)
+          .tag(AppPage.settings)
+        }
+      }
+      .listStyle(.sidebar)
+      .scrollContentBackground(.hidden)
+      .background(AppTheme.sidebarBackground)
+      .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 250)
+    } detail: {
+      NavigationStack(path: $modelNavigationPath) {
+        VStack(spacing: 0) {
+          HStack {
+            Text(selectedPage.title(language: selectedLanguage))
+              .font(.title2.bold())
+            Spacer()
+          }
+          .frame(maxWidth: AppLayout.contentWidth)
+          .frame(maxWidth: .infinity)
+          .padding(.horizontal, 40)
+          .padding(.vertical, 16)
+
+          Divider()
+
+          selectedPageView
+        }
+        .background(AppTheme.pageBackground)
+        .navigationDestination(for: String.self) { rawValue in
+          if let modelKind = ModelKind(rawValue: rawValue) {
+            modelAdvancedPage(for: modelKind)
+          }
+        }
+      }
+    }
+    .navigationSplitViewStyle(.balanced)
+    .background(AppTheme.pageBackground)
+    .preferredColorScheme(.dark)
+    .environment(\.locale, selectedLanguage.locale)
+    .onDisappear { chatSession.stopGenerating() }
+    .task {
+      await modelLibrary.scan()
+      activateSelectedModel()
+      modelLibrary.resumeDownloadIfNeeded()
+    }
+    .onChange(of: modelLibrary.models) { activateSelectedModel() }
+    .onChange(of: modelLibrary.selectedModelKind) { activateSelectedModel() }
+    .onChange(of: configuration) {
+      configuration.save()
+      AppKeychain.saveAPIKey(configuration.apiKey)
+    }
+    .onChange(of: advancedSettings) {
+      if let advancedSettingsModelKind {
+        advancedSettings.save(for: advancedSettingsModelKind)
+        syncAdvancedSettings(for: advancedSettingsModelKind)
+      }
+    }
+    .onChange(of: aliasDraft) {
+      guard let advancedSettingsModelKind else { return }
+      do {
+        _ = try modelLibrary.saveAlias(aliasDraft, for: advancedSettingsModelKind)
+        aliasError = nil
+        syncAdvancedSettings(for: advancedSettingsModelKind)
+      } catch {
+        aliasError = error.localizedDescription
+      }
+    }
+    .onChange(of: selectedPage) {
+      if selectedPage != .model {
+        modelNavigationPath.removeAll()
+      }
+    }
+    .onChange(of: languageCode) { modelLibrary.refreshPreflight() }
+  }
+
+  private var selectedLanguage: AppLanguage {
+    (AppLanguage(rawValue: languageCode) ?? .appDefault).resolved
+  }
+
+  @ViewBuilder
+  private var selectedPageView: some View {
+    switch selectedPage {
+    case .server:
+      ServerView(
+        page: .server,
+        configuration: $configuration,
+        server: server,
+        modelLibrary: modelLibrary,
+        language: selectedLanguage,
+        showAdvancedSettings: showModelAdvancedSettings
+      )
+    case .model:
+      ServerView(
+        page: .model,
+        configuration: $configuration,
+        server: server,
+        modelLibrary: modelLibrary,
+        language: selectedLanguage,
+        showAdvancedSettings: showModelAdvancedSettings
+      )
+    case .advanced:
+      AdvancedView(
+        configuration: $configuration,
+        serverActive: server.isActive,
+        language: selectedLanguage
+      )
+    case .chat:
+      ChatView(
+        configuration: configuration,
+        server: server,
+        session: chatSession,
+        language: selectedLanguage
+      )
+    case .metric:
+      MetricView(
+        state: server.state,
+        performance: server.performance,
+        history: server.performanceHistory,
+        language: selectedLanguage,
+        clearHistory: server.clearPerformanceHistory
+      )
+    case .logs:
+      LogsView(server: server, language: selectedLanguage)
+    case .settings:
+      SettingsView(
+        languageCode: $languageCode,
+        language: selectedLanguage,
+        checkForUpdates: checkForUpdates
+      )
+    }
+  }
+
+  private func activateSelectedModel() {
+    let modelKind = modelLibrary.selectedModelKind
+    if advancedSettingsModelKind != modelKind {
+      if let advancedSettingsModelKind {
+        advancedSettings.save(for: advancedSettingsModelKind)
+      }
+      advancedSettingsModelKind = modelKind
+      advancedSettings = ModelAdvancedSettings.loadOrDefault(for: modelKind)
+      aliasDraft = modelLibrary.alias(for: modelKind)
+      aliasError = nil
+    }
+  }
+
+  private func showModelAdvancedSettings(_ modelKind: ModelKind) {
+    if modelLibrary.selectedModelKind != modelKind {
+      modelLibrary.selectedModelKind = modelKind
+    }
+    activateSelectedModel()
+    modelNavigationPath = [modelKind.rawValue]
+  }
+
+  private func modelAdvancedPage(for modelKind: ModelKind) -> some View {
+    let backLabel = L10n.string("Back to Model", language: selectedLanguage)
+
+    return VStack(spacing: 0) {
+      HStack(spacing: 12) {
+        Button {
+          modelNavigationPath.removeAll()
+        } label: {
+          Label(backLabel, systemImage: "chevron.backward")
+        }
+        .buttonStyle(TertiaryIconButtonStyle())
+        .accessibilityLabel(backLabel)
+        .help(backLabel)
+
+        Text(modelKind.displayName)
+          .font(.title2.bold())
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 8)
+
+      Divider()
+
+      ModelAdvancedView(
+        settings: $advancedSettings,
+        alias: $aliasDraft,
+        aliasError: aliasError,
+        settingsLocked: modelAdvancedSettingsAreLocked(
+          modelID: modelKind.apiModelID,
+          loadedModel: server.performance.loadedModel,
+          loadingModel: server.performance.loadingModel,
+          modelActionID: server.modelAction?.modelID
+        ),
+        mtpAvailable: modelLibrary.usableModel(for: modelKind)?.hasMTP == true,
+        dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
+        modelKind: modelKind,
+        language: selectedLanguage
+      )
+    }
+    .background(AppTheme.pageBackground)
+    .navigationBarBackButtonHidden()
+  }
+
+  private func syncAdvancedSettings(for modelKind: ModelKind) {
+    guard server.canManageModels,
+      !modelAdvancedSettingsAreLocked(
+        modelID: modelKind.apiModelID,
+        loadedModel: server.performance.loadedModel,
+        loadingModel: server.performance.loadingModel,
+        modelActionID: server.modelAction?.modelID
+      ),
+      let catalog = try? modelLibrary.makeServerCatalog(
+        powerSavingLimitGBps: configuration.powerSavingLimitGBps),
+      let entry = catalog.models.first(where: { $0.id == modelKind.apiModelID })
+    else { return }
+    server.configureModel(entry)
+  }
+}
+
+private enum AppPage: String, CaseIterable, Identifiable {
+  case server
+  case model
+  case advanced
+  case chat
+  case metric
+  case logs
+  case settings
+
+  var id: String { rawValue }
+
+  static let primaryPages: [AppPage] = [.server, .model, .advanced, .chat, .metric, .logs]
+
+  var icon: String {
+    switch self {
+    case .server: "externaldrive"
+    case .model: "shippingbox"
+    case .advanced: "slider.horizontal.3"
+    case .chat: "bubble"
+    case .metric: "gauge.with.dots.needle.50percent"
+    case .logs: "doc.text"
+    case .settings: "gearshape"
+    }
+  }
+
+  func title(language: AppLanguage) -> String {
+    switch self {
+    case .server: L10n.string("Server", language: language)
+    case .model: L10n.string("Model", language: language)
+    case .advanced: L10n.string("Advance", language: language)
+    case .chat: L10n.string("Chat", language: language)
+    case .metric: L10n.string("Metric", language: language)
+    case .logs: L10n.string("Logs", language: language)
+    case .settings: L10n.string("Settings", language: language)
+    }
+  }
+}
+
+private enum AppLayout {
+  // Change this value to set the visible page content width.
+  static let contentWidth: CGFloat = 880
+}
+
+private enum AppTheme {
+  static let pageBackground = Color(red: 0.095, green: 0.095, blue: 0.1)
+  static let sidebarBackground = Color(red: 0.12, green: 0.12, blue: 0.125)
+  static let cardBackground = Color(red: 0.15, green: 0.15, blue: 0.155)
+  static let fieldBackground = Color(red: 0.075, green: 0.075, blue: 0.08)
+  static let cardRadius: CGFloat = 16
+  static let fieldRadius: CGFloat = 8
+}
+
+private struct TertiaryIconButtonStyle: ButtonStyle {
+  var color = Color.secondary
+
+  func makeBody(configuration: Configuration) -> some View {
+    TertiaryIconButtonBody(
+      label: configuration.label,
+      isPressed: configuration.isPressed,
+      color: color
+    )
+  }
+}
+
+private struct TertiaryIconButtonBody<Label: View>: View {
+  let label: Label
+  let isPressed: Bool
+  let color: Color
+  @Environment(\.isEnabled) private var isEnabled
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var isHovered = false
+
+  var body: some View {
+    label
+      .labelStyle(.iconOnly)
+      .font(.system(size: 14, weight: .semibold))
+      .foregroundStyle(color)
+      .opacity(iconOpacity)
+      .frame(width: 32, height: 32)
+      .background {
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+          .fill(color.opacity(backgroundOpacity))
+      }
+      .frame(width: 40, height: 40)
+      .contentShape(Rectangle())
+      .scaleEffect(reduceMotion ? 1 : scale)
+      .onHover { isHovered = $0 }
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+      .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isPressed)
+  }
+
+  private var iconOpacity: Double {
+    if !isEnabled { return 0.35 }
+    if isPressed { return 0.55 }
+    return isHovered ? 1 : 0.78
+  }
+
+  private var backgroundOpacity: Double {
+    if !isEnabled { return 0 }
+    if isPressed { return 0.18 }
+    return isHovered ? 0.12 : 0
+  }
+
+  private var scale: CGFloat {
+    isEnabled && isPressed ? 0.96 : 1
+  }
+}
+
+private struct SectionHeader: View {
+  let title: String
+
+  var body: some View {
+    Text(title.uppercased())
+      .font(.callout.weight(.semibold))
+      .tracking(1.1)
+      .foregroundStyle(.secondary)
+      .accessibilityAddTraits(.isHeader)
+  }
+}
+
+private struct AppCardModifier: ViewModifier {
+  let padding: CGFloat
+
+  func body(content: Content) -> some View {
+    content
+      .padding(padding)
+      .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius))
+      .overlay(
+        RoundedRectangle(cornerRadius: AppTheme.cardRadius)
+          .stroke(Color.primary.opacity(0.06))
+      )
+  }
+}
+
+private struct AppInputModifier: ViewModifier {
+  let width: CGFloat?
+
+  func body(content: Content) -> some View {
+    content
+      .textFieldStyle(.plain)
+      .padding(.horizontal, 11)
+      .frame(width: width)
+      .frame(minHeight: 34)
+      .background(
+        AppTheme.fieldBackground, in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+          .stroke(Color.primary.opacity(0.12))
+      )
+  }
+}
+
+extension View {
+  fileprivate func appCard(padding: CGFloat = 16) -> some View {
+    modifier(AppCardModifier(padding: padding))
+  }
+
+  fileprivate func appInput(width: CGFloat? = nil) -> some View {
+    modifier(AppInputModifier(width: width))
+  }
+}
+
+private enum ServerViewPage {
+  case server
+  case model
+}
+
+private struct ServerView: View {
+  let page: ServerViewPage
+  @Binding var configuration: ServerConfiguration
+  @ObservedObject var server: ServerController
+  @ObservedObject var modelLibrary: ModelLibrary
+  let language: AppLanguage
+  let showAdvancedSettings: (ModelKind) -> Void
+  @State private var confirmsDownload = false
+  @State private var downloadTarget: ModelKind?
+  @State private var confirmsMTPDownload = false
+  @State private var mtpDownloadTarget: InstalledModelInfo?
+  @State private var confirmsRepair = false
+  @State private var repairTarget: InstalledModelInfo?
+  @State private var confirmsReinstall = false
+  @State private var reinstallTarget: URL?
+  @State private var startError: String?
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        if page == .server {
+          serverSummaryCard
+
+          SectionHeader(title: L10n.string("System Check", language: language))
+            .padding(.top, 10)
+          systemCheckPanel
+
+          SectionHeader(title: L10n.string("Server", language: language))
+            .padding(.top, 10)
+          serverPanel
+        } else {
+          if let loadedModelKind {
+            SectionHeader(title: L10n.string("Loaded", language: language))
+            loadedModelPanel(loadedModelKind)
+          }
+
+          HStack(spacing: 16) {
+            SectionHeader(title: L10n.string("Model", language: language))
+            Spacer()
+            Button {
+              chooseModelDirectory()
+            } label: {
+              Label(
+                L10n.string("Select Model Folder", language: language),
+                systemImage: "folder"
+              )
+            }
+            .buttonStyle(.bordered)
+            .frame(minHeight: 40)
+            .contentShape(Rectangle())
+            .help(L10n.string("Select Model Folder", language: language))
+            .disabled(modelLibrary.isBusy)
+          }
+
+          modelPanel
+
+          if let modelActionError = server.modelActionError {
+            Label(modelActionError, systemImage: "exclamationmark.triangle.fill")
+              .font(.callout)
+              .foregroundStyle(.red)
+              .textSelection(.enabled)
+              .accessibilityLabel(
+                L10n.string("Error: %@", language: language, modelActionError))
+          }
+
+          if modelLibrary.isBusy && modelLibrary.downloadModelKind == nil {
+            operationPanel
+          }
+
+          if let message = modelLibrary.message {
+            Label(
+              message,
+              systemImage: message.hasPrefix("無法")
+                ? "exclamationmark.triangle.fill" : "info.circle"
+            )
+            .foregroundStyle(message.hasPrefix("無法") ? Color.red : Color.secondary)
+            .textSelection(.enabled)
+            .accessibilityLabel(L10n.string("Model status: %@", language: language, message))
+          }
+
+          if !modelLibrary.damagedModels.isEmpty || !modelLibrary.invalidModelURLs.isEmpty {
+            damagedModelsPanel
+          }
+        }
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+    .confirmationDialog(
+      L10n.string("Download and install the model?"),
+      isPresented: $confirmsDownload,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Download Model", language: language)) {
+        if let downloadTarget { modelLibrary.startDownload(for: downloadTarget) }
+      }
+      Button(L10n.string("Cancel"), role: .cancel) {}
+    } message: {
+      Text(
+        L10n.string(
+          "The app will install the model in %@. You can resume an interrupted download.",
+          language: language,
+          modelLibrary.rootURL.path))
+    }
+    .confirmationDialog(
+      L10n.string("Verify and repair the model?"),
+      isPresented: $confirmsRepair,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Verify and Repair")) {
+        if let repairTarget { modelLibrary.startRepair(repairTarget) }
+      }
+      Button(L10n.string("Cancel"), role: .cancel) {}
+    } message: {
+      Text(
+        L10n.string(
+          "The app will verify the complete model. It will download only missing or damaged data."))
+    }
+    .confirmationDialog(
+      L10n.string("Download the model again?"),
+      isPresented: $confirmsReinstall,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Download Again"), role: .destructive) {
+        if let reinstallTarget { modelLibrary.reinstall(reinstallTarget) }
+      }
+      Button(L10n.string("Cancel"), role: .cancel) {}
+    } message: {
+      Text(
+        L10n.string(
+          "The app will move the damaged model to Trash. It will then download the complete model.")
+      )
+    }
+    .confirmationDialog(
+      L10n.string("Download and install MTP?", language: language),
+      isPresented: $confirmsMTPDownload,
+      titleVisibility: .visible
+    ) {
+      Button(L10n.string("Download MTP", language: language)) {
+        if let mtpDownloadTarget { modelLibrary.startMTPInstallation(mtpDownloadTarget) }
+      }
+      Button(L10n.string("Cancel", language: language), role: .cancel) {}
+    } message: {
+      if let mtpDownloadTarget {
+        Text(
+          L10n.string(
+            "The app will add MTP to %@. The existing Qwen model will remain installed.",
+            language: language,
+            mtpDownloadTarget.url.path
+          )
+        )
+      }
+    }
+  }
+
+  private var serverSummaryCard: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 18) {
+        Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+          .resizable()
+          .interpolation(.high)
+          .frame(width: 56, height: 56)
+          .accessibilityHidden(true)
+
+        VStack(alignment: .leading, spacing: 5) {
+          HStack(spacing: 10) {
+            Text("Whallm")
+              .font(.title3.bold())
+              .lineLimit(1)
+            Label(summaryStatusLabel, systemImage: summaryStatusSymbol)
+              .font(.callout.weight(.semibold))
+              .foregroundStyle(summaryStatusColor)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 4)
+              .background(summaryStatusColor.opacity(0.12), in: Capsule())
+          }
+          Text(summaryDetail)
+            .font(.callout.monospaced())
+            .foregroundStyle(.secondary)
+            .textSelection(.enabled)
+        }
+        .accessibilityElement(children: .combine)
+
+        Spacer(minLength: 20)
+
+        Button {
+          if server.isActive {
+            server.stop()
+          } else {
+            do {
+              let catalog = try modelLibrary.makeServerCatalog(
+                powerSavingLimitGBps: configuration.powerSavingLimitGBps)
+              startError = nil
+              server.start(configuration, catalog: catalog)
+            } catch {
+              startError = error.localizedDescription
+            }
+          }
+        } label: {
+          Label(
+            L10n.string(server.isActive ? "Stop Server" : "Start Server", language: language),
+            systemImage: server.isActive ? "stop.fill" : "play.fill"
+          )
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.blue)
+        .controlSize(.large)
+        .keyboardShortcut(server.isActive ? "." : "\r", modifiers: .command)
+      }
+
+      if let startError {
+        Text(startError)
+          .font(.caption)
+          .foregroundStyle(.red)
+          .accessibilityLabel(L10n.string("Error: %@", language: language, startError))
+      }
+    }
+    .appCard(padding: 22)
+  }
+
+  private var serverPanel: some View {
+    VStack(alignment: .leading, spacing: 0) {
+      if case .failed(let message) = server.state {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+          .foregroundStyle(.red)
+          .accessibilityLabel(L10n.string("Error: %@", language: language, message))
+          .padding(.bottom, 12)
+      }
+
+      SettingRow(
+        "Listen Address",
+        hint: "Choose which devices can connect. From another device, use this Mac’s LAN IP address—not 0.0.0.0.",
+        language: language
+      ) {
+        Picker(L10n.string("Listen Address", language: language), selection: $configuration.host) {
+          Text(L10n.string("127.0.0.1 (Local only)", language: language))
+            .tag("127.0.0.1")
+          Text(L10n.string("0.0.0.0 (All networks)", language: language))
+            .tag("0.0.0.0")
+        }
+        .labelsHidden()
+        .frame(width: 290, alignment: .trailing)
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "Port",
+        hint: "Default 11434. Restart the server after changing it.",
+        language: language
+      ) {
+        TextField("11434", value: $configuration.port, format: .number.grouping(.never))
+          .appInput(width: 120)
+          .accessibilityLabel(L10n.string("Port", language: language))
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "Log level",
+        hint:
+          "Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content.",
+        language: language
+      ) {
+        Picker(
+          L10n.string("Log level", language: language),
+          selection: $configuration.logLevel
+        ) {
+          ForEach(ServerLogLevel.allCases) { level in
+            Text(L10n.string(level.localizationKey, language: language)).tag(level)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 240, alignment: .trailing)
+      }
+      .disabled(server.isActive)
+
+      Divider()
+
+      SettingRow(
+        "API key",
+        hint: "Optional for local use",
+        language: language
+      ) {
+        SecureField(L10n.string("Optional for local use"), text: $configuration.apiKey)
+          .appInput(width: 320)
+      }
+      .disabled(server.isActive)
+
+    }
+    .appCard()
+  }
+
+  private var systemCheckPanel: some View {
+    HStack(spacing: 0) {
+      ForEach(modelLibrary.preflightChecks) { check in
+        HStack(spacing: 10) {
+          Image(systemName: preflightCheckSymbol(check.id))
+            .font(.system(size: 20, weight: .regular))
+            .foregroundStyle(.secondary)
+            .frame(width: 24)
+            .accessibilityHidden(true)
+
+          Text(check.title)
+            .font(.callout.weight(.medium))
+            .lineLimit(1)
+
+          Spacer(minLength: 8)
+
+          Image(systemName: preflightSymbol(check.status))
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(preflightColor(check.status))
+            .accessibilityHidden(true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .help(check.detail)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(preflightAccessibilityLabel(check))
+
+        if check.id != modelLibrary.preflightChecks.last?.id {
+          Divider()
+            .frame(height: 28)
+            .padding(.horizontal, 16)
+        }
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .appCard()
+  }
+
+  private var modelPanel: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      List(selection: selectedModelKind) {
+        ForEach(selectableModelKinds, id: \.rawValue) { modelKind in
+          modelRow(modelKind)
+          .contentShape(Rectangle())
+          .tag(modelKind.rawValue)
+          .selectionDisabled(modelSelectionLocked)
+          .task { await modelLibrary.refreshInstallationPlan(for: modelKind) }
+        }
+      }
+      .listStyle(.inset)
+      .scrollContentBackground(.hidden)
+      .frame(height: modelListHeight)
+      .accessibilityLabel(L10n.string("Model", language: language))
+      .accessibilityHint(
+        L10n.string(
+          "Select a model. You can select it before it is installed.", language: language))
+
+      if let selectedModel, selectableModelKinds.contains(selectedModel.modelKind) {
+        Divider()
+
+        HStack(spacing: 10) {
+          Button(L10n.string("Show in Finder")) {
+            modelLibrary.reveal(selectedModel.url)
+          }
+          Button(L10n.string("Verify Complete Model")) {
+            modelLibrary.startVerification(selectedModel)
+          }
+          .disabled(server.isActive || modelLibrary.isBusy)
+          if selectedModel.modelKind == .deepSeekV4, !selectedModel.hasDSpark {
+            Button(L10n.string("Install DSpark (10.12 GiB)")) {
+              modelLibrary.startDSparkInstallation(selectedModel)
+            }
+            .disabled(server.isActive || modelLibrary.isBusy)
+          }
+          Spacer()
+        }
+      }
+
+      Divider()
+      modelFolderSummary
+
+      if modelLibrary.verificationModelPath == selectedModel?.url.path,
+        let issues = modelLibrary.verificationIssues
+      {
+        if issues.isEmpty {
+          Label(L10n.string("Complete verification passed"), systemImage: "checkmark.seal.fill")
+            .foregroundStyle(.green)
+        } else {
+          Label(
+            L10n.string("%lld files need repair", Int64(issues.count)),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .foregroundStyle(.red)
+          Button(L10n.string("Verify and Repair")) {
+            repairTarget = selectedModel
+            confirmsRepair = true
+          }
+          .disabled(modelLibrary.isBusy || server.isActive)
+        }
+      }
+    }
+    .appCard()
+  }
+
+  private func loadedModelPanel(_ modelKind: ModelKind) -> some View {
+    modelRow(modelKind)
+      .task { await modelLibrary.refreshInstallationPlan(for: modelKind) }
+      .appCard()
+  }
+
+  private func modelRow(_ modelKind: ModelKind) -> some View {
+    let model = modelLibrary.usableModel(for: modelKind)
+    let downloadBlock = modelLibrary.downloadBlock(for: modelKind)
+    let isDownloading = modelLibrary.downloadModelKind == modelKind
+    let downloadReason = visibleDownloadReason(modelKind, block: downloadBlock)
+
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 12) {
+        if modelLibrary.isScanning
+          || (model == nil && modelLibrary.isPlanningInstallation(for: modelKind))
+        {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityHidden(true)
+        } else {
+          Image(
+            systemName: isModelLoading(modelKind)
+              ? "clock.fill" : (model == nil ? "arrow.down.circle" : "checkmark.circle.fill")
+          )
+            .foregroundStyle(
+              isModelLoading(modelKind) ? Color.orange : (model == nil ? Color.orange : Color.green)
+            )
+            .accessibilityHidden(true)
+        }
+
+        VStack(alignment: .leading, spacing: 3) {
+          Text(modelKind.displayName)
+            .font(.body.weight(.medium))
+          modelStatus(modelKind, model: model)
+        }
+
+        Spacer(minLength: 16)
+
+        if isDownloading {
+          Button(L10n.string("Stop Download", language: language)) {
+            modelLibrary.cancelOperation()
+          }
+          .buttonStyle(.bordered)
+          .disabled(modelLibrary.operationPhase == .cancelling)
+        } else if model == nil {
+          modelDownloadButton(modelKind, block: downloadBlock)
+        } else if let model, shouldShowMTPDownloadButton(model) {
+          mtpDownloadButton(model)
+        }
+
+        modelLifecycleButton(modelKind, model: model)
+
+        Button {
+          showAdvancedSettings(modelKind)
+        } label: {
+          Label(
+            L10n.string("Advanced Settings", language: language),
+            systemImage: "slider.horizontal.3"
+          )
+        }
+        .buttonStyle(TertiaryIconButtonStyle())
+        .accessibilityLabel(
+          L10n.string(
+            "Advanced Settings for %@",
+            language: language,
+            modelKind.displayName
+          )
+        )
+        .help(
+          L10n.string(
+            "Advanced Settings for %@",
+            language: language,
+            modelKind.displayName
+          )
+        )
+        .disabled(modelSelectionLocked && modelKind != modelLibrary.selectedModelKind)
+      }
+      .frame(minHeight: 48)
+
+      if shouldShowModelDownloadReason(
+        modelIsInstalled: model != nil,
+        modelIsDownloading: isDownloading,
+        hasReason: downloadReason != nil
+      ), let downloadReason
+      {
+        Label(downloadReason, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .padding(.leading, 32)
+      }
+
+      if isDownloading {
+        modelDownloadProgress
+          .padding(.leading, 32)
+          .padding(.bottom, 8)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func modelStatus(_ modelKind: ModelKind, model: InstalledModelInfo?) -> some View {
+    if let model {
+      let status = L10n.string(
+        isModelLoading(modelKind)
+          ? "Loading" : (isModelLoaded(modelKind) ? "Loaded" : "Installed"),
+        language: language
+      )
+      Text(
+        L10n.string(
+          shouldShowMTPDownloadButton(model) ? "%@ · %@ · MTP download available" : "%@ · %@",
+          language: language,
+          status,
+          formattedBytes(model.size)
+        )
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+    } else if modelLibrary.isPlanningInstallation(for: modelKind) {
+      Text(L10n.string("Not installed · Checking download size…", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    } else if let bytes = modelLibrary.plannedInstalledBytes(for: modelKind) {
+      Text(
+        L10n.string(
+          "Not installed · Download size: %@",
+          language: language,
+          formattedBytes(bytes)
+        )
+      )
+      .font(.callout)
+      .foregroundStyle(.secondary)
+    } else if case .some(.installationPlanUnavailable) = modelLibrary.downloadBlock(
+      for: modelKind)
+    {
+      Text(L10n.string("Not installed · Download size unavailable", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    } else {
+      Text(L10n.string("Not installed", language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+  }
+
+  private func modelLifecycleButton(
+    _ modelKind: ModelKind,
+    model: InstalledModelInfo?
+  ) -> some View {
+    let isLoaded = isModelLoaded(modelKind)
+    let label = L10n.string(
+      isLoaded ? "Unload %@" : "Load %@",
+      language: language,
+      modelKind.displayName
+    )
+    let disabledReason = modelLifecycleDisabledReason(modelKind, model: model)
+
+    return Button {
+      Task {
+        if isLoaded {
+          await server.unloadModel(modelKind.apiModelID)
+        } else {
+          await server.loadModel(modelKind.apiModelID) {
+            try modelLibrary.makeServerCatalog(
+              powerSavingLimitGBps: configuration.powerSavingLimitGBps)
+          }
+        }
+      }
+    } label: {
+      Label(
+        label,
+        systemImage: isLoaded ? "eject.fill" : "play.fill"
+      )
+    }
+    .fontWeight(isLoaded ? .thin : .regular)
+    .buttonStyle(TertiaryIconButtonStyle(color: isLoaded ? .secondary : .accentColor))
+    .accessibilityLabel(label)
+    .accessibilityHint(disabledReason ?? "")
+    .help(disabledReason ?? label)
+    .disabled(disabledReason != nil)
+    .overlay {
+      if let disabledReason {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(disabledReason)
+          .accessibilityHidden(true)
+      }
+    }
+  }
+
+  private func modelLifecycleDisabledReason(
+    _ modelKind: ModelKind,
+    model: InstalledModelInfo?
+  ) -> String? {
+    if model == nil {
+      return L10n.string("Install the model first.", language: language)
+    }
+    if !server.canManageModels {
+      return L10n.string("Start the server first", language: language)
+    }
+    if server.performance.generating {
+      return L10n.string("Wait for the current response to finish.", language: language)
+    }
+    if server.modelAction != nil || server.performance.loadingModel != nil {
+      return L10n.string("Another model action is in progress.", language: language)
+    }
+    if !server.catalogModels.contains(where: { $0.id == modelKind.apiModelID }) {
+      return L10n.string(
+        "The model is not available to this server. Restart the server.",
+        language: language
+      )
+    }
+    return nil
+  }
+
+  @ViewBuilder
+  private func modelDownloadButton(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> some View {
+    let isDisabled = modelDownloadIsDisabled(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      canStartDownload: modelLibrary.canStartDownload(modelKind),
+      hasPartialDownload: modelLibrary.hasPartialDownload,
+      targetHasPartialDownload: modelLibrary.hasPartialDownload(for: modelKind)
+    )
+    let label =
+      modelLibrary.hasPartialDownload(for: modelKind) ? "Resume" : "Download"
+    let help = downloadHelp(modelKind, block: block)
+
+    let button = Button {
+      requestDownload(modelKind)
+    } label: {
+      Label(L10n.string(label, language: language), systemImage: "arrow.down.circle")
+    }
+    .frame(minHeight: 40)
+    .contentShape(Rectangle())
+    .disabled(isDisabled)
+    .overlay {
+      if isDisabled {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(help)
+          .accessibilityHidden(true)
+      }
+    }
+    .help(help)
+    .accessibilityHint(help)
+
+    if modelLibrary.selectedModelKind == modelKind {
+      button
+        .buttonStyle(.borderedProminent)
+        .tint(isDisabled ? .gray : .blue)
+    } else {
+      button
+        .buttonStyle(.bordered)
+        .tint(isDisabled ? .gray : .secondary)
+    }
+  }
+
+  private func mtpDownloadButton(_ model: InstalledModelInfo) -> some View {
+    let block = modelLibrary.mtpDownloadBlock(for: model)
+    let disabledReason =
+      modelLibrary.isBusy
+      ? L10n.string("Wait for the current model operation to finish.", language: language)
+      : block?.message
+    let label = L10n.string(
+      modelLibrary.hasPartialMTPInstallation(for: model)
+        ? "Resume MTP download for %@" : "Download MTP for %@",
+      language: language,
+      model.modelKind.displayName
+    )
+
+    return Button {
+      requestMTPDownload(model)
+    } label: {
+      Label(label, systemImage: "arrow.down.circle")
+    }
+    .buttonStyle(TertiaryIconButtonStyle())
+    .accessibilityLabel(label)
+    .accessibilityHint(disabledReason ?? "")
+    .help(label)
+    .disabled(disabledReason != nil)
+    .overlay {
+      if let disabledReason {
+        Color.clear
+          .contentShape(Rectangle())
+          .help(disabledReason)
+          .accessibilityHidden(true)
+      }
+    }
+  }
+
+  private var modelDownloadProgress: some View {
+    VStack(alignment: .leading, spacing: 6) {
+      if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
+        let fractionText = formattedProgress(fraction)
+        HStack(spacing: 12) {
+          Text(modelLibrary.operationPhase.label)
+            .font(.callout.weight(.medium))
+          Spacer()
+          Text(fractionText)
+            .font(.callout.weight(.semibold).monospacedDigit())
+        }
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+          .fill(Color.primary.opacity(0.12))
+          .overlay {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+              .fill(Color.accentColor)
+              .scaleEffect(x: max(0, min(1, fraction)), anchor: .leading)
+          }
+          .frame(height: 6)
+          .accessibilityElement()
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+          .accessibilityValue(fractionText)
+        modelDownloadMetadata(progress)
+      } else {
+        HStack(spacing: 10) {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityHidden(true)
+          Text(modelLibrary.operationPhase.label)
+            .font(.callout.weight(.medium))
+        }
+        .accessibilityElement(children: .combine)
+      }
+    }
+  }
+
+  private var modelListHeight: CGFloat {
+    var height = CGFloat(selectableModelKinds.count) * 62
+    if modelLibrary.downloadModelKind != nil {
+      height += modelDownloadProgressExtraHeight(
+        hasProgressFraction: modelLibrary.operationProgress?.fraction != nil)
+    }
+    let visibleDownloadReasonCount = selectableModelKinds.filter {
+      shouldShowModelDownloadReason(
+        modelIsInstalled: modelLibrary.usableModel(for: $0) != nil,
+        modelIsDownloading: modelLibrary.downloadModelKind == $0,
+        hasReason: visibleDownloadReason($0, block: modelLibrary.downloadBlock(for: $0)) != nil
+      )
+    }.count
+    height += CGFloat(visibleDownloadReasonCount) * 32
+    return min(height, 320)
+  }
+
+  private var selectedModelKind: Binding<String> {
+    Binding(
+      get: { modelLibrary.selectedModelKind.rawValue },
+      set: { value in
+        guard !modelSelectionLocked, let modelKind = ModelKind(rawValue: value),
+          modelKind != modelLibrary.selectedModelKind
+        else { return }
+        modelLibrary.selectedModelKind = modelKind
+      }
+    )
+  }
+
+  private var modelSelectionLocked: Bool {
+    modelSelectionIsLocked(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      downloadIsActive: modelLibrary.downloadModelKind != nil,
+      hasPartialDownload: modelLibrary.hasPartialDownload
+    )
+  }
+
+  private var operationPanel: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      Text(modelLibrary.operationPhase.label).font(.headline)
+      if let progress = modelLibrary.operationProgress, let fraction = progress.fraction {
+        ProgressView(value: fraction)
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+          .accessibilityValue(formattedProgress(fraction))
+        modelDownloadMetadata(progress)
+      } else {
+        ProgressView()
+          .accessibilityLabel(modelLibrary.operationPhase.label)
+      }
+      Button(L10n.string("Stop Current Operation")) { modelLibrary.cancelOperation() }
+        .disabled(modelLibrary.operationPhase == .cancelling)
+    }
+    .appCard()
+  }
+
+  private var damagedModelsPanel: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Text(L10n.string("Models That Need Attention")).font(.headline)
+      ForEach(modelLibrary.damagedModels) { model in
+        HStack(alignment: .top, spacing: 12) {
+          Label(
+            L10n.string(
+              "%@: %lld files are missing or have the wrong size", model.name,
+              Int64(model.quickIssues.count)),
+            systemImage: "exclamationmark.triangle.fill"
+          )
+          .foregroundStyle(.red)
+          Spacer()
+          Button(L10n.string("Show in Finder")) { modelLibrary.reveal(model.url) }
+          Button(L10n.string("Verify and Repair")) {
+            repairTarget = model
+            confirmsRepair = true
+          }
+          .disabled(modelLibrary.isBusy || server.isActive)
+        }
+      }
+      ForEach(modelLibrary.invalidModelURLs, id: \.path) { url in
+        HStack(alignment: .top, spacing: 12) {
+          Label(
+            L10n.string("%@: The manifest cannot be read", url.lastPathComponent),
+            systemImage: "xmark.octagon.fill"
+          )
+          .foregroundStyle(.red)
+          Spacer()
+          Button(L10n.string("Show in Finder")) { modelLibrary.reveal(url) }
+          Button(L10n.string("Download Again")) {
+            reinstallTarget = url
+            confirmsReinstall = true
+          }
+          .disabled(modelLibrary.isBusy || server.isActive || !modelLibrary.canDownload)
+        }
+      }
+    }
+    .appCard()
+  }
+
+  private var selectedModel: InstalledModelInfo? {
+    modelLibrary.usableModel(for: modelLibrary.selectedModelKind)
+  }
+
+  private var loadedModelKind: ModelKind? {
+    modelKind(withAPIModelID: server.performance.loadedModel)
+  }
+
+  private var selectableModelKinds: [ModelKind] {
+    ModelLibrary.supportedModelKinds.filter { $0 != loadedModelKind }
+  }
+
+  private func isModelLoaded(_ modelKind: ModelKind) -> Bool {
+    server.performance.loadedModel == modelKind.apiModelID
+  }
+
+  private func isModelLoading(_ modelKind: ModelKind) -> Bool {
+    server.performance.loadingModel == modelKind.apiModelID
+      || server.modelAction == .load(modelKind.apiModelID)
+  }
+
+  private var summaryStatusLabel: String {
+    return server.state.label
+  }
+
+  private var summaryStatusSymbol: String {
+    return "circle.fill"
+  }
+
+  private var summaryStatusColor: Color {
+    return statusColor
+  }
+
+  private var summaryDetail: String {
+    return configuration.baseURL?.absoluteString ?? L10n.string("Invalid Base URL")
+  }
+
+  private var modelFolderSummary: some View {
+    HStack(alignment: .center, spacing: 12) {
+      Image(systemName: "folder")
+        .foregroundStyle(.secondary)
+        .frame(width: 18)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(L10n.string("Model folder", language: language))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(modelLibrary.rootURL.path)
+          .font(.callout.monospaced())
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+          .help(modelLibrary.rootURL.path)
+      }
+      Spacer(minLength: 16)
+      VStack(alignment: .trailing, spacing: 3) {
+        Text(L10n.string("Available space", language: language))
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        if let availableBytes = modelLibrary.modelFolderAvailableBytes {
+          Text(formattedBytes(availableBytes))
+            .font(.callout.weight(.medium).monospacedDigit())
+        } else if modelLibrary.isScanning {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel(L10n.string("Available space", language: language))
+        } else {
+          Text(L10n.string("Unavailable", language: language))
+            .font(.callout.weight(.medium))
+        }
+      }
+    }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func visibleDownloadReason(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> String? {
+    if case .some(.loadingInstallationPlan) = block { return nil }
+    if let block { return block.message }
+    let isDisabled = modelDownloadIsDisabled(
+      serverIsActive: server.isActive,
+      operationIsBusy: modelLibrary.isBusy,
+      canStartDownload: modelLibrary.canStartDownload(modelKind),
+      hasPartialDownload: modelLibrary.hasPartialDownload,
+      targetHasPartialDownload: modelLibrary.hasPartialDownload(for: modelKind)
+    )
+    guard isDisabled else { return nil }
+    return downloadHelp(modelKind, block: nil)
+  }
+
+  private func modelDownloadMetadata(_ progress: ModelOperationProgress) -> some View {
+    let completed = L10n.string(
+      "%@ of %@",
+      language: language,
+      formattedBytes(progress.completedBytes),
+      formattedBytes(progress.totalBytes)
+    )
+    let speed = progress.bytesPerSecond.flatMap { bytesPerSecond in
+      bytesPerSecond > 0
+        ? L10n.string("%@/s", language: language, formattedBytes(UInt64(bytesPerSecond)))
+        : nil
+    }
+    let remaining = progress.estimatedSecondsRemaining.flatMap { seconds in
+      seconds.isFinite
+        ? L10n.string(
+          "About %@ remaining", language: language, formattedDuration(seconds))
+        : nil
+    }
+
+    return HStack(spacing: 14) {
+      Text(completed)
+      Spacer(minLength: 12)
+      if let speed {
+        Label(speed, systemImage: "speedometer")
+      }
+      if let remaining {
+        Label(remaining, systemImage: "clock")
+      }
+    }
+    .font(.callout.monospacedDigit())
+    .foregroundStyle(.secondary)
+  }
+
+  private var statusColor: Color {
+    switch server.state {
+    case .running: .green
+    case .failed: .red
+    case .starting, .stopping: .orange
+    case .stopped: .secondary
+    }
+  }
+
+  private func requestDownload(_ modelKind: ModelKind) {
+    guard !modelLibrary.isBusy, modelLibrary.canStartDownload(modelKind),
+      !modelLibrary.hasPartialDownload || modelLibrary.hasPartialDownload(for: modelKind)
+    else { return }
+    if modelLibrary.hasPartialDownload(for: modelKind) {
+      modelLibrary.startDownload(for: modelKind)
+    } else {
+      downloadTarget = modelKind
+      confirmsDownload = true
+    }
+  }
+
+  private func requestMTPDownload(_ model: InstalledModelInfo) {
+    guard !modelLibrary.isBusy, modelLibrary.mtpDownloadBlock(for: model) == nil else { return }
+    if modelLibrary.hasPartialMTPInstallation(for: model) {
+      modelLibrary.startMTPInstallation(model)
+    } else {
+      mtpDownloadTarget = model
+      confirmsMTPDownload = true
+    }
+  }
+
+  private func downloadHelp(
+    _ modelKind: ModelKind,
+    block: ModelDownloadBlock?
+  ) -> String {
+    if let block { return block.message }
+    if modelLibrary.isBusy {
+      return L10n.string(
+        "Wait for the current model operation to finish.", language: language)
+    }
+    if modelLibrary.hasPartialDownload && !modelLibrary.hasPartialDownload(for: modelKind) {
+      return L10n.string(
+        "Finish the current model download before downloading another model.",
+        language: language
+      )
+    }
+    if !modelLibrary.canStartDownload(modelKind) {
+      return L10n.string(
+        "A model already exists in this location. Verify and repair the existing model first.",
+        language: language
+      )
+    }
+    return L10n.string(
+      modelLibrary.hasPartialDownload(for: modelKind) ? "Resume Download" : "Download Model",
+      language: language
+    )
+  }
+
+  private func chooseModelDirectory() {
+    let panel = NSOpenPanel()
+    panel.title = L10n.string("Select Model Folder")
+    panel.prompt = L10n.string("Select Folder")
+    panel.canChooseDirectories = true
+    panel.canChooseFiles = false
+    panel.allowsMultipleSelection = false
+    if panel.runModal() == .OK, let url = panel.url {
+      Task {
+        await modelLibrary.setRoot(url)
+        if modelLibrary.usableModel(for: modelLibrary.selectedModelKind) == nil,
+          let firstModel = modelLibrary.usableModels.first
+        {
+          modelLibrary.selectedModelKind = firstModel.modelKind
+        }
+      }
+    }
+  }
+
+  private func formattedBytes(_ bytes: UInt64) -> String {
+    if bytes == 0 { return "0 KB" }
+    return ByteCountFormatter.string(
+      fromByteCount: Int64(clamping: bytes), countStyle: .file)
+  }
+
+  private func formattedDuration(_ seconds: Double) -> String {
+    let totalMinutes = max(1, Int(seconds / 60))
+    if totalMinutes < 60 { return L10n.string("%lld min", Int64(totalMinutes)) }
+    return L10n.string(
+      "%lld hr %lld min", Int64(totalMinutes / 60), Int64(totalMinutes % 60))
+  }
+
+  private func formattedProgress(_ fraction: Double) -> String {
+    if fraction > 0, fraction < 0.001 {
+      return fraction.formatted(.percent.precision(.fractionLength(2)))
+    }
+    if fraction < 0.01 {
+      return fraction.formatted(.percent.precision(.fractionLength(1)))
+    }
+    return fraction.formatted(.percent.precision(.fractionLength(0)))
+  }
+
+  private func preflightSymbol(_ status: PreflightStatus) -> String {
+    switch status {
+    case .passed: "checkmark.circle.fill"
+    case .warning: "exclamationmark.triangle.fill"
+    case .failed: "xmark.circle.fill"
+    }
+  }
+
+  private func preflightCheckSymbol(_ id: String) -> String {
+    switch id {
+    case "architecture": "apple.logo"
+    case "memory": "memorychip"
+    case "ssd": "externaldrive.fill"
+    default: "checklist"
+    }
+  }
+
+  private func preflightAccessibilityLabel(_ check: PreflightCheck) -> String {
+    let status: String
+    switch check.status {
+    case .passed: status = L10n.string("Passed", language: language)
+    case .warning: status = L10n.string("Review", language: language)
+    case .failed: status = L10n.string("Action required", language: language)
+    }
+    return "\(check.title). \(status). \(check.detail)"
+  }
+
+  private func preflightColor(_ status: PreflightStatus) -> Color {
+    switch status {
+    case .passed: .green
+    case .warning: .orange
+    case .failed: .red
+    }
+  }
+}
+
+func shouldShowModelDownloadReason(
+  modelIsInstalled: Bool,
+  modelIsDownloading: Bool,
+  hasReason: Bool
+) -> Bool {
+  !modelIsInstalled && !modelIsDownloading && hasReason
+}
+
+func shouldShowMTPDownloadButton(_ model: InstalledModelInfo?) -> Bool {
+  model?.modelKind == .qwen3_8FlashNext && model?.hasMTP == false
+}
+
+func modelAdvancedSettingsAreLocked(
+  modelID: String,
+  loadedModel: String?,
+  loadingModel: String?,
+  modelActionID: String?
+) -> Bool {
+  modelID == loadedModel || modelID == loadingModel || modelID == modelActionID
+}
+
+func modelDownloadProgressExtraHeight(hasProgressFraction: Bool) -> CGFloat {
+  hasProgressFraction ? 72 : 40
+}
+
+func modelDownloadIsDisabled(
+  serverIsActive _: Bool,
+  operationIsBusy: Bool,
+  canStartDownload: Bool,
+  hasPartialDownload: Bool,
+  targetHasPartialDownload: Bool
+) -> Bool {
+  operationIsBusy || !canStartDownload
+    || (hasPartialDownload && !targetHasPartialDownload)
+}
+
+func modelSelectionIsLocked(
+  serverIsActive _: Bool,
+  operationIsBusy: Bool,
+  downloadIsActive: Bool,
+  hasPartialDownload _: Bool
+) -> Bool {
+  operationIsBusy && !downloadIsActive
+}
+
+@MainActor
+func modelKind(withAPIModelID modelID: String?) -> ModelKind? {
+  guard let modelID else { return nil }
+  return ModelLibrary.supportedModelKinds.first { $0.apiModelID == modelID }
+}
+
+private struct AdvancedView: View {
+  @Binding var configuration: ServerConfiguration
+  let serverActive: Bool
+  let language: AppLanguage
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: L10n.string("Power Saving Mode", language: language))
+        powerSavingPanel
+          .disabled(serverActive)
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+
+  private var powerSavingPanel: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(alignment: .firstTextBaseline) {
+        SettingLabel(
+          "SSD read limit",
+          hint: "A lower SSD read limit can reduce generation speed.",
+          language: language
+        )
+        Spacer()
+        Text(powerSavingLimitLabel(configuration.powerSavingLimitGBps))
+          .font(.body.weight(.semibold).monospacedDigit())
+      }
+
+      VStack(spacing: 6) {
+        HStack {
+          Text(L10n.string("Power saving", language: language))
+          Spacer()
+          Text(L10n.string("Performance", language: language))
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+
+        Slider(
+          value: powerSavingSelection,
+          in: 0...Double(ServerConfiguration.powerSavingLimitOptionsGBps.count - 1),
+          step: 1
+        )
+        .accessibilityLabel(L10n.string("SSD read limit", language: language))
+        .accessibilityValue(powerSavingLimitLabel(configuration.powerSavingLimitGBps))
+
+        GeometryReader { geometry in
+          ZStack(alignment: .topLeading) {
+            ForEach(
+              Array(ServerConfiguration.powerSavingLimitOptionsGBps.enumerated()),
+              id: \.offset
+            ) { index, limit in
+              let frame = powerSavingLegendFrame(
+                index: index,
+                count: ServerConfiguration.powerSavingLimitOptionsGBps.count,
+                totalWidth: geometry.size.width
+              )
+              Text(powerSavingLimitLabel(limit))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(
+                  width: frame.width,
+                  alignment: index == 0
+                    ? .leading
+                    : index == ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+                      ? .trailing : .center
+                )
+                .offset(x: frame.minX)
+            }
+          }
+        }
+        .frame(height: 16)
+        .accessibilityHidden(true)
+      }
+    }
+    .appCard()
+  }
+
+  private var powerSavingSelection: Binding<Double> {
+    Binding(
+      get: {
+        Double(
+          ServerConfiguration.powerSavingLimitOptionsGBps.firstIndex {
+            $0 == configuration.powerSavingLimitGBps
+          } ?? ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+        )
+      },
+      set: { value in
+        let index = min(
+          max(Int(value.rounded()), 0),
+          ServerConfiguration.powerSavingLimitOptionsGBps.count - 1
+        )
+        configuration.powerSavingLimitGBps =
+          ServerConfiguration.powerSavingLimitOptionsGBps[index]
+      }
+    )
+  }
+
+  private func powerSavingLimitLabel(_ limit: Double?) -> String {
+    guard let limit else { return L10n.string("Unlimited", language: language) }
+    if limit == 0.5 { return L10n.string("500 MB/s", language: language) }
+    return L10n.string("%lld GB/s", language: language, Int64(limit))
+  }
+}
+
+private struct ModelAdvancedView: View {
+  @Binding var settings: ModelAdvancedSettings
+  @Binding var alias: String
+  let aliasError: String?
+  let settingsLocked: Bool
+  let mtpAvailable: Bool
+  let dsparkAvailable: Bool
+  let modelKind: ModelKind
+  let language: AppLanguage
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        SectionHeader(title: L10n.string("Model", language: language))
+        VStack(spacing: 0) {
+          SettingRow(
+            "Alias",
+            hint: "Optional request name for this model. Changes are saved automatically.",
+            language: language
+          ) {
+            VStack(alignment: .trailing, spacing: 6) {
+              TextField(
+                L10n.string("Optional Alias", language: language),
+                text: $alias
+              )
+              .appInput(width: 340)
+              .accessibilityLabel(
+                L10n.string("Alias for %@", language: language, modelKind.displayName))
+
+              if let aliasError {
+                Label(aliasError, systemImage: "exclamationmark.triangle.fill")
+                  .font(.caption)
+                  .foregroundStyle(.red)
+                  .accessibilityLabel(
+                    L10n.string("Error: %@", language: language, aliasError))
+              }
+            }
+          }
+        }
+        .appCard()
+        .disabled(settingsLocked)
+
+        SectionHeader(title: L10n.string("Generate", language: language))
+          .padding(.top, 12)
+        VStack(spacing: 0) {
+          integerField(
+            "Max tokens",
+            hint: "Default token limit for each request.",
+            value: $settings.defaultMaxTokens
+          )
+          if modelKind == .deepSeekV4 {
+            Divider()
+            doubleField(
+              "Temperature",
+              hint: "A higher value increases output variation.",
+              value: $settings.defaultTemperature
+            )
+            Divider()
+            doubleField(
+              "Top P",
+              hint: "A lower value reduces the candidate token range.",
+              value: $settings.defaultTopP
+            )
+            Divider()
+            integerField(
+              "Top K",
+              hint: "0 disables Top K.",
+              value: $settings.defaultTopK
+            )
+          }
+        }
+        .appCard()
+        .disabled(settingsLocked)
+
+        SectionHeader(title: L10n.string("Runtime", language: language))
+          .padding(.top, 12)
+        VStack(spacing: 0) {
+          integerField(
+            "Slots",
+            hint: modelKind == .qwen3_8FlashNext
+              ? "Number of routed experts in the Active Parameters Cache. The recommended value is 4096."
+              : "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
+            value: $settings.slots
+          )
+          Divider()
+          integerField(
+            "Read workers",
+            hint:
+              "Number of workers that read expert blobs at the same time. The recommended value is 4.",
+            value: $settings.readWorkers
+          )
+          Divider()
+          integerField(
+            "Memory limit GiB",
+            hint: "0 selects the model-safe automatic limit.",
+            value: $settings.memoryLimitGiB
+          )
+          Divider()
+          integerField(
+            "Prefill step size",
+            hint: "0 selects 128, 256, or 1024 based on the prompt length.",
+            value: $settings.prefillStepSize
+          )
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            doubleField(
+              "ANE Prefill share",
+              hint:
+                "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.",
+              value: anePrefillRatio
+            )
+          }
+          Divider()
+          toggleField(
+            "Use layer-major prefill",
+            hint: "Loads routed experts by layer during prefill.",
+            value: $settings.layerMajorPrefill
+          )
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            toggleField(
+              "Prefill acceleration",
+              hint:
+                "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load.",
+              value: qwenGroupedExperts
+            )
+            .disabled(!settings.layerMajorPrefill || mtpEnabled.wrappedValue)
+          }
+          if modelKind == .deepSeekV4 {
+            Divider()
+            integerField(
+              "Layer-major prefill threshold",
+              hint:
+                "Minimum uncached prompt tokens required for layer-major prefill. The default is 1024.",
+              value: layerMajorPrefillThreshold
+            )
+            .disabled(!settings.layerMajorPrefill)
+          }
+          Divider()
+          integerField(
+            "Prompt cache entries",
+            hint: "Number of linear conversations to keep. The recommended value is 2.",
+            value: $settings.promptCacheEntries
+          )
+          Divider()
+          integerField(
+            "Prompt cache GiB",
+            hint: "Memory limit for all prompt caches. The recommended value is 8.",
+            value: $settings.promptCacheMemoryGiB
+          )
+          Divider()
+          SettingRow(
+            "Warmup prompt",
+            hint: "Optional UTF-8 prompt file path",
+            language: language
+          ) {
+            TextField(
+              L10n.string("Optional UTF-8 prompt file path", language: language),
+              text: $settings.warmupPromptPath
+            )
+            .appInput(width: 340)
+          }
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            toggleField(
+              "Use MTP",
+              hint: mtpAvailable
+                ? "MTP uses speculative decoding. Text may arrive in short bursts."
+                : "Install the MTP files before enabling this setting.",
+              value: mtpEnabled
+            )
+            .disabled(!mtpAvailable)
+            Divider()
+            integerField(
+              "MTP slots",
+              hint:
+                "Number of MTP experts kept in memory. More slots use more memory. The default is 32.",
+              value: mtpSlots
+            )
+            .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
+          }
+          if modelKind == .deepSeekV4 {
+            Divider()
+            toggleField(
+              "Use BF16 KV cache",
+              hint: "Stores the KV cache in BF16 format.",
+              value: $settings.bf16KVCache
+            )
+            Divider()
+            toggleField(
+              "Use DSpark",
+              hint: "Uses DSpark speculative decoding when it is installed.",
+              value: $settings.dsparkEnabled
+            )
+            .disabled(!dsparkAvailable)
+            Divider()
+            integerField(
+              "DSpark slots",
+              hint:
+                "Number of DSpark routed experts kept in memory. The recommended value is 768.",
+              value: $settings.dsparkSlots
+            )
+            .disabled(!settings.dsparkEnabled || !dsparkAvailable)
+            Divider()
+            doubleField(
+              "DSpark confidence threshold",
+              hint:
+                "0 keeps all draft tokens. A higher value rejects low-confidence draft tokens early.",
+              value: $settings.dsparkConfidenceThreshold
+            )
+            .disabled(!settings.dsparkEnabled || !dsparkAvailable)
+          }
+        }
+        .appCard()
+        .disabled(settingsLocked)
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+
+  private var layerMajorPrefillThreshold: Binding<Int> {
+    Binding(
+      get: { settings.layerMajorPrefillThreshold ?? 1_024 },
+      set: { settings.layerMajorPrefillThreshold = $0 }
+    )
+  }
+
+  private var anePrefillRatio: Binding<Double> {
+    Binding(
+      get: { settings.anePrefillRatio ?? 0.25 },
+      set: { settings.anePrefillRatio = $0 }
+    )
+  }
+
+  private var qwenGroupedExperts: Binding<Bool> {
+    Binding(
+      get: { settings.qwenGroupedExperts ?? true },
+      set: { settings.qwenGroupedExperts = $0 }
+    )
+  }
+
+  private var mtpEnabled: Binding<Bool> {
+    Binding(
+      get: { mtpAvailable && settings.mtpEnabled == true },
+      set: { enabled in
+        settings.mtpEnabled = enabled
+      }
+    )
+  }
+
+  private var mtpSlots: Binding<Int> {
+    Binding(
+      get: { settings.mtpSlots ?? 32 },
+      set: { settings.mtpSlots = $0 }
+    )
+  }
+
+  private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      TextField(
+        L10n.string(label, language: language),
+        value: value,
+        format: .number.grouping(.never)
+      )
+      .labelsHidden()
+      .appInput(width: 120)
+    }
+  }
+
+  private func doubleField(_ label: String, hint: String, value: Binding<Double>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      TextField(
+        L10n.string(label, language: language),
+        value: value,
+        format: .number.precision(.fractionLength(0...6))
+      )
+      .labelsHidden()
+      .appInput(width: 120)
+    }
+  }
+
+  private func toggleField(_ label: String, hint: String, value: Binding<Bool>) -> some View {
+    SettingRow(label, hint: hint, language: language) {
+      Toggle(L10n.string(label, language: language), isOn: value)
+        .labelsHidden()
+        .accessibilityLabel(L10n.string(label, language: language))
+    }
+  }
+}
+
+func powerSavingLegendFrame(index: Int, count: Int, totalWidth: CGFloat) -> CGRect {
+  let width = totalWidth / CGFloat(count - 1)
+  let nodeX = CGFloat(index) * width
+  let minX = min(max(nodeX - width / 2, 0), totalWidth - width)
+  return CGRect(x: minX, y: 0, width: width, height: 0)
+}
+
+private struct LogsView: View {
+  @ObservedObject var server: ServerController
+  let language: AppLanguage
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      SectionHeader(title: L10n.string("Server log", language: language))
+      ScrollView {
+        Text(
+          server.log.isEmpty
+            ? L10n.string(
+              "The log will appear here after the server starts.", language: language)
+            : server.log
+        )
+        .font(.system(.callout, design: .monospaced))
+        .foregroundStyle(server.log.isEmpty ? .secondary : .primary)
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .appCard()
+      .accessibilityLabel(L10n.string("Server log", language: language))
+    }
+    .frame(maxWidth: AppLayout.contentWidth)
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding(.horizontal, 40)
+    .padding(.vertical, 24)
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+}
+
+private struct SettingsView: View {
+  @Binding var languageCode: String
+  let language: AppLanguage
+  let checkForUpdates: () -> Void
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(spacing: 20) {
+          Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+            .resizable()
+            .interpolation(.high)
+            .frame(width: 76, height: 76)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 5) {
+            Text("Whallm")
+              .font(.title.bold())
+            Text(L10n.string("Local DeepSeek inference from SSD.", language: language))
+              .font(.title3)
+              .foregroundStyle(.secondary)
+            Text(
+              L10n.string(
+                "Version %@ · build %@",
+                language: language,
+                appVersion,
+                buildVersion
+              )
+            )
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.tertiary)
+            .textSelection(.enabled)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard(padding: 22)
+
+        SectionHeader(title: L10n.string("Preferences", language: language))
+          .padding(.top, 12)
+
+        VStack(alignment: .leading, spacing: 0) {
+          SettingRow(
+            "Language",
+            hint: "Select the language used by the app.",
+            language: language
+          ) {
+            Picker(L10n.string("Language", language: language), selection: $languageCode) {
+              ForEach(AppLanguage.allCases) { option in
+                Text(option.displayName(language: language)).tag(option.rawValue)
+              }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(minWidth: 180, alignment: .trailing)
+          }
+
+          Divider()
+
+          SettingRow(
+            "Software Updates",
+            hint: "Check GitHub Releases for a newer app version.",
+            language: language
+          ) {
+            Button(action: checkForUpdates) {
+              Label(
+                L10n.string("Check for Updates…", language: language),
+                systemImage: "arrow.clockwise"
+              )
+            }
+          }
+        }
+        .appCard()
+
+        SectionHeader(title: L10n.string("Project", language: language))
+          .padding(.top, 12)
+
+        VStack(spacing: 0) {
+          projectLink(
+            title: "GitHub Repository",
+            note: "Source, issues, and roadmap",
+            icon: "chevron.left.forwardslash.chevron.right",
+            url: "https://github.com/yanun0323/Whallm"
+          )
+          Divider()
+          projectLink(
+            title: "Releases",
+            note: "Download the latest macOS app",
+            icon: "shippingbox",
+            url: "https://github.com/yanun0323/Whallm/releases"
+          )
+          Divider()
+          projectLink(
+            title: "Documentation",
+            note: "Setup, model management, and API usage",
+            icon: "book.closed",
+            url: "https://github.com/yanun0323/Whallm#readme"
+          )
+          Divider()
+          projectLink(
+            title: "Report an Issue",
+            note: "Report bugs and request features on GitHub",
+            icon: "exclamationmark.bubble",
+            url: "https://github.com/yanun0323/Whallm/issues"
+          )
+        }
+        .appCard()
+
+        SectionHeader(title: L10n.string("License", language: language))
+          .padding(.top, 12)
+
+        VStack(alignment: .leading, spacing: 6) {
+          Label(
+            L10n.string("MIT License", language: language),
+            systemImage: "point.3.connected.trianglepath.dotted"
+          )
+          .font(.headline)
+          Text(
+            L10n.string(
+              "Copyright © 2026 Yanun. See the LICENSE file in the repository for the full text.",
+              language: language
+            )
+          )
+          .font(.callout)
+          .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard()
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+
+  private var appVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "-"
+  }
+
+  private var buildVersion: String {
+    Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
+  }
+
+  private func projectLink(title: String, note: String, icon: String, url: String) -> some View {
+    Link(destination: URL(string: url)!) {
+      HStack(spacing: 14) {
+        Image(systemName: icon)
+          .font(.title3)
+          .foregroundStyle(.secondary)
+          .frame(width: 28)
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(L10n.string(title, language: language))
+            .font(.body.weight(.semibold))
+          Text(L10n.string(note, language: language))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Image(systemName: "arrow.up.right.square")
+          .foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+      }
+      .padding(.vertical, 9)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(L10n.string(title, language: language))
+    .accessibilityHint(L10n.string(note, language: language))
+  }
+}
+
+private struct MetricView: View {
+  let state: ServerController.State
+  let performance: LivePerformance
+  let history: PerformanceHistory
+  let language: AppLanguage
+  let clearHistory: () -> Void
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        SectionHeader(title: localized("Active Now"))
+        activeCard
+
+        HStack(alignment: .center) {
+          SectionHeader(title: localized("Serving Stats"))
+          Spacer()
+          Button(action: clearHistory) {
+            Label(localized("Clear metric history"), systemImage: "trash")
+          }
+          .buttonStyle(TertiaryIconButtonStyle(color: .red))
+          .disabled(history.isEmpty)
+          .help(localized("Clear metric history"))
+          .accessibilityLabel(localized("Clear metric history"))
+        }
+        .padding(.top, 10)
+
+        LazyVGrid(
+          columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 3),
+          spacing: 14
+        ) {
+          metricCard(.inputTokens)
+          metricCard(.outputTokens)
+          metricCard(.cacheHitRate)
+        }
+
+        SectionHeader(title: localized("Average Speed"))
+          .padding(.top, 10)
+
+        LazyVGrid(
+          columns: Array(repeating: GridItem(.flexible(), spacing: 14), count: 2),
+          spacing: 14
+        ) {
+          metricCard(.prefillTokensPerSecond)
+          metricCard(.decodeTokensPerSecond)
+        }
+
+        SectionHeader(title: localized("System"))
+          .padding(.top, 10)
+        systemCard
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .accessibilityElement(children: .contain)
+    .environment(\.locale, language.locale)
+  }
+
+  @ViewBuilder
+  private func metricCard(_ metric: PerformanceMetric) -> some View {
+    switch metric {
+    case .inputTokens:
+      singleValueMetricCard(
+        metric,
+        label: localized("Live"),
+        value: formattedValue(performance.snapshot[metric], for: metric, live: true)
+      )
+    case .outputTokens:
+      singleValueMetricCard(
+        metric,
+        label: localized("Accumulate"),
+        value: performance.hasStatus ? performance.accumulatedOutputTokens.formatted() : "-"
+      )
+    default:
+      historicalMetricCard(metric)
+    }
+  }
+
+  private func singleValueMetricCard(
+    _ metric: PerformanceMetric,
+    label: String,
+    value: String
+  ) -> some View {
+    VStack(spacing: 14) {
+      Text(localized(metricTitle(metric)))
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+      VStack(spacing: 2) {
+        Text(label)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        Text(value)
+          .font(.title2.weight(.semibold).monospacedDigit())
+          .lineLimit(1)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 126)
+    .appCard(padding: 18)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("\(localized(metricTitle(metric)))。\(label)：\(value)")
+  }
+
+  private func historicalMetricCard(_ metric: PerformanceMetric) -> some View {
+    let live = formattedValue(performance.snapshot[metric], for: metric, live: true)
+    let statistics = history[metric]
+    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
+    let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
+    return VStack(spacing: 14) {
+      Text(localized(metricTitle(metric)))
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+      Text(live)
+        .font(.title2.weight(.semibold).monospacedDigit())
+        .lineLimit(1)
+      HStack(spacing: 16) {
+        statisticLabel(localized("Maximum"), value: maximum)
+        Divider().frame(height: 28)
+        statisticLabel("P95", value: p95)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 126)
+    .appCard(padding: 18)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(
+      "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
+        + "\(localized("Maximum"))：\(maximum)。P95：\(p95)"
+    )
+  }
+
+  private func statisticLabel(_ title: String, value: String) -> some View {
+    VStack(spacing: 2) {
+      Text(title)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Text(value)
+        .font(.callout.monospacedDigit())
+        .lineLimit(1)
+    }
+    .frame(maxWidth: .infinity)
+  }
+
+  private var activeCard: some View {
+    HStack(spacing: 12) {
+      Circle()
+        .fill(statusColor)
+        .frame(width: 9, height: 9)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(activeModelLabel)
+          .font(.headline)
+          .lineLimit(1)
+        Text(localizedStateLabel)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+      }
+      Spacer()
+      if performance.dsparkEnabled {
+        Text(
+          L10n.string(
+            "DSpark · %@ accepted · %@ tokens per round",
+            language: language,
+            performance.dsparkAcceptanceRate.formatted(
+              .percent.precision(.fractionLength(1))),
+            performance.dsparkAverageAcceptedLength.formatted(
+              .number.precision(.fractionLength(1)))
+          )
+        )
+        .font(.callout.monospacedDigit())
+        .foregroundStyle(.secondary)
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+    .appCard()
+    .accessibilityElement(children: .combine)
+  }
+
+  private var systemCard: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Text(localized("Metric"))
+        Spacer()
+        Text(localized("Live")).frame(width: 120, alignment: .trailing)
+        Text(localized("Maximum")).frame(width: 120, alignment: .trailing)
+        Text("P95").frame(width: 120, alignment: .trailing)
+      }
+      .font(.callout.weight(.semibold))
+      .foregroundStyle(.secondary)
+      .padding(.bottom, 12)
+
+      ForEach(
+        [
+          PerformanceMetric.memoryUsage,
+          .ssdReadSpeed,
+          .firstTokenWaitTime,
+          .completionTime,
+        ]
+      ) { metric in
+        Divider()
+        metricRow(metric)
+      }
+    }
+    .appCard()
+  }
+
+  private func metricRow(_ metric: PerformanceMetric) -> some View {
+    let value =
+      metric == .firstTokenWaitTime
+      ? performance.liveFirstTokenWaitTime : performance.snapshot[metric]
+    let live = formattedValue(value, for: metric, live: true)
+    let statistics = history[metric]
+    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
+    let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
+    return HStack {
+      Text(localized(metricTitle(metric)))
+        .font(.body.weight(.medium))
+      Spacer()
+      Text(live).frame(width: 120, alignment: .trailing)
+      Text(maximum).frame(width: 120, alignment: .trailing)
+      Text(p95).frame(width: 120, alignment: .trailing)
+    }
+    .font(.body.monospacedDigit())
+    .padding(.vertical, 10)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(
+      "\(localized(metricTitle(metric)))。\(localized("Live"))：\(live)。"
+        + "\(localized("Maximum"))：\(maximum)。P95：\(p95)"
+    )
+  }
+
+  private func localized(_ key: String) -> String {
+    L10n.string(key, language: language)
+  }
+
+  private var localizedStateLabel: String {
+    switch state {
+    case .stopped: localized("Stopped")
+    case .starting: localized("Starting")
+    case .running: localized("Running")
+    case .stopping: localized("Stopping")
+    case .failed: localized("Start failed")
+    }
+  }
+
+  private var activeModelLabel: String {
+    if let loadedModel = performance.loadedModel { return loadedModel }
+    if let loadingModel = performance.loadingModel {
+      return L10n.string("Loading %@", language: language, loadingModel)
+    }
+    return localized("No model loaded")
+  }
+
+  private func metricTitle(_ metric: PerformanceMetric) -> String {
+    switch metric {
+    case .prefillTokensPerSecond: "Prefill Tok/s"
+    case .decodeTokensPerSecond: "Decode Tok/s"
+    case .inputTokens: "Input Tokens"
+    case .outputTokens: "Output Tokens"
+    case .memoryUsage: "Memory usage"
+    case .ssdReadSpeed: "SSD read speed"
+    case .cacheHitRate: "Cache Hit rate"
+    case .firstTokenWaitTime: "First Token wait time"
+    case .completionTime: "Completion time"
+    }
+  }
+
+  private func formattedValue(
+    _ value: Double,
+    for metric: PerformanceMetric,
+    live: Bool = false
+  ) -> String {
+    if value == 0 { return "-" }
+    if live && !hasLiveValue(metric, value: value) { return "-" }
+    switch metric {
+    case .prefillTokensPerSecond, .decodeTokensPerSecond:
+      return value.formatted(.number.precision(.fractionLength(1)))
+    case .inputTokens, .outputTokens:
+      return Int64(value.rounded()).formatted()
+    case .memoryUsage:
+      return ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .memory)
+    case .ssdReadSpeed:
+      return "\(ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file))/s"
+    case .cacheHitRate:
+      return value.formatted(.percent.precision(.fractionLength(1)))
+    case .firstTokenWaitTime, .completionTime:
+      if value < 1 {
+        return "\((value * 1_000).formatted(.number.precision(.fractionLength(0)))) ms"
+      }
+      return "\(value.formatted(.number.precision(.fractionLength(2)))) s"
+    }
+  }
+
+  private func hasLiveValue(_ metric: PerformanceMetric, value: Double) -> Bool {
+    guard performance.hasStatus else { return false }
+    switch metric {
+    case .memoryUsage:
+      return value > 0
+    case .prefillTokensPerSecond, .firstTokenWaitTime:
+      return value > 0
+    case .inputTokens, .outputTokens, .decodeTokensPerSecond, .completionTime:
+      return performance.snapshot.inputTokens > 0
+    case .ssdReadSpeed, .cacheHitRate:
+      return true
+    }
+  }
+
+  private var statusColor: Color {
+    switch state {
+    case .running: .green
+    case .failed: .red
+    case .starting, .stopping: .orange
+    case .stopped: .secondary
+    }
+  }
+
+}
+
+private struct SettingLabel: View {
+  let title: String
+  let hint: String
+  let language: AppLanguage
+
+  init(_ title: String, hint: String, language: AppLanguage) {
+    self.title = title
+    self.hint = hint
+    self.language = language
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(L10n.string(title, language: language))
+        .font(.body.weight(.medium))
+      Text(L10n.string(hint, language: language))
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+    .help(L10n.string(hint, language: language))
+    .accessibilityElement(children: .combine)
+  }
+}
+
+private struct SettingRow<Value: View>: View {
+  let title: String
+  let hint: String
+  let language: AppLanguage
+  let value: Value
+
+  init(
+    _ title: String,
+    hint: String,
+    language: AppLanguage,
+    @ViewBuilder value: () -> Value
+  ) {
+    self.title = title
+    self.hint = hint
+    self.language = language
+    self.value = value()
+  }
+
+  var body: some View {
+    HStack(alignment: .center, spacing: 32) {
+      SettingLabel(title, hint: hint, language: language)
+        .frame(maxWidth: .infinity, alignment: .leading)
+
+      value
+        .fixedSize(horizontal: true, vertical: false)
+    }
+    .frame(maxWidth: .infinity)
+    .padding(.vertical, 8)
+  }
+}
+
+func resolvedChatModelName(savedName: String, models: [CatalogModel]) -> String? {
+  guard !models.isEmpty else { return nil }
+  return models.first {
+    $0.requestName == savedName || $0.id == savedName
+  }?.requestName ?? models.first?.requestName
+}
+
+@MainActor
+final class ChatSession: ObservableObject {
+  typealias Stream = (
+    _ messages: [ChatMessage],
+    _ baseURL: URL,
+    _ apiKey: String,
+    _ model: String,
+    _ thinkingMode: String,
+    _ receive: @MainActor @escaping (ChatDelta) -> Void
+  ) async throws -> Void
+
+  @Published private(set) var messages: [ChatMessage]
+  @Published private(set) var isSending = false
+  @Published private(set) var errorMessage: String?
+
+  private let defaults: UserDefaults
+  private let stream: Stream
+  private var generationTask: Task<Void, Never>?
+  private var pendingDeltas: [ChatDelta] = []
+  private var deltaFlushTask: Task<Void, Never>?
+
+  init(
+    defaults: UserDefaults = .standard,
+    stream: @escaping Stream = { messages, baseURL, apiKey, model, thinkingMode, receive in
+      _ = try await ChatClient.stream(
+        messages: messages,
+        baseURL: baseURL,
+        apiKey: apiKey,
+        model: model,
+        thinkingMode: thinkingMode,
+        enableTestTool: false,
+        receive: receive
+      )
+    }
+  ) {
+    self.defaults = defaults
+    self.stream = stream
+    messages = ChatHistory.load(defaults: defaults)
+  }
+
+  @discardableResult
+  func send(
+    text: String,
+    configuration: ServerConfiguration,
+    model: String,
+    thinkingMode: String,
+    language: AppLanguage
+  ) -> Bool {
+    let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty, !isSending, let baseURL = configuration.baseURL else { return false }
+
+    let userMessage = ChatMessage(role: "user", content: text)
+    messages.append(userMessage)
+    errorMessage = nil
+    isSending = true
+    let requestMessages = messages
+    let assistantID = UUID()
+    messages.append(
+      ChatMessage(id: assistantID, role: "assistant", content: "", modelName: model))
+    save()
+
+    generationTask = Task {
+      defer {
+        flushPendingDeltas(for: assistantID)
+        save()
+        isSending = false
+        generationTask = nil
+      }
+      do {
+        try await stream(
+          requestMessages,
+          baseURL,
+          configuration.apiKey,
+          model,
+          thinkingMode
+        ) { delta in
+          self.enqueue(delta, for: assistantID)
+        }
+      } catch {
+        flushPendingDeltas(for: assistantID)
+        if Task.isCancelled {
+          removeEmptyAssistantMessage(id: assistantID)
+          return
+        }
+        if let index = messages.firstIndex(where: { $0.id == assistantID }),
+          messages[index].content.isEmpty,
+          messages[index].reasoningContent.isEmpty,
+          messages[index].toolCalls.isEmpty
+        {
+          messages.remove(at: index)
+        }
+        errorMessage = L10n.string(
+          "Could not get a response. %@", language: language, error.localizedDescription)
+      }
+    }
+    return true
+  }
+
+  func stopGenerating() {
+    generationTask?.cancel()
+  }
+
+  func clear() {
+    guard !isSending else { return }
+    messages.removeAll()
+    errorMessage = nil
+    save()
+  }
+
+  private func save() {
+    ChatHistory.save(messages, defaults: defaults)
+  }
+
+  private func enqueue(_ delta: ChatDelta, for assistantID: UUID) {
+    pendingDeltas.append(delta)
+    guard deltaFlushTask == nil else { return }
+    deltaFlushTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .milliseconds(50))
+      } catch {
+        return
+      }
+      self?.deltaFlushTask = nil
+      self?.flushPendingDeltas(for: assistantID)
+    }
+  }
+
+  private func flushPendingDeltas(for assistantID: UUID) {
+    deltaFlushTask?.cancel()
+    deltaFlushTask = nil
+    guard !pendingDeltas.isEmpty,
+      let index = messages.firstIndex(where: { $0.id == assistantID })
+    else {
+      pendingDeltas.removeAll(keepingCapacity: true)
+      return
+    }
+    var message = messages[index]
+    for delta in pendingDeltas {
+      message.append(delta)
+    }
+    pendingDeltas.removeAll(keepingCapacity: true)
+    messages[index] = message
+  }
+
+  private func removeEmptyAssistantMessage(id: UUID) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    let message = messages[index]
+    if message.content.isEmpty && message.reasoningContent.isEmpty && message.toolCalls.isEmpty {
+      messages.remove(at: index)
+    }
+  }
+}
+
+struct ChatView: View {
+  let configuration: ServerConfiguration
+  @ObservedObject var server: ServerController
+  @ObservedObject var session: ChatSession
+  let language: AppLanguage
+  @AppStorage("chatDraft") private var input = ""
+  @AppStorage("chatThinkingMode") private var thinkingMode = "chat"
+  @AppStorage("chatModel") private var selectedModelName = ""
+  @State private var showingClearConfirmation = false
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      HStack(spacing: 12) {
+        HStack(spacing: 8) {
+          Text(localized("Decode Tok/s"))
+            .foregroundStyle(.secondary)
+          Text(liveDecodeRate)
+            .font(.headline.monospacedDigit())
+        }
+        .accessibilityElement(children: .combine)
+        Spacer()
+        Picker(localized("Model"), selection: $selectedModelName) {
+          ForEach(server.catalogModels) { model in
+            Text(modelPickerLabel(model)).tag(model.requestName)
+          }
+        }
+        .pickerStyle(.menu)
+        .frame(width: 300)
+        .disabled(server.catalogModels.isEmpty)
+        .accessibilityLabel(localized("Model"))
+        Picker(localized("Mode"), selection: $thinkingMode) {
+          Text(localized("Chat")).tag("chat")
+          Text(localized("Thinking")).tag("thinking")
+        }
+        .pickerStyle(.segmented)
+        .tint(.blue)
+        .frame(width: 220)
+      }
+      .appCard(padding: 16)
+
+      VStack(spacing: 0) {
+        ScrollViewReader { scroll in
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+              if messages.isEmpty {
+                ContentUnavailableView(
+                  localized("No Test Messages"),
+                  systemImage: "bubble.left",
+                  description: Text(
+                    L10n.string(
+                      "Start the server. Then send a message to %@.",
+                      language: language,
+                      selectedCatalogModel?.requestName ?? localized("Assistant")
+                    )
+                  )
+                )
+                .frame(maxWidth: .infinity, minHeight: 280)
+              } else {
+                ForEach(messages) { message in
+                  VStack(alignment: .leading, spacing: 6) {
+                    Text(
+                      message.role == "user"
+                        ? localized("You") : message.modelName ?? localized("Assistant")
+                    )
+                      .font(.callout.bold())
+                      .foregroundStyle(.secondary)
+                    if !message.reasoningContent.isEmpty {
+                      VStack(alignment: .leading, spacing: 4) {
+                        Text(localized("Reasoning"))
+                          .font(.callout.bold())
+                          .foregroundStyle(.secondary)
+                        Text(message.reasoningContent)
+                          .foregroundStyle(.secondary)
+                          .textSelection(.enabled)
+                      }
+                    }
+                    if !message.content.isEmpty {
+                      Text(message.content)
+                        .textSelection(.enabled)
+                    }
+                    ForEach(message.toolCalls) { toolCall in
+                      GroupBox(localized("Tool call")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                          LabeledContent(
+                            localized("Function"), value: toolCall.function.name)
+                          VStack(alignment: .leading, spacing: 3) {
+                            Text(localized("Arguments"))
+                              .foregroundStyle(.secondary)
+                            Text(toolCall.function.arguments)
+                              .font(.system(.body, design: .monospaced))
+                              .textSelection(.enabled)
+                          }
+                          Text(localized("The app does not run this tool."))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                      }
+                    }
+                    if message.role == "assistant" && message.content.isEmpty
+                      && message.reasoningContent.isEmpty && message.toolCalls.isEmpty
+                    {
+                      ProgressView(localized("Generating"))
+                        .controlSize(.small)
+                    }
+                  }
+                  .padding(14)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .background(
+                    message.role == "user"
+                      ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 10)
+                  )
+                  .accessibilityElement(children: .combine)
+                }
+              }
+              Color.clear.frame(height: 1).id("chat-bottom")
+            }
+            .padding(8)
+          }
+          .onChange(of: streamedCharacterCount) {
+            scroll.scrollTo("chat-bottom", anchor: .bottom)
+          }
+        }
+      }
+      .frame(maxHeight: .infinity)
+      .appCard(padding: 10)
+
+      if let errorMessage {
+        Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+          .foregroundStyle(.red)
+          .accessibilityLabel(L10n.string("Error: %@", language: language, errorMessage))
+      }
+
+      VStack(alignment: .leading, spacing: 10) {
+        ZStack(alignment: .topLeading) {
+          if input.isEmpty {
+            Text(localized("Enter a message…"))
+              .foregroundStyle(.tertiary)
+              .padding(.horizontal, 5)
+              .padding(.vertical, 8)
+              .allowsHitTesting(false)
+          }
+          TextEditor(text: $input)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .padding(8)
+            .frame(minHeight: 90, maxHeight: 180)
+            .background(
+              AppTheme.fieldBackground,
+              in: RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+            )
+            .overlay(
+              RoundedRectangle(cornerRadius: AppTheme.fieldRadius)
+                .stroke(Color.primary.opacity(0.12))
+            )
+            .accessibilityLabel(localized("Test message"))
+        }
+
+        HStack(spacing: 10) {
+          if server.state != .running {
+            Label(localized("Start the server first"), systemImage: "server.rack")
+              .font(.callout)
+              .foregroundStyle(.secondary)
+          }
+          Spacer()
+          Button {
+            showingClearConfirmation = true
+          } label: {
+            Label(localized("Clear Chat"), systemImage: "trash")
+          }
+          .disabled(messages.isEmpty || isSending)
+          if isSending {
+            Button(action: stopGenerating) {
+              Label(localized("Stop Generating"), systemImage: "stop.fill")
+            }
+            .controlSize(.large)
+          } else {
+            Button {
+              send()
+            } label: {
+              Label(localized("Generate"), systemImage: "arrow.up")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+            .controlSize(.large)
+            .disabled(server.state != .running || selectedCatalogModel == nil)
+            .keyboardShortcut(.return, modifiers: .command)
+          }
+        }
+      }
+      .appCard(padding: 16)
+    }
+    .frame(maxWidth: AppLayout.contentWidth)
+    .frame(maxWidth: .infinity)
+    .padding(.horizontal, 40)
+    .padding(.vertical, 24)
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+    .onChange(of: server.catalogModels) { selectAvailableModel() }
+    .onAppear { selectAvailableModel() }
+    .confirmationDialog(
+      localized("Clear the test chat?"),
+      isPresented: $showingClearConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button(localized("Clear Chat"), role: .destructive) {
+        session.clear()
+        input = ""
+      }
+      Button(localized("Cancel"), role: .cancel) {}
+    } message: {
+      Text(
+        localized(
+          "The app will clear only the local test chat. The server and other API clients are not affected."
+        ))
+    }
+  }
+
+  private var streamedCharacterCount: Int {
+    guard let message = messages.last else { return 0 }
+    return message.content.count + message.reasoningContent.count
+      + message.toolCalls.reduce(0) {
+        $0 + $1.function.name.count + $1.function.arguments.count
+      }
+  }
+
+  private var liveDecodeRate: String {
+    let value = server.performance.snapshot.decodeTokensPerSecond
+    guard server.performance.generating, value > 0 else { return "-" }
+    return value.formatted(.number.precision(.fractionLength(1)))
+  }
+
+  private func localized(_ key: String) -> String {
+    L10n.string(key, language: language)
+  }
+
+  private var messages: [ChatMessage] { session.messages }
+
+  private var isSending: Bool { session.isSending }
+
+  private var errorMessage: String? { session.errorMessage }
+
+  private var selectedCatalogModel: CatalogModel? {
+    server.catalogModels.first {
+      $0.requestName == selectedModelName || $0.id == selectedModelName
+    }
+  }
+
+  private func modelPickerLabel(_ model: CatalogModel) -> String {
+    guard let alias = model.alias, alias != model.id else { return model.id }
+    return "\(alias) — \(model.id)"
+  }
+
+  private func selectAvailableModel() {
+    guard let resolved = resolvedChatModelName(
+      savedName: selectedModelName,
+      models: server.catalogModels
+    ) else { return }
+    selectedModelName = resolved
+  }
+
+  private func send() {
+    guard let model = selectedCatalogModel?.requestName else { return }
+    if session.send(
+      text: input,
+      configuration: configuration,
+      model: model,
+      thinkingMode: thinkingMode,
+      language: language
+    ) {
+      input = ""
+    }
+  }
+
+  private func stopGenerating() {
+    session.stopGenerating()
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "formal_performance_result": false,
+  "checks": {
+    "performance_requests": 8,
+    "cache_requests": 8,
+    "performance_passed": true,
+    "output_and_io_parity": true,
+    "integrated_cache_crossread_passed": true
+  },
+  "files_sha256": {
+    "docs/benchmarks/2026-09-06-qwen-nohint-n3-integration-m5-pro.json": "14cf04de27e4bec59286dff48cbea337d4a1aa412007c775e5b9df311f64e6e4",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/raw-results.json": "11e602e0c0e8b23afd055d603d02f2be5843cafd3c3163f87de418639cb94d29",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/research/QWEN_NOHINT_INTEGRATION_2026-09-06.md": "4504f5284e9cc0a2f43f66a7c16b68b81077edb5b093e9c55991255b55ca5e30",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/benchmark_research_baseline.py": "172a845ba787cd1bad95d599044c00b56b9e7cf6f3def718152976f01e6b5a10",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/research_qwen_sorted_experts.py": "7940e951616c543f8f2974a99122048a9cb8aabbbd7683d2950f4ec036e90db6",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/prepare_r0_prompts.py": "6fc268df107ce46a99cc5a44568ab73405894761087d603e547d86faea7e8836",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/benchmark_qwen_nohint_cache.py": "0df4384e325b7f41b32fc5f59c5672667e1ccf207b0eea9dca7596008f9818f6",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/benchmark_qwen_nohint_integration.py": "4b382819bbe6d32256067d4756a167aa4987a4b0a9094a5a3b395d6faacc0a3c",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/build-ane-bridge.sh": "dd2cb76e6cd2c3fefbf5c6270872a1a1adcf60996e8170e07d0d22b84f2cffd2",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Scripts/analyze_qwen_nohint_validation.py": "98041f3992b80a3af65c95389bcd25df66c62644277234cb6fa889fd953dcd1f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/.build/native/libWhallmANE.dylib": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Native/ANEBridge/WhallmANE.m": "d4b624caa430034a3586a42e38d9d2decd0493fc1f589ae086f957cbcd1d10ec",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/Native/ANEBridge/LICENSE": "f40de840366c4d3787c0cfbc24e88eab86763d9aeca641957efbd012015e22a6",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/tests/test_qwen_nohint_validation.py": "73ed6abfc008e9bdb83d3be0eec0a9723964d06b818b2585ab501a34c98435a0",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/tests/test_qwen_grouped_experts.py": "0629852df301b575a21e4a0fee396c43dfb691a599ceab8105bb9afa7ea30abd",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/server.py": "1c81323a7367c67366309a33d175d61fcfd9711fefc12093f58ed1c1e1f0a929",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/model_manager.py": "a0e13b342a3e2ae23e174bb2555538311e066977f7e5b98466ae9f7214879b4b",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/model.py": "23cb9596275ca99da44130e57d423ef5cf3273148f01f854e6b35683c4e509e7",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/cli.py": "46a544053edacbdfc229d59118c3f8c3e964af4f1318c3ac87bfe8bfced23c3b",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/qwen4_exp.py": "ccb9dfbbaaf55911bd5b3bd955b8f78bbc9a0e52eb3aeb78bb60b927e6173ec4",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n3/runtime/deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+  }
+}
