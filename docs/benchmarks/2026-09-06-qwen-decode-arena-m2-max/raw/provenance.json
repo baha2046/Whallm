@@ -1,0 +1,32 @@
+{
+  "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "chip": "Apple M2 Max",
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 16.0.0 (clang-1600.0.26.6)]",
+  "packages": {
+    "mlx": "0.32.0",
+    "mlx-lm": "0.31.3",
+    "numpy": "2.3.5"
+  },
+  "power": "AC Power:\n Sleep On Power Button 1\n autorestartatconnect 0\n lowpowermode         0\n standby              0\n ttyskeepawake        1\n powernap             1\n displaysleep         30\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n autorestart          0\n disksleep            10\n",
+  "swap": "vm.swapusage: total = 1024.00M  used = 1.88M  free = 1022.12M  (encrypted)\n",
+  "configuration": {
+    "slots": 1152,
+    "ane_requested": true,
+    "ane_ratio": 0.25,
+    "persistent_cache": false,
+    "OS_cache": "not-purged",
+    "fresh_process": true,
+    "temperature": 0,
+    "top_p": 1,
+    "top_k": 0
+  },
+  "sources": {
+    "runtime/deepseek_v4_ssd/qwen4_exp.py": "34dc6eca2f63fa4b062fc74532c6510e93086bf0cfa764f97ef80e3a7e28c95f",
+    "runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+    "runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+    "research/qwen_decode_probe.py": "a48fff9c1f53cd65620a514876571b68353bc7ce6528fc25e973ad579547d816",
+    "research/qwen_a_run.py": "13417d06d527326e50ff667bd871e57295a146da5d4f1be9e8a5ccc722fb3f5a",
+    "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4/manifest.json": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc"
+  }
+}

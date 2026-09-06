@@ -1,0 +1,2914 @@
+{
+  "status": "RESEARCH_ONLY_UNADOPTED",
+  "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+  "first_wave_artifact": "raw/tool-abba/summary.json",
+  "matrix_artifact": "raw/matrix/summary.json",
+  "attempt": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01",
+  "summaries": {
+    "tool-abba": {
+      "status": "passed-cross-arena-wave-research-only",
+      "order": "ABBA",
+      "slots": 4096,
+      "runs": [
+        {
+          "mode": "control",
+          "command": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_run.py",
+            "--mode",
+            "control",
+            "--status",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/1-control-status.json",
+            "--",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--prompt-file",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--max-tokens",
+            "256",
+            "--temperature",
+            "0",
+            "--top-p",
+            "1",
+            "--top-k",
+            "0",
+            "--slots",
+            "4096",
+            "--no-persistent-prompt-cache",
+            "--metrics-json",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/1-control.json"
+          ],
+          "metrics": "1-control.json",
+          "status": "1-control-status.json",
+          "exit_code": 0,
+          "client_wall_seconds": 106.42615524993744,
+          "prompt_exact": true,
+          "output_exact": true
+        },
+        {
+          "mode": "arena",
+          "command": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_run.py",
+            "--mode",
+            "control",
+            "--status",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/2-arena-status.json",
+            "--",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--prompt-file",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--max-tokens",
+            "256",
+            "--temperature",
+            "0",
+            "--top-p",
+            "1",
+            "--top-k",
+            "0",
+            "--slots",
+            "4096",
+            "--no-persistent-prompt-cache",
+            "--metrics-json",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/2-arena.json",
+            "--qwen-grouped-decode"
+          ],
+          "metrics": "2-arena.json",
+          "status": "2-arena-status.json",
+          "exit_code": 0,
+          "client_wall_seconds": 102.56855029193684,
+          "prompt_exact": true,
+          "output_exact": true
+        },
+        {
+          "mode": "arena",
+          "command": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_run.py",
+            "--mode",
+            "control",
+            "--status",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/3-arena-status.json",
+            "--",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--prompt-file",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--max-tokens",
+            "256",
+            "--temperature",
+            "0",
+            "--top-p",
+            "1",
+            "--top-k",
+            "0",
+            "--slots",
+            "4096",
+            "--no-persistent-prompt-cache",
+            "--metrics-json",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/3-arena.json",
+            "--qwen-grouped-decode"
+          ],
+          "metrics": "3-arena.json",
+          "status": "3-arena-status.json",
+          "exit_code": 0,
+          "client_wall_seconds": 102.67002812505234,
+          "prompt_exact": true,
+          "output_exact": true
+        },
+        {
+          "mode": "control",
+          "command": [
+            "/usr/bin/time",
+            "-l",
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_run.py",
+            "--mode",
+            "control",
+            "--status",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/4-control-status.json",
+            "--",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--prompt-file",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--max-tokens",
+            "256",
+            "--temperature",
+            "0",
+            "--top-p",
+            "1",
+            "--top-k",
+            "0",
+            "--slots",
+            "4096",
+            "--no-persistent-prompt-cache",
+            "--metrics-json",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/4-control.json"
+          ],
+          "metrics": "4-control.json",
+          "status": "4-control-status.json",
+          "exit_code": 0,
+          "client_wall_seconds": 106.14857650001068,
+          "prompt_exact": true,
+          "output_exact": true
+        }
+      ],
+      "prompt_sha256": "94140f4a5939265fb0367244ac1d1f5dc6164a73119605c88f0c667ee10d64d7",
+      "gates": {
+        "exact_tokens": true,
+        "decode_improvement_min": 0.05,
+        "ttft_regression_max": 0.05,
+        "p95_regression_max": 0.1,
+        "peak_memory_regression_max": 0.15,
+        "expert_bytes_regression_max": 0.05
+      },
+      "source_sha256": {
+        "runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+        "runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+        "runtime/deepseek_v4_ssd/cli.py": "641f2d2175ae118c3a3fff7ac3dda746cc830501fc0a722c4d2b88b8af984e37",
+        "runtime/deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+        "runtime/deepseek_v4_ssd/expert_cache.py": "435f4b183940372db27043b1284a6a33a6ae04f533b69f0d826ce2f25df8f687",
+        "runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+        "runtime/deepseek_v4_ssd/generation.py": "6f33ae2f50ffde2855f65948138582820a040081b7756c66a1e445dbfff8c113",
+        "runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+        "runtime/deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+        "runtime/deepseek_v4_ssd/model.py": "cfa90520224e36c9d88b52a48d2aeab582f4e206db0d6780dca09bafbed62740",
+        "runtime/deepseek_v4_ssd/model_manager.py": "10593392e04255aa93703461ae426e132d396f39e400dc29f647ea79aa167aba",
+        "runtime/deepseek_v4_ssd/qwen4_exp.py": "dc219e9cafac46e1dd5662697ef0733ded67ffd89960689a80724500967ae981",
+        "runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+        "runtime/deepseek_v4_ssd/server.py": "1c81323a7367c67366309a33d175d61fcfd9711fefc12093f58ed1c1e1f0a929",
+        "runtime/deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+      },
+      "research_sha256": {
+        "research/qwen_decode_cross_arena.py": "2ce8a3f90b4d50f89087100c2637f4f904cfba1d0f3cb224b89676f9fc9fbc14",
+        "research/qwen_decode_cross_arena_abba.py": "4c9520d078826078f211d788ebe464e3c3814ff9bf81577015cafd7f4b30fc2e",
+        "research/qwen_decode_cross_arena_gate.py": "797d70cae31120a9d1438672ed5bc40e4c5fdb2f820ab1c3f924665f85ea7939",
+        "research/qwen_decode_cross_arena_run.py": "c4bafaaf2559e998516fa9cbb97905c9a73c235a56e9f88c96cbfbf49cd1ca24",
+        "research/kernels/MLX-LICENSE.txt": "ccfab7ccb2ea306f71531c8ca77bb55507606cd90768b1e32b8b52ab5b48cf01",
+        "research/kernels/qwen_cross_arena_qmv.h": "6785e4c33d341209ba8075641de2e2807fb4ffbb264c0913997f00f3b801c8f8"
+      },
+      "commit": "7dc9cf8f050c75def77c0563cd7b8ac03f2d8435",
+      "environment": {
+        "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 16.0.0 (clang-1600.0.26.6)]",
+        "os": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n",
+        "chip": "Apple M2 Max",
+        "os_file_cache": "not purged",
+        "process": "fresh per run",
+        "persistent_prompt_cache": false
+      },
+      "manifest_sha256": "a71f38985d7b46919e4ba5abd5ca37f209c6864e6a51fe635e48cd45788326dc",
+      "medians": {
+        "control": {
+          "decode_tokens_per_second": 8.080480767938974,
+          "time_to_first_token_seconds": 58.18835497897817,
+          "request_seconds": 89.75893627095502,
+          "decode_latency_p95_seconds": 0.18288729391642844,
+          "peak_memory_bytes": 21184233513.0,
+          "expert_bytes_read": 153376665600.0
+        },
+        "arena": {
+          "decode_tokens_per_second": 9.042271941939477,
+          "time_to_first_token_seconds": 57.65817927097669,
+          "request_seconds": 85.87104627100052,
+          "decode_latency_p95_seconds": 0.15700144139700567,
+          "peak_memory_bytes": 21140613122.0,
+          "expert_bytes_read": 153376665600.0
+        }
+      },
+      "fraction_changes": {
+        "decode_tokens_per_second": 0.11902647894622964,
+        "time_to_first_token_seconds": -0.009111371307764515,
+        "request_seconds": -0.04331479584626685,
+        "decode_latency_p95_seconds": -0.14153991764595453,
+        "peak_memory_bytes": -0.0020590969681877347,
+        "expert_bytes_read": 0.0
+      },
+      "failed_metrics": []
+    },
+    "matrix": {
+      "status": "passed-local-research-matrix-unadopted",
+      "first_wave": "scratch/qwen-decode-kernel-2026-09-06/attempt-01/tool-abba/summary.json",
+      "tasks": [
+        [
+          "cold-1",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "1"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "cold-2",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "2"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "cold-3",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "3"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "cold-4",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "4"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "cold-8",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "8"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "cold-16",
+          "qwen_decode_cross_arena_cold.py",
+          [
+            "--tokens",
+            "16"
+          ],
+          "passed-cold-edge"
+        ],
+        [
+          "lifecycle",
+          "qwen_decode_cross_arena_lifecycle.py",
+          [],
+          "passed-lifecycle-gate"
+        ],
+        [
+          "tool-reverse",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code143-4096-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code143-4096-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code143-1152-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "1152",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code143-1152-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "1152",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "zh_technical-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-09-06-qwen-decode-zh-extended.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "zh_technical-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-09-06-qwen-decode-zh-extended.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "mixed_math-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/mixed_math-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "mixed_math-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/mixed_math-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/code-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "code-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/code-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "repeated-abba",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ],
+        [
+          "repeated-baab",
+          "qwen_decode_cross_arena_abba.py",
+          [
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ],
+          "passed-cross-arena-wave-research-only"
+        ]
+      ],
+      "completed": [
+        {
+          "name": "cold-1",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-1",
+            "--tokens",
+            "1"
+          ]
+        },
+        {
+          "name": "cold-2",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-2",
+            "--tokens",
+            "2"
+          ]
+        },
+        {
+          "name": "cold-3",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-3",
+            "--tokens",
+            "3"
+          ]
+        },
+        {
+          "name": "cold-4",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-4",
+            "--tokens",
+            "4"
+          ]
+        },
+        {
+          "name": "cold-8",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-8",
+            "--tokens",
+            "8"
+          ]
+        },
+        {
+          "name": "cold-16",
+          "exit_code": 0,
+          "status": "passed-cold-edge",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_cold.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/cold-16",
+            "--tokens",
+            "16"
+          ]
+        },
+        {
+          "name": "lifecycle",
+          "exit_code": 0,
+          "status": "passed-lifecycle-gate",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_lifecycle.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle"
+          ]
+        },
+        {
+          "name": "tool-reverse",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/tool-reverse",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/tool_like-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "code143-4096-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code143-4096-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "code143-4096-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code143-4096-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "code143-1152-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code143-1152-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "1152",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "code143-1152-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code143-1152-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-128/code-128.txt",
+            "--tokens",
+            "64",
+            "--slots",
+            "1152",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "zh_technical-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/zh_technical-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-09-06-qwen-decode-zh-extended.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "zh_technical-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/zh_technical-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-09-06-qwen-decode-zh-extended.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "mixed_math-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/mixed_math-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/mixed_math-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "mixed_math-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/mixed_math-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/mixed_math-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "code-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/code-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "code-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/code-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/code-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        },
+        {
+          "name": "repeated-abba",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/repeated-abba",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "ABBA"
+          ]
+        },
+        {
+          "name": "repeated-baab",
+          "exit_code": 0,
+          "status": "passed-cross-arena-wave-research-only",
+          "command": [
+            "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+            "research/qwen_decode_cross_arena_abba.py",
+            "--model",
+            "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+            "--output",
+            "scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/repeated-baab",
+            "--prompt",
+            "docs/benchmarks/prompts/2026-08-26-adaptive-4096/repeated-4096.txt",
+            "--tokens",
+            "256",
+            "--slots",
+            "4096",
+            "--order",
+            "BAAB"
+          ]
+        }
+      ],
+      "first_wave_sha256": "4765f93e0a5091fa9e584913489730e5056836dd7c856fb0960ce681f809d842",
+      "source_sha256": {
+        "research/qwen_decode_cross_arena.py": "2ce8a3f90b4d50f89087100c2637f4f904cfba1d0f3cb224b89676f9fc9fbc14",
+        "research/qwen_decode_cross_arena_cold_run.py": "173943c80887635643e31fa1c4fb51deebda2e8dd11cb8f8579a4553397e848a",
+        "research/qwen_decode_cross_arena_gate.py": "797d70cae31120a9d1438672ed5bc40e4c5fdb2f820ab1c3f924665f85ea7939",
+        "research/qwen_decode_cross_arena_cold.py": "d1fccb60198126aa6ca21689f948f49e7e8e328c1691f33595968e54fdddde8d",
+        "research/qwen_decode_cross_arena_abba.py": "4c9520d078826078f211d788ebe464e3c3814ff9bf81577015cafd7f4b30fc2e",
+        "research/qwen_decode_cross_arena_matrix.py": "2a0ea62403a8bb5af858d7ef8924c5c8112ebe7b8634cc7f2325d3bbf63bfc6b",
+        "research/qwen_decode_cross_arena_run.py": "c4bafaaf2559e998516fa9cbb97905c9a73c235a56e9f88c96cbfbf49cd1ca24",
+        "research/qwen_decode_cross_arena_lifecycle.py": "f53d0da8ae137afaccd8dba08a35d0216978c57cf317ffbdb549c0a47e58f6d7",
+        "research/qwen_decode_cross_arena_export.py": "9fe2b8a79769ee74493c391dc90c36e4affda707df82d2dfc57fc156d56425c8"
+      }
+    }
+  },
+  "index": [
+    {
+      "path": "audit-source/research/qwen_decode_cross_arena_audit.py",
+      "sha256": "38e86bc03d0799812253de4a54e9e1d62825da4d9ff0f71098706a6a855e94c0",
+      "bytes": 5261,
+      "local_only": false
+    },
+    {
+      "path": "audit-source/research/qwen_decode_cross_arena_export.py",
+      "sha256": "031981f0d3f30167e63c61739c3b16a1f179d06faacd53f099d8a828f510e291",
+      "bytes": 2447,
+      "local_only": false
+    },
+    {
+      "path": "boundaries.json",
+      "sha256": "1b0e2e9ebc1bddfa71dd6bc2e97a571f05c5ae7f03b02800da3689530fd256f9",
+      "bytes": 6004,
+      "local_only": false
+    },
+    {
+      "path": "boundaries.log",
+      "sha256": "6d6fa670595db41a4b18d244566d5ee8e52d841c36e02578778598cb0953765f",
+      "bytes": 4196,
+      "local_only": false
+    },
+    {
+      "path": "final-audit.json",
+      "sha256": "024db7c4e1de340c74904fda853b6b137e1119cb7cd89673ee812bed46e95d04",
+      "bytes": 6475,
+      "local_only": false
+    },
+    {
+      "path": "final-environment.json",
+      "sha256": "1fc4a2b7993391775c6794a6769da45a7a76b7db41f3ce51fcf5bf97a46a9b62",
+      "bytes": 744,
+      "local_only": false
+    },
+    {
+      "path": "layer0.json",
+      "sha256": "728649e7f31f78e907bd39f35b57e2f66796672cfe86324e0aa11bcb21d4c7a7",
+      "bytes": 4763,
+      "local_only": false
+    },
+    {
+      "path": "layer23.json",
+      "sha256": "eeaf75d4dfedf30f898a8a593661f1e67d9ef6118ff651434ebe420fba43cf78",
+      "bytes": 4753,
+      "local_only": false
+    },
+    {
+      "path": "layer23.log",
+      "sha256": "b3fb67b33387d28900317f57d448ab9f9d00ba1450ff9d71104583d2e6b17ac4",
+      "bytes": 3569,
+      "local_only": false
+    },
+    {
+      "path": "layer47.json",
+      "sha256": "77736043daafbf0d1be375a81978765638d479a6aeeca7693911af7611662b06",
+      "bytes": 4755,
+      "local_only": false
+    },
+    {
+      "path": "layer47.log",
+      "sha256": "8c3f95341af1e89dde8504119e76008c8520a92cb0b1b68e6d62fd50b0cb39fe",
+      "bytes": 3571,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/1-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/1-control.json",
+      "sha256": "39aa6a4bd9ecb2b31d1046dcdc8608d7451898c60b18d5b90ed2b9dac6ea3ee1",
+      "bytes": 15309,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/1-control.log",
+      "sha256": "2632b449f716277210717f1771c3d5a8de2baf42b01cfb4ae66828ab7d965ac3",
+      "bytes": 17039,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/2-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/2-arena.json",
+      "sha256": "3b725f6603bd454ec0ffb82acd1c1a6e25b33aa3eadf85e2bde9adbb5be3b2bc",
+      "bytes": 15309,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/2-arena.log",
+      "sha256": "1a4b73ccfa6aca23a482772045709d14902e553455c15b6ec619462d0d19435d",
+      "bytes": 17039,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/3-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/3-arena.json",
+      "sha256": "fc0f165a023926023dd201c53f6e9eb728f13d1a610d2c601aebac5d75176c7f",
+      "bytes": 15307,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/3-arena.log",
+      "sha256": "d5becba7b3547bfee1615556eaee34873dde0b85b25303a9bd31200283278f9f",
+      "bytes": 17037,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/4-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/4-control.json",
+      "sha256": "ffe0d43fca22129032782f6f89c2bcd0a27a68b7603fa1eaf5a41d9876ec2ea9",
+      "bytes": 15307,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/4-control.log",
+      "sha256": "f6d36d054c9f60a946cf5c9986695e1952a810e5e9f276d38055176d96b4d067",
+      "bytes": 17037,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba/summary.json",
+      "sha256": "2d87da5456b76ba59a35f095228c1e0341fd5ed97eceb505fdaa1502b11e79e8",
+      "bytes": 9347,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-abba.log",
+      "sha256": "28293365f555eb3e5c0921ebc770411e05b38d85d7127fb79fcfd7e491a0168b",
+      "bytes": 554,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/1-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/1-arena.json",
+      "sha256": "8781ac2539860808a371b9d52f84cfaf2baff3227a8527a45614cfef80815537",
+      "bytes": 15310,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/1-arena.log",
+      "sha256": "2ab8e4e6876b23d45a106fe156636c735c1ef5dffc02069f98b47771e2cb8701",
+      "bytes": 17040,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/2-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/2-control.json",
+      "sha256": "e0c96e65825163887969168870ab730e90ef287ab356e0cda2751b846050da9e",
+      "bytes": 15306,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/2-control.log",
+      "sha256": "17c64b4686e9541a426501fb1bcd9d4a09eb85c41675d66bd838c15f06c650eb",
+      "bytes": 17036,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/3-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/3-control.json",
+      "sha256": "d55e68068a79533bab42f28c409dd7f8a7cb89966f1e35415d23e5c1ebd902c1",
+      "bytes": 15308,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/3-control.log",
+      "sha256": "5e4cf4abb1ce08836eb88b685f7d86972ccf0bc9ca3dac9e66cc203d6b107052",
+      "bytes": 17038,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/4-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/4-arena.json",
+      "sha256": "e24ea29ce5fcb87113d09c4f6390cc353d00e13dcc0fa7933453c5a32689d40a",
+      "bytes": 15304,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/4-arena.log",
+      "sha256": "e486e62735f75542bfaa2e82f7f5ca1c845c18126e3ed303b6913cb3d132ee60",
+      "bytes": 17034,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab/summary.json",
+      "sha256": "00ca40fe3f2796d28c4477d927b04ba13fc082c49c402e97cc29debc74bc6a5e",
+      "bytes": 9347,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code-baab.log",
+      "sha256": "9815ac065f4cd814fc612a99b6d3819a7f220bbc99920c78045f4bd8cfc019f4",
+      "bytes": 554,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/1-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/1-control.json",
+      "sha256": "e132baabd190f09f274dd54f3dc08ae60dc1f7404098d76f43f6c86c28b7e7b6",
+      "bytes": 13442,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/1-control.log",
+      "sha256": "32e5aba73338ef922af24db3cfb510ed931d1ea999694fae15e5d256e2b4088d",
+      "bytes": 14462,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/2-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/2-arena.json",
+      "sha256": "81d49e84c8a2f630e9d41fda501ea64ef2004552a845db48cc03376908500de1",
+      "bytes": 13444,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/2-arena.log",
+      "sha256": "380f5eb1c52df6e72f5600d73c19f312e270f3c29b754b9e9231ad5f0e9385dd",
+      "bytes": 14464,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/3-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/3-arena.json",
+      "sha256": "92af261d86244b729457d0beaecb3083c6e90a618cfe6d5d7edbf2d8986671b0",
+      "bytes": 13439,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/3-arena.log",
+      "sha256": "6d83782269d221dd84925483e3dfea1e3f190ad9c3255c1d027621b14975df31",
+      "bytes": 14459,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/4-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/4-control.json",
+      "sha256": "0957d01e0aa97c7fbe4bdd59ee075c6612ccc4dee88dbd6829f23de6469da07e",
+      "bytes": 13441,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/4-control.log",
+      "sha256": "0025640fca2140439d7fa12e692a3d229cdac6fb70d849f1771e6655d28bfd5b",
+      "bytes": 14461,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba/summary.json",
+      "sha256": "180339e0505a96f5633a45fe1b4233ee31d671d5b93af015d073eae122236603",
+      "bytes": 9398,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-abba.log",
+      "sha256": "29af51942609bfe675c55eda0667e297b5893ae4a888ded18e0964ddf2df0e21",
+      "bytes": 554,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/1-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/1-arena.json",
+      "sha256": "ab4632dfa9a3f310ccd3f50abe562fd511daee4beec44a1c19ad5aa259795835",
+      "bytes": 13437,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/1-arena.log",
+      "sha256": "56ffb1a53b40ca6f8aa71ee9e8e81b463b66ad779e1758b69043c08817235871",
+      "bytes": 14457,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/2-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/2-control.json",
+      "sha256": "cbdf25b9583effcfc7c53f2dfdc4a144a0949f2fb263193cba0b12baffad7923",
+      "bytes": 13440,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/2-control.log",
+      "sha256": "afe22b2564d1297fb84505bb965c8def22c4644125bde6d04506341a39625009",
+      "bytes": 14460,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/3-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/3-control.json",
+      "sha256": "ead5a5fc9a9a92d42e7b0a8fa42d9283277e977a1449b0547dca8cb48ca0f59a",
+      "bytes": 13441,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/3-control.log",
+      "sha256": "406b02fd8227ea7441e39200aa4c721f0234965fb9465b10634763834cfc1707",
+      "bytes": 14461,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/4-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/4-arena.json",
+      "sha256": "d443a1dc1ef5d81412a4fddcd0071bdc9b01e178c3b613385ecd39ef457ab0f2",
+      "bytes": 13440,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/4-arena.log",
+      "sha256": "90bfdb50ad67a74ec18e6b22594c8c09d9eaa352c264f92b7e9f455952f036da",
+      "bytes": 14460,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab/summary.json",
+      "sha256": "440d84efcd4143e7d41d825e02b52c9c7c9bfe0a72b142398893bf624f79bb74",
+      "bytes": 9399,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-1152-baab.log",
+      "sha256": "1b4a8064b36275bfe4bb9e3d56f2ce610336a067974102a6777e316df3fc5ad8",
+      "bytes": 553,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/1-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/1-control.json",
+      "sha256": "64f17c525fcddd6d2f8f06f6f207140b963f8f253293a31908c947c17d358bd9",
+      "bytes": 13438,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/1-control.log",
+      "sha256": "5c5b6e696ef6fe53a5adb2fce46ce47760e6f0930c6492341bec3ebee7fccb6d",
+      "bytes": 14458,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/2-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/2-arena.json",
+      "sha256": "a142cfe51bd1acb5e1ba8ebcdf1e7d0f3e47f77582faa97809c077600eeb11ce",
+      "bytes": 13440,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/2-arena.log",
+      "sha256": "cda2abeceed5d6aa0bf84dcee652decd5633c200d4ee2089da80105d3be00a16",
+      "bytes": 14460,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/3-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/3-arena.json",
+      "sha256": "dc859767c1e172e6b6defc7f52d1baa0eecb5a3375466b5e2b7bd598ad42cbd3",
+      "bytes": 13432,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/3-arena.log",
+      "sha256": "0a6c53553d8b96fa2e65056fb9f59e34b5605ba50e7805511223952be51e0393",
+      "bytes": 14452,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/4-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/4-control.json",
+      "sha256": "a9e22de1750ffd5ff03d71a68482715e6815a0d5ff2568664051c02e539688ea",
+      "bytes": 13438,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/4-control.log",
+      "sha256": "0e4684975ae8d0ab1e516ae363d5cbd584cb7c2ac8e879b7e844f0d869c3af51",
+      "bytes": 14458,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba/summary.json",
+      "sha256": "379b082124496de2eed73cf67498f124742b853cfe4873655d87003e2eabf267",
+      "bytes": 9397,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-abba.log",
+      "sha256": "953e3265a4cb0e8fed65d0a6f2e16b65fdfdbc1c9b86a15b4b6336fe21ff7c32",
+      "bytes": 554,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/1-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/1-arena.json",
+      "sha256": "201263334a395404b7e8c3d745f1327a90ec3e5928b39c4dca532121f9915ffb",
+      "bytes": 13438,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/1-arena.log",
+      "sha256": "345a96cd785887ce0c77478e3f1f99beb29450722352a1087b0675a0ada278e1",
+      "bytes": 14458,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/2-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/2-control.json",
+      "sha256": "55b11d3038a4cd2f20a520cab018a74fa73c70ab9998d24b0725f55662a16539",
+      "bytes": 13437,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/2-control.log",
+      "sha256": "0f815fb9f4cea5560282a315efa83ee73fed9c223ffcc1d5eaccaa71b25302a4",
+      "bytes": 14457,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/3-control-status.json",
+      "sha256": "00d16222f3912738a923b722467a111d5e346cf7209bb98c7f5d5f2d3933ee57",
+      "bytes": 420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/3-control.json",
+      "sha256": "c3d231c8586aaeb8a7059425b39fad84fbc4ce8ea4f2f1482287f73984fb5a89",
+      "bytes": 13436,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/3-control.log",
+      "sha256": "9e2362d280184f5c971f7e08beda887d102c47e698a062cca31883cb6b9fac01",
+      "bytes": 14456,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/4-arena-status.json",
+      "sha256": "1df926b89026be16ad74124577edbb73f045f641079550561dbd918a782758f5",
+      "bytes": 422,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/4-arena.json",
+      "sha256": "0f000c236dcecd339c4c7e2409c0334699b67c1e59f5e2c5251a489d86d13191",
+      "bytes": 13437,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/4-arena.log",
+      "sha256": "f7163d96a2177d826ea1559df194213c6feb9e012cd2125b8208aab3bd81064e",
+      "bytes": 14457,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab/summary.json",
+      "sha256": "5d2140e33e586a42ad7ea7bf8f0baf2d833ad1595993670fa55a5f324a0d1a07",
+      "bytes": 9402,
+      "local_only": false
+    },
+    {
+      "path": "matrix/code143-4096-baab.log",
+      "sha256": "a31441c97248e6312ded06c205b20f89c1678af627e568fdb8489eb2b1261cde",
+      "bytes": 556,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/arena-status.json",
+      "sha256": "d8965620833fba9bf107443296d0cdf2ec62197ab271a50315d95a21229fcb08",
+      "bytes": 717,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/arena.json",
+      "sha256": "eb841279787c9c2f4881850df44dcd2dc1415df9fee5237375515181b643f557",
+      "bytes": 12585,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/arena.log",
+      "sha256": "fad5c37dc7f65fa8dfd54988f036107f7835007364ddb640ed1503e6efcd91f2",
+      "bytes": 13364,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/control.json",
+      "sha256": "52b971bebf8a23e133c4add02316efca93c460b87ea3eadfcd1e0782415333c4",
+      "bytes": 12588,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/control.log",
+      "sha256": "ce9eb31e178c50729385e14546589b8e575f640e59c3bd7097925336dc5f5be8",
+      "bytes": 13367,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1/summary.json",
+      "sha256": "8f0df8913c57fec63e791ce69c32eb92f7f1a35f5ea2794bb2145511a428ca4b",
+      "bytes": 3004,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-1.log",
+      "sha256": "32f8069e78cf966a5d95dec26474b821eb1dac265e3b05914081209aaa9a7df7",
+      "bytes": 2256,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/arena-status.json",
+      "sha256": "fc15ebc60b38d7b95b411d7168c3381202880e69d98871d0b5c9d1050dcdb4d3",
+      "bytes": 718,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/arena.json",
+      "sha256": "6dd3ccad0057009d7e167dfbfea9c5e2c73d818263d1810cd8ef33d6dc2df299",
+      "bytes": 12889,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/arena.log",
+      "sha256": "5e0c718da7d7fc9617604ad3449fa46e5d6e5ad7fc6ebcbba15c567e0ecc4e54",
+      "bytes": 13731,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/control.json",
+      "sha256": "10daddda636e776d2c9f2f53a63381a375e46f8a3ce29bb8194e92ffd5dab3ba",
+      "bytes": 12885,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/control.log",
+      "sha256": "7043ea4440444fc5b04495af8bb71ec6fa2839d26d0b9cfce57d521347e124b2",
+      "bytes": 13727,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16/summary.json",
+      "sha256": "52ae5cfa38bb13456441c0dfd2ff4165a100f4854a88749d94fd993ad17df173",
+      "bytes": 3016,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-16.log",
+      "sha256": "2be39f71b85885c631ddea2608bf3abefde3dc4d1388023f6ccc0918237b41e1",
+      "bytes": 2268,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/arena-status.json",
+      "sha256": "606082b9d2c561c1a4693e483c487a191753882ad483409b60e5999f891e7dec",
+      "bytes": 717,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/arena.json",
+      "sha256": "bd9ec3a8d54eebb8dc66bf7150ca4d2843d853e4e21ff0d3018a75bd8e938cc9",
+      "bytes": 12743,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/arena.log",
+      "sha256": "c9cf4ac6e4c3e46eb498430fa386a2abbc0939955135bcbd732fd43ba90f4ca0",
+      "bytes": 13527,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/control.json",
+      "sha256": "e6ff37aee5b871d1095791ea7a67b2faf48835d92564db76951708f9e1918051",
+      "bytes": 12752,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/control.log",
+      "sha256": "182ae06a8bed4f6107ef4fb45a4b8b20ba59b7cdbf3f0b66d4ee30b55f59a06e",
+      "bytes": 13536,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2/summary.json",
+      "sha256": "a90718b663b2051204c0e73de9a31f85c5a3c98688706924f0a48649c8b95ef8",
+      "bytes": 3007,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-2.log",
+      "sha256": "f0e6ffe2492fe19f84dec1aefa1346ab37bce1c008756e83b24524543c7e8899",
+      "bytes": 2259,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/arena-status.json",
+      "sha256": "932e3ef2341e6ec016260ef2eb8b580867463df51fa00b79ad5d548c07867108",
+      "bytes": 718,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/arena.json",
+      "sha256": "c776c7aa3d19f1ae810f7c88f3beb7e130ccba046a7fd7e6bbc3656769aa126f",
+      "bytes": 12765,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/arena.log",
+      "sha256": "d7d10bdaf8122aa49b351436ff333276a5a3f8491ca5ea84fea752a93a7bb57e",
+      "bytes": 13553,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/control.json",
+      "sha256": "2840e31179e7cad631e4853d576cdc5a1485064ca4da6a8f3291bdfcba17c6a2",
+      "bytes": 12765,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/control.log",
+      "sha256": "9d3420a56f4081f3630902040d25080f36d89ac9ef2dd7b75e6110339b68e65d",
+      "bytes": 13553,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3/summary.json",
+      "sha256": "fd7088d4b670755e184959fbab3fd359853503821ac77b798c272eddd85acad0",
+      "bytes": 3008,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-3.log",
+      "sha256": "7df8fbc4d3e7d80f87eae18e88f6b986e9ca74d1c145d9012240af630f9b2202",
+      "bytes": 2260,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/arena-status.json",
+      "sha256": "9f2016b47b520769eda60f39976ef178c2ffd73e06f49c5ffa4ae1a7eddd531e",
+      "bytes": 718,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/arena.json",
+      "sha256": "9d282fa0075d2ef1367691d14e8225cfb342f00186f8b6b3baed092bd334786f",
+      "bytes": 12771,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/arena.log",
+      "sha256": "8aad0c7234e3049b2ab8ed11323a1cab3b1c85efb4a3a8fa726cc0ef30bf4fd4",
+      "bytes": 13563,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/control.json",
+      "sha256": "01ffdf3ca8e5609c6396c4c79b4c056652310cec8b2e4d67c831b3b684bede6d",
+      "bytes": 12779,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/control.log",
+      "sha256": "bea858af4142d2ac29693adb7b529d85bc245a0aa9751cc39f9a07407a1e3ba9",
+      "bytes": 13571,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4/summary.json",
+      "sha256": "ecb29d1b47b1c3aafe2e7047c56452a198ea346b760a3f7c7979a2279fb28a75",
+      "bytes": 3005,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-4.log",
+      "sha256": "635d3252745a5cc8d5555e430ba2105cb4850b9f9e1689b48a75c5cb4588aefc",
+      "bytes": 2257,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/arena-status.json",
+      "sha256": "573d1ecb355cc16a541f23f87eaf33d6954f45b504d3aedc760ae5b931555c5a",
+      "bytes": 718,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/arena.json",
+      "sha256": "ba5020842ef8729e8032434b7824bfbedef53f4e7bc91b4a4d9031e87aa929ea",
+      "bytes": 12810,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/arena.log",
+      "sha256": "5baa231575600c529103106b34f643eb24ed2c41b44f51b129ca7e6f50d84a19",
+      "bytes": 13617,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/control-status.json",
+      "sha256": "e0370b8eeea12caa975118fe1ad216485c7643c29697a27d7299ff0cd12c7f0d",
+      "bytes": 647,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/control.json",
+      "sha256": "dbeb92779074a7571f340cfbbc127d08f8c50f1ea674c76d14859c6e5af0532e",
+      "bytes": 12816,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/control.log",
+      "sha256": "f3194102ba6a4bc2fe488d0fb3ce979e500599aa2da4d283c1737733da256444",
+      "bytes": 13623,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8/summary.json",
+      "sha256": "60f70bfb0fcef21d9c778c32e2843955445109080122d903fc6e3118a2363064",
+      "bytes": 3007,
+      "local_only": false
+    },
+    {
+      "path": "matrix/cold-8.log",
+      "sha256": "64dea77ec6bcd07129e8603a114e5c1bd413d465d6426f4e28ef132eb0eba2bd",
+      "bytes": 2259,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/326d76891ac11124089b3d602df468a48c67365bf5651c85639a4442d3a8d593.normal.v5.access",
+      "sha256": "8e510974994ae22bcac2ad4a39b3ac58d2f63f35ab8e6a69a248034eab723a98",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/326d76891ac11124089b3d602df468a48c67365bf5651c85639a4442d3a8d593.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/326d76891ac11124089b3d602df468a48c67365bf5651c85639a4442d3a8d593.normal.v5.json",
+      "sha256": "d2faa4bd159a9f634af52a2581efbb2857c7a3530d2b223eeedc18bd1f1460eb",
+      "bytes": 2204,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/326d76891ac11124089b3d602df468a48c67365bf5651c85639a4442d3a8d593.normal.v5.safetensors",
+      "sha256": "f37b0d8e8f07b7e12873077ac293c960330d6a326df3dda741e8f85b7dfe534c",
+      "bytes": 120025077,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/326d76891ac11124089b3d602df468a48c67365bf5651c85639a4442d3a8d593.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/3d02a849b9453730e1266a9503141e8bcb59c4c936811d56b3988a0ff9095e51.normal.v5.access",
+      "sha256": "38bfa901946616f36489a63038eb078a0ccd063698f28ca5f7eaf9b4694afe8e",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/3d02a849b9453730e1266a9503141e8bcb59c4c936811d56b3988a0ff9095e51.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/3d02a849b9453730e1266a9503141e8bcb59c4c936811d56b3988a0ff9095e51.normal.v5.json",
+      "sha256": "b48e07fe8924cd776d187f40f410b758cdabf8b911fcec6376c988d5e7a37915",
+      "bytes": 2215,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/3d02a849b9453730e1266a9503141e8bcb59c4c936811d56b3988a0ff9095e51.normal.v5.safetensors",
+      "sha256": "adc83d45b625627710d323465214804e6be6e2c18f146e266bca28af1247ab60",
+      "bytes": 120086517,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/3d02a849b9453730e1266a9503141e8bcb59c4c936811d56b3988a0ff9095e51.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/4a0aff82621cc8adb881118867efb7be0861c727aec7c0ea9f13887e043065f3.normal.v5.access",
+      "sha256": "a4af4e480e43a61370b1c8bce8b14fc6ae54211c29f35339df195d7aa1a00ae4",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/4a0aff82621cc8adb881118867efb7be0861c727aec7c0ea9f13887e043065f3.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/4a0aff82621cc8adb881118867efb7be0861c727aec7c0ea9f13887e043065f3.normal.v5.json",
+      "sha256": "b21f926db1653a0f59e9c884ce26225e1c6d7c675911440552f3a34929cb8980",
+      "bytes": 2256,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/4a0aff82621cc8adb881118867efb7be0861c727aec7c0ea9f13887e043065f3.normal.v5.safetensors",
+      "sha256": "358d339eb72627e97d09b2bbb0a7ccf2fa3d1d47cc0e8efc96b52bd4e8f5b164",
+      "bytes": 120393717,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/4a0aff82621cc8adb881118867efb7be0861c727aec7c0ea9f13887e043065f3.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/5ccc1f1dc8679f1cfa3e959b5adf880af6dea0d3c505577c1900be5870319519.normal.v5.access",
+      "sha256": "eab594870a3db79d1a4f294afef511a814b1211fc040d66aebfb3ccc06693eee",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/5ccc1f1dc8679f1cfa3e959b5adf880af6dea0d3c505577c1900be5870319519.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/5ccc1f1dc8679f1cfa3e959b5adf880af6dea0d3c505577c1900be5870319519.normal.v5.json",
+      "sha256": "b5d08f5921a03b38ed700e7e789f1f1e23cfc9ef8e253e81fa43bedd8201a72b",
+      "bytes": 2253,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/5ccc1f1dc8679f1cfa3e959b5adf880af6dea0d3c505577c1900be5870319519.normal.v5.safetensors",
+      "sha256": "4154ad58902d7eff7f6cb6960eebdfc22a0a803806c0cf7d49aeada2460cac5b",
+      "bytes": 120332277,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/5ccc1f1dc8679f1cfa3e959b5adf880af6dea0d3c505577c1900be5870319519.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/a115ab707f9ccc241c2e527b3447e6dc4a3d543d6dccefdfd9ce0a7171cfcacc.normal.v5.access",
+      "sha256": "fa944877fd6a8037377d6e736da2bc1237bb644358a77d74dbfc14da6b8ea2f5",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/a115ab707f9ccc241c2e527b3447e6dc4a3d543d6dccefdfd9ce0a7171cfcacc.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/a115ab707f9ccc241c2e527b3447e6dc4a3d543d6dccefdfd9ce0a7171cfcacc.normal.v5.json",
+      "sha256": "d3eeaa1108aab5d34fbeab9172ed9bdfd4543887ceb7a9bb0f3affc6bccb59e0",
+      "bytes": 2353,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/a115ab707f9ccc241c2e527b3447e6dc4a3d543d6dccefdfd9ce0a7171cfcacc.normal.v5.safetensors",
+      "sha256": "8fc10e947d37894282afd6df5f8d29888f5c1898bef359f30503b16329925af7",
+      "bytes": 121038837,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/arena-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/a115ab707f9ccc241c2e527b3447e6dc4a3d543d6dccefdfd9ce0a7171cfcacc.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/arena-restart.json",
+      "sha256": "8d6817b73bf623719b646bbaca034200f218c5019b8781db2a37d647d68c2756",
+      "bytes": 17268,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-restart.log",
+      "sha256": "29a1a8d25c8d53818a2bc4d918c18a039b7af183afafa5c715b8abe28ce862e0",
+      "bytes": 38,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-seed.json",
+      "sha256": "394b8a40dcd4c93b0fde410060319de9f3232f292908559efb33d0d3d76c7928",
+      "bytes": 94113,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/arena-seed.log",
+      "sha256": "a336c95b0135204dd7a6859261b44cd4a28f5ca1b390d387b7617da3dcfcde37",
+      "bytes": 290,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1bc83605cbdfc3d51394cce155c183d31656f8ab9a9fec0c07b3e65ee077e7d6.normal.v5.access",
+      "sha256": "96f04682c7c94e955c8a0fefbe9397430d440ce324578a52c2942d0436056a5d",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1bc83605cbdfc3d51394cce155c183d31656f8ab9a9fec0c07b3e65ee077e7d6.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1bc83605cbdfc3d51394cce155c183d31656f8ab9a9fec0c07b3e65ee077e7d6.normal.v5.json",
+      "sha256": "4a81bf9213f76faade6e4d6ee96812b11c4cbf6574465d630321fbdade4020b7",
+      "bytes": 2231,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1bc83605cbdfc3d51394cce155c183d31656f8ab9a9fec0c07b3e65ee077e7d6.normal.v5.safetensors",
+      "sha256": "358d339eb72627e97d09b2bbb0a7ccf2fa3d1d47cc0e8efc96b52bd4e8f5b164",
+      "bytes": 120393717,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1bc83605cbdfc3d51394cce155c183d31656f8ab9a9fec0c07b3e65ee077e7d6.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1c5d6397d2bab59e1ebe56527e9831ecfe1a5e70ba156331e926de45d2145c4e.normal.v5.access",
+      "sha256": "f840e621df680225aeb5ed3c8374618f75cd5660d40e3c9b07a7291a16c2fc8d",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1c5d6397d2bab59e1ebe56527e9831ecfe1a5e70ba156331e926de45d2145c4e.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1c5d6397d2bab59e1ebe56527e9831ecfe1a5e70ba156331e926de45d2145c4e.normal.v5.json",
+      "sha256": "5a3f41fa27633cfd8dc8ca0ed3ad43073511621ead4962fc69b5362ffe6d1086",
+      "bytes": 2228,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1c5d6397d2bab59e1ebe56527e9831ecfe1a5e70ba156331e926de45d2145c4e.normal.v5.safetensors",
+      "sha256": "4154ad58902d7eff7f6cb6960eebdfc22a0a803806c0cf7d49aeada2460cac5b",
+      "bytes": 120332277,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/1c5d6397d2bab59e1ebe56527e9831ecfe1a5e70ba156331e926de45d2145c4e.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/6eab97fd62f5424d9e672956d245a8e33588d49bf81748dd0dc53710c594b3cc.normal.v5.access",
+      "sha256": "6d058907c60709b29f46b3c27e78486b0d2b55c4af22df9c97cdeab0f3d91a1f",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/6eab97fd62f5424d9e672956d245a8e33588d49bf81748dd0dc53710c594b3cc.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/6eab97fd62f5424d9e672956d245a8e33588d49bf81748dd0dc53710c594b3cc.normal.v5.json",
+      "sha256": "7f513f5259ead793dee66d65b71bc8bbfcd80d87dba3a8c422b4f5a37f9abbfa",
+      "bytes": 2190,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/6eab97fd62f5424d9e672956d245a8e33588d49bf81748dd0dc53710c594b3cc.normal.v5.safetensors",
+      "sha256": "adc83d45b625627710d323465214804e6be6e2c18f146e266bca28af1247ab60",
+      "bytes": 120086517,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/6eab97fd62f5424d9e672956d245a8e33588d49bf81748dd0dc53710c594b3cc.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/79661430979a3c98da6a328bc945c4dcb5228ca828926b599d645417f6e1ebf4.normal.v5.access",
+      "sha256": "bfbe45f7e68712f9c343b40d0213b051ba70692b6669937e1453fc33030c1baf",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/79661430979a3c98da6a328bc945c4dcb5228ca828926b599d645417f6e1ebf4.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/79661430979a3c98da6a328bc945c4dcb5228ca828926b599d645417f6e1ebf4.normal.v5.json",
+      "sha256": "2b9f5403611252c6c320a760554f5a7f5777f2e3b12a038138389f3bcf2d7a80",
+      "bytes": 2328,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/79661430979a3c98da6a328bc945c4dcb5228ca828926b599d645417f6e1ebf4.normal.v5.safetensors",
+      "sha256": "8fc10e947d37894282afd6df5f8d29888f5c1898bef359f30503b16329925af7",
+      "bytes": 121038837,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/79661430979a3c98da6a328bc945c4dcb5228ca828926b599d645417f6e1ebf4.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/e18d2c7d478ee2a2597ff52e9acde8e858bb58022079813b9ddb936c8c60cf65.normal.v5.access",
+      "sha256": "d54ee5463fbd88604055b836133efadbf94c0c2dcc900d304bc710499e847aeb",
+      "bytes": 55,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/e18d2c7d478ee2a2597ff52e9acde8e858bb58022079813b9ddb936c8c60cf65.normal.v5.access"
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/e18d2c7d478ee2a2597ff52e9acde8e858bb58022079813b9ddb936c8c60cf65.normal.v5.json",
+      "sha256": "2d86cd04bab727f63ed8d16610d684cd3e0049e59fd6fc1537fc3b4eef46a884",
+      "bytes": 2179,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/e18d2c7d478ee2a2597ff52e9acde8e858bb58022079813b9ddb936c8c60cf65.normal.v5.safetensors",
+      "sha256": "f37b0d8e8f07b7e12873077ac293c960330d6a326df3dda741e8f85b7dfe534c",
+      "bytes": 120025077,
+      "local_only": true,
+      "local_path": "/Users/Shared/Project/product/llm-ssd/scratch/qwen-decode-kernel-2026-09-06/attempt-01/matrix/lifecycle/control-cache/Qwen--Qwen3.8-Flash-Next-FP8/bcd9f01ddc9cff2316eb84281bebcd5b058bddce/format-2/e18d2c7d478ee2a2597ff52e9acde8e858bb58022079813b9ddb936c8c60cf65.normal.v5.safetensors"
+    },
+    {
+      "path": "matrix/lifecycle/control-restart.json",
+      "sha256": "8b03f54553c6a5af550e67c0008a93f06591ca0fbb34a2dda339643c1e7e1683",
+      "bytes": 17269,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-restart.log",
+      "sha256": "1515303e3aa99593b9d458af86c0d565102770ef17bb6f13d35fd06bff153eaf",
+      "bytes": 40,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-seed.json",
+      "sha256": "1e2154216f7144ceb61319565a52f4125f1e7cd7d1c824c54a1880acd4d17842",
+      "bytes": 94075,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/control-seed.log",
+      "sha256": "04a3e3328c491cb822c1d0bb077494cadc58037eace106156348e1409b81ba41",
+      "bytes": 304,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle/summary.json",
+      "sha256": "b5de55d3fbf534b9e588504e7588bd42d2dcedac53ac89c7aaa974205f8f2aa9",
+      "bytes": 5993,
+      "local_only": false
+    },
+    {
+      "path": "matrix/lifecycle.log",
+      "sha256": "77d3f9ff008f9d536405e838e959eca10eafa0797567ccfd2cac155ae7c68ba6",
+      "bytes": 100,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/1-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/1-control.json",
+      "sha256": "a2208b87aaa564cc5a88afd3c60adb77d22fff125e04e5c5dee1bfb16f20467a",
+      "bytes": 15260,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/1-control.log",
+      "sha256": "0297b965ad648dce09ca9c40ac328b0f1566119715f758297e067b659aafae79",
+      "bytes": 16715,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/2-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/2-arena.json",
+      "sha256": "4d6be9f1da703990f44a0d61d9c77eb05b36609a061dd74a7bed0c903fcdfdba",
+      "bytes": 15255,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/2-arena.log",
+      "sha256": "6ba94a78c7577fccbada53bfe3092b780ecdc8ac56358ceef7f2bcbc3e7efe44",
+      "bytes": 16710,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/3-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/3-arena.json",
+      "sha256": "66336de0a644e1a49e2844c3d2bdc4ffa33795a68e1223794bbe09997cec9384",
+      "bytes": 15255,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/3-arena.log",
+      "sha256": "36c82df4e1f71b9dc2a87b76a1a09b8ae158a5debf5ce80567820443e27b86fd",
+      "bytes": 16710,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/4-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/4-control.json",
+      "sha256": "3025c26e584b35b5d19cd68a199f4f4f6720cd726cc94abefc98c5ed9a66f994",
+      "bytes": 15261,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/4-control.log",
+      "sha256": "0ce8c8eaf9be013f80ab32eeb36d1284a6d9dc5413d2eaf7d39e32558e7a1ece",
+      "bytes": 16716,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba/summary.json",
+      "sha256": "7f139ea0e84df8081f43eacd08a88d68be2b251eebe4efd877b033fef5c53d33",
+      "bytes": 9420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-abba.log",
+      "sha256": "a776c5d4dc14c1d12f11000cf5586386fe161465e55cb74fc085d0277c9c83d6",
+      "bytes": 554,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/1-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/1-arena.json",
+      "sha256": "6790a8dd2508e01eeb91abc8414caceced35ceb3ed8033c9994ce3ced13dea2a",
+      "bytes": 15258,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/1-arena.log",
+      "sha256": "05416c8cc9535119db3886305d0cde5233e4901bcb4920e3937849c38c661f6e",
+      "bytes": 16713,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/2-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/2-control.json",
+      "sha256": "fd95fdedc1813ac6b46e0ea48ee3de14428a84244f0e316bb4ddbd2e9d879417",
+      "bytes": 15259,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/2-control.log",
+      "sha256": "1ce4d169bfd54a1693fb19f252c03095b247590aff318ddbcb55ba8c57fd61e7",
+      "bytes": 16714,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/3-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/3-control.json",
+      "sha256": "a89d561ad4d3f6303d81d8e831a4ed0b0b187aad5d4d731bbb840b98e39d69a9",
+      "bytes": 15258,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/3-control.log",
+      "sha256": "20055ab8dd7f7fdc5d504ea2c957407a3e5ce9092dd0b49f6a6a46fb102f0eb6",
+      "bytes": 16713,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/4-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/4-arena.json",
+      "sha256": "6391c4b7f6c3b514cec641db439be7adf821b873275898388fae36bd7f0e914f",
+      "bytes": 15259,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/4-arena.log",
+      "sha256": "21787e086b7387b531b9dba9d60b083e86d0e38250efdc9d4c53feb1a67c2c95",
+      "bytes": 16714,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab/summary.json",
+      "sha256": "797d26d7b9f7b921f5a0cd52e7028f5752597ef0fa646dfd11a3e8b0d2ee9cbd",
+      "bytes": 9418,
+      "local_only": false
+    },
+    {
+      "path": "matrix/mixed_math-baab.log",
+      "sha256": "cd795ea41aa64dda29fd35ce2f6d875de7770a1483b2466a08804cfe85a7d0bb",
+      "bytes": 552,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/1-control-status.json",
+      "sha256": "44ca2dd636743f19d94763dc7bfd8f1d46b62090ffcd7ffcbc675c962482059f",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/1-control.json",
+      "sha256": "b2742df419b66ea3e5175c5112ce7f9118e3e34f3af7e77e51e90af209ca5759",
+      "bytes": 15415,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/1-control.log",
+      "sha256": "3573bd6200b8a90ec51ea2577e27490c5fddb0e9a0c2c2d76ed8c6467a4397b1",
+      "bytes": 17473,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/2-arena-status.json",
+      "sha256": "981d35a441f36ebbbeefc9e43c771717476bd2ca5d3e4d1b59bf1d041f1a75bd",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/2-arena.json",
+      "sha256": "d60b88c2b4acbc679d7c9fea91d694103e1c58026e9e0bf6ad0c54859f5ffea8",
+      "bytes": 15419,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/2-arena.log",
+      "sha256": "567377953ba4b202f16692748a3f4e906960426478d94d5eba459480da1f352b",
+      "bytes": 17477,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/3-arena-status.json",
+      "sha256": "981d35a441f36ebbbeefc9e43c771717476bd2ca5d3e4d1b59bf1d041f1a75bd",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/3-arena.json",
+      "sha256": "0bf373d392c2fb6cadea71dd420625943b91f96644725e41c52e6174eb4dc07c",
+      "bytes": 15414,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/3-arena.log",
+      "sha256": "031d8957f6ce623afebc00bcf94351d4dc806c60e1ba53f60341e657fee052ab",
+      "bytes": 17472,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/4-control-status.json",
+      "sha256": "44ca2dd636743f19d94763dc7bfd8f1d46b62090ffcd7ffcbc675c962482059f",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/4-control.json",
+      "sha256": "01a5073591ee0eef86f132dfd6e6943167b105b8806d20734d40a82b91864ac9",
+      "bytes": 15421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/4-control.log",
+      "sha256": "5ac48109f079a60d9400b0e99041ad1216ca89d491c87c56a557e1f6ab292407",
+      "bytes": 17479,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba/summary.json",
+      "sha256": "c6facd70c5c12f8338915c4f35bf94c8f30dc36c526b35a409c306dbab969175",
+      "bytes": 9390,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-abba.log",
+      "sha256": "a66cb8e2d0f70054ff4eb8becf27796379b6c882750d75872cbdc2ebe4846947",
+      "bytes": 557,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/1-arena-status.json",
+      "sha256": "981d35a441f36ebbbeefc9e43c771717476bd2ca5d3e4d1b59bf1d041f1a75bd",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/1-arena.json",
+      "sha256": "d2b45246af0df8ec7b048f427245f1cd284d054c452293f3a63504df787a2ffd",
+      "bytes": 15419,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/1-arena.log",
+      "sha256": "cc9bb48d1d1ca2e815f88653b48b70159beb5fad4552f6e94d3329c5dbc724c8",
+      "bytes": 17477,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/2-control-status.json",
+      "sha256": "44ca2dd636743f19d94763dc7bfd8f1d46b62090ffcd7ffcbc675c962482059f",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/2-control.json",
+      "sha256": "f2ca63ef6f7b901b374ecac9a8a6ad0abf48fcf08e65f0c63fc5521854d81211",
+      "bytes": 15420,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/2-control.log",
+      "sha256": "9df302d5f1ff0f7adb461c9f578b1f4fd727396d405954cd6c8c691490f99a33",
+      "bytes": 17478,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/3-control-status.json",
+      "sha256": "44ca2dd636743f19d94763dc7bfd8f1d46b62090ffcd7ffcbc675c962482059f",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/3-control.json",
+      "sha256": "a52796e846a140db734e054276019da24398b06fd3c853a7f194127369409512",
+      "bytes": 15419,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/3-control.log",
+      "sha256": "253f56897ce6c59a15550b7cc93fd68ab187aca339c1b6e43ab924383b16177a",
+      "bytes": 17477,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/4-arena-status.json",
+      "sha256": "981d35a441f36ebbbeefc9e43c771717476bd2ca5d3e4d1b59bf1d041f1a75bd",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/4-arena.json",
+      "sha256": "daab3716b3d2d316a57756ce2a4f8310272e3c233e99bf140af4e77a6517c711",
+      "bytes": 15417,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/4-arena.log",
+      "sha256": "46bf356e9aa8a03af2c68bba20ce1951452562ee0eb274e3804c14716dccb7bd",
+      "bytes": 17475,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab/summary.json",
+      "sha256": "2ac70f7a060103645f21e0f08d413395df94826b21d6b90bc4424a8c6478d43a",
+      "bytes": 9394,
+      "local_only": false
+    },
+    {
+      "path": "matrix/repeated-baab.log",
+      "sha256": "5566f648bbb5b1746a176aac68d013b4adf87b78bb79fa460823b6ef4024b966",
+      "bytes": 561,
+      "local_only": false
+    },
+    {
+      "path": "matrix/summary.json",
+      "sha256": "a8d5bf081e4c4b3bc406df8d2d95914c689b6994b631887dbf8101e40dccca6b",
+      "bytes": 18253,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/1-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/1-arena.json",
+      "sha256": "1607ed73e36da56b70eea3c5bdac70fa645dfa3930fc189f7cdd912bf42b0f51",
+      "bytes": 15261,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/1-arena.log",
+      "sha256": "5ca73ce7851f52ca4d716092ef0c5095a450d22ecdec5b7259da915b132b3524",
+      "bytes": 16925,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/2-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/2-control.json",
+      "sha256": "b8adf0595d2622feeb799c39908e72839698529c4b7dc286a6c6e07c88b99eb4",
+      "bytes": 15263,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/2-control.log",
+      "sha256": "8320c7d1762635cccb9f68a421a531d85c3e3fc2ecb9ccb27bbec3ff0bf68b2c",
+      "bytes": 16927,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/3-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/3-control.json",
+      "sha256": "72ba4def8f7b69df2b307ea44ac38f1ca5749da218bb4fdde9f0dac3efaaa493",
+      "bytes": 15260,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/3-control.log",
+      "sha256": "bc13e03c67c9ac4bd2af221150810945d586e6054d5cc08207365c6da3644754",
+      "bytes": 16924,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/4-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/4-arena.json",
+      "sha256": "66d5e2060f43f343d8d2d653dd7f939bd3f173512bf68168484e057f3bdfd4b6",
+      "bytes": 15257,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/4-arena.log",
+      "sha256": "84da95c92fab4f289eb22de4d25f1c02edc5731722f3d56a69416d3dae93f195",
+      "bytes": 16921,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse/summary.json",
+      "sha256": "9f0b677745438f5c689287bba02d1c54378a8c275dc59dbc0da5b184a6126c6d",
+      "bytes": 9393,
+      "local_only": false
+    },
+    {
+      "path": "matrix/tool-reverse.log",
+      "sha256": "fb8476a1e4504cf4a7124870cfa3e27ac7f6b9cfe190219889b8876bb306f872",
+      "bytes": 556,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/1-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/1-control.json",
+      "sha256": "b8cc5ed3e21170b79a2339410c938ccf7895f5d113f92c51826fbc5b176d6188",
+      "bytes": 15398,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/1-control.log",
+      "sha256": "7a6221de24ff5b8cc7893d791e0e1a76dd437dfa7d573fbc4ab6301392613a19",
+      "bytes": 17374,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/2-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/2-arena.json",
+      "sha256": "79357aef63364ba148add3daddceb791b65f6bada10b8089ecf83ae87e56960b",
+      "bytes": 15390,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/2-arena.log",
+      "sha256": "953aa2e7bc72743c1c40c661387d6ad756d0d30287f5a8467efe8b3bae49594a",
+      "bytes": 17366,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/3-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/3-arena.json",
+      "sha256": "a8c276196e9f75429ebd7b18cb2fde95a7e1df52a5a9c7a7dd052a9a8e1c601f",
+      "bytes": 15396,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/3-arena.log",
+      "sha256": "17a1a693880a055335afef01166331287f49c17d6eedd01e07982fc0fed0a08f",
+      "bytes": 17372,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/4-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/4-control.json",
+      "sha256": "0bc7c618cf2bf12c2a0539db88001619dfc350098aa034591d69d8b826a5f0d5",
+      "bytes": 15397,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/4-control.log",
+      "sha256": "d4fe5cf56c34c06767c372c86859e3baf66cbf23454abf47c54db3fb37e4645b",
+      "bytes": 17373,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba/summary.json",
+      "sha256": "6d57069910ab1fd16e5e4d4a91ca2991b02f10b43c70c046efc28c77b8bbd22b",
+      "bytes": 9410,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-abba.log",
+      "sha256": "afd378164e806d80e91000414c45bf7b5fd2c0c4a2fb19b51a98d16a87715b5a",
+      "bytes": 553,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/1-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/1-arena.json",
+      "sha256": "0e9f437bd7e4c578c6fa098b3fd06e9fe6dcaa00290711f6297184dd0977cebc",
+      "bytes": 15389,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/1-arena.log",
+      "sha256": "bce5e4706228ca6d4122d00e1ecac79d39de65fc6e29f88fcd4e2e165d8b7757",
+      "bytes": 17365,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/2-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/2-control.json",
+      "sha256": "a211d14c55d380e9d6729d88e86475d26a2d8246a9f75bb629783781105732b4",
+      "bytes": 15396,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/2-control.log",
+      "sha256": "215300eed7277a6b1369058b3e8a21e4c513f3c54592452e86e58b872a83a790",
+      "bytes": 17372,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/3-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/3-control.json",
+      "sha256": "4e1213af8d68e8d10a429da5eb620312ed30fdebbe4c06d1684c3cb0971ecb37",
+      "bytes": 15387,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/3-control.log",
+      "sha256": "8a95cd51abace0e3f9617bd3f7436f8d7a2d01ec37300e9bfecd3f8d9e7af3d2",
+      "bytes": 17363,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/4-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/4-arena.json",
+      "sha256": "b3593d037638a6ea77031e3a9def386943fa93e80a6777bd0a5c1c062507d0db",
+      "bytes": 15392,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/4-arena.log",
+      "sha256": "b880b4c626c4ebf765f4ca922bdda986453f56e0616184299c8b7f22f2d74ee7",
+      "bytes": 17368,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab/summary.json",
+      "sha256": "666e49c4a80c5c03c7f3a504f9106f427dfaf50598429f58db39e2557513df34",
+      "bytes": 9414,
+      "local_only": false
+    },
+    {
+      "path": "matrix/zh_technical-baab.log",
+      "sha256": "3adb949f1b55e90b92b134674d29afcecba833ad74808df254fb6fd70310c97c",
+      "bytes": 556,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena.py",
+      "sha256": "2ce8a3f90b4d50f89087100c2637f4f904cfba1d0f3cb224b89676f9fc9fbc14",
+      "bytes": 3662,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_abba.py",
+      "sha256": "4c9520d078826078f211d788ebe464e3c3814ff9bf81577015cafd7f4b30fc2e",
+      "bytes": 5915,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_cold.py",
+      "sha256": "d1fccb60198126aa6ca21689f948f49e7e8e328c1691f33595968e54fdddde8d",
+      "bytes": 3587,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_cold_run.py",
+      "sha256": "173943c80887635643e31fa1c4fb51deebda2e8dd11cb8f8579a4553397e848a",
+      "bytes": 894,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_gate.py",
+      "sha256": "797d70cae31120a9d1438672ed5bc40e4c5fdb2f820ab1c3f924665f85ea7939",
+      "bytes": 4874,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_lifecycle.py",
+      "sha256": "f53d0da8ae137afaccd8dba08a35d0216978c57cf317ffbdb549c0a47e58f6d7",
+      "bytes": 6891,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_matrix.py",
+      "sha256": "2a0ea62403a8bb5af858d7ef8924c5c8112ebe7b8634cc7f2325d3bbf63bfc6b",
+      "bytes": 3945,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_cross_arena_run.py",
+      "sha256": "c4bafaaf2559e998516fa9cbb97905c9a73c235a56e9f88c96cbfbf49cd1ca24",
+      "bytes": 870,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source/research/qwen_decode_growth_run.py",
+      "sha256": "d1e59934083221ab95763878c2767bfc3b0756a13b7caef0fc8a6d75ac4c190c",
+      "bytes": 1206,
+      "local_only": false
+    },
+    {
+      "path": "matrix-source.json",
+      "sha256": "ba8044b3b6f59a0bd44f282bc5737dd070b32fc6a01571a52bd12d476ea2ad27",
+      "bytes": 1028,
+      "local_only": false
+    },
+    {
+      "path": "matrix.log",
+      "sha256": "ab450b23568e99cf7c680ae5e53c9f3dc443f6056fe9e44e650de136798340c3",
+      "bytes": 728,
+      "local_only": false
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "ff1ea243c0969b7eaf32269cf59b02fcb528c935cdf373a7692bd87044a4224a",
+      "bytes": 3338,
+      "local_only": false
+    },
+    {
+      "path": "source/research/kernels/MLX-LICENSE.txt",
+      "sha256": "ccfab7ccb2ea306f71531c8ca77bb55507606cd90768b1e32b8b52ab5b48cf01",
+      "bytes": 1066,
+      "local_only": false
+    },
+    {
+      "path": "source/research/kernels/qwen_cross_arena_qmv.h",
+      "sha256": "6785e4c33d341209ba8075641de2e2807fb4ffbb264c0913997f00f3b801c8f8",
+      "bytes": 13322,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_a_replay.py",
+      "sha256": "8705c19351e2e76e6333c29364fed176ceefebc940acb360435932d1e2b2929d",
+      "bytes": 4817,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_a_run.py",
+      "sha256": "13417d06d527326e50ff667bd871e57295a146da5d4f1be9e8a5ccc722fb3f5a",
+      "bytes": 2002,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_decode_candidates.py",
+      "sha256": "c78eb670379e2b48fa341650fded8fa188db02af35bd305320f77ed9e03ed5f6",
+      "bytes": 2031,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_decode_cross_arena.py",
+      "sha256": "2ce8a3f90b4d50f89087100c2637f4f904cfba1d0f3cb224b89676f9fc9fbc14",
+      "bytes": 3662,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_decode_cross_arena_abba.py",
+      "sha256": "4c9520d078826078f211d788ebe464e3c3814ff9bf81577015cafd7f4b30fc2e",
+      "bytes": 5915,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_decode_cross_arena_gate.py",
+      "sha256": "797d70cae31120a9d1438672ed5bc40e4c5fdb2f820ab1c3f924665f85ea7939",
+      "bytes": 4874,
+      "local_only": false
+    },
+    {
+      "path": "source/research/qwen_decode_cross_arena_run.py",
+      "sha256": "c4bafaaf2559e998516fa9cbb97905c9a73c235a56e9f88c96cbfbf49cd1ca24",
+      "bytes": 870,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/__init__.py",
+      "sha256": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+      "bytes": 375,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/ane_prefill.py",
+      "sha256": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+      "bytes": 9852,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/cli.py",
+      "sha256": "641f2d2175ae118c3a3fff7ac3dda746cc830501fc0a722c4d2b88b8af984e37",
+      "bytes": 19834,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/dspark.py",
+      "sha256": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+      "bytes": 51028,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/expert_cache.py",
+      "sha256": "435f4b183940372db27043b1284a6a33a6ae04f533b69f0d826ce2f25df8f687",
+      "bytes": 89292,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/fp8_cache.py",
+      "sha256": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+      "bytes": 13459,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/generation.py",
+      "sha256": "6f33ae2f50ffde2855f65948138582820a040081b7756c66a1e445dbfff8c113",
+      "bytes": 141272,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/io_metrics.py",
+      "sha256": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+      "bytes": 8236,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/manifest.py",
+      "sha256": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+      "bytes": 14767,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/model.py",
+      "sha256": "cfa90520224e36c9d88b52a48d2aeab582f4e206db0d6780dca09bafbed62740",
+      "bytes": 56728,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/model_manager.py",
+      "sha256": "10593392e04255aa93703461ae426e132d396f39e400dc29f647ea79aa167aba",
+      "bytes": 28692,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/qwen4_exp.py",
+      "sha256": "dc219e9cafac46e1dd5662697ef0733ded67ffd89960689a80724500967ae981",
+      "bytes": 48602,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/route_trace.py",
+      "sha256": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+      "bytes": 11904,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/server.py",
+      "sha256": "1c81323a7367c67366309a33d175d61fcfd9711fefc12093f58ed1c1e1f0a929",
+      "bytes": 86690,
+      "local_only": false
+    },
+    {
+      "path": "source/runtime/deepseek_v4_ssd/tool_codec.py",
+      "sha256": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc",
+      "bytes": 24664,
+      "local_only": false
+    },
+    {
+      "path": "source-audit.json",
+      "sha256": "f0f26420228d17aa52844ae2c31b24b6309a80d6b0ae44afe8966d6184752e9f",
+      "bytes": 634,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/1-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/1-control.json",
+      "sha256": "3141bfd607063a084cfc51232ed4015b8808869ccab531ff39b1c82e02cc17a2",
+      "bytes": 15267,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/1-control.log",
+      "sha256": "04e345c146de525a35e654669c7342e429c8d56c53f3ffcccb4ea5539988c844",
+      "bytes": 16931,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/2-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/2-arena.json",
+      "sha256": "4179915b68da09c54af675879256f9b79b2955539bd0fe7c6eb3184a466924b9",
+      "bytes": 15268,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/2-arena.log",
+      "sha256": "85f3baefc5094f65ff0a01e18e5fcb4e0e1d145b5e7a326b7339c89a686d23ef",
+      "bytes": 16932,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/3-arena-status.json",
+      "sha256": "2aa050e86f4fbc24aaa77c76306ba88ab4e748fda6384fffc8ecb4818f549c21",
+      "bytes": 424,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/3-arena.json",
+      "sha256": "c43fb089662b47244d1e3df3bf1bfa7e1fb4883eed443480f84af7db5a276169",
+      "bytes": 15262,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/3-arena.log",
+      "sha256": "40b86c683ba53480a7381ec244c95709629c9782092b61e2a74d4796b504e56b",
+      "bytes": 16926,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/4-control-status.json",
+      "sha256": "f5033531b3061f388ad4739059fced2370fd7d41676ce853135a96562d764192",
+      "bytes": 421,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/4-control.json",
+      "sha256": "38e918f668c4aaa4bb2f526d4d323d34b8ce62342315dde94149a52f245293fd",
+      "bytes": 15262,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/4-control.log",
+      "sha256": "615ca8ae693d37b7b9941b41051912309c0a4323d64fb4bc318ac267653b5d4f",
+      "bytes": 16926,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba/summary.json",
+      "sha256": "4765f93e0a5091fa9e584913489730e5056836dd7c856fb0960ce681f809d842",
+      "bytes": 8720,
+      "local_only": false
+    },
+    {
+      "path": "tool-abba.log",
+      "sha256": "53e964052423d7469b0a4b7f43ac405a4e61d081a75678c260d708f180626e53",
+      "bytes": 555,
+      "local_only": false
+    }
+  ],
+  "limits": [
+    "M2 Max only",
+    "No energy measurement",
+    "Kernel not installed in production runtime",
+    "No gate relaxation"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "recorded_at": "2026-09-06T08:50:41.901324+08:00",
+  "binary_or_distribution_record_sha256": {
+    ".build/native/libWhallmANE.dylib": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69",
+    "/Users/Shared/Project/product/llm-ssd/.venv/lib/python3.14/site-packages/mlx-0.32.0.dist-info/RECORD": "37dfd4e7b69f3c42a31e51bdf3d66c58fb73b70b3d9530ccfca11cbb38752185",
+    "/Users/Shared/Project/product/llm-ssd/.venv/lib/python3.14/site-packages/mlx_lm-0.31.3.dist-info/RECORD": "5109d12590cbb97f77393f38301122a75c89ff8582a9f14e0e89526cd9a8bf54",
+    "/Users/Shared/Project/product/llm-ssd/.venv/lib/python3.14/site-packages/numpy-2.3.5.dist-info/RECORD": "9fa3e82b1f052929a2664fdf6307049a68fa9d6ffb5950259fa0d12e9678d1c6"
+  },
+  "swap": "vm.swapusage: total = 1024.00M  used = 2.19M  free = 1021.81M  (encrypted)\n",
+  "runtime_diff": "",
+  "power_source": "Now drawing from 'AC Power'\n"
+}

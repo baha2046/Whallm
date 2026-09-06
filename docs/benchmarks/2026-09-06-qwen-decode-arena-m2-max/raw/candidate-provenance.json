@@ -1,0 +1,15 @@
+{
+  "recorded_at": "2026-09-06T08:20:27.571617+08:00",
+  "source_sha256": {
+    "research/qwen_decode_candidates.py": "c78eb670379e2b48fa341650fded8fa188db02af35bd305320f77ed9e03ed5f6",
+    "research/qwen_decode_component.py": "979c206b82e13c4d8d0b78c58b5ea55fcc83f6c27c0ed72f66ebfce0ac4d8d58",
+    "research/qwen_decode_run.py": "de333853b0cb249fa57dd2f1b2d3af17b034eefa2cffa690846b4e40e13e11cc",
+    "research/qwen_decode_arena_gate.py": "2792187d528acb681b32291a4db6a458825664a28f6b81269f9e6b4fb5387c49",
+    "research/qwen_decode_arena.py": "483794d09ddbcb9abfc231c81fbd9d9e84ec8e0cdeb7e8ea698cce3de359deb8",
+    "research/qwen_decode_abba.py": "e5b304389c7f0d644f58afd10985e064248c1a20aa93c67be2a145e421c7fd67",
+    "research/qwen_decode_probe.py": "a48fff9c1f53cd65620a514876571b68353bc7ce6528fc25e973ad579547d816",
+    "research/QWEN_DECODE_RESEARCH_2026-09-06.md": "cd4e2eedc9135b9fae1f09cf729e69049658ffa068835ef13fb465a3d9432229"
+  },
+  "candidate_identity": "arena grouped QMM with explicit shared slot views; copied-row and one-dimensional attempts preserved",
+  "runtime_defaults_changed": false
+}

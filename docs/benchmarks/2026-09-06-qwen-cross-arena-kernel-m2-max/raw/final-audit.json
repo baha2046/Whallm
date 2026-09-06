@@ -1,0 +1,193 @@
+{
+  "status": "passed-independent-audit",
+  "formal_waves": 14,
+  "formal_requests": 56,
+  "formal_generated_tokens": 11264,
+  "cold_requests": 12,
+  "lifecycle_requests": 16,
+  "cross_wave_output_groups": 6,
+  "waves": [
+    {
+      "path": "tool-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11902647894622964,
+        "time_to_first_token_seconds": -0.009111371307764515,
+        "request_seconds": -0.04331479584626685,
+        "decode_latency_p95_seconds": -0.14153991764595453,
+        "peak_memory_bytes": -0.0020590969681877347,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11346282174811129,
+        "time_to_first_token_seconds": 0.0030305503969889624,
+        "request_seconds": -0.0339316481093912,
+        "decode_latency_p95_seconds": -0.11218206122276297,
+        "peak_memory_bytes": -0.0019742659772832294,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.09589333712338655,
+        "time_to_first_token_seconds": 0.009578140283784453,
+        "request_seconds": -0.02462868688720099,
+        "decode_latency_p95_seconds": -0.11095361764790435,
+        "peak_memory_bytes": -0.0020787700035354018,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code143-1152-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11471716243953423,
+        "time_to_first_token_seconds": 0.026010529832806162,
+        "request_seconds": -0.02347473030388736,
+        "decode_latency_p95_seconds": -0.08527833103467342,
+        "peak_memory_bytes": -0.0009090650816182544,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code143-1152-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11083448045224475,
+        "time_to_first_token_seconds": 0.002077134824917115,
+        "request_seconds": -0.03632085922177131,
+        "decode_latency_p95_seconds": -0.0807356786719493,
+        "peak_memory_bytes": -0.0009090650816182544,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code143-4096-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.10944017115494065,
+        "time_to_first_token_seconds": 0.01912674227916522,
+        "request_seconds": -0.024671637805942503,
+        "decode_latency_p95_seconds": -0.04207276225450962,
+        "peak_memory_bytes": -0.0020164173743119074,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/code143-4096-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.10957852178351879,
+        "time_to_first_token_seconds": 0.005579066772628538,
+        "request_seconds": -0.033187187037599264,
+        "decode_latency_p95_seconds": -0.052969436756093446,
+        "peak_memory_bytes": -0.0020164173743119074,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/mixed_math-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11673271654644557,
+        "time_to_first_token_seconds": 0.0013573285784436173,
+        "request_seconds": -0.03657228777212507,
+        "decode_latency_p95_seconds": -0.1117485568956268,
+        "peak_memory_bytes": -0.0019958544333392725,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/mixed_math-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.1373349518323821,
+        "time_to_first_token_seconds": -0.0009306861118307808,
+        "request_seconds": -0.0444264621340692,
+        "decode_latency_p95_seconds": -0.1433056664427177,
+        "peak_memory_bytes": -0.002144677422933894,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/repeated-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.16419092182142303,
+        "time_to_first_token_seconds": 0.015781110441160262,
+        "request_seconds": -0.032687695261508165,
+        "decode_latency_p95_seconds": -0.1755787833042569,
+        "peak_memory_bytes": -0.001997065531371023,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/repeated-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.15208434814550564,
+        "time_to_first_token_seconds": -2.7462277585654782e-05,
+        "request_seconds": -0.04033918006568371,
+        "decode_latency_p95_seconds": -0.14668190713945306,
+        "peak_memory_bytes": -0.0019917613634952147,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/tool-reverse/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.12378589610370527,
+        "time_to_first_token_seconds": -0.0018983126409682916,
+        "request_seconds": -0.040164313528677886,
+        "decode_latency_p95_seconds": -0.1395806858137666,
+        "peak_memory_bytes": -0.0020539594639664704,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/zh_technical-abba/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.11559593064175888,
+        "time_to_first_token_seconds": -0.019234073349611136,
+        "request_seconds": -0.0512264015634607,
+        "decode_latency_p95_seconds": -0.09471373407039119,
+        "peak_memory_bytes": -0.002143217132319797,
+        "expert_bytes_read": 0.0
+      }
+    },
+    {
+      "path": "matrix/zh_technical-baab/summary.json",
+      "changes": {
+        "decode_tokens_per_second": 0.10246347340319817,
+        "time_to_first_token_seconds": -0.002369927750639378,
+        "request_seconds": -0.036753314147883076,
+        "decode_latency_p95_seconds": -0.09376368934828216,
+        "peak_memory_bytes": -0.0018699741340472142,
+        "expert_bytes_read": 0.0
+      }
+    }
+  ],
+  "cold": [
+    {
+      "tokens": 1,
+      "peak_change": 0.0726077299349499
+    },
+    {
+      "tokens": 2,
+      "peak_change": 0.020274928622334487
+    },
+    {
+      "tokens": 3,
+      "peak_change": 0.11500416496078958
+    },
+    {
+      "tokens": 4,
+      "peak_change": 0.08399220781977434
+    },
+    {
+      "tokens": 8,
+      "peak_change": 0.09919749650141352
+    },
+    {
+      "tokens": 16,
+      "peak_change": 0.01934436861369937
+    }
+  ],
+  "lifecycle_prefix_consistency": true,
+  "scope": "M2 Max research only; no production adoption, M5 Pro or energy result"
+}

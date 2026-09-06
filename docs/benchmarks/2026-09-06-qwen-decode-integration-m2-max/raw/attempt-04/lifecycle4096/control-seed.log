@@ -1,0 +1,7 @@
+control cold: 32 outputs; reused 0
+control memory-repeat: 32 outputs; reused 142
+control branch-eos: 1 outputs; reused 142
+control decode-cancel: 5 outputs; reused 142
+control after-cancel: 32 outputs; reused 142
+control one-output: 1 outputs; reused 142
+control after-one-output: 32 outputs; reused 142

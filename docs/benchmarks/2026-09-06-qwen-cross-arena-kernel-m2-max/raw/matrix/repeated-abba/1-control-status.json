@@ -1,0 +1,23 @@
+{
+  "status": "completed",
+  "mode": "control",
+  "ane": [
+    {
+      "requested": true,
+      "requested_ratio": 0.25,
+      "active_ratio": 0.25,
+      "ane_channels": 3072,
+      "gpu_channels": 9216,
+      "active": true,
+      "error": null,
+      "evaluations": 36,
+      "fallbacks": 0
+    }
+  ],
+  "calls": {
+    "candidate": 0,
+    "control": 0
+  },
+  "cross_arena_calls": 0,
+  "cross_arena_requested": false
+}

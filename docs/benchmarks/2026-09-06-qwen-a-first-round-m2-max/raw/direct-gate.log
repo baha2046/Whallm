@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_a_sdpa_gate.py", line 53, in <module>
+    main()
+    ~~~~^^
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_a_sdpa_gate.py", line 35, in main
+    result = candidate(proxy, **inputs)
+  File "<qwen-direct-selected-attention>", line 66, in _bounded_attention
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_a_qsa_candidate.py", line 106, in direct
+    scores=qk(inputs=[query,key,selected,valid],template=template,
+           ~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        grid=(32,ns,ql*hk),threadgroup=(32,4,1),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        output_shapes=[(ql,hq,ns)],output_dtypes=[query.dtype])[0]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: [metal_kernel] Invalid template argument. Must be `mlx.core.Dtype`, `int` or `bool`.

@@ -1,0 +1,28 @@
+{
+  "status": "completed",
+  "mode": "control",
+  "ane": [
+    {
+      "requested": true,
+      "requested_ratio": 0.25,
+      "active_ratio": 0.25,
+      "ane_channels": 3072,
+      "gpu_channels": 9216,
+      "active": true,
+      "error": null,
+      "evaluations": 0,
+      "fallbacks": 0
+    }
+  ],
+  "calls": {
+    "candidate": 0,
+    "control": 0
+  },
+  "decode_mode": "arena",
+  "arena_state": {
+    "single_model_calls": 65,
+    "active": false,
+    "grouped_calls": 3072,
+    "original_calls": 96
+  }
+}

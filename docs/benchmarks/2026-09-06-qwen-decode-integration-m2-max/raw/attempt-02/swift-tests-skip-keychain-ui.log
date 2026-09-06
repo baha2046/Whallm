@@ -1,0 +1,20 @@
+[0/1] Planning build
+Building for debugging...
+[0/6] Write swift-version--58304C5D6DBC2206.txt
+Build complete! (0.80s)
+Test Suite 'Selected tests' started at 2026-09-06 10:03:56.832.
+Test Suite 'DeepSeekV4SSDPackageTests.xctest' started at 2026-09-06 10:03:56.833.
+Test Suite 'ChatStreamDecoderTests' started at 2026-09-06 10:03:56.833.
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testChatHistoryPersistenceRestoresLocalFields]' started.
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testChatHistoryPersistenceRestoresLocalFields]' passed (0.002 seconds).
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testChatModelSelectionUsesAliasAndRestoresSavedSelection]' started.
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testChatModelSelectionUsesAliasAndRestoresSavedSelection]' passed (0.000 seconds).
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testDecoderPreservesThinkingAndAnswerDeltas]' started.
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testDecoderPreservesThinkingAndAnswerDeltas]' passed (0.001 seconds).
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testOldChatHistoryLoadsWithoutAModelName]' started.
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testOldChatHistoryLoadsWithoutAModelName]' passed (0.001 seconds).
+Test Case '-[DeepSeekV4SSDAppTests.ChatStreamDecoderTests testRapidStreamingCoalescesMessagePublications]' started.
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

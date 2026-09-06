@@ -1,0 +1,37 @@
+{
+  "kind": "strided slot arena component gate, not full-model acceptance",
+  "slots": [
+    0,
+    7,
+    63,
+    127,
+    255,
+    511,
+    767,
+    1023,
+    1100,
+    1151
+  ],
+  "capture_sha256": "5a20142a27bee90da373b4919ab79532455995fa3863cdbff5abb091b5eaa7ce",
+  "tensor_exact": true,
+  "finite": true,
+  "max_abs_error": 0.0,
+  "timing": {
+    "median_seconds": 0.0003882079618051648,
+    "samples_seconds": [
+      0.0003928330261260271,
+      0.000356250093318522,
+      0.0003958329325541854,
+      0.0003885410260409117,
+      0.00037808308843523264,
+      0.00038545799907296896,
+      0.00039091601502150297,
+      0.00037641602102667093,
+      0.0003882079618051648
+    ]
+  },
+  "overwrite_visible": true,
+  "restore_exact": true,
+  "peak_memory_bytes": 3034846812,
+  "screen_pass": true
+}

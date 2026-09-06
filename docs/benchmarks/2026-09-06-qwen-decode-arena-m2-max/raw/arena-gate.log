@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_decode_arena_gate.py", line 68, in <module>
+    main()
+    ~~~~^^
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_decode_arena_gate.py", line 38, in main
+    pool.store(slots, blobs)
+    ~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/Shared/Project/product/llm-ssd/runtime/deepseek_v4_ssd/expert_cache.py", line 627, in store
+    self.prepare(slots)
+    ~~~~~~~~~~~~^^^^^^^
+  File "/Users/Shared/Project/product/llm-ssd/research/qwen_decode_arena.py", line 29, in prepare
+    self.arena = mx.empty((len(self._slots) * self._model.expert_blob_size,), dtype=mx.uint8)
+                 ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OverflowError: Integer value 3008102400 is outside the supported range [-2147483648, 2147483647].

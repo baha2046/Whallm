@@ -1,0 +1,92 @@
+{
+  "status": "passed-cold-edge-matrix",
+  "planned_output_limits": [
+    2,
+    3,
+    4,
+    8,
+    16
+  ],
+  "cases": [
+    {
+      "limit": 2,
+      "command": [
+        "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+        "research/qwen_decode_growth_cold_outputs.py",
+        "--model",
+        "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+        "--output",
+        "scratch/qwen-decode-2026-09-06/attempt-04/cold-2-outputs",
+        "--tokens",
+        "2"
+      ],
+      "exit_code": 0,
+      "status": "passed-cold-edge",
+      "outputs": 2
+    },
+    {
+      "limit": 3,
+      "command": [
+        "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+        "research/qwen_decode_growth_cold_outputs.py",
+        "--model",
+        "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+        "--output",
+        "scratch/qwen-decode-2026-09-06/attempt-04/cold-3-outputs",
+        "--tokens",
+        "3"
+      ],
+      "exit_code": 0,
+      "status": "passed-cold-edge",
+      "outputs": 3
+    },
+    {
+      "limit": 4,
+      "command": [
+        "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+        "research/qwen_decode_growth_cold_outputs.py",
+        "--model",
+        "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+        "--output",
+        "scratch/qwen-decode-2026-09-06/attempt-04/cold-4-outputs",
+        "--tokens",
+        "4"
+      ],
+      "exit_code": 0,
+      "status": "passed-cold-edge",
+      "outputs": 4
+    },
+    {
+      "limit": 8,
+      "command": [
+        "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+        "research/qwen_decode_growth_cold_outputs.py",
+        "--model",
+        "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+        "--output",
+        "scratch/qwen-decode-2026-09-06/attempt-04/cold-8-outputs",
+        "--tokens",
+        "8"
+      ],
+      "exit_code": 0,
+      "status": "passed-cold-edge",
+      "outputs": 8
+    },
+    {
+      "limit": 16,
+      "command": [
+        "/Users/Shared/Project/product/llm-ssd/.venv/bin/python",
+        "research/qwen_decode_growth_cold_outputs.py",
+        "--model",
+        "/Users/yanun/.dsmodel/qwen3.8-flash-next.dsv4",
+        "--output",
+        "scratch/qwen-decode-2026-09-06/attempt-04/cold-16-outputs",
+        "--tokens",
+        "16"
+      ],
+      "exit_code": 0,
+      "status": "passed-cold-edge",
+      "outputs": 16
+    }
+  ]
+}

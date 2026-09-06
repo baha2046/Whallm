@@ -1,0 +1,7 @@
+arena cold: 32 outputs; reused 0
+arena memory-repeat: 32 outputs; reused 142
+arena branch-eos: 1 outputs; reused 142
+arena decode-cancel: 5 outputs; reused 142
+arena after-cancel: 32 outputs; reused 142
+arena one-output: 1 outputs; reused 142
+arena after-one-output: 32 outputs; reused 142

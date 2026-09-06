@@ -1,0 +1,8 @@
+{
+  "power": "AC Power:\n Sleep On Power Button 1\n autorestartatconnect 0\n lowpowermode         0\n standby              0\n ttyskeepawake        1\n powernap             1\n displaysleep         30\n womp                 1\n networkoversleep     0\n sleep                0\n tcpkeepalive         1\n autorestart          0\n disksleep            10\n",
+  "thermal": "Note: No thermal warning level has been recorded\nNote: No performance warning level has been recorded\nNote: No CPU power status has been recorded\n",
+  "swap": "vm.swapusage: total = 1024.00M  used = 4.81M  free = 1019.19M  (encrypted)\n",
+  "file_cache": "not purged",
+  "metal_compiler_cache": "not purged",
+  "research_default": "not installed in production runtime"
+}

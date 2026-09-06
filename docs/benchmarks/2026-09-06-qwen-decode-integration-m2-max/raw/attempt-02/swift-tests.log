@@ -1,0 +1,43 @@
+mkdir -p .build/debug/PackageFrameworks
+ln -sfn "/Users/Shared/Project/product/llm-ssd/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework" .build/debug/PackageFrameworks/Sparkle.framework
+swift test 
+[0/1] Planning build
+Building for debugging...
+[0/20] Write sources
+[3/20] Copying InfoPlist.strings
+[3/20] Write sources
+[3/20] Copying Localizable.strings
+[10/20] Write sources
+[11/20] Write swift-version--1AB21518FC5DEDBE.txt
+[13/30] Compiling DeepSeekRepack SafeTensors.swift
+[14/30] Compiling DeepSeekRepack Model.swift
+[15/30] Compiling DeepSeekRepack Qwen.swift
+[16/30] Compiling DeepSeekRepack RepackPlanner.swift
+[17/30] Compiling DeepSeekRepack MXFP4.swift
+[18/30] Compiling DeepSeekRepack ExpertIOBenchmark.swift
+[19/30] Compiling DeepSeekRepack Checkpoint.swift
+[20/30] Emitting module DeepSeekRepack
+[21/30] Compiling DeepSeekRepack Repacker.swift
+[22/30] Compiling DeepSeekRepack InstalledArtifact.swift
+[23/42] Compiling dsv4_repack main.swift
+[24/42] Emitting module dsv4_repack
+[24/42] Write Objects.LinkFileList
+[25/42] Linking dsv4-repack
+[26/42] Applying dsv4-repack
+error: emit-module command failed with exit code 1 (use -v to see invocation)
+[28/42] Emitting module DeepSeekRepackTests
+/Users/Shared/Project/product/llm-ssd/Tests/DeepSeekRepackTests/DeepSeekRepackTests.swift:2:8: error: no such module 'XCTest'
+  1 | import Foundation
+  2 | import XCTest
+    |        `- error: no such module 'XCTest'
+  3 | 
+  4 | @testable import DeepSeekRepack
+[29/42] Compiling DeepSeekRepackTests DeepSeekRepackTests.swift
+/Users/Shared/Project/product/llm-ssd/Tests/DeepSeekRepackTests/DeepSeekRepackTests.swift:2:8: error: no such module 'XCTest'
+  1 | import Foundation
+  2 | import XCTest
+    |        `- error: no such module 'XCTest'
+  3 | 
+  4 | @testable import DeepSeekRepack
+error: fatalError
+make: *** [test] Error 1
