@@ -1,0 +1,90 @@
+{
+  "date": "2026-09-06T04:17:16.545781+00:00",
+  "decision": "User chose Qwen grouped experts enabled by default.",
+  "formal_performance_result": false,
+  "behavior": {
+    "qwen_default": true,
+    "catalog_missing_qwen": true,
+    "catalog_missing_deepseek": false,
+    "explicit_false_preserved": true,
+    "mtp_disables_grouping": true,
+    "app_slots_qwen": 4096,
+    "app_slots_deepseek": 1152,
+    "mtp_default": false,
+    "disable_cli": "--no-qwen-grouped-experts",
+    "disable_catalog": "configuration.runtime.qwen_grouped_experts=false",
+    "app_ui_changed": false
+  },
+  "validation": {
+    "python_unique_tests_passed": 225,
+    "app_configuration_tests_passed": 24,
+    "recorded_runs": [
+      {
+        "command": "PYTHONPATH=runtime .venv/bin/python -m unittest runtime.tests.test_cli runtime.tests.test_model_manager runtime.tests.test_server runtime.tests.test_qwen_grouped_experts runtime.tests.test_qwen runtime.tests.test_runtime runtime.tests.test_block_prompt_cache",
+        "passed": 217,
+        "seconds": 4.102
+      },
+      {
+        "command": "PYTHONPATH=runtime .venv/bin/python -m unittest runtime.tests.test_qwen_grouped_experts runtime.tests.test_qwen_nohint_validation runtime.tests.test_research_baseline runtime.tests.test_qwen_task_accuracy",
+        "passed": 10,
+        "seconds": 0.043,
+        "overlap_with_previous": 2
+      },
+      {
+        "command": "swift test --filter ServerConfigurationTests",
+        "passed": 24,
+        "seconds": 0.141
+      }
+    ],
+    "default_smoke": {
+      "generated_tokens": 256,
+      "sorting_calls": 192,
+      "matches_n3": true,
+      "token_sha256": "0f9694b4962c4e9cae51066f47f1410538bae435bda61721e79dabe2a502bf05",
+      "prompt_token_sha256": "f43230825fcef8c0866d1a0b74d1db8cb24a757adec4d23dcc831f8e51a3bcce",
+      "record_sha256": "99ff4bc8b1794db2c3ac66120bddfc26ecc3d881423b68cd34ed3b87a1dfbf0d"
+    }
+  },
+  "historical_indexes_unchanged": {
+    "docs/benchmarks/2026-09-06-qwen-nohint-n1-index.json": "50c8350162f0710869e5791bfe3235a0cfffcd56ec178226c8006f5939ea9fc4",
+    "docs/benchmarks/2026-09-06-qwen-nohint-n2-index.json": "ed0578ebf6b023ce45471a0931b62fa3258958d73333b4e7896e76b9d3472bd8",
+    "docs/benchmarks/2026-09-06-qwen-nohint-n3-index.json": "7263eeab9f5c3900d8ec99f8cfdb61dfa71ae3000170bcbd50ce190420d1c792"
+  },
+  "files_sha256": {
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_qsa_research.py": "bbb7f028c27ff30c03f984605f2826fbd78dd41a93455f2778533f5e96e0f54b",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_qwen_nohint_cache.py": "09ed9e34e27fc16639c48c0d4dbc4bb2b9b8983d655d64562640f4f8b8ae44c0",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_qwen_nohint_integration.py": "4b382819bbe6d32256067d4756a167aa4987a4b0a9094a5a3b395d6faacc0a3c",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_qwen_nohint_validation.py": "0c0fd4c4441d86b7863bba8a07d1ff3adf8ba72bf85f6fba31095b8c72c1c1bc",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_qwen_task_accuracy.py": "6419a263cacd1c7f584d3c183d8895f287ca2d9d7f4128164d959657156327f8",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Scripts/benchmark_research_baseline.py": "56df7d475bb51ad93792e718e78c3d0394009f9bdad72e6a31500d2b37e21249",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Sources/DeepSeekV4SSDApp/ModelLibrary.swift": "b6d16434f2461f4b0e5f40297517a522fec917375c25a190b19297b80c7afcd2",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Sources/DeepSeekV4SSDApp/ServerController.swift": "1335da65cdab0e1f9724fe4b7cef882fb9f2a8558ff0473fb32fef15425d579e",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/Tests/DeepSeekV4SSDAppTests/ServerConfigurationTests.swift": "99062887429606e8e7fe0ea16e8893723d254607d11009c12b87a2f69eccee97",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/check_default.py": "6b01b587348d3c83a180067984745c9c22869eaa2f020c80de1da00440352bfb",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/default-smoke.json": "99ff4bc8b1794db2c3ac66120bddfc26ecc3d881423b68cd34ed3b87a1dfbf0d",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/cli.py": "225b631fd1d156a2615deef0baa47f25d98a32de7cf1f799556bda3e6a756ef2",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/model.py": "41f5ad732e6c81e17cd8c43bd47fe5b879f8084631bc05b61e432e60149c03bf",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/model_manager.py": "3d2be2182a483aae4ad56b041e813c800db632ce0cbbea29d6cf4416281ff80e",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/qwen4_exp.py": "476c05eb7d1fd6db77ec15c13404948b27b9f59e5b983675b9c69a57c28bd24e",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/server.py": "76c194e35b60109dc76305523fd538267719d8b7280be84ba24951884a6b9815",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/tests/test_cli.py": "96e87a8105a789e8631d9caf10fc3f376f522afd1da6e632ed1212c62c953cb6",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/tests/test_model_manager.py": "f767b94b2e6f0ed44f6c77f253a355b1ea76db5e78a31a9ecb838fc96709abf5",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/tests/test_qwen_grouped_experts.py": "7d0a4d8301f198fb9b16107ed80fbf3b7b1e7afd3e3bbd7a8c462d660229df3d",
+    "docs/benchmarks/source/2026-09-06-qwen-grouped-experts-default-on/runtime/tests/test_server.py": "ab172888eb0e5708fb877cd31c9b4a46c6da5876957e7cc8d0461c0e8a9546a3"
+  },
+  "limits": [
+    "Default smoke verifies wiring and output consistency; no new speed claim.",
+    "N1-N3 speed results remain tied to their frozen source and single M5 Pro workload.",
+    "Existing running server must restart to use the changed code. App packaging and release were not requested."
+  ]
+}

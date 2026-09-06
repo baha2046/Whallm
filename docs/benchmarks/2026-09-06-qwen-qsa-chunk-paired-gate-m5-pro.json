@@ -1,0 +1,166 @@
+{
+  "evidence_kind": "paired_synthetic_workload_screen",
+  "formal_performance_result": false,
+  "artifact_sha256": "d7b5c3d11ffd7e854cf6d728f5575b70b17392fba71585d5520389d44dc73326",
+  "script_sha256": "5c8af4ee2e943af51ed770f03f03836030e9fdeec74bc9da89047a5a15ca038f",
+  "summary": {
+    "pairs": [
+      {
+        "wave": 0,
+        "case": "repeated-4096",
+        "ttft_reduction": 0.022834126388885045,
+        "decode_change": 0.013096110118252513,
+        "p95_change": -0.02675017741793595,
+        "mlx_memory_change": 1.3654390061734745e-05,
+        "rss_change": -0.000663575638749414,
+        "token_sha256": "1ba018b08ffcfccd361132da02a01ad4520e836b252f8cfec6eab639cd332bff"
+      },
+      {
+        "wave": 0,
+        "case": "code-4096",
+        "ttft_reduction": 0.030047014665342875,
+        "decode_change": 0.020889154808670707,
+        "p95_change": -0.041165463223450494,
+        "mlx_memory_change": 1.8884089443949037e-05,
+        "rss_change": 0.003573923004932311,
+        "token_sha256": "872ec85e0e9a896e10e50b67723c310f1b8ad1ec0bd1265a6b8e4ba8032d82ab"
+      },
+      {
+        "wave": 0,
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.030041116903652743,
+        "decode_change": 0.030339713886473607,
+        "p95_change": 0.00472379470779738,
+        "mlx_memory_change": 1.5010376286817007e-05,
+        "rss_change": 0.003525051530657075,
+        "token_sha256": "8498f94dcaba38c3adbb3a71160f0951d12f2f03cdea88444361439799dba0fe"
+      },
+      {
+        "wave": 0,
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.031368010579837624,
+        "decode_change": 0.013270255627114036,
+        "p95_change": 0.0022541588201105967,
+        "mlx_memory_change": 1.4623007489111828e-05,
+        "rss_change": 0.0026052810334153964,
+        "token_sha256": "17fa8071b54392949715c752d296d5f74a78aad55c2dc6f493251f64641f4456"
+      },
+      {
+        "wave": 0,
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.029206555689198943,
+        "decode_change": 0.01452022303181133,
+        "p95_change": -0.012204617283429808,
+        "mlx_memory_change": 1.3654581851429981e-05,
+        "rss_change": 0.0035102760188705506,
+        "token_sha256": "187e82231f087085a03db45d45875edb418ef55a2213674692c5e06bba6909a9"
+      },
+      {
+        "wave": 1,
+        "case": "repeated-4096",
+        "ttft_reduction": 0.03187034450202675,
+        "decode_change": -8.4775249927449e-05,
+        "p95_change": -0.006377755923137163,
+        "mlx_memory_change": 1.4428750847672589e-05,
+        "rss_change": -0.0006519925896605328,
+        "token_sha256": "1ba018b08ffcfccd361132da02a01ad4520e836b252f8cfec6eab639cd332bff"
+      },
+      {
+        "wave": 1,
+        "case": "code-4096",
+        "ttft_reduction": 0.018924562932857047,
+        "decode_change": 0.0008059525962464953,
+        "p95_change": -0.020532990535511275,
+        "mlx_memory_change": 1.191145066381516e-05,
+        "rss_change": -0.0004392043644013688,
+        "token_sha256": "872ec85e0e9a896e10e50b67723c310f1b8ad1ec0bd1265a6b8e4ba8032d82ab"
+      },
+      {
+        "wave": 1,
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.02472565360912793,
+        "decode_change": 0.0051849356374586986,
+        "p95_change": 0.0002984632342508675,
+        "mlx_memory_change": 1.4235654081096172e-05,
+        "rss_change": 0.003484801302349183,
+        "token_sha256": "8498f94dcaba38c3adbb3a71160f0951d12f2f03cdea88444361439799dba0fe"
+      },
+      {
+        "wave": 1,
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.022388330578983484,
+        "decode_change": -0.006438667564689582,
+        "p95_change": 4.7894001933501684e-05,
+        "mlx_memory_change": 1.733763021660728e-05,
+        "rss_change": -0.003834912769183574,
+        "token_sha256": "17fa8071b54392949715c752d296d5f74a78aad55c2dc6f493251f64641f4456"
+      },
+      {
+        "wave": 1,
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.02265977481827286,
+        "decode_change": 0.0065858453060037014,
+        "p95_change": 0.0023338956987728476,
+        "mlx_memory_change": 1.588177121902845e-05,
+        "rss_change": 0.0035729045231089884,
+        "token_sha256": "187e82231f087085a03db45d45875edb418ef55a2213674692c5e06bba6909a9"
+      }
+    ],
+    "per_case": [
+      {
+        "case": "repeated-4096",
+        "ttft_reduction": 0.027352235445455897,
+        "decode_change": 0.006505667434162532,
+        "p95_change": -0.016563966670536556,
+        "mlx_memory_change": 1.4041570454703667e-05,
+        "rss_change": -0.0006577841142049734
+      },
+      {
+        "case": "code-4096",
+        "ttft_reduction": 0.02448578879909996,
+        "decode_change": 0.010847553702458601,
+        "p95_change": -0.030849226879480884,
+        "mlx_memory_change": 1.5397770053882098e-05,
+        "rss_change": 0.0015673593202654712
+      },
+      {
+        "case": "zh_technical-4096",
+        "ttft_reduction": 0.027383385256390336,
+        "decode_change": 0.017762324761966153,
+        "p95_change": 0.0025111289710241236,
+        "mlx_memory_change": 1.462301518395659e-05,
+        "rss_change": 0.003504926416503129
+      },
+      {
+        "case": "mixed_math-4096",
+        "ttft_reduction": 0.026878170579410554,
+        "decode_change": 0.003415794031212227,
+        "p95_change": 0.0011510264110220492,
+        "mlx_memory_change": 1.5980318852859554e-05,
+        "rss_change": -0.0006148158678840887
+      },
+      {
+        "case": "tool_like-4096",
+        "ttft_reduction": 0.0259331652537359,
+        "decode_change": 0.010553034168907516,
+        "p95_change": -0.00493536079232848,
+        "mlx_memory_change": 1.4768176535229216e-05,
+        "rss_change": 0.0035415902709897695
+      }
+    ],
+    "primary_median_ttft_reduction": 0.026405667916573228,
+    "checks": {
+      "ttft": false,
+      "decode": true,
+      "p95": true,
+      "memory": true
+    },
+    "passed": false,
+    "decision": "stop_chunk16_at_this_gate"
+  },
+  "limits": [
+    "Only two pairs per synthetic workload; no independent held-out adoption result.",
+    "Per-workload gates use the median of the two paired relative changes.",
+    "OS cache and system noise remain possible confounders."
+  ]
+}

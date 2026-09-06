@@ -60,9 +60,15 @@ APP 使用版本化 JSON model catalog 啟動 server。
 }
 ```
 
-實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
-相容舊 APP catalog 時，只有新增的 `qwen_grouped_decode` 可省略，省略等於 `false`。
-設定 `true` 僅支援 Qwen 且必須關閉 MTP；這是尚未預設採用的 grouped Decode 實驗。
+實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
+相容舊 catalog 時，以下兩個新增欄位可各自省略：
+
+- `qwen_grouped_decode`：預設 `false`；啟用時僅支援 Qwen 且 MTP 必須關閉。
+  這是尚未預設採用的 grouped Decode 實驗。
+- `qwen_grouped_experts`：Qwen 預設 `true`，DeepSeek 預設 `false`；明確 `false`
+  可關閉，Qwen 開啟 MTP 時不作用。App 的 Qwen「Prefill 加速」開關會明確傳入此欄位。
+
+兩個欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 `--public-model` 只適用於舊的 `--model` 流程。
 該參數會設定該 installed model 的 Alias。
 
@@ -195,8 +201,15 @@ server 會先驗證並更新 entry，再載入模型。
 }
 ```
 
-實際的 `runtime` object 必須包含全部 `RuntimeConfig` snake-case 欄位。
-舊 catalog 可省略 `qwen_grouped_decode`，等於 `false`；啟用時僅支援 Qwen 且 MTP 必須關閉。
+實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
+相容舊 catalog 時，以下兩個新增欄位可各自省略：
+
+- `qwen_grouped_decode`：預設 `false`；啟用時僅支援 Qwen 且 MTP 必須關閉。
+  這是尚未預設採用的 grouped Decode 實驗。
+- `qwen_grouped_experts`：Qwen 預設 `true`，DeepSeek 預設 `false`；明確 `false`
+  可關閉，Qwen 開啟 MTP 時不作用。App 的 Qwen「Prefill 加速」開關會明確傳入此欄位。
+
+兩個欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 Loaded 或 Loading 的模型不能更新 entry。
 未載入模型的更新會在下次載入時生效。
 三個模型管理 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。

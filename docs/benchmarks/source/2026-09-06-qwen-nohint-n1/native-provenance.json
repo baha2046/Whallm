@@ -1,0 +1,18 @@
+{
+  "recorded_at": "2026-09-06T02:34:09.237356+00:00",
+  "n1_started_at": "2026-09-06T01:50:14.890141+00:00",
+  "captured_after_completed_requests": 15,
+  "library": "/Users/Shared/Project/test/llm_ssd/.build/native/libWhallmANE.dylib",
+  "sha256": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69",
+  "modified_at": "2026-09-03T17:42:22.574331+00:00",
+  "size_bytes": 54256,
+  "configured_override": null,
+  "limit": "Native binary provenance captured during N1, not at its start. Python sources were frozen before N1.",
+  "source_files_sha256": {
+    "Native/ANEBridge/WhallmANE.m": "d4b624caa430034a3586a42e38d9d2decd0493fc1f589ae086f957cbcd1d10ec",
+    "Native/ANEBridge/LICENSE": "f40de840366c4d3787c0cfbc24e88eab86763d9aeca641957efbd012015e22a6",
+    "Scripts/build-ane-bridge.sh": "dd2cb76e6cd2c3fefbf5c6270872a1a1adcf60996e8170e07d0d22b84f2cffd2"
+  },
+  "n1_end_sha256": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69",
+  "n1_end_verified_at": "2026-09-06T03:18:50.730285+00:00"
+}

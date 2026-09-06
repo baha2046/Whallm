@@ -10,6 +10,9 @@ Qwen 支援核對版本是目前工作樹。
 Issue #6 的重現、修復測試與長文驗證邊界見 [驗證紀錄](VALIDATION.md)。
 修復已整合至 `master`，source commit `5245d42` 的本機 App 1.1.4 與 ZIP 已通過
 簽章、三語隔離啟動及包內抽樣回歸檢查；這不是新的公開 Release。
+後續已整合 `feat/optimize_qwen` 的 Prefill 加速設定，合併後 Python 330 項通過、
+Swift 62 項通過（3 項 fixture 略過、4 項 Keychain 案例排除）。上述本機 App
+尚未包含此次合併，完整驗證範圍見 [驗證紀錄](VALIDATION.md)。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact
@@ -81,6 +84,8 @@ MTP 安裝會保留既有 Qwen 主模型，並可續傳未完成的 MTP 下載�
 使用者可以在安裝模型前設定 Alias。
 server 執行期間，App 只會停用 Loaded 或 Loading 模型的 Alias 和模型進階設定。
 未載入模型的有效變更會同步到 server，並在下次載入時生效。
+Qwen 進階設定新增預設開啟的「Prefill 加速」開關，可儲存關閉選擇；
+MTP 開啟或 layer-major prefill 關閉時，開關會停用。
 DeepSeek 下載固定包含 DSpark。模型列不提供排除 DSpark 的選項。
 App 使用 pinned revision 的固定 installed model 大小執行下載前空間檢查。
 App 啟動時不會為了取得下載大小連線到 Hugging Face。
@@ -136,6 +141,25 @@ projection 是另一條已實作路線。其餘方向的 reopening
 接著請更新文件和測試。
 
 ## 歷史研究
+
+2026-09-05 的新一輪 Prefill／Decode 盤點、成敗經驗與論文研究位於
+[`research/README.md`](../research/README.md)。使用者已選擇同時研究精確與近似路線。
+Qwen 的 16 組新基準、快取離線重播與三層共用權重篩選已完成；
+這些是診斷證據，沒有取得新優化的速度改善結論或變更預設值。
+結果見 [B 第一輪](../research/PREFILL_DECODE_B_ROUND1_2026-09-05.md)。
+使用者於 2026-09-06 允許恢復 GPU 研究；H2 Prefill 組件計時已完成。
+4K code 的 recurrent kernel 約 0.55 秒，暫緩完整分塊改寫；這不是新優化的速度結果。
+方法與限制見 [H2 診斷](../research/GATED_DELTA_PREFILL_2026-09-06.md)。
+後續 QSA 批次調整的 20 組配對只改善 2.64%，未採用；
+expert 排序但關閉排序提示的 20 組配對，主要四類 TTFT 改善中位數 15.79%，輸出與讀取量一致。
+後續 N1 新題目與長生成的 32 次執行全部輸出／讀取量一致，1K／16K 首次回覆改善 7.04%／13.46%；
+N2 的 18 次快取分支／重啟回答和共用 state tensors 也通過。
+Qwen expert 分組已通過 [N3 整合對照](../research/QWEN_NOHINT_INTEGRATION_2026-09-06.md)：
+1K／16K 首次回覆改善 7.59%／13.30%，輸出與快取互讀一致。使用者於 2026-09-06 決定採用為 Qwen 預設；可用 CLI 或 model catalog 關閉。
+詳見 [expert 分組研究](../research/QWEN_GROUPED_EXPERTS_2026-09-06.md)。
+會改變文字的開提示候選雖在 12 題初測未觀察到退步，後續 Q1A 在第 27 題出現繁中回退，
+反向重跑仍重現，未通過「任務正確率不下降」門檻，已停止此版本的擴測與採用。
+詳見 [規則與結果](../research/QWEN_QUALITY_Q1_2026-09-06.md)。
 
 SSD Streaming 的 active 瓶頸整理、目前程式碼對照和分階段執行規則位於
 [`research/SSD_STREAMING_BOTTLENECKS_2026-08-31.md`](../research/SSD_STREAMING_BOTTLENECKS_2026-08-31.md)。

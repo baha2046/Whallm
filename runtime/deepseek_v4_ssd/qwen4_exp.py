@@ -13,6 +13,7 @@ from mlx_lm.models.base import create_ssm_mask
 from mlx_lm.models.cache import ArraysCache, CacheList, KVCache
 from mlx_lm.models.qwen3_5 import GatedDeltaNet
 from mlx_lm.models.rope_utils import initialize_rope
+from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
 from .expert_cache import ExpertCache, QwenBatchedExperts, QwenExpertWeights
 from .manifest import InstalledModel, NGram
@@ -599,6 +600,7 @@ class StreamingExperts(nn.Module):
         super().__init__()
         self.layer = layer
         self.cache = cache
+        self.grouped_prefill = False
 
     @staticmethod
     def _one(value: mx.array, weights: QwenExpertWeights) -> mx.array:
@@ -632,8 +634,39 @@ class StreamingExperts(nn.Module):
                     mx.array(np.argsort(positions)), axis=-2,
                 )
         if isinstance(batched, QwenBatchedExperts):
+            source = mx.expand_dims(value, (-2, -3))
+            grouped = self.grouped_prefill and indices.size >= 64
+            selected = indices
+            if grouped:
+                source, selected, inverse = _gather_sort(source, indices)
+            # Preserve the tested QMM path even when expert indices are sorted.
+            projected = mx.gather_qmm(
+                source,
+                batched.gate_up,
+                batched.gate_up_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=False,
+            )
+            gate, up = mx.split(projected, 2, axis=-1)
+            output = mx.gather_qmm(
+                nn.silu(gate) * up,
+                batched.down,
+                batched.down_scales,
+                rhs_indices=selected,
+                transpose=True,
+                group_size=32,
+                bits=4,
+                mode="mxfp4",
+                sorted_indices=False,
+            )
             self.cache.record_gather_qmm(2)
-            return self._grouped(value, indices, batched)
+            if grouped:
+                output = _scatter_unsort(output, inverse, indices.shape)
+            return output.squeeze(-2)
 
         selected = np.asarray(indices, dtype=np.int32)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
@@ -1203,6 +1236,12 @@ def load(
             weight_scale,
         )
         model = Model(args, cache, ngram_store)
+        grouped_prefill = bool(
+            getattr(config, "qwen_grouped_experts", True)
+            and not getattr(config, "mtp_enabled", False)
+        )
+        for layer in model.model.layers:
+            layer.mlp.experts.grouped_prefill = grouped_prefill
         model.eval()
         model.load_weights(list(model.sanitize(weights).items()), strict=True)
         model.dspark = None

@@ -274,6 +274,25 @@ Qwen layer-major prefill 每層只載入一次完整 expert layer。
 少於 128 個未快取 token 時，runtime 使用 selected expert cache。
 短 prompt 不會載入完整 expert layer。
 
+`RuntimeConfig.qwen_grouped_experts` 預設為 `true`，Qwen Prefill 預設使用 expert 分組。
+CLI 可用 `--no-qwen-grouped-experts` 關閉、`--qwen-grouped-experts` 開啟；
+單模型 server（`--model`）也支援這兩個參數，使用 model catalog 時以各模型設定為準。
+它只在 Qwen batched Prefill、MTP 關閉且至少 64 個 expert assignments 時排序輸入，
+沿用 `sorted_indices=False` 的兩次 MXFP4 QMM，還原 expert 順序後才加權。
+一般 individual-expert Decode 與 MTP 路徑維持原本行為，prompt-cache format 5 不變。
+Model catalog 與 `/api/models/configure` 的 `configuration.runtime` 可選填
+`qwen_grouped_experts` boolean；Qwen 省略時為 `true`，明確的 `false` 可關閉。
+App 的 Qwen Model Advanced Settings 提供預設開啟的「Prefill 加速」開關。
+開關只顯示於 Qwen；需要 layer-major prefill 開啟且 MTP 關閉，否則保留選擇但停用操作。
+舊設定缺少此欄位時預設開啟；手動關閉會儲存並以 `qwen_grouped_experts=false` 傳給 server。
+未載入模型的變更會同步到 server，於下次載入生效；Loaded／Loading 模型維持不可編輯。
+正在執行的 server 需重新啟動才能載入更新後的程式；4,096 slots 與 MTP 關閉預設不變。
+新題目、長生成、快取互讀與實際整合對照均已通過。M5 Pro 上整合版本的
+1K／16K 首次回覆改善 7.59%／13.30%，輸出相同。使用者於 2026-09-06 決定預設開啟。
+規則與結果見 [N1](../research/QWEN_NOHINT_VALIDATION_2026-09-06.md)、
+[N2](../research/QWEN_NOHINT_CACHE_2026-09-06.md) 與
+[N3](../research/QWEN_NOHINT_INTEGRATION_2026-09-06.md)。
+
 啟用 expert route trace 時，Qwen 會記錄 Prefill histogram、完整 Decode route
 和 Decode miss。一般 request 不會建立 route trace。
 

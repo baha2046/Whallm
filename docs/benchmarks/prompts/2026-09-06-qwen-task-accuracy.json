@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "limits": [
+    "12 newly authored synthetic tasks, 3 per category; screening only, not general accuracy proof.",
+    "Code cases test comprehension, not code generation. Tool cases test JSON arguments, not actual API calls.",
+    "All tasks require strict JSON; this screen combines answer correctness and format adherence.",
+    "1024-token input with inert padding, greedy generation capped at 128 tokens, thinking off.",
+    "Stop after a paired control-correct/candidate-wrong result; no offset by gains elsewhere.",
+    "No runtime adoption based on this screen, even with zero regressions."
+  ],
+  "cases": [
+    {
+      "id": "code-01",
+      "category": "code",
+      "prompt": "For Python 3, let f(xs) return list(dict.fromkeys(x % 3 for x in xs if x >= 0)). Return {\"outputs\": [f([4,1,-1,2,5,6]), f([]), f([0,3,2,2])]}.",
+      "expected": {
+        "outputs": [
+          [
+            1,
+            2,
+            0
+          ],
+          [],
+          [
+            0,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "id": "math-01",
+      "category": "math",
+      "prompt": "A tank starts with 180 litres. Remove one third of its water, then add 25 litres, then remove 20% of the current water. Return {\"litres\": integer_remaining}.",
+      "expected": {
+        "litres": 116
+      }
+    },
+    {
+      "id": "zh-01",
+      "category": "zh",
+      "prompt": "依據本文回答，不補充外部資訊：甲倉週一收到30箱，其中8箱送往乙倉；週二乙倉退回其中3箱。甲倉原先沒有貨。回傳 {\"甲倉箱數\":整數,\"乙倉保留箱數\":整數}。",
+      "expected": {
+        "甲倉箱數": 25,
+        "乙倉保留箱數": 5
+      }
+    },
+    {
+      "id": "tool-01",
+      "category": "tool",
+      "prompt": "Allowed tool: set_alarm, arguments hour (integer 0..23), minute (integer 0..59), enabled (boolean). User asks: Set an enabled alarm for 7:05 in the evening. Return exactly {\"name\": tool_name, \"arguments\": arguments_object}.",
+      "expected": {
+        "name": "set_alarm",
+        "arguments": {
+          "hour": 19,
+          "minute": 5,
+          "enabled": true
+        }
+      }
+    },
+    {
+      "id": "code-02",
+      "category": "code",
+      "prompt": "In Python 3: a = [[1], [2]]; b = a[:]; b[0].append(3); b[1] = [9]. Return {\"a\": a, \"b\": b}.",
+      "expected": {
+        "a": [
+          [
+            1,
+            3
+          ],
+          [
+            2
+          ]
+        ],
+        "b": [
+          [
+            1,
+            3
+          ],
+          [
+            9
+          ]
+        ]
+      }
+    },
+    {
+      "id": "math-02",
+      "category": "math",
+      "prompt": "Find the smallest positive integer n such that n leaves remainder 2 when divided by 5 and remainder 3 when divided by 7. Return {\"n\": integer}.",
+      "expected": {
+        "n": 17
+      }
+    },
+    {
+      "id": "zh-02",
+      "category": "zh",
+      "prompt": "公告：一般訂單在週二、週四出貨。冷藏訂單只在週四出貨。今天是週二，沒有假日或例外。甲是一般訂單，乙是冷藏訂單，兩筆均已付款並可出貨。回傳 {\"今天可出貨\":[訂單名稱],\"今天不可出貨\":[訂單名稱]}。",
+      "expected": {
+        "今天可出貨": [
+          "甲"
+        ],
+        "今天不可出貨": [
+          "乙"
+        ]
+      }
+    },
+    {
+      "id": "tool-02",
+      "category": "tool",
+      "prompt": "Allowed tool: search_files, arguments query (string), limit (integer), include_archived (boolean). User asks: Find files containing the literal text error: timeout, return at most 3, exclude archived files. Return exactly {\"name\": tool_name, \"arguments\": arguments_object}.",
+      "expected": {
+        "name": "search_files",
+        "arguments": {
+          "query": "error: timeout",
+          "limit": 3,
+          "include_archived": false
+        }
+      }
+    },
+    {
+      "id": "code-03",
+      "category": "code",
+      "prompt": "In Python 3, define f(s) as follows:\ndef f(s):\n    total = 0\n    for i, x in enumerate(s):\n        if x < 0:\n            continue\n        if i >= 3:\n            break\n        total += i * x\n    return total\nReturn {\"outputs\": [f([2,-1,4,8]), f([-1,3,-2,5]), f([])]}.",
+      "expected": {
+        "outputs": [
+          8,
+          3,
+          0
+        ]
+      }
+    },
+    {
+      "id": "math-03",
+      "category": "math",
+      "prompt": "A bag contains 4 red and 6 blue balls. Draw two balls uniformly without replacement. What is the probability of two red balls? Return the reduced fraction as {\"numerator\":integer,\"denominator\":integer}.",
+      "expected": {
+        "numerator": 2,
+        "denominator": 15
+      }
+    },
+    {
+      "id": "zh-03",
+      "category": "zh",
+      "prompt": "只按這份紀錄推論：小林比小陳早到；小黃比小林晚到，但比小陳早到；小周最後到。四人抵達時間不同。回傳 {\"由早到晚\":[姓名依序]}。",
+      "expected": {
+        "由早到晚": [
+          "小林",
+          "小黃",
+          "小陳",
+          "小周"
+        ]
+      }
+    },
+    {
+      "id": "tool-03",
+      "category": "tool",
+      "prompt": "Allowed tool: convert_temperature, arguments value (number), from_unit (\"C\" or \"F\"), to_unit (\"C\" or \"F\"). User asks: Convert minus forty degrees Celsius to Fahrenheit. Return the tool call, not the converted answer, exactly {\"name\": tool_name, \"arguments\": arguments_object}; use an integer for value.",
+      "expected": {
+        "name": "convert_temperature",
+        "arguments": {
+          "value": -40,
+          "from_unit": "C",
+          "to_unit": "F"
+        }
+      }
+    }
+  ]
+}

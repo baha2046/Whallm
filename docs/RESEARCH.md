@@ -1,5 +1,31 @@
 # 研究結論與決策
 
+## 2026-09-06 的新驗證
+
+Qwen QSA query chunk 4→16 在五類 4K／256-token 的 20 組配對中保持輸出一致，
+但主要四類 TTFT 改善中位數 2.64%，未達 5% 門檻，未採用。
+Expert 分組開啟排序提示的版本未通過 token parity；關閉提示、保留排序的版本完成相同規模的配對，
+TTFT 改善中位數 15.79%，通過本輪輸出、Decode、p95 與記憶體篩選。
+後續 N1 四類新題目、1K／16K 輸入與 1,024-token 生成的 32 次執行全部輸出／讀取量一致，
+首次回覆改善中位數為 7.04%／13.46%，Decode／p95／記憶體條件通過。
+N2 的 18 次快取分支／重啟回答與 122 個共用 state tensors 也完全相同。
+`qwen_grouped_experts` 與 CLI 開關已通過 N3：
+八次效能對照及八次快取互讀均通過，1K／16K 首次回覆改善 7.59%／13.30%。
+220 個相關測試通過；舊 App 設定檔省略新欄位仍可載入。使用者於 2026-09-06 選擇預設開啟，已採用為 Qwen 預設；MTP 開啟時不作用。
+完整規則與證據見 [N1](../research/QWEN_NOHINT_VALIDATION_2026-09-06.md)、
+[N2](../research/QWEN_NOHINT_CACHE_2026-09-06.md)、[N3](../research/QWEN_NOHINT_INTEGRATION_2026-09-06.md)。
+方法、數字與限制見 [QSA](../research/QWEN_ATTENTION_GRANULARITY_2026-09-06.md)
+和 [expert 分組](../research/QWEN_GROUPED_EXPERTS_2026-09-06.md)。
+
+會改變文字的開提示候選，採用門檻已由使用者定為「任務正確率不下降」。
+12 題固定答案初測兩版各 10/12，各類沒有觀察到退步，1 題文字不同但兩版都錯。
+後續 Q1A 在第 27/32 題出現繁中候補名單回退，反向重跑仍是原版對／候選錯。
+該開提示版本未通過品質門檻，已停止擴測與採用；Q0 小題組結果不能覆蓋這個反例。
+一題原版數學生成截斷另列未定，未以候選在該題的答案抵銷回退。
+規則、逐類結果與下一步見 [Q1A 研究](../research/QWEN_QUALITY_Q1_2026-09-06.md)。
+
+## 既有結論背景
+
 本文件整合 2026-08-07 至 2026-08-11 的研究。
 本文件只保留目前仍成立的結論。
 日期型原始研究已移到 [`research/archive`](../research/archive/README.md)。
@@ -716,12 +742,12 @@ Wave 5 完整資料位於
 | --- | --- | --- |
 | Canonical expert blob | repacker 固定 `w1/w2/w3` 和 scales 的 byte layout。 | 合約測試、完整 SHA-256。 |
 | Resumable repack | 8 MiB chunk、receipt、digest 和 repair。 | Swift tests 和完整 installed model。 |
-| Layer-major prefill | 4,096 個未快取 token 起啟用。 | 14K 歷史結果把 expert bytes 降低約 94.3%。 |
+| Layer-major prefill | DeepSeek 預設 1,024 個未快取 token 起啟用，可設定；Qwen 門檻為 128。 | 目前門檻見 RuntimeConfig 與 Qwen runtime；14K 歷史結果把 expert bytes 降低約 94.3%，不代表目前門檻的測速結果。 |
 | Batched layer-local MoE | full-layer buffer、strided view 和 `gather_qmm`。 | 4K/14K 歷史配對、fixture parity。 |
 | 自動 prefill step | 128、256、1,024。 | 目前程式碼和 tests。 |
 | MXFP8 compressed cache | 完成的 64-row chunk 使用 MXFP8。 | cache tests 和 8K 歷史 greedy token。 |
 | MXFP4 index cache | index scoring 預設使用 MXFP4 view。 | shape、gather 和 parity tests。 |
-| Block prompt cache v4 | 以完整 RoPE／KV／attention contract 與 128-token SHA-256 chain 命名 immutable cumulative cache checkpoints；suffix 分岔可回退到 bounded prefill checkpoint，frequency-aware sidecar 保留高重用 prefix。 | Restart partial-match、immutable sharing、contract rejection、eviction、MXFP8 snapshot-isolation tests，以及 installed-model functional gate。 |
+| Block prompt cache v5 | 以完整 RoPE／KV／attention contract 與 128-token SHA-256 chain 命名 immutable cumulative cache checkpoints；suffix 分岔可回退到 bounded prefill checkpoint，frequency-aware sidecar 保留高重用 prefix。Format 5 隔離可變 snapshot state，拒絕舊 format 4。 | Restart partial-match、immutable sharing、contract rejection、eviction、snapshot-isolation tests，以及 [Qwen format-5 restart 驗證](QWEN.md)。較早 format-4 functional gate 保留為歷史證據。 |
 | Direct slot read | `preadv` 直接寫入 MLX slot view。 | 目前程式碼和 full-model run。 |
 | Ready expert decode | resident 和先讀完的 expert 先提交 compute。 | 五組配對 hash；改善中位數 12.9%。 |
 | 分開 decode 指標 | model step、cache eval、end-to-end、p50 和 p95。 | 目前 status 和 metrics artifact。 |

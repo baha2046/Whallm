@@ -1,5 +1,25 @@
 # 驗證紀錄
 
+## 2026-09-06：合併 feat/optimize_qwen 至 master
+
+將遠端 `87ffb59845aef94555fea703b511ab7249cf836b` 合併至本機
+`a3572c3c59876edd5ec0ca5ee488fa7aee259642`，保留 MLX **0.32.1** 修復、
+Qwen 預設開啟的 `qwen_grouped_experts` Prefill 加速與預設關閉的
+`qwen_grouped_decode` 實驗。兩個 catalog 欄位可各自省略；另補測兩者皆缺少的
+舊 Qwen／DeepSeek catalog，確認可載入並套用各自預設值。
+
+合併後 Python **330 項通過**；Swift 執行 65 項，**62 通過、3 項缺少 fixture
+略過、零失敗**。四個先前會等待 Keychain 的案例明確排除，不算通過。
+測試使用本機 M2 Max、MLX 0.32.1 與完整 Xcode；命令與原始 log 見
+[合併驗證 artifact](benchmarks/2026-09-06-merge-optimize-qwen/summary.json)。
+
+下方保留兩個分支各自的歷史測試、打包與效能紀錄。遠端分支的 MLX 0.32.0／
+M5 Pro 效能結果並非合併後 MLX 0.32.1 的重新量測；本輪沒有執行模型效能測試。
+本輪也未重新打包：本機 `dist` 仍是下述 `5245d42` 的 Issue #6 build，尚未包含
+此次合併的 Prefill 設定介面。未推送遠端或替換已安裝 App。
+
+## Issue #6 重現、修復與合併前本機打包
+
 2026-09-06 另以已安裝的 Whallm **v1.1.4**（不是目前開發工作樹）完成
 [#6 的四輪探索性重現](../research/ISSUE_6_REPRODUCTION_2026-09-06.md)：
 Qwen thinking 的日文長文在正文第 641 個字元起，連續重複同一短語 187 次後
@@ -51,6 +71,161 @@ ZIP 大小 `120401377` bytes，SHA-256：
 完整命令、各輪 log 與檢查結果見
 [build local artifact](benchmarks/2026-09-06-issue6-build-local/summary.json)。
 沒有建立 tag、notarize、upload 或替換 `/Applications/Whallm.app`。
+
+## 2026-09-06：Qwen「Prefill 加速」開關與本機 App 打包
+
+Qwen 的 Model Advanced Settings 新增預設開啟的「Prefill 加速」開關。
+選擇會儲存，並透過 model catalog／configure 傳入 `qwen_grouped_experts`；
+未載入模型下次載入時生效。舊設定缺少欄位仍預設開啟，明確 false 不會被覆蓋。
+Loaded／Loading 模型維持鎖定；MTP 開啟或 layer-major prefill 關閉時停用此開關。
+英文、簡中、繁中名稱與說明皆已加入；DeepSeek 不顯示此選項。
+
+`make test` 的 69 個 Swift 測試，以及模型管理／API／CLI／分組計算的 87 個 Python 測試通過。
+執行 `env -u NOTARY_PROFILE CODE_SIGN_IDENTITY=- make package` 完成本機打包。
+`dist/Whallm.app` 與 ZIP 解壓後的 App 均通過 `codesign --verify --deep --strict`。
+兩份 App 都在禁止讀取專案 `.build` 與 Swift module 資源 bundle 的情況下，
+以 en／zh-Hans／zh-Hant 各啟動 3 秒並保持運作。
+三語資源位於 `Contents/Resources`，`L10n` 先讀 `.main` 再讀 `.module` 的順序已核對。
+包內 Python 另在禁止讀取專案 `.build`、`.venv` 和 `runtime` 時完成匯入，
+確認 Qwen 預設開啟、明確 false 可關閉，以及舊 DeepSeek catalog 的補值不變。
+
+App 採本機 ad-hoc 簽章；沒有公證、建立 tag 或上傳。
+[打包證據、檔案雜湊與測試紀錄](benchmarks/2026-09-06-qwen-prefill-ui-local-package.json) 已保存。
+介面使用有本地化名稱的系統 Toggle；本輪未執行互動式鍵盤／VoiceOver 操作測試。
+
+## 2026-09-06：Qwen 無提示排序的新題目、長生成與快取驗證
+
+N1 使用四類新編題目、1K／16K 輸入、每次 1,024-token 生成，兩輪反向配對共 32 次執行。
+16 對完整 outputs、logical expert bytes 和 QMM 呼叫數相同；同題四次重跑的輸出也相同。
+跨四題首次回覆改善中位數為 1K **7.04%**、16K **13.46%**。
+逐題兩對的 Decode／p95／MLX peak／RSS 均通過原訂門檻，code 長生成沒有重現先前的小幅回退。
+
+N2 使用兩個 2,048-token 分支、1,024-token shared checkpoint 和 128-token 生成。
+10 個 processes 的 18 次回答與各分支未快取對照相同；其中 14 次實際重用快取。
+A→B→A 的 reuse 為 1,024／1,024／2,047 tokens；四種 writer／reader 重啟組合都通過。
+兩版 format-5 checkpoint 的 122 個 tensors、state schema 與 metadata 相同，分支執行後也未改變。
+
+保存 [N1 完整量測](benchmarks/2026-09-06-qwen-nohint-n1-runs-m5-pro.json)、
+[N1 門檻](benchmarks/2026-09-06-qwen-nohint-n1-gate-m5-pro.json)、
+[N1 來源索引](benchmarks/2026-09-06-qwen-nohint-n1-index.json)、
+[N2 完整合約](benchmarks/2026-09-06-qwen-nohint-n2-cache-m5-pro.json)
+與 [N2 來源索引](benchmarks/2026-09-06-qwen-nohint-n2-index.json)。
+N1 的 native binary 額外雜湊是在第 15 次 request 後補記，結束時再次核對相同；
+Python 原始碼則在開始前固定。N2 已在執行前固定 native binary／source。
+N1 全部回答均達生成上限，這是等長運算與輸出比較，不是完成任務的正確率成績。
+N2 是功能驗證，不以其時間宣稱快取加速；本組 ANE evaluation counter 為零。
+
+當時預設關閉的 `qwen_grouped_experts` 已通過 [N3 實際 runtime 對照](../research/QWEN_NOHINT_INTEGRATION_2026-09-06.md)：
+八次效能執行與八次快取互讀均通過，1K／16K 首次回覆改善 7.59%／13.30%，
+Decode 變化 +0.17%／−0.14%，輸出與 N1 對應片段一致。N1–N3 共 66 次模型請求。
+[N3 完整量測](benchmarks/2026-09-06-qwen-nohint-n3-integration-m5-pro.json) 與
+[來源索引](benchmarks/2026-09-06-qwen-nohint-n3-index.json) 已保存。
+
+相關 runtime／Qwen／CLI／cache 測試共 140 個通過。
+N3 後先修正 model catalog 對舊設定檔的相容性：新 boolean 可省略，當時預設 false；
+80 個模型管理／API 測試通過，累計 220 個。設定解析修正未改動 N3 的生成計算程式，
+詳見 [最後核對](benchmarks/2026-09-06-qwen-nohint-final-verification.json)。
+使用者後續選擇預設開啟；現在 Qwen 省略新欄位時為 true，明確 false 仍可關閉。
+採用階段新增的預設／關閉／MTP 保護檢查通過；本次 225 個 Python 測試與 24 個 App 設定測試通過。
+[採用驗證](benchmarks/2026-09-06-qwen-grouped-experts-default-on.json) 保存目前來源與不帶開啟參數的實際模型檢查。
+原始量測來源與結果保留不變；當輪尚未打包或發布。
+後續 UI 開關與本機打包驗證見本文最新紀錄。
+
+## 2026-09-06：Qwen 開排序提示候選在 Q1A 因回退停止
+
+預定四類各 8 題，在第 27 題出現原版對／候選錯，依事前規則停止後續 5 題。
+已執行 27 對、54 個模型 process，另以相反順序重跑回退題 2 個 process。
+數學題 `math-0926` 原版在 1024-token 上限截斷，另列未定；26 對有完整答案可比較。
+其程式功能原版／候選各 7/7；數學各 6/6；繁中 6/7 對 5/7；工具紀錄續接各 6/6。
+這不是完整公開能力基準成績，也不外推一般任務正確率。
+
+`zh-07` 正確錄取名單為丙、丁、戊，候補為乙；候選漏掉丙並錯列候補。
+反向重跑仍是原版對、候選錯，兩版各自的 output token hash 與第一次相同。
+兩次候選均有 192 次預期 Prefill expert 呼叫。
+因此目前開提示版本未通過「任務正確率不下降」門檻，未採用，Q1B 和截斷題延長生成補測暫緩。
+無提示候選的既有輸出一致性／速度篩選不受此判定覆蓋。
+
+保存 [完整結果與反向確認](benchmarks/2026-09-06-qwen-quality-q1-gate-m5-pro.json)、
+[證據索引](benchmarks/2026-09-06-qwen-quality-q1-index.json)
+與 [規則、題目來源、未覆蓋範圍](../research/QWEN_QUALITY_Q1_2026-09-06.md)。
+已重新計分並核對 hashes；8 個相關 CPU 單元測試和固定 seed 複核通過。
+runtime、App 和模型預設未變更。
+
+## 2026-09-06：Qwen 開排序提示候選的任務初測
+
+以新編固定題組完成 24 個獨立 process／12 題配對，1K 輸入（含填充）、greedy、thinking off、
+4096 slots、MTP off、persistent prompt cache off，生成上限 128 tokens，沒有截斷。
+程式理解原版／候選各 2/3；數學各 2/3；繁中理解各 3/3；工具參數 JSON 各 3/3。
+兩版皆 10/12，沒有原版答對／候選答錯；11/12 題輸出 hash 相同。
+唯一文字不同的程式題兩版均錯，不能把文字差異直接當成能力下降。
+每次候選都有 192 次開排序提示的 Prefill expert 呼叫。
+
+這是小型正確性初測，不是正式能力基準或速度採用結果；每類只有三題，
+未涵蓋程式生成、多步工具與真實長內容，尚未證明「任務正確率不下降」的完整採用條件。
+保存 [逐題結果與來源紀錄](benchmarks/2026-09-06-qwen-task-accuracy-screen-m5-pro.json)
+與 [規則、共同錯誤和下一步](../research/QWEN_TASK_ACCURACY_2026-09-06.md)。
+24 次執行的 hashes／評分已重新核對；評分器與相關 4 個 CPU 測試通過。
+runtime 與 App 預設未變更。
+
+## 2026-09-06：Qwen QSA 批次與 expert 分組
+
+QSA query chunk 4→16 完成五類 4K／256-token、兩組相反順序配對，共 20 個獨立 process。
+10 對輸出 tokens 與 logical expert bytes 全部相同。
+主要四類 TTFT 改善中位數 2.64%，未達 5% 門檻；Decode、p95、記憶體保護條件通過。
+此候選未採用。保存 [完整配對](benchmarks/2026-09-06-qwen-qsa-chunk-paired-runs-m5-pro.json)
+與 [門檻結果](benchmarks/2026-09-06-qwen-qsa-chunk-paired-gate-m5-pro.json)。
+
+Expert 分組的初次候選開啟排序提示，在 code 4K／32 從第 5 個 token 起分歧，未通過精確輸出條件。
+layer 0／23／47 的排序還原檢查全部通過；關閉提示後，三層 expert 輸出元素完全相同。
+無提示候選的 code 4K／32 完整輸出和反向短測試也通過。
+隨後五類 4K／256-token 的 20 組完整配對，主要四類 TTFT 改善中位數 15.79%；
+全部 output tokens、logical expert bytes 與 gather_qmm 計數相同，Decode／p95／記憶體保護條件通過。
+程式碼題目的 Decode 中位數 −2.20%，需在長生成另驗；本輪不是 Decode 加速結論。
+保存 [完整配對](benchmarks/2026-09-06-qwen-grouped-experts-nohint-paired-runs-m5-pro.json)
+與 [門檻結果](benchmarks/2026-09-06-qwen-grouped-experts-nohint-paired-gate-m5-pro.json)。
+尚無獨立 held-out、長輸入或 cache contract 驗證，未採用；不混用初次失敗候選。
+數值診斷見 [artifact](benchmarks/2026-09-06-qwen-grouped-experts-numerical-diagnosis-m5-pro.json)。
+
+上述都是指定輸入的研究驗證，runtime 程式和模型預設未改。
+
+## 2026-09-06：Qwen Prefill recurrent kernel 診斷
+
+沿用前一輪 runtime source hashes、Qwen 4,096 slots、exact／MTP off、48 GiB memory limit，
+以 code 4K 跑正常基準、獨立同步 observer、正常重跑，各 32 tokens，均與前一輪前 32 tokens 相同。
+144 次 Prefill kernel 呼叫共 0.5528 秒；扣除兩種形狀首次呼叫後為 0.5437 秒。
+兩次正常 TTFT 是 69.910／43.981 秒，故組件計時約為其 0.78%／1.24%。
+這是受同步影響的投入排序參考，非嚴格瓶頸占比，也沒有候選加速結果。
+完整分塊改寫在此案例暫緩，不能推論其他輸入長度或整個研究方向失敗。
+
+保存 [逐次計時、三次完整 metrics 與來源 hashes](benchmarks/2026-09-06-qwen-gated-delta-prefill-diagnosis-m5-pro.json)。
+方法與限制見 [H2 研究紀錄](../research/GATED_DELTA_PREFILL_2026-09-06.md)。
+檢查了輸出 hashes、呼叫數、來源／樣本 hashes 與 Python 編譯；runtime 未修改，未重跑完整 App／runtime 測試。
+
+## 2026-09-05：Qwen 研究第一輪
+
+基準 commit 為 `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`，
+Apple M5 Pro／64 GiB、MLX 0.32.0、mlx-lm 0.31.3。
+Qwen 使用 4,096 slots、exact、MTP off、48 GiB memory limit；
+每個 request 是獨立 process，prompt cache 不重用，OS page cache 未清除。
+
+五類合成診斷輸入各有 1K／4K 基準，另加一次 code 4K 重跑與五次獨立路徑記錄，
+共 16 組，每組 256 output tokens。重跑與路徑記錄的完整 token hashes 均對上基準。
+五組目前 LFU 的離線 Decode miss 數也全部對上 runtime 記錄。
+這是本次工作樹的診斷驗證，不是候選優化的正式速度或能力驗證。
+同題正常重跑仍有速度波動，未逐次記錄系統記憶體壓力或實際 ANE 執行次數。
+
+`prefill_guided_24` 的四類主要題目 miss 變化中位數為 +9.27%，未通過離線入口門檻。
+三層、每層一對 experts 的固定 base 權重篩選也完成，但不利於直接採用；
+它不含通道排列對齊、微調或生成品質測試，不能否定完整的共用權重方法。
+兩個候選均未接入 runtime，App 預設不變。
+
+完整 commit、環境、設定、prompt／output hashes、原始資料和保存檔案的 hashes 見
+[證據索引](benchmarks/2026-09-05-qwen-research-round1-index.json)。
+結果與方法限制見 [B 第一輪報告](../research/PREFILL_DECODE_B_ROUND1_2026-09-05.md)。
+本輪另通過 7 個 CPU 單元測試、保存檔案／解壓 trace 的 hash 核對與 diff 檢查；
+沒有重跑完整 runtime 或 App 測試，runtime 程式未改動。
+
+## 既有驗證背景
 
 本文件分開記錄目前驗證和歷史量測。
 以下為本次依賴修正前的自動測試：2026-09-06、base commit `7dc9cf8f050c75def77c0563cd7b8ac03f2d8435`
@@ -2136,7 +2311,7 @@ runtime memory limit 是 48 GiB。
 | 14K context | 歷史通過 | Tool-like prompt，greedy，1 output token。 |
 | 1M context | 未驗證 | checkpoint 合約值不等於本機證據。 |
 | Full-model sampling parity | 未驗證 | 目前沒有固定 reference artifact。 |
-| Model quality benchmark | 未執行 | 本專案驗證 runtime，不宣稱品質評分。 |
+| 正式模型能力基準 | 未執行 | 2026-09-06 完成 Q0 初測，Q1A 在第 27/32 題因回退停止；不宣稱一般能力評分，詳見本文件開頭。 |
 
 ## 重跑規則
 

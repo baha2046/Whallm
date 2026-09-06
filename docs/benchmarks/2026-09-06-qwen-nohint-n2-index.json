@@ -1,0 +1,48 @@
+{
+  "formal_performance_result": false,
+  "checks": {
+    "requests": 18,
+    "cache_requests": 14,
+    "format": 5,
+    "shared_tokens": 1024,
+    "shared_blocks": 8,
+    "shared_tensor_count": 122,
+    "all_output_parity": true,
+    "shared_state_exact": true
+  },
+  "files_sha256": {
+    "docs/benchmarks/2026-09-06-qwen-nohint-n2-cache-m5-pro.json": "8af55f1c806baa562e50f903122eebef94a8aabbb16f2cc49098a50c9e8405dc",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/suite.json": "d34d12a3480414cebdf3e7629df74f7eefe9753db4bb5cde60816d292fb83669",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/research/QWEN_NOHINT_CACHE_2026-09-06.md": "2544fcc284bc5fecfdba82e1cb60dce297a1a661ac4fc2e80fd925dcc09b962f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/benchmark_research_baseline.py": "172a845ba787cd1bad95d599044c00b56b9e7cf6f3def718152976f01e6b5a10",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/research_qwen_sorted_experts.py": "7940e951616c543f8f2974a99122048a9cb8aabbbd7683d2950f4ec036e90db6",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/prepare_r0_prompts.py": "6fc268df107ce46a99cc5a44568ab73405894761087d603e547d86faea7e8836",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/benchmark_qwen_nohint_cache.py": "99970ae6d7ac70fc08a5ec8f3239637411d2676d27944994756c0532ad168724",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/build-ane-bridge.sh": "dd2cb76e6cd2c3fefbf5c6270872a1a1adcf60996e8170e07d0d22b84f2cffd2",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Scripts/analyze_qwen_nohint_validation.py": "98041f3992b80a3af65c95389bcd25df66c62644277234cb6fa889fd953dcd1f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/.build/native/libWhallmANE.dylib": "fecfdf3e96f7d1eead6018dc0cb983cf1e813ef3d0296fd8536c8317298dcd69",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Native/ANEBridge/WhallmANE.m": "d4b624caa430034a3586a42e38d9d2decd0493fc1f589ae086f957cbcd1d10ec",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/Native/ANEBridge/LICENSE": "f40de840366c4d3787c0cfbc24e88eab86763d9aeca641957efbd012015e22a6",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/server.py": "1c81323a7367c67366309a33d175d61fcfd9711fefc12093f58ed1c1e1f0a929",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/generation.py": "3b3f07e9d0c887cdb1eb9220e63f45e3e1dc929d28fc881b88436199ddbe47e5",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/manifest.py": "b7d7094f2f3fccbc9886198e3ca2810120c7b70865888e9e1f61786b24a6ab45",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/model_manager.py": "a0e13b342a3e2ae23e174bb2555538311e066977f7e5b98466ae9f7214879b4b",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/model.py": "eaebd076eb78c31fb789a70bb59c3dc99ff11be6b4d005995c237d56232c5489",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/expert_cache.py": "be2cff184ca93e045aadb84b9fa7366ca551af71fff84203a614a939bb990f36",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/cli.py": "a56e72c084b587e4d7a5a44dc09c54336b44d4de7b3f212ff61e7fa0003b47eb",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/qwen4_exp.py": "34dc6eca2f63fa4b062fc74532c6510e93086bf0cfa764f97ef80e3a7e28c95f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/dspark.py": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/ane_prefill.py": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+    "docs/benchmarks/source/2026-09-06-qwen-nohint-n2/runtime/deepseek_v4_ssd/tool_codec.py": "26db760464ae365b6c581432e4fe14983ee5a61adc922a06472641a3c00594bc"
+  },
+  "limits": [
+    "Functional cache validation, not a performance claim.",
+    "All requests used 2048-token prompts and 128 output tokens.",
+    "ANE remained configured at 0.25 but its evaluation counter was zero for these chunk sizes.",
+    "Raw cache payloads are retained under the recorded scratch paths."
+  ]
+}

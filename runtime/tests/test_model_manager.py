@@ -90,6 +90,50 @@ class FakeRuntime:
 
 
 class ModelCatalogTests(unittest.TestCase):
+    def test_legacy_catalog_without_either_grouped_field_loads(self):
+        for kind in ("deepseek-v4", "qwen3.8-flash-next"):
+            with self.subTest(kind=kind):
+                model = raw_model(kind)
+                model["runtime"].pop("qwen_grouped_decode")
+                model["runtime"].pop("qwen_grouped_experts")
+                parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+                self.assertFalse(parsed.runtime.qwen_grouped_decode)
+                self.assertEqual(
+                    parsed.runtime.qwen_grouped_experts,
+                    kind == "qwen3.8-flash-next",
+                )
+
+    def test_grouped_experts_remains_optional_for_existing_catalogs(self):
+        for kind in ("deepseek-v4", "qwen3.8-flash-next"):
+            model = raw_model(kind)
+            model["runtime"].pop("qwen_grouped_experts")
+            model["runtime"]["slots"] = 4096 if kind == "qwen3.8-flash-next" else 1152
+            parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+            self.assertEqual(parsed.runtime.qwen_grouped_experts, kind == "qwen3.8-flash-next")
+            self.assertEqual(parsed.runtime.slots, model["runtime"]["slots"])
+            self.assertFalse(parsed.runtime.mtp_enabled)
+
+    def test_grouped_experts_requires_boolean_and_preserves_catalog_validation(self):
+        model = raw_model("qwen3.8-flash-next")
+        model["runtime"]["qwen_grouped_experts"] = True
+        parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+        self.assertTrue(parsed.runtime.qwen_grouped_experts)
+        self.assertTrue(parsed.to_json()["runtime"]["qwen_grouped_experts"])
+        for value in ("false", 0, 1, None, []):
+            model["runtime"]["qwen_grouped_experts"] = value
+            with self.subTest(value=value), self.assertRaises(ModelCatalogError):
+                parse_model_catalog({"version": 1, "models": [model]})
+        model["runtime"]["qwen_grouped_experts"] = False
+        parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+        self.assertFalse(parsed.runtime.qwen_grouped_experts)
+        model["runtime"]["unknown_field"] = False
+        with self.assertRaises(ModelCatalogError):
+            parse_model_catalog({"version": 1, "models": [model]})
+        model["runtime"].pop("unknown_field")
+        model["runtime"].pop("slots")
+        with self.assertRaises(ModelCatalogError):
+            parse_model_catalog({"version": 1, "models": [model]})
+
     def test_empty_catalog_is_valid(self):
         self.assertEqual(parse_model_catalog({"version": 1, "models": []}), ())
 
