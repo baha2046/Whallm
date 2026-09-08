@@ -1,6 +1,6 @@
 # 驗證紀錄
 
-## 2026-09-08：Whallm 1.1.6 發布準備
+## 2026-09-08：Whallm 1.1.6 發布
 
 本機 master 已 fast-forward 合併 `origin/codex/ssd-prefill-pipeline`，來源 commit
 `8e69efb3e5f9ebb4bc31dd88c1c778ee5cf9a123`；使用分支既有的
@@ -26,6 +26,23 @@ App 與 ZIP 解壓副本的 strict/deep 簽章、英文／簡中／繁中資源�
 包內 MLX／MLX Metal 0.32.2，Python **371 項通過**；四項研究 grader 測試因既有
 沙盒禁止包內 Python 路徑而排除，這四項已在本次開發環境全套測試通過。
 `pip check` 通過。未替換 `/Applications/Whallm.app`。
+
+本機驗證後執行 `make release VERSION=1.1.6`，使用 Developer ID 與
+`NOTARY_PROFILE=deepseek_ssd`。Apple 公證 submission
+`97e1c66d-c6a3-436f-a3e8-90c4a3c35e6f` 為 Accepted。
+標籤 `v1.1.6` 對應 `195420b2edbf409519c8ec34ef0230f8d530ba9c`，已推送 master。
+包內 21 個 Git 追蹤 runtime 檔案與此 tag 內容完全一致。
+
+[GitHub Release](https://github.com/yanun0323/Whallm/releases/tag/v1.1.6)
+已公開為正式版本，包含 `Whallm-macOS-arm64.zip` 與 `appcast.xml`。
+Release notes 與分支原稿逐字一致。上傳前及 GitHub 下載後的 App／ZIP 副本
+皆通過 strict deep signature、公證 ticket、Gatekeeper、三語資源與隔離啟動檢查。
+目前 `dist` 已更新為 1.1.6 簽章及公證成品。
+
+下載檔案 SHA-256：
+
+- `Whallm-macOS-arm64.zip`：`3732e5b741145bd4eec6f44d9cd614d043555c525dc68e29548c6ff3289426d6`
+- `appcast.xml`：`5d08e384ebf2507f9f7c4143969c52bcff7882e0d3663c2d2e0d34072730cc3c`
 
 本次原始日誌與取回來源 SHA-256 保存在本機 `scratch/release-1.1.6/`。
 上述為目前測試結果，不是重新執行歷史真實模型或效能矩陣。

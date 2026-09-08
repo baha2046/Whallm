@@ -4,9 +4,11 @@
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
 最後核對日期是 2026-09-08。
-1.1.6 發布準備已將 `origin/codex/ssd-prefill-pipeline`（`8e69efb`）合併至本機 master。
-補齊原開發機未追蹤的六個研究來源檔後，本機 Python 375 項、Swift 66 項通過；
-四項 Keychain 互動測試排除。此次封裝與發布驗證見 [驗證紀錄](VALIDATION.md)。
+已發布 [Whallm 1.1.6](https://github.com/yanun0323/Whallm/releases/tag/v1.1.6)，
+標籤對應 `195420b`，已包含 `origin/codex/ssd-prefill-pipeline`（`8e69efb`）與六個缺漏研究來源檔。
+本次 Python 375 項、Swift 66 項及包內 Python 371 項通過；排除範圍見 [驗證紀錄](VALIDATION.md)。
+GitHub 下載 ZIP 的簽章、公證與三語隔離啟動均通過，release notes 與分支原稿一致。
+目前 `dist` 為 1.1.6 正式成品；以下較早的本機封裝紀錄均為歷史驗證。
 依使用者要求，Model Advanced Settings 已加入預設開啟的 LRU 快取，以及 Qwen
 最多四字詞合批確認；舊偏好自動遷移，手動關閉值保留，下次載入模型時生效。
 合批已接入聊天生成，使用已知文字提出候選及主模型抽樣；不支援的模式、太大的 state
