@@ -4,6 +4,9 @@
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
 最後核對日期是 2026-09-08。
+1.1.6 發布準備已將 `origin/codex/ssd-prefill-pipeline`（`8e69efb`）合併至本機 master。
+補齊原開發機未追蹤的六個研究來源檔後，本機 Python 375 項、Swift 66 項通過；
+四項 Keychain 互動測試排除。此次封裝與發布驗證見 [驗證紀錄](VALIDATION.md)。
 依使用者要求，Model Advanced Settings 已加入預設開啟的 LRU 快取，以及 Qwen
 最多四字詞合批確認；舊偏好自動遷移，手動關閉值保留，下次載入模型時生效。
 合批已接入聊天生成，使用已知文字提出候選及主模型抽樣；不支援的模式、太大的 state
@@ -23,6 +26,10 @@ peak 約 704 MB；這是功能驗證，沒有新的普遍加速或 2x 證明。
 上述隔離研究使用同版本本機 Python；後續依使用者授權，dependency 與本機成品已升級為 0.32.2。
 見 [0.32.2 實測](../research/ISSUE_7_MLX_0322_2026-09-08.md)。
 
+已發布 [Whallm 1.1.5](https://github.com/yanun0323/Whallm/releases/tag/v1.1.5)，
+對應 commit `13d4452`。本次 Python 338 項、Swift 65 項通過，四項 Keychain
+互動測試排除。GitHub 下載成品的簽章、公證、三語隔離啟動均通過；
+該次 `dist` 為 1.1.5 正式成品。以下 1.1.4 打包紀錄為發布前的歷史驗證。
 Qwen 支援核對版本是目前工作樹。
 目前 Python dependency 固定為 MLX **0.32.2**，修正編譯函式在背景執行緒結束時的
 解構問題，並保留先前抽樣亂數狀態修正；打包會拒絕不符合 pinned 版本的 MLX／MLX Metal 環境。

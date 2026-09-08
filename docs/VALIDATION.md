@@ -1,5 +1,35 @@
 # 驗證紀錄
 
+## 2026-09-08：Whallm 1.1.6 發布準備
+
+本機 master 已 fast-forward 合併 `origin/codex/ssd-prefill-pipeline`，來源 commit
+`8e69efb3e5f9ebb4bc31dd88c1c778ee5cf9a123`；使用分支既有的
+[1.1.6 Release notes](../Packaging/ReleaseNotes/1.1.6.md)。
+
+首次 Python 測試執行 358 項、有 8 個 import errors：分支忽略 research 目錄，
+六個必要 Python 來源未追蹤。從原開發機同一 commit 的工作目錄
+取回這六檔及既有 kernel／授權檔，八檔兩端 SHA-256 完全一致。
+六個缺檔加入版本控制，既有兩檔內容不變；沒有改動原始內容。
+補齊後 `PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests
+-p 'test_*.py'` 完整 **375 項通過**。本機 MLX／MLX Metal 依 requirements 升至 0.32.2。
+
+Swift 使用 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make test`，
+**66 項通過**，排除以下四項既有 Keychain 互動案例，未將其列為通過：
+`testAPIKeyRoundTripsThroughIsolatedKeychainItem`、
+`testGenerationContinuesAfterLeavingAndReturningToChat`、
+`testRapidStreamingCoalescesMessagePublications`、
+`testStreamingFlushesPendingTextBeforeReportingAnError`。
+
+`make package APP_VERSION=1.1.6 BUILD_VERSION=1.1.6` 已完成本機 ad hoc 封裝。
+App 與 ZIP 解壓副本的 strict/deep 簽章、英文／簡中／繁中資源及六次隔離啟動通過；
+啟動禁止讀取專案 `.build` 與 Swift module bundle，L10n 均從 App Resources 初始化。
+包內 MLX／MLX Metal 0.32.2，Python **371 項通過**；四項研究 grader 測試因既有
+沙盒禁止包內 Python 路徑而排除，這四項已在本次開發環境全套測試通過。
+`pip check` 通過。未替換 `/Applications/Whallm.app`。
+
+本次原始日誌與取回來源 SHA-256 保存在本機 `scratch/release-1.1.6/`。
+上述為目前測試結果，不是重新執行歷史真實模型或效能矩陣。
+
 ## 2026-09-08：MLX 0.32.2 升級與本機成品驗證
 
 依使用者授權，requirements.txt 與開發環境 MLX／MLX Metal 升至 0.32.2，
@@ -175,6 +205,31 @@ request 加速 **1.77x / 1.36x**，不是普遍 2x 的結果。
 沒有修改 production/App、模型權重或建立 commit。
 規則與限制見 [研究紀錄](../research/SSD_PREFILL_PIPELINE_2026-09-07.md)，
 source/raw hashes 和逐次資料見 [證據摘要](benchmarks/2026-09-07-ssd-prefill-pipeline/summary.json)。
+
+## 2026-09-07：Whallm 1.1.5 發布
+
+[GitHub Release](https://github.com/yanun0323/Whallm/releases/tag/v1.1.5)
+的 tag `v1.1.5` 指向 `13d44524c9c12a71f26bee79b33bc345a5163d7f`。
+發布內容見 [Release notes](../Packaging/ReleaseNotes/1.1.5.md)。
+
+本次在 `/Users/Shared/Project/test/llm_ssd` 將本機 MLX／MLX Metal 從
+0.32.0 更新為 requirements 指定的 0.32.1 後，Python 338 項通過；
+Swift 65 項通過、零略過，另外四項既有 Keychain 互動測試排除。
+先完成 `make package APP_VERSION=1.1.5 BUILD_VERSION=1.1.5` 本機驗證，
+再執行 `make release VERSION=1.1.5`，使用 Developer ID 與
+`NOTARY_PROFILE=deepseek_ssd`。Apple 公證 submission
+`ace7c95c-4144-461c-9917-f6919c18ceba` 為 Accepted。
+
+上傳前與 GitHub 下載後均通過 strict deep signature、公證 ticket、
+Gatekeeper、英文／簡中／繁中資源及隔離啟動檢查。隔離啟動禁止讀取
+專案 `.build` 和 Swift module bundle，六次 L10n 初始化均完成。
+GitHub Release 包含 ZIP 與 `appcast.xml`，發布筆記與本機原稿一致。
+本次原始日誌保留於本機 `scratch/release-1.1.5/`。
+
+下載檔案 SHA-256：
+
+- `Whallm-macOS-arm64.zip`：`5ba28945e1f621b452667690a8d4ca01e4dc50c80de02a5eb4b6e83d36a0ddf5`
+- `appcast.xml`：`79f2a851137b738de2e8a5f51e6ae205c7498eb007766ae47ead1037a04d29c1`
 
 ## 2026-09-07：最終 build local 與 dist 清理
 
