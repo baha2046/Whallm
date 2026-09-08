@@ -914,7 +914,7 @@ class _QwenArenaSlotPool(_SlotPool):
 
 
 class ExpertCache:
-    """A fixed-size, layer-aware LFU slot pool for routed expert weights."""
+    """A fixed-size, layer-aware LFU/LRU slot pool for routed expert weights."""
 
     def __init__(
         self,
@@ -931,6 +931,8 @@ class ExpertCache:
         file_cache_policy: str = "cached",
         staged_expert_streaming: bool = False,
         qwen_grouped_decode: bool = False,
+        eviction_policy: str = "lfu",
+        qwen_short_block: bool = False,
     ) -> None:
         if qwen_grouped_decode and (not installed_model.is_qwen or staged_expert_streaming):
             raise ValueError("grouped Decode requires Qwen without staged streaming")
@@ -944,6 +946,9 @@ class ExpertCache:
             raise ValueError(
                 f"unknown expert-file cache policy: {file_cache_policy}"
             )
+        if eviction_policy not in ("lfu", "lru"):
+            raise ValueError(f"unknown expert eviction policy: {eviction_policy}")
+        self.eviction_policy = eviction_policy
         self.model = installed_model
         self.slots = slots
         self.read_workers = read_workers
@@ -975,6 +980,21 @@ class ExpertCache:
             if staged_expert_streaming
             else (_QwenArenaSlotPool if qwen_grouped_decode else _SlotPool)(installed_model, slots)
         )
+        self.qwen_short_block_active = False
+        self.qwen_short_block_reason = "disabled"
+        if qwen_short_block:
+            self.qwen_short_block_reason = "unsupported cache layout or mode"
+            if (installed_model.is_qwen and slots >= 4 * installed_model.selected_expert_count
+                    and not staged_expert_streaming and not qwen_grouped_decode):
+                from .qwen_resident_block import BoundedArenaPool
+                try:
+                    pool = BoundedArenaPool(installed_model, slots)
+                except ValueError:
+                    pass
+                else:
+                    self._pool = pool
+                    self.qwen_short_block_active = True
+                    self.qwen_short_block_reason = "ready"
         self._entries: dict[tuple[int, int], _Entry] = {}
         self._free_slots = list(reversed(range(slots)))
         self._heap: list[tuple[int, int, int, int, int]] = []
@@ -1826,8 +1846,13 @@ class ExpertCache:
         entry.version += 1
         heapq.heappush(
             self._heap,
-            (entry.frequency, entry.last_access, entry.version, layer, expert),
+            (self._eviction_rank(entry), entry.last_access, entry.version, layer, expert),
         )
+
+    def _eviction_rank(self, entry: _Entry) -> int:
+        # Keep actual assignment counts for profiling and decay. LRU changes
+        # ranking only; reservation, pinning and in-flight protection are shared.
+        return entry.frequency if self.eviction_policy == "lfu" else 0
 
     def _evict(self, protected: set[tuple[int, int]]) -> tuple[tuple[int, int], _Entry]:
         protected_items: list[tuple[int, int, int, int, int]] = []
@@ -1841,7 +1866,7 @@ class ExpertCache:
                 key = (layer, expert)
                 entry = self._entries.get(key)
                 if entry is None or (
-                    entry.frequency,
+                    self._eviction_rank(entry),
                     entry.last_access,
                     entry.version,
                 ) != (frequency, last_access, version):
@@ -1884,7 +1909,7 @@ class ExpertCache:
             entry.version += 1
             heapq.heappush(
                 self._heap,
-                (entry.frequency, entry.last_access, entry.version, layer, expert),
+                (self._eviction_rank(entry), entry.last_access, entry.version, layer, expert),
             )
 
     def _read_expert_into_slot(self, layer: int, expert: int, slot: int) -> float:

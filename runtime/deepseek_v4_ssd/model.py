@@ -48,6 +48,7 @@ class RuntimeConfig:
     qwen_next_layer_prefetch: bool = False
     qwen_grouped_decode: bool = False
     qwen_grouped_experts: bool = True
+    qwen_short_block: bool = False
     ane_prefill: bool = True
     ane_prefill_ratio: float = 0.25
     fp4_index_cache: bool = True
@@ -65,6 +66,7 @@ class RuntimeConfig:
     expert_route_trace: str | None = None
     expert_page_cache_probe: bool = False
     expert_file_cache_policy: str = "cached"
+    expert_eviction_policy: str = "lfu"
     ready_expert_decode: bool = True
     staged_expert_streaming: bool = False
     adaptive_expert_prefill_threshold: float | None = None
@@ -897,6 +899,7 @@ def load_model(
         read_limiter=read_limiter,
         page_cache_probe=config.expert_page_cache_probe,
         file_cache_policy=config.expert_file_cache_policy,
+        eviction_policy=config.expert_eviction_policy,
         staged_expert_streaming=config.staged_expert_streaming,
     )
     try:
@@ -1404,7 +1407,11 @@ def _clone_layer_cache(layer_cache):
         ):
             value = getattr(item, name, None)
             if isinstance(value, mx.array):
-                copied = value + mx.zeros((), value.dtype)
+                # Copy as bytes: floating addition changes signed zero and can
+                # alter subnormal/NaN payloads in a speculative checkpoint.
+                copied = (
+                    value.reshape(-1).view(mx.uint8) + mx.zeros((), mx.uint8)
+                ).view(value.dtype).reshape(value.shape)
                 setattr(item, name, copied)
                 arrays.append(copied)
     return checkpoint, arrays
@@ -1436,6 +1443,7 @@ def _load_dspark(
         read_limiter=read_limiter,
         page_cache_probe=config.expert_page_cache_probe,
         file_cache_policy=config.expert_file_cache_policy,
+        eviction_policy=config.expert_eviction_policy,
     )
     try:
         dspark = load_dspark_model(
@@ -1482,6 +1490,7 @@ def _load_qwen_mtp(
         read_limiter=read_limiter,
         page_cache_probe=config.expert_page_cache_probe,
         file_cache_policy=config.expert_file_cache_policy,
+        eviction_policy=config.expert_eviction_policy,
     )
     try:
         model = MTPModel(args, expert_cache)

@@ -2322,6 +2322,12 @@ def _parser() -> argparse.ArgumentParser:
             "F_NOCACHE with read-ahead disabled"
         ),
     )
+    parser.add_argument("--qwen-short-block", action=argparse.BooleanOptionalAction, default=False,
+                        help="Reuse resident Qwen experts across up to four verified tokens")
+    parser.add_argument(
+        "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
+        help="expert eviction ranking for the single-model runtime (default LFU)",
+    )
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
         "--dspark-prompt-cache",
@@ -2393,6 +2399,8 @@ def main() -> None:
         fp4_index_cache=not arguments.no_fp4_index_cache,
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
+        expert_eviction_policy=arguments.expert_eviction_policy,
+        qwen_short_block=arguments.qwen_short_block,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         mtp_enabled=arguments.mtp,
         mtp_slots=arguments.mtp_slots,

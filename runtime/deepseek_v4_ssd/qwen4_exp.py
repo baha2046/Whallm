@@ -1225,7 +1225,9 @@ def load(
         read_limiter=read_limiter,
         page_cache_probe=getattr(config, "expert_page_cache_probe", False),
         file_cache_policy=getattr(config, "expert_file_cache_policy", "cached"),
+        eviction_policy=getattr(config, "expert_eviction_policy", "lfu"),
         qwen_grouped_decode=getattr(config, "qwen_grouped_decode", False),
+        qwen_short_block=getattr(config, "qwen_short_block", False) and not config.mtp_enabled,
     )
     try:
         scale_name = (

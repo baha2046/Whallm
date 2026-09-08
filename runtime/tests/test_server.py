@@ -49,6 +49,7 @@ class FakeRuntime:
         fp4_index_cache=True,
         expert_page_cache_probe=False,
         expert_file_cache_policy="cached",
+        expert_eviction_policy="lfu",
         dspark_enabled=False,
         dspark_prompt_cache=False,
         dspark_hash_prefetch=False,
@@ -1842,6 +1843,7 @@ class ServerTests(unittest.TestCase):
         self.assertFalse(payload["runtime"]["dspark_prompt_cache"])
         self.assertEqual(payload["runtime"]["layer_major_prefill_threshold"], 1_024)
         self.assertEqual(payload["runtime"]["expert_file_cache_policy"], "cached")
+        self.assertEqual(payload["runtime"]["expert_eviction_policy"], "lfu")
         self.assertEqual(
             payload["runtime"]["expert_file_direct_io_alignment_bytes"],
             0,

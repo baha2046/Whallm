@@ -1303,6 +1303,7 @@ class RuntimeMetrics:
                 "prompt_cache_write_seconds": self._prompt_cache_write_seconds,
                 "prompt_cache_write_errors": self._prompt_cache_write_errors,
                 "prompt_cache_write_error": self._prompt_cache_write_error,
+                "qwen_short_block": dict(getattr(self, "qwen_short_block", {})),
                 "request_prefill_step_size": self._prefill_step_size,
                 "layer_major_prefill": self._layer_major_prefill,
                 "request_expert_cache_hit_rate": self._expert_request.hit_rate,
@@ -2106,6 +2107,17 @@ class ModelRuntime:
                     dspark_prompt_cache_source=dspark_prompt_cache_source,
                     approximation_mode=options.approximation_mode,
                 )
+                block_enabled = bool(getattr(self.config, "qwen_short_block", False))
+                use_short_block = bool(
+                    block_enabled and self._is_qwen and dspark is None and mtp is None
+                    and getattr(self.expert_cache, "qwen_short_block_active", False)
+                    and options.approximation_mode == EXACT_APPROXIMATION_MODE
+                )
+                self.metrics.qwen_short_block = dict(
+                    enabled=block_enabled, active=use_short_block, rounds=0,
+                    proposed_tokens=0, accepted_tokens=0, memory_fallbacks=0,
+                    reason="ready" if use_short_block else "disabled or incompatible mode/layout",
+                )
                 completed = False
                 prefill_persist_entry = None
                 prefill_persist_snapshots: dict[int, _PromptCacheSnapshot] = {}
@@ -2229,8 +2241,14 @@ class ModelRuntime:
                     with _use_mlx_lm_generation_stream(self._generation_stream):
                         if getattr(self.config, "qwen_grouped_decode", False):
                             self.expert_cache.set_qwen_decode_prefill(len(generation_prompt))
+                        generate = stream_generate
+                        extra = {}
+                        if use_short_block:
+                            from .qwen_block_generation import stream_block_generate
+                            generate = stream_block_generate
+                            extra = dict(history=prompt_tokens, stats=self.metrics.qwen_short_block)
                         responses = iter(
-                            stream_generate(
+                            generate(
                                 self.model,
                                 self.tokenizer,
                                 generation_prompt,
@@ -2240,6 +2258,7 @@ class ModelRuntime:
                                 prompt_cache=prompt_cache,
                                 prefill_step_size=step_size,
                                 prompt_progress_callback=record_prefill_checkpoint,
+                                **extra,
                             )
                         )
                         with closing(responses):

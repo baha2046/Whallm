@@ -1762,6 +1762,12 @@ private struct ModelAdvancedView: View {
             value: $settings.slots
           )
           Divider()
+          toggleField(
+            "Keep recently used experts",
+            hint: "Keeps recently used expert data in the same cache capacity. Changes apply on next load.",
+            value: recentExpertCache
+          )
+          Divider()
           integerField(
             "Read workers",
             hint:
@@ -1796,6 +1802,12 @@ private struct ModelAdvancedView: View {
             value: $settings.layerMajorPrefill
           )
           if modelKind == .qwen3_8FlashNext {
+            Divider()
+            toggleField(
+              "Verify up to four tokens together",
+              hint: "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.",
+              value: qwenShortBlock
+            )
             Divider()
             toggleField(
               "Prefill acceleration",
@@ -1913,6 +1925,20 @@ private struct ModelAdvancedView: View {
     Binding(
       get: { settings.anePrefillRatio ?? 0.25 },
       set: { settings.anePrefillRatio = $0 }
+    )
+  }
+
+  private var recentExpertCache: Binding<Bool> {
+    Binding(
+      get: { settings.recentExpertCache ?? true },
+      set: { settings.recentExpertCache = $0 }
+    )
+  }
+
+  private var qwenShortBlock: Binding<Bool> {
+    Binding(
+      get: { settings.qwenShortBlock ?? true },
+      set: { settings.qwenShortBlock = $0 }
     )
   }
 

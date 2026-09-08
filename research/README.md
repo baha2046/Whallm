@@ -3,6 +3,49 @@
 目前 runtime 行為以 [docs](../docs/README.md) 為準。
 本目錄保存研究問題、實驗與尚未採用的方向。
 
+## 2026-09-07：SSD Streaming 架構原型
+
+最新 [功能實作結果](SSD_FEATURE_IMPLEMENTATION_RESULTS_2026-09-07.md)：runtime
+增加可選 LRU，完整 request 縮短 3.17%，未升預設。保留次數的 warm B4 verifier
+成本縮短 14.85%、logical reads 少 20.53%，全 logits／state exact、MLX peak
+增加 252 MB；尚未接入聊天生成。另修正 state clone 的負零位元，367 tests 通過。
+
+前一輪 [三方向第一輪 gate](SSD_THREE_DIRECTIONS_GATE_2026-09-07.md) 已完成；
+[原始結果及 191 份 source／raw 索引](../docs/benchmarks/2026-09-07-ssd-three-directions/summary.json)：
+sparse fill + 整層 QMM 在 8K／16K 的 request 時間縮短 2.86%／1.36%，
+數值與 +1 GB 通過但速度未達 5%，未採用。多字合批保留頻率、同容量 LRU 的
+CPU 重播少讀有潛力，尚非 runtime 加速／峰值驗收。360 + 3 tests 通過。
+結論與限制已同步 [docs/RESEARCH.md](../docs/RESEARCH.md)。
+
+前一輪 [8K／16K 長輸入實測](SSD_RETAINED_LONG_RESULTS_2026-09-07.md) 已完成：
+兩長度 full logits/state exact；各八次有效交錯測量，8K request 1.00393x，
+幾乎持平；16K 0.95716x、時間增加 4.48%，速度 gate 拒絕。
+峰值增幅均低於 +1 GB；受換頁干擾的首輪與完整重測資料分開保留，
+112 項證據稽核通過。production／App 預設未改。
+
+前一輪 [長 Prefill／ready Decode 實作結果](SSD_RETAINED_READY_RESULTS_2026-09-07.md)：
+每層保留 pages、跨 chunk 重用已完成。4K／8K 數值與 state exact；
+4K request 1.0907x、TTFT 1.1059x、MLX／RSS peak 增幅不到 1 MB。
+當輪 8K 只有正確性，16K 尚未驗證，現由上述實測更新。Decode ready groups／shared overlap 數值通過，
+但三版測速在第 10 次原版對照出現 system swapout，效能 gate 停止，未採用。
+前置 [設計研究](LONG_PREFILL_DECODE_PIPELINE_2026-09-07.md) 保存逐 chunk 重讀問題
+及 route 推算；它不覆蓋本次實測結果。各版均未改 App 預設。
+
+後續 [直接 resident 短 block](QWEN_RESIDENT_BLOCK_RESULTS_2026-09-07.md) 已完成：
+消除權重重打包，數值/state 正確、+1 GB 內；兩字 0.9374x、四字 1.0530x。
+四字只通過 verifier 初篩，logical reads 沒下降，未接入正式生成。
+
+後續 [穩定性與短 block](SSD_STABILITY_AND_BLOCK_2026-09-07.md) 已完成：
+Prefill 通過 23 對 lifecycle 情境並封存 source；新短 block verifier 的 logits/state
+exact，但速度成本為 0.944x / 1.001x，沒有減少 logical reads，第一候選停止。
+不要在沒有新設計下重跑相同 2 / 4-token 打包版本或直接加上 drafter。
+
+[雙緩衝 expert Prefill 流水線](SSD_PREFILL_PIPELINE_2026-09-07.md)
+已實作研究版、取消／buffer lifetime 測試與真實權重 component gate。
+使用者將記憶體條件更新為峰值最多增加 1 GB；原始零增幅結果保留。
+143 / 1024-token 的完整模型 observer 均通過 48 層 tensor 與生成 token 一致性。
+速度、冷／暖啟動限制和目前 gate 狀態以該文件及其證據檔為準；尚未採用為 App 預設。
+
 ## 新一輪 Prefill／Decode 研究
 
 要接續 2026-09-05 的速度研究，先讀

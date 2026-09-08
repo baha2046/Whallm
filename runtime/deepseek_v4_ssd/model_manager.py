@@ -211,7 +211,7 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
 
 def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
     names = {field.name for field in fields(RuntimeConfig)}
-    required = names - {"qwen_grouped_experts", "qwen_grouped_decode"}
+    required = names - {"qwen_grouped_experts", "qwen_grouped_decode", "expert_eviction_policy", "qwen_short_block"}
     if not isinstance(value, dict) or not required <= set(value) <= names:
         raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
@@ -254,6 +254,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "persistent_prompt_cache",
         "batched_expert_prefill",
         "qwen_grouped_experts",
+        "qwen_short_block",
         "ane_prefill",
         "fp4_index_cache",
         "dspark_enabled",
@@ -294,6 +295,8 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
             raise ValueError(f"{name} must be a string or null")
     if config.expert_file_cache_policy not in EXPERT_FILE_CACHE_POLICIES:
         raise ValueError("expert_file_cache_policy is not supported")
+    if config.expert_eviction_policy not in ("lfu", "lru"):
+        raise ValueError("expert_eviction_policy must be lfu or lru")
     for name in (
         "dspark_prompt_cache",
         "dspark_hash_prefetch",
@@ -593,6 +596,10 @@ class ModelManager:
                     "fp4_index_cache": config.fp4_index_cache,
                     "expert_page_cache_probe": config.expert_page_cache_probe,
                     "expert_file_cache_policy": config.expert_file_cache_policy,
+                    "expert_eviction_policy": config.expert_eviction_policy,
+                    "qwen_short_block": getattr(config, "qwen_short_block", False),
+                    "qwen_short_block_ready": getattr(cache, "qwen_short_block_active", False),
+                    "qwen_short_block_reason": getattr(cache, "qwen_short_block_reason", "unsupported model or mode"),
                     "expert_file_direct_io_alignment_bytes": getattr(
                         cache, "direct_io_alignment", 0
                     ),

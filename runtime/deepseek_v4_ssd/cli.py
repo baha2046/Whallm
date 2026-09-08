@@ -172,6 +172,12 @@ def main() -> None:
             "F_NOCACHE with read-ahead disabled"
         ),
     )
+    parser.add_argument("--qwen-short-block", action=argparse.BooleanOptionalAction, default=False,
+                        help="Reuse resident Qwen experts across up to four verified tokens")
+    parser.add_argument(
+        "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
+        help="expert cache eviction ranking; LRU is opt-in and keeps per-layer reserves",
+    )
     parser.add_argument("--no-ready-expert-decode", action="store_true")
     arguments = parser.parse_args()
     try:
@@ -311,6 +317,8 @@ def main() -> None:
         expert_route_trace=arguments.expert_route_trace,
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
+        expert_eviction_policy=arguments.expert_eviction_policy,
+        qwen_short_block=arguments.qwen_short_block,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
@@ -437,6 +445,7 @@ def main() -> None:
             "ready_expert_decode": config.ready_expert_decode,
             "expert_page_cache_probe": config.expert_page_cache_probe,
             "expert_file_cache_policy": config.expert_file_cache_policy,
+            "expert_eviction_policy": runtime.expert_cache.eviction_policy,
             "expert_file_direct_io_alignment_bytes": (
                 runtime.expert_cache.direct_io_alignment
             ),

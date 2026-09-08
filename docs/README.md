@@ -3,17 +3,41 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-07。
+最後核對日期是 2026-09-08。
+依使用者要求，Model Advanced Settings 已加入預設開啟的 LRU 快取，以及 Qwen
+最多四字詞合批確認；舊偏好自動遷移，手動關閉值保留，下次載入模型時生效。
+合批已接入聊天生成，使用已知文字提出候選及主模型抽樣；不支援的模式、太大的 state
+或沒有候選時使用逐字計算。狀態位元複製修正始終生效。
+4096 slots 的實際開關配對，生成文字、完整 state 及後續對話快取一致，最終額外 MLX
+peak 約 704 MB；這是功能驗證，沒有新的普遍加速或 2x 證明。
+詳見 [UI 整合驗證](VALIDATION.md#2026-09-08model-advanced-settings-與合批生成)。
+歷史 1152-slot LRU 的 request 改善為 3.17%，研究 B4 verifier 成本改善 14.85%；
+這些不同條件的結果仍見 [功能實作結果](../research/SSD_FEATURE_IMPLEMENTATION_RESULTS_2026-09-07.md)。
+已確認公開 1.1.5 的 DeepSeek request-thread 結束時可能發生 Python SIGSEGV；
+本機已重現，現已升級 MLX 0.32.2。原始背景見 [Issue #7 調查](../research/ISSUE_7_REPRODUCTION_2026-09-07.md)。
+2026-09-08 實測回報者的 Handler.finish() 清理修法：第一筆不再 SIGSEGV，第二筆卻
+因找不到 GPU stream 失敗，基本連續請求 gate 拒絕，正式 runtime 未採用。
+見 [修法實測](../research/ISSUE_7_HANDLER_FINISH_2026-09-08.md)。
+後續隔離 MLX 0.32.2、未加 cleanup：100 次 thread lifecycle、375 項 Python
+測試、DeepSeek 六次連續請求、265-token 快取重用、取消恢復及 Qwen 四次抽樣均通過。
+上述隔離研究使用同版本本機 Python；後續依使用者授權，dependency 與本機成品已升級為 0.32.2。
+見 [0.32.2 實測](../research/ISSUE_7_MLX_0322_2026-09-08.md)。
+
 Qwen 支援核對版本是目前工作樹。
-目前 Python dependency 固定為 MLX **0.32.1**，修正背景執行緒的編譯抽樣器
-無法正常推進亂數狀態的問題；打包會拒絕不符合 pinned 版本的 MLX 環境。
+目前 Python dependency 固定為 MLX **0.32.2**，修正編譯函式在背景執行緒結束時的
+解構問題，並保留先前抽樣亂數狀態修正；打包會拒絕不符合 pinned 版本的 MLX／MLX Metal 環境。
+開發環境 375 項 Python 測試通過；本機 ad hoc 簽章 App 與 ZIP 解壓副本已通過
+簽章及三語系隔離啟動。包內 371 項 runtime 測試通過，研究評分工具的四項測試
+因其沙盒禁止 App 所在路徑而另列，完整失敗紀錄保留。版本號保留 1.1.4，未發布或替換已安裝 App。
+包內 DeepSeek 連續請求、快取重用、取消恢復與 Qwen 抽樣也通過；詳見
+[升級成品驗證](VALIDATION.md#2026-09-08mlx-0322-升級與本機成品驗證)。
 Issue #6 的重現、修復測試與長文驗證邊界見 [驗證紀錄](VALIDATION.md)。
 修復與 `feat/optimize_qwen` 的 Prefill 加速設定已整合至 `master`。
 source commit `ec39204` 的本機 App 1.1.4 與 ZIP 已通過簽章、三語隔離啟動及
 包內抽樣回歸檢查；這不是新的公開 Release，也未替換已安裝 App。
 此次打包前 Python 330 項通過、Swift 62 項通過（3 項 fixture 略過、4 項
 Keychain 案例排除）。完整驗證範圍見 [驗證紀錄](VALIDATION.md)。
-後續已加入 Codex Responses 串流保活與 Ctrl+C 取消修復，工作樹 Python
+後續已加入 Codex Responses 串流保活與 Ctrl+C 取消修復，該次 Python
 338 項通過。真正 Codex CLI 的慢速模型工具回圈，以及真實 Qwen 的
 Codex SIGINT 取消、HTTP 輸出中取消與後續請求恢復均通過。
 另修正重複 Keychain 存取與打包初始化判定，見同一紀錄。
@@ -21,6 +45,20 @@ Codex SIGINT 取消、HTTP 輸出中取消與後續請求恢復均通過。
 初始化與包內抽樣檢查均通過。2026-09-07 再次完成最終 build local，
 `dist` 僅保留 `Whallm.app` 與對應 ZIP；已移除舊備份及打包暫存目錄。
 本次重新開啟 App，保留 build 前的 server 停止狀態。
+前一輪研究工作樹 Python **360 項通過**。長 Prefill 新原型可跨 1024-token chunks
+保留資料：4K／8K 數值一致；4K request 快 9.1%，MLX／RSS 峰值增幅不到 1 MB，
+取消／重用／恢復通過。後續 8K／16K 完整數值檢查及各八次有效測速完成：
+8K request 僅快 0.39%，16K 回答時間增加 4.48%；兩者記憶體均在 +1 GB 內，
+因此不將這版直接擴用到長輸入。新 Decode 分組原型數值
+通過，但效能測量在第 10 次原版對照發生 system swapout 而停止，未採用。
+舊穩定 Prefill 與兩版短 block 的 source／結果完整保留；仍無普遍 2x 證據。
+上述歷史研究當時均未改 production／App 預設；2026-09-08 的 UI 變更見本頁開頭。
+結果見 [研究結論](RESEARCH.md) 與 [驗證](VALIDATION.md)。
+三方向後續第一輪研究已完成：新 sparse-fill 原型在 8K／16K 分別縮短 request
+2.86%／1.36%，未達 5% gate，仍不採用。多 token 的頻率保留與同容量 LRU
+快取重播有少讀線索，尚無實際加速／峰值驗收；優先驗證新題目的同容量 LRU。
+本輪 runtime 360 項與研究 component 3 項測試通過，詳見
+[三方向證據](benchmarks/2026-09-07-ssd-three-directions/summary.json)。
 DeepSeek runtime 研究的核對基準是 commit
 `997e2ca756d3d6c8ae97aa4df3effcf566ed449f`
 加上目前 working tree 的 storage-aware profiling 與預設關閉的 hash exact

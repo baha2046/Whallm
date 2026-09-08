@@ -1,5 +1,97 @@
 # 研究結論與決策
 
+## 2026-09-08：依使用者要求整合 UI 並預設開啟
+
+LRU 與 Qwen 四字詞合批已加入 Model Advanced Settings 並預設開啟；Python
+CLI 與舊 catalog 的省略預設保留。合批已加入 production prompt-lookup／主模型逐字
+抽樣、拒絕前綴重播及記憶體 fallback，無須額外草稿模型。狀態位元複製修正不設開關。
+這項預設變更來自最新使用者要求，不會把下列歷史未達效能 gate 的結果改寫成通過。
+新實際 4096-slot 功能驗證見 [驗證紀錄](VALIDATION.md#2026-09-08model-advanced-settings-與合批生成)。
+
+## 2026-09-07：8K／16K 長輸入測量完成，收益消失或退步
+
+受測 retained Prefill 與原版 source 不變。兩種精確長度的全部 Prefill observer、
+32 步 logits、前後 122 個 state arrays/schema 都 exact。
+各八次有效交錯測量：8K 完整回答 **101.409 → 101.012 秒（1.00393x）**，
+接近持平；16K **184.525 → 192.784 秒（0.95716x，時間增加 4.48%）**，速度拒絕。
+MLX／RSS 峰值差額均低於 +1 GB；16K 最保守 RSS 增幅約 1.26 MB。
+有效系列輸出一致、ANE 無 fallback、沒有新增 swapout。
+兩種長度受換頁干擾的首輪另存，依事前規則各完整重測一次，未混合取樣。
+112 項獨立證據稽核通過；不將稽核通過視為 16K 的速度通過。
+這是單一 code-review 題加背景填充的長度初篩，不能外推到所有長文件。
+保留 4K 舊結果，暫不將此候選直接擴用到 8K／16K，production／App 預設未改。
+[完整條件、數字與封存](../research/SSD_RETAINED_LONG_RESULTS_2026-09-07.md)。
+
+## 2026-09-07：長 Prefill 原型通過 4K 初篩，Decode 效能驗證因 swapout 停止
+
+已實作每層保留 expert pages、跨 1024-token chunks 重用的研究路徑。
+4K／8K 完整模型數值與 state exact；4K／64-token 的八次交錯測量，
+request **1.0907x**、TTFT **1.1059x**，MLX／RSS 峰值最保守增幅分別約
+0.45／0.97 MB，符合 +1 GB；少請求 10.818 GB logical expert bytes。
+8K 尚無效能／記憶體 gate，16K 只是 wrapper 上限，不是已驗證範圍。
+
+Qwen Decode 的 resident ready groups 與 shared async overlap 也已實作，
+同 native wait-all 對照及候選的 32 步 full logits/state 完全相同。
+原定三版 12 次效能測量在第 10 次原版對照出現 system swapout，依事前規則
+停止，狀態 `REJECTED_SWAPOUT`。已完成十次輸出／讀取量一致，但未完成
+有效效能 gate；不以部分數字採用候選，也不歸因成候選自身耗盡記憶體。
+長輸入的有效八次結果與 Decode 的失效測量分開保留。
+各版均為 research wrapper，未改 production／App 預設。
+[實作、結果與限制](../research/SSD_RETAINED_READY_RESULTS_2026-09-07.md)。
+
+## 2026-09-07：長 Prefill／Decode 延伸設計研究
+
+以原版 runtime 完成一次 4096-token／64-output 路徑診斷。對同一路徑重播，
+每個 1024 chunk 重新讀 union 將請求 138.785 GB，為原整層讀取 64.173 GB 的
+2.163 倍；每層保留已讀 experts 則推算 53.355 GB，少 16.86%。這是排程推算，
+不是新 scheduler 效能或實際 SSD bytes。Decode 的 3024 個層步驟有 85.55%
+同時含 hit/miss，支持先驗 Qwen resident 合批 + shared 計算／demand I/O 重疊。
+記憶體約束維持 matched baseline +1 GB，尚未改 runtime 或 App。
+[設計、證據及下一輪 gate](../research/LONG_PREFILL_DECODE_PIPELINE_2026-09-07.md)。
+
+## 2026-09-07：resident 短 block 實作完成，四字僅通過成本初篩
+
+新 native 原型直接使用已載入 expert，權重重打包為 0 bytes；兩字／四字完整
+logits、122 個 cache state arrays 與 fork 隔離均通過。相對原逐字路徑，
+ABBA/BAAB 為 **0.9374x / 1.0530x**，最大 MLX 增幅約 292 MB，RSS 約 1.9 MB。
+額外同 native 路徑歸因測試的四字 block 為 1.0967x；但兩組 logical reads
+都未下降，目前沒有支持 2x / 3x 的證據。保留研究 source，未加 drafter 或改 App。
+完整條件及下一步門檻見 [resident block 結果](../research/QWEN_RESIDENT_BLOCK_RESULTS_2026-09-07.md)。
+
+## 2026-09-07：Prefill 穩定性完成，短 block verifier 第一版停止
+
+雙 buffer Prefill 的 23 對 lifecycle 情境通過，包括多輪、4K fallback、
+256-token 生成、Prefill / Decode 取消、恢復、12 次重用與重啟互讀 cache。
+680 個對照輸出 token 及 reuse 序列相同；最後 5 次 active MLX 波動兩版皆 16 KiB，
+peak 差額在使用者 +1 GB 上限內。Source 已封存，App 預設未修改。
+
+下一階段已實作 Qwen 逐 token dense/state、合併 expert union 的 2 / 4-token
+verifier。完整 logits 與 122 個 cache state arrays exact，且 fork 隔離通過；
+但 ABBA/BAAB 成本 gate 為 **0.944x / 1.001x**，logical expert bytes 均未下降。
+此候選 **REJECTED_VERIFIER_COST**，未繼續疊加 drafter 或宣稱完整生成加速。
+後續需有降低 resident-view 打包／同步成本的實質新設計才重啟。
+規則、失敗原因與 snapshot 見 [穩定性及短 block 研究](../research/SSD_STABILITY_AND_BLOCK_2026-09-07.md)。
+
+## 2026-09-07：SSD expert 流水線原型
+
+研究版以兩個 32-expert buffers 交替讀取與計算，替代 Qwen Prefill 的整層讀取等待。
+保留原 checkpoint MXFP4、gather_qmm、不開排序提示與 router 加總順序。
+真實權重 component 的 128 / 1024-token 輸出完全一致且記憶體下降；
+完整模型兩種長度的 48 層 observer 及生成 token 也一致。
+使用者在實作途中授權峰值最多增加 **1 GB**；原本零增幅的失敗不覆寫。
+
+第一組 143-token／64-token generation 的 request 時間改善 1.69x，
+TTFT 改善 2.71x，但未控制的 process startup 使整體 client timer 反而退步，
+因此該組完整 gate 仍拒絕。後續另以相同常駐權重檔案快取條件測試，
+冷／暖啟動與 request 結果必須分開解讀，不能將 TTFT 當成整體速度。
+原型僅作用於單一既有 Prefill chunk、最多 1024 tokens；production 與 App 預設未改。
+相同 warm-common 條件的後續 16 次執行通過 bounded screen：143 / 1024-token
+輸入的 request 分別改善 **1.77x / 1.36x**，TTFT **2.96x / 1.55x**；
+全部 prompt/token exact，MLX/RSS 峰值增幅皆低於 1 GB，p95 與 swapout gate 通過。
+這是兩個本機工作負載的暖啟動研究證據，仍不代表冷啟動或所有模型都達 2x。
+目前結果、重現方式與未驗證範圍見
+[實作與 gate 紀錄](../research/SSD_PREFILL_PIPELINE_2026-09-07.md)。
+
 ## 2026-09-06 的新驗證
 
 Qwen QSA query chunk 4→16 在五類 4K／256-token 的 20 組配對中保持輸出一致，
@@ -47,7 +139,7 @@ N2 的 18 次快取分支／重啟回答與 122 個共用 state tensors 也完�
 - routed expert 使用 checkpoint-native FP4。
 - runtime 依需求從 SSD 讀取 expert blob。
 - 長 prefill 使用 layer-major 和 batched `gather_qmm`。
-- decode 使用 ready expert path。
+- DeepSeek decode 使用 ready expert path；Qwen 目前仍走自己的 wait-all／可選 grouped 路徑。
 - compressed KV cache 使用 MXFP8。
 - prompt cache 保存完整 prefix state。
 - Qwen QSA 使用 Grouped-KV 計算，不再把兩個 selected KV heads 複製成 24 個 heads。4K quick gate 的 paired median Prefill 從 53.63 提升至 102.00 tok/s；使用者已授權採用。
@@ -1385,6 +1477,62 @@ M2 Max 的 4,096-slot lifecycle 已通過。2,048-slot 區塊的長輸出有速�
 production integration 與能耗仍未完成。來源與限制見
 [kernel 報告](../research/QWEN_DECODE_KERNEL_2026-09-06.md)，完整資料見
 [333 份證據索引](benchmarks/2026-09-06-qwen-cross-arena-kernel-m2-max/summary.json)。
+
+## 2026-09-07：LRU 與頻率保留 B4 的實作驗證
+
+LRU 已接入 RuntimeConfig、CLI、單模型 server 與 catalog；相同容量與保護規則，
+預設 LFU 不變。新自然繁中 280-input／128-output 題、1152 slots 的八次
+ABBA／BAAB：request 33.045639 → 31.999531 秒，縮短 3.17%；Decode +5.28%，
+全部輸出一致，MLX peak 無增加、RSS +999,424 bytes。整體未達 5%，TTFT 中位數
+約 +0.014 秒，未升為預設，依規則停止第二個 adoption workload。
+
+保留完整 assignment 次數的 native B4 已實作。另一份自然 code 題 365 tokens，
+先暖 32 步、再計算 32 個已知正確的 inputs：八次 verifier 成本中位數
+4.543675 → 3.868829 秒，縮短 14.85%；logical reads 少 20.53%，
+MLX peak +252,208,280 bytes，RSS +2,621,440 bytes，全部 logits／state exact。
+成本含 private fork／acquisition／compute／同步，未含 drafter、接受／拒絕與
+完整 request；尚未接入聊天生成，不能宣稱聊天加速 14.85%。
+
+首次 warm gate 抓到浮點加零的 clone 將一個 -0.0 改為 +0.0，立即停止測速。
+保留失敗及 dump，改成整數 byte copy 後重新通過，未放寬 hash 門檻。
+LRU 的普通 CLI 路徑沒有呼叫此 speculative helper，原 failed adoption 結果保留；
+新 B4 使用修正後 source。最終 367 tests 與獨立 read-back 通過。
+條件仍限 M2 Max／MLX 0.32.1／Qwen、fresh processes、warm common.bin，未清 OS
+expert cache。短輸入的 ANE controller active，但記錄 evaluations 為 0；不是
+ANE 加速測量。沒有其他模型、M5 Pro、能耗、physical SSD bytes 或普遍 2x 證據。
+
+詳見 [實作與限制](../research/SSD_FEATURE_IMPLEMENTATION_RESULTS_2026-09-07.md) 及
+[原始 artifacts](benchmarks/2026-09-07-ssd-feature-implementation/summary.json)。
+
+## 2026-09-07：三個 SSD 方向的第一輪研究
+
+三方向已依序完成 bounded screen，production runtime／App 預設未修改。
+完整 source、失敗嘗試、原始 metrics 與獨立核對見
+[191 份 source／raw 證據索引](benchmarks/2026-09-07-ssd-three-directions/summary.json)。
+
+1. **Sparse fill + 原整層 QMM**：新原型只填入真正會用到的專家，保留 canonical
+   expert 位置及原數學。8K／16K 各八次有效 ABBA／BAAB、64-token 輸出完全一致；
+   request 中位數分別 101.614 → 98.705 秒（縮短 2.86%）及
+   184.938 → 182.416 秒（縮短 1.36%）。MLX／RSS 各不到 +0.6 MB，仍未達
+   預先固定的 5% 速度門檻，不採用。8K 第一次測速整輪因 system swapout 排除。
+   有額外同步點的診斷不可當正式測速；原 expert call 包含 lazy 上游計算。
+2. **多 token 共用 expert acquisition**：三份 64-output trace 的原 LFU 共
+   90,720 個 Decode miss-mask bits 完全重現。B4 只記 unique experts 可少讀
+   2.09–9.03%；保留原 assignment 次數可少讀 18.25–21.94%。這是已知正確
+   target tokens 的 CPU 重播，尚未量測 drafter、verifier、rollback 或速度。
+   Prompt lookup B4 只接受 0／3／4 tokens，未接入 runtime。
+3. **固定預算快取**：同樣 1,152 slots、保留每層配額時，LRU 重播少讀
+   10.74–18.57%；獨立切換配額證實主要差異在淘汰排序，另有 OrderedDict
+   LRU 重算一致。原 LFU 增至 1,504 slots（payload +919,142,400 bytes）
+   只少讀 11.32–12.64%；LRU 加相同容量則少讀 21.36–26.80%。這些不是
+   實際速度或 MLX／RSS 峰值驗收，也不是改用 LRU 的採用證明。
+
+Formal speed 條件限 M2 Max 64 GiB、MLX 0.32.1、Qwen canonical MXFP4 experts、
+1,152 slots、step 1024、ANE active、fresh processes、warm common.bin、未清 OS
+expert cache。重播使用既有 padded code-4096 與本輪新自然程式題 2260／3670
+tokens；沒有新自然 8K／16K 文件、長回答、其他模型或 M5 Pro 結論。
+下一輪優先固定同容量 LRU，以新題目完整請求、數值／state、+1 GB 與 P95 gate
+驗證；warm B4 與多 token 權重計算共用仍為研究候選。沒有普遍 2x／3x 證據。
 
 ## 一手來源
 

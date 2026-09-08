@@ -217,6 +217,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var bf16KVCache = false
   var anePrefillRatio: Double? = 0.25
   var qwenGroupedExperts: Bool?
+  var recentExpertCache: Bool?
+  var qwenShortBlock: Bool?
   var mtpEnabled: Bool? = false
   var mtpSlots: Int? = 32
   var dsparkEnabled = false
@@ -229,6 +231,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
 
   static func defaults(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = ModelAdvancedSettings()
+    settings.recentExpertCache = true
+    settings.qwenShortBlock = modelKind == .qwen3_8FlashNext
     settings.qwenGroupedExperts = modelKind == .qwen3_8FlashNext
     if modelKind == .qwen3_8FlashNext {
       settings.slots = 4_096
@@ -245,6 +249,9 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
 
   func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = self
+    settings.recentExpertCache = settings.recentExpertCache ?? true
+    settings.qwenShortBlock = modelKind == .qwen3_8FlashNext
+      ? (settings.qwenShortBlock ?? true) : false
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
     if modelKind == .qwen3_8FlashNext {
@@ -589,6 +596,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let qwenNextLayerPrefetch: Bool
       let qwenGroupedDecode: Bool = false
       let qwenGroupedExperts: Bool
+      let expertEvictionPolicy: String
+      let qwenShortBlock: Bool
       let anePrefill: Bool
       let anePrefillRatio: Double
       let fp4IndexCache: Bool
@@ -630,6 +639,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case qwenNextLayerPrefetch = "qwen_next_layer_prefetch"
         case qwenGroupedDecode = "qwen_grouped_decode"
         case qwenGroupedExperts = "qwen_grouped_experts"
+        case expertEvictionPolicy = "expert_eviction_policy"
+        case qwenShortBlock = "qwen_short_block"
         case anePrefill = "ane_prefill"
         case anePrefillRatio = "ane_prefill_ratio"
         case fp4IndexCache = "fp4_index_cache"
@@ -680,6 +691,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(qwenNextLayerPrefetch, forKey: .qwenNextLayerPrefetch)
         try values.encode(qwenGroupedDecode, forKey: .qwenGroupedDecode)
         try values.encode(qwenGroupedExperts, forKey: .qwenGroupedExperts)
+        try values.encode(expertEvictionPolicy, forKey: .expertEvictionPolicy)
+        try values.encode(qwenShortBlock, forKey: .qwenShortBlock)
         try values.encode(anePrefill, forKey: .anePrefill)
         try values.encode(anePrefillRatio, forKey: .anePrefillRatio)
         try values.encode(fp4IndexCache, forKey: .fp4IndexCache)

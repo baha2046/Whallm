@@ -61,14 +61,22 @@ APP 使用版本化 JSON model catalog 啟動 server。
 ```
 
 實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
-相容舊 catalog 時，以下兩個新增欄位可各自省略：
+相容舊 catalog 時，以下新增欄位可各自省略：
 
 - `qwen_grouped_decode`：預設 `false`；啟用時僅支援 Qwen 且 MTP 必須關閉。
   這是尚未預設採用的 grouped Decode 實驗。
 - `qwen_grouped_experts`：Qwen 預設 `true`，DeepSeek 預設 `false`；明確 `false`
   可關閉，Qwen 開啟 MTP 時不作用。App 的 Qwen「Prefill 加速」開關會明確傳入此欄位。
 
-兩個欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
+- `expert_eviction_policy`：省略為 `lfu`，可選 `lru`。兩者使用相同容量、每層配額、
+  pinned 與讀取保護。新版 App 的「保留最近使用的專家資料」預設開啟，明確傳入 `lru`；
+  手動關閉傳入 `lfu`，舊 catalog 省略時仍維持 LFU。
+- `qwen_short_block`：省略為 `false`，新版 App 在 Qwen 預設明確傳入 `true`。
+  最多四個 token 共用 expert acquisition，以主模型逐字抽樣確認；不需額外草稿模型。
+  開關在下次載入生效。MTP、非 Qwen、非 canonical layout、slots 小於四倍 top-k
+  或超過 4096、不相容的 cache mode 均不啟用 native 路徑。
+
+三個 Qwen 欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 `--public-model` 只適用於舊的 `--model` 流程。
 該參數會設定該 installed model 的 Alias。
 
@@ -202,14 +210,17 @@ server 會先驗證並更新 entry，再載入模型。
 ```
 
 實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
-相容舊 catalog 時，以下兩個新增欄位可各自省略：
+相容舊 catalog 時，以下新增欄位可各自省略：
 
 - `qwen_grouped_decode`：預設 `false`；啟用時僅支援 Qwen 且 MTP 必須關閉。
   這是尚未預設採用的 grouped Decode 實驗。
 - `qwen_grouped_experts`：Qwen 預設 `true`，DeepSeek 預設 `false`；明確 `false`
   可關閉，Qwen 開啟 MTP 時不作用。App 的 Qwen「Prefill 加速」開關會明確傳入此欄位。
 
-兩個欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
+- `expert_eviction_policy`：省略為 `lfu`，可選 `lru`；未知值、boolean 與 null 都拒絕。
+- `qwen_short_block`：省略為 `false`，必須是 boolean；新版 App 的 Qwen 預設開啟。
+
+三個 Qwen 欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 Loaded 或 Loading 的模型不能更新 entry。
 未載入模型的更新會在下次載入時生效。
 三個模型管理 endpoint 成功時都回傳與 `GET /api/status` 相同的資料。
@@ -689,6 +700,18 @@ Nonresident 是 expert-file-specific page-cache-miss proxy，不是 physical SSD
 `performance.dspark_hash_prefetch_*_page_cache_*` 分別保存 draft 與 exact hash-prefetch
 useful／wasted partition。Probe 本身會改變 timing，不應在服務模式預設開啟。
 `runtime.expert_file_cache_policy` 是 `cached` 或 `bypass`；預設為 `cached`。
+`runtime.expert_eviction_policy` 是 `lfu` 或 `lru`；預設為 `lfu`。CLI 與單模型
+Python server 使用 `--expert-eviction-policy lru` 選用；catalog 模式在 model entry
+的 `runtime.expert_eviction_policy` 指定。CLI metrics 與 server status 會回報策略。
+此設定傳至 main／DSpark／MTP 的 expert cache；真實數值／效能驗證範圍以
+研究結果為準，不代表各模型均會加速。2026-09-08 依使用者要求，App 新增此開關並
+預設採用 LRU；Python CLI／舊 catalog 的省略預設不變。
+CLI／單模型 server 可用 `--qwen-short-block`／`--no-qwen-short-block`；catalog 以
+`qwen_short_block` 控制。Server status 的 `qwen_short_block_ready`／`qwen_short_block_reason`
+表示模型 cache 是否支援；`performance.qwen_short_block` 分別回報 enabled、active、
+rounds、proposed_tokens、accepted_tokens、memory_fallbacks。active 表示本請求採用該生成器，
+實際合批次數要看 rounds。沒有重複候選或 state fork 計帳超過 300 MB 時，逐字計算；
+零接受的猜測後會暫停猜測 32 步。這不代表所有請求都會加速。
 `runtime.expert_file_direct_io_alignment_bytes` 是目前 expert descriptors 要求的
 alignment，cached mode 為 0，本次 APFS bypass mode 為 4,096。Darwin bypass mode
 會對 main 與 DSpark expert descriptors 設定 `F_NOCACHE` 並停用 read-ahead；它不清除

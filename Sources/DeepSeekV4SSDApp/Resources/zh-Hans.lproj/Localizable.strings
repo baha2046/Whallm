@@ -328,3 +328,11 @@
 
 "Prefill acceleration" = "Prefill 加速";
 "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load." = "加快提示词处理。需要启用 layer-major prefill，并关闭 MTP。更改会在下次载入模型时生效。";
+
+"Keep recently used experts" = "保留最近使用的专家数据";
+
+"Keeps recently used expert data in the same cache capacity. Changes apply on next load." = "在相同缓存容量内，优先保留最近用过的专家数据。下次加载模型时生效。";
+
+"Verify up to four tokens together" = "一次确认最多四个字词";
+
+"Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "文字重复时重用专家数据，每个字词仍由模型确认。启用 MTP、格式不支持或状态缓存过大时，使用原本的生成方式。下次加载模型时生效。";

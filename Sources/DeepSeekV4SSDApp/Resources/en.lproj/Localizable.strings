@@ -328,3 +328,11 @@
 
 "Prefill acceleration" = "Prefill acceleration";
 "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load." = "Speeds up prompt processing. Requires layer-major prefill with MTP off. Changes apply on next load.";
+
+"Keep recently used experts" = "Keep recently used experts";
+
+"Keeps recently used expert data in the same cache capacity. Changes apply on next load." = "Keeps recently used expert data in the same cache capacity. Changes apply on next load.";
+
+"Verify up to four tokens together" = "Verify up to four tokens together";
+
+"Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.";

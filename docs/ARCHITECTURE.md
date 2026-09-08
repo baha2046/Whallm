@@ -8,6 +8,18 @@ runtime 只在 router 選到 routed expert 時讀取 expert blob。
 本文件描述目前程式碼。
 本文件不描述研究中的預期設計。
 
+2026-09-08 的 Model Advanced Settings 新增「保留最近使用的專家資料」及 Qwen
+「一次確認最多四個字詞」，兩者預設開啟。缺少新欄位的舊設定會遷移為開啟，明確的
+關閉值會保留；catalog 將設定傳入 runtime，載入中的模型維持既有設定鎖定規則。
+LRU 不增加 slots；Qwen 合批使用 production `qwen_block_generation.py`、
+`qwen_short_block.py`、`qwen_resident_block.py` 與包內 Metal header，沒有 research
+import 或全域 monkeypatch。它從已知文字提出最多三個候選，主模型以 T=1 dense/state
+數學及一次 expert union 取得各位置 logits，再逐位置抽樣。猜錯或提前結束時，丟棄
+私有 state 並重播已消耗前綴；取消或讀取失敗不儲存未完成對話快取。
+每頁 32 slots 的未使用 payload 上限為 80,947,200 bytes；state fork 計帳上限 300 MB。
+超過 16 個 arena 的 kernel 參數會按 token 分組，仍共用同一次 expert acquisition。
+狀態位元複製修正始終生效，不提供會重新引入錯誤的關閉選項。
+
 ## 元件
 
 ```text
@@ -210,6 +222,7 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `adaptive_expert_prefill_threshold` | `null` | Internal stopped research prototype；只接受 0.7／0.8／0.9，需要 layer-major batched prefill，拒絕 DSpark／staged composition，且沒有 CLI／server／APP opt-in。 |
 | `expert_page_cache_probe` | `false` | Research-only `mincore` pre-read page-residency classification；不是 physical SSD counter。 |
 | `expert_file_cache_policy` | `cached` | Expert descriptor policy；research-only `bypass` 使用 Darwin `F_NOCACHE` 並停用 read-ahead。 |
+| `expert_eviction_policy` | `lfu` | 固定容量 expert cache 的淘汰排序，可選 `lru`；保留相同每層配額、pinning、in-flight 保護與 heap 清理。CLI／server／catalog 可 opt-in，舊 catalog 省略時仍用 LFU，App UI 預設不變。 |
 | `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
 | persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 5 依 reuse count 和 access recency 執行 eviction。 |

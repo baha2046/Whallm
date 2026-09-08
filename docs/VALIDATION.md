@@ -1,5 +1,181 @@
 # 驗證紀錄
 
+## 2026-09-08：MLX 0.32.2 升級與本機成品驗證
+
+依使用者授權，requirements.txt 與開發環境 MLX／MLX Metal 升至 0.32.2，
+mlx-lm revision 及其他 dependency pins 保留；未加入 finish()/clear_streams()。
+既有 packaging guard 直接讀 requirements，已確認兩個套件版本皆符合新 pin。
+
+- 開發環境完整 Python **375 項通過**，pip check 通過。
+- `make package APP_VERSION=1.1.4 BUILD_VERSION=1.1.4 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=`
+  通過。App 與 ZIP 解壓副本均通過 deep/strict 簽章、資源檢查及三語系隔離啟動，
+  六次啟動禁止讀取專案 .build 與 Bundle.module 資源。未 notarize 或發布。
+- 簽章包內 Python 實際載入 MLX／MLX Metal 0.32.2，沒有外部 overlay，100 次 tuple
+  worker lifecycle 通過；包內 21 個 runtime 來源檔與工作樹一致。
+- 包內完整 375 項嘗試有 10 個 failure（含 subtests，涉及三個 test methods）：
+  研究評分工具 `grade_qwen_quality.py` 的沙盒禁止讀 /Users，故無法執行位於 App
+  內的子 Python。完整 log 保留；未修改沙盒規則。將該研究工具整個四項測試模組
+  排除後，包內 **371 項 runtime 測試通過**。這四項在開發環境已全部通過。
+- 包內真實 DeepSeek 六次獨立 HTTP 請求與 health 全部 200，輸出一致且與先前隔離
+  基準相同；實際前綴重用 265 tokens，SSE 斷線後 idle／後續請求恢復通過。
+- 包內 Qwen 四次各 32 tokens 抽樣請求及 health 全部 200。每個 server 在 harness
+  cleanup 前仍存活，最後已終止。沒有新增通用速度或記憶體結論。
+
+成品為 `dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip`，App 版本號保留 1.1.4、
+本機 ad hoc signature；未替換 `/Applications` 的 App。前版本機成品保存在
+`scratch/issue7-mlx0322-upgrade-2026-09-08/previous-dist`。
+機器、來源及成品 hashes、命令與完整通過／失敗 log：
+[summary.json](benchmarks/2026-09-08-mlx0322-upgrade/summary.json)。
+
+## 2026-09-08：Issue #7 MLX 0.32.2 隔離功能測試通過
+
+未加 finish()/clear_streams()。同一本機 Python 3.14.7，MLX 0.32.1 tuple probe
+仍 SIGSEGV，0.32.2 完成 100 次 worker lifecycle。目前工作樹 Python 375 項通過。
+公開 1.1.5 runtime：DeepSeek 六次連續 HTTP 200 且輸出一致、實際重用 265 tokens、
+SSE 斷線後恢復成功；Qwen 四次各 32 tokens 抽樣全部 HTTP 200。
+
+bundled Python 直接載入新版 wheel 遭 Team ID 驗證拒絕，改用同版本本機 Python。
+錯誤 Qwen API model ID 的初次 400 亦保留。正式 dependency、App、權重未修改，
+簽章成品、長文、完整新功能組合及成對效能／記憶體尚未驗證。
+見 [報告](../research/ISSUE_7_MLX_0322_2026-09-08.md) 與
+[機器可讀證據](benchmarks/2026-09-08-issue7-mlx0322/summary.json)。
+
+## 2026-09-08：Issue #7 回報者的 finish() 修法未通過
+
+在公開 1.1.5 的隔離 runtime 副本，照回報者方法於 `OpenAIHandler.finish()` 的
+`finally` 呼叫 `mx.clear_streams()`。原版第一筆 HTTP 200 後 SIGSEGV；修正版第一筆
+成功且 server 存活，但第二筆出現 `There is no Stream(gpu, 0) in current thread.`。
+三個修正版 fresh processes（close、要求 keep-alive、要求 keep-alive 且無中間健康檢查）
+皆在第二筆失敗；四組第一筆內容相同。公開 server 強制 `Connection: close`，所以
+keep-alive header 不代表實際同連線重用。完整 gate 狀態為 `REJECTED_BASIC_REPEAT_GATE`。
+
+條件為 M2 Max 64 GiB、bundled Python 3.14.7／MLX 0.32.1、DeepSeek、DSpark off、
+18-input／16-output、temperature 0、persistent prompt cache off。公開 ZIP、原版
+server 與 libmlx hashes 已核對。未改正式 runtime／App／weights，未發布。
+基本 gate 失敗後停止長前綴重用、取消恢復、Qwen／MTP 及打包採用測試。
+[完整結果](../research/ISSUE_7_HANDLER_FINISH_2026-09-08.md)；
+[原始資料與來源](benchmarks/2026-09-08-issue7-handler-finish/summary.json)。
+
+## 2026-09-08：Model Advanced Settings 與合批生成
+
+UI 增加預設開啟的 LRU 快取及 Qwen 最多四字詞合批；英／繁中／簡中標籤、
+舊設定缺值遷移、明確關閉保存、模型限制與 catalog snake-case 編碼已驗證。
+狀態位元複製修正始終生效。既有 Prefill 加速選項保留。
+
+Python **375 項通過**；Swift **69 項通過**（63 + 6 個不同案例）。Swift 首輪因
+Command Line Tools 缺少 XCTest 無法執行，改用本機實際存在的
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` 後編譯成功。
+全套執行遇到既有聊天導航測試的 Keychain 等待，停止該程序；此一案例未完成，
+其餘分組測試通過。沒有改 Keychain 權限，也没有把等待案例算成通過。
+
+實際模型：M2 Max 64 GiB、MLX 0.32.1、Qwen3.8-Flash-Next、4096 slots、兩邊
+皆 LRU、MTP 關閉、ANE 設定維持預設，persistent prompt cache 關閉。
+在各自新程序依序執行繁中重複文字（64 outputs、greedy）、自然問答（32 outputs、
+temperature 0.7／top-p 0.8／top-k 20）、精確 token 前綴重用（8 outputs、greedy）。
+三組 output token、cached token、完整 state schema／逐陣列 raw-byte hash 全部一致；
+沒有新增 system swapout。重複文字的 16 次合批提出 48 個候選並全部接受；自然問答
+提出 3 個候選、接受 0 個，之後暫停猜測。候選不是未確認就輸出。
+
+第一版 128-slot pages 的 matched 額外 MLX peak 為 **1,025,613,207 bytes**，
+超過使用者 +1 GB 上限，因此未保留為最終實作；完整結果保存在 attempt-01。
+改為 32-slot pages 後，matched 額外 MLX peak 最大 **703,732,987 bytes**；
+process peak RSS 沒有增加。這是上述短輸入功能驗證，不代表所有長度的實測上限。
+state fork 的保守計帳超過 300 MB 時不合批；缺候選或不支援模式亦逐字計算。
+取消發生於 private verification、注入讀取失敗、接受／拒絕、各位置 EOS／長度停止、
+隨機抽樣、跨 24 arenas、反覆 expert 頻率與一次 SSD acquisition 均有測試。
+
+單次 request 時間：重複文字 22.889 → 21.850 s；自然問答 6.809 → 7.390 s；
+prefix reuse 1.414 → 1.424 s。這些不是平衡交錯效能 gate，不宣稱普遍加速。
+預設開啟遵循最新使用者要求，並未把先前未達效能門檻的結果改判。
+
+證據與來源 hashes：[UI 整合記錄](benchmarks/2026-09-08-ssd-ui/summary.json)。
+已編譯開發版 UI；未重新打包或替換 `/Applications/Whallm.app`。
+
+## 2026-09-07：retained Prefill 的 8K／16K 延伸測量
+
+精確 8192／16384-token 輸入，各兩個完整模型 worker 的 384／768 次 Prefill
+observations、hidden、32 步 logits、前後 122 個 state arrays/schema exact。
+各完成八次有效 `ABBABAAB` 新程序測量、固定 64 outputs、warm common file。
+8K request **1.00393x**，僅微幅改善；16K **0.95716x**，速度 gate 拒絕。
+MLX peak 最保守增幅 **230,392／442,364 bytes**，RSS **802,816／1,261,568 bytes**；
+兩長度均符合 +1 GB，p95、ANE、輸出與無新增 swapout gate 通過。
+
+8K 首輪第五次／16K 首輪第二次分別新增 140／88 頁 system swapout，首輪停止保存。
+依事前規則各在新安靜期後完整重測一次；有效結果不混入首輪資料。
+獨立重算與來源核對 **112 項通過**，16K 明確為速度失敗，不是數值或記憶體失敗。
+沒有修改 production／App，沒有重跑未變更的既有 Python unit suite。
+[結果與限制](../research/SSD_RETAINED_LONG_RESULTS_2026-09-07.md)；
+[機器可讀證據及 archive hashes](benchmarks/2026-09-07-ssd-retained-long/summary.json)。
+
+## 2026-09-07：長 Prefill 保留 pages／Decode ready groups
+
+Python **360 項通過**。新增六項測試驗證跨 chunk 重用、資料生命週期、
+取消／失敗收尾、先算 resident、LFU 一致與 reader 失敗後重試。
+長 Prefill 在 4K／8K 的 expert tensors、hidden、32 步 logits、前後各 122 個
+state arrays 及 schema exact；4K 八次交錯測量 request **1.0907x**、TTFT
+**1.1059x**，MLX／RSS 最大候選減最小原版為 **450,504／966,656 bytes**。
+輸出一致、ANE 無 fallback、無新增 swapout。8K 沒有效能／記憶體 gate。
+真實 4K 五對取消／恢復／重用情境也通過，26 個對照輸出 token 與 reuse 相同。
+
+Decode native wait-all 與 ready groups 兩版的 32 步 logits/state exact。
+原定三版 12 次效能測量在第 10 次原版對照出現 80 頁 system swapout，
+狀態 **REJECTED_SWAPOUT**，停止後兩次；已完成十次輸出與 logical reads 相同。
+這是效能驗證無效，不是速度通過，也不能判為候選自身記憶體失敗。
+
+50 項獨立證據 audit 通過；三份舊 source archive 未變，新 source／raw evidence
+另封存並讀回逐檔 hash。兩個早期 harness 假設錯誤與修正 log 保留，未放寬數值要求。
+production／App 預設未修改，沒有新增完整生成 2x 或跨模型認證。
+[結果與限制](../research/SSD_RETAINED_READY_RESULTS_2026-09-07.md)；
+[完整證據及封存 hashes](benchmarks/2026-09-07-ssd-retained-ready/summary.json)。
+
+## 2026-09-07：直接 resident 短 block
+
+Python **354 項通過**。新增四項 native 跨 page／重排重複 routes、slot 重寫可見性、
+budget guard／hook 恢復及輸入形狀驗證。完整模型兩個 shape 的精確 logits/state
+初驗通過，再完成 16 次原版配對與 8 次同 native 歸因配對，候選 fork 隔離正確。
+兩字 0.9374x、四字 1.0530x；MLX/RSS peak 差額皆低於 +1 GB。只有四字
+通過 verifier 成本初篩，沒有真正 speculative generation 或端到端 2x 證據。
+既有穩定 Prefill／失敗候選的封存內容與 executable sources 校驗通過。
+[證據及 source snapshot](benchmarks/2026-09-07-qwen-resident-block/summary.json)；
+[限制與結果](../research/QWEN_RESIDENT_BLOCK_RESULTS_2026-09-07.md)。
+
+## 2026-09-07：Prefill lifecycle 封存與短 block verifier 成本拒絕
+
+最新 Python **350 項通過**。Prefill 的獨立 lifecycle gate 通過 **23 對情境**，
+680 個對照輸出 token、prompt 與逐次 reuse 序列相同；涵蓋多輪、4K fallback、
+256-token 生成、Prefill 途中取消、Decode 第 5 token 中止、恢復、12 次重用，
+以及重啟後互讀另一版 persistent cache。所有 banks、batched scope 與 lock 均釋放，
+最後 5 次 active MLX 波動兩版皆 16 KiB，MLX/RSS peak 差額符合 +1 GB。
+最初 control 的「每次都必須 cache hit」harness 失敗保留，修正後使用新目錄。
+[穩定性證據與封存 source](benchmarks/2026-09-07-ssd-prefill-stability/summary.json)
+保存逐次結果及已驗證的 tar SHA-256。
+
+短 block 原型維持 token-shaped dense/state，僅合併 expert union。2 / 4-token
+完整 logits、122 個 cache arrays 與 metadata exact，fork 未修改原 cache。
+各 8 次 ABBA/BAAB 的 verifier 速度為 **0.944x / 1.001x**，logical reads 均未下降；
+新增打包／同步成本下未達 1.05x gate，狀態 **REJECTED_VERIFIER_COST**。
+沒有疊加 drafter、跑正式 speculative generation 或改 App 預設。
+350 項功能測試通過不能覆蓋這個效能拒絕。
+[短 block 證據](benchmarks/2026-09-07-qwen-short-block/summary.json)
+與 [完整研究紀錄](../research/SSD_STABILITY_AND_BLOCK_2026-09-07.md) 保存限制和停止條件。
+
+## 2026-09-07：SSD expert Prefill 流水線研究原型
+
+Python **347 項通過**，包含新增 9 項雙 buffer、partial read、取消／drain、
+重用、GPU fence、workspace guard、trace 記憶體有界與輸出精確一致測試。
+初次 API 錯誤及 trace 累積的重現失敗各自保留，未覆寫。
+Qwen 真實權重 component 的 128 / 1024-token gate 通過；143 / 1024-token
+完整模型 observer 的 48 層 input/routes/expert output、32 個生成 token 均 exact。
+收尾修正 trace 後，再次驗證 1K observer、生成 token 與讀取量相同。
+
+原始不受控 startup 的 full gate 拒絕，使用者更新為 +1 GB 記憶體上限
+後也沒有將其他失敗抹除。後續兩種長度各 8 次 warm-common ABBA/BAAB
+通過 bounded screen，64-token 輸出一致、ANE 無 fallback、無 swapout。
+request 加速 **1.77x / 1.36x**，不是普遍 2x 的結果。
+沒有修改 production/App、模型權重或建立 commit。
+規則與限制見 [研究紀錄](../research/SSD_PREFILL_PIPELINE_2026-09-07.md)，
+source/raw hashes 和逐次資料見 [證據摘要](benchmarks/2026-09-07-ssd-prefill-pipeline/summary.json)。
+
 ## 2026-09-07：最終 build local 與 dist 清理
 
 以 `ec39204` 基礎及既有修復工作樹重新執行測試和 `make package`，App
@@ -2743,3 +2919,62 @@ cache；cold allocation 單次 latency 不是正式 throughput 結論。
 本輪僅新增 research 程式，未改 production runtime；research Python 語法檢查
 通過，未重跑先前 305 項 Python suite。M5 Pro、能耗與 production integration
 均未完成。原 CLI grouped flag 不會啟用新 kernel，App 預設仍關閉。
+
+## 2026-09-07：Issue #7 公開 1.1.5 崩潰重現
+
+M2 Max 64 GB／macOS 26.6.2 使用公開 1.1.5 套件，DeepSeek 第一筆 HTTP
+request 回 200 後，Python 在 request thread 的 MLX compile-cache cleanup
+SIGSEGV，後續連線被拒絕。與本機當日 installed App crash 堆疊相符；#7 回報者
+尚無 traceback／模型資訊，未確認 M1 Ultra 是否同因。
+
+無模型 tuple compile probe：公開 1.1.4 100 次 thread lifecycle 通過；
+1.1.5 三個 fresh processes 全部 exit 139。Qwen 12 次 bounded requests 未崩潰，
+這不代表所有模式安全。隔離 clear_streams 候選通過最小測試，但完整 DeepSeek
+第二筆 request 出現 missing GPU Stream，因此拒絕採用。Production、installed
+App 及模型未修改，沒有 build／release。此為崩潰驗證，不是效能結果。
+
+詳見 [調查](../research/ISSUE_7_REPRODUCTION_2026-09-07.md) 與
+[機器可讀摘要](benchmarks/2026-09-07-issue7-reproduction/summary.json)。
+
+## 2026-09-07：SSD 功能實作 gate
+
+最終 runtime **367 tests 通過**。新增七項覆蓋 eviction ranking、保留配額／
+heap rebuild、protected／speculative pinned keys、讀取失敗與恢復、舊 catalog
+及合法值、B4 次數保留／去重 reads／native exact，以及 BF16／FP16／FP32
+state clone 的原始位元與實體 buffer 隔離（含負零、subnormal、NaN payload）。
+CLI、server 與 model catalog 新選項預設 LFU；status／metrics 可觀測策略。
+
+LRU 八次 128-token 完整請求、32 full-logit／122 state-array 比對通過；完整
+request 只縮短 3.17%，未達門檻，未升預設。B4 首次 warm gate 只有一個負零
+sign bit 改變，logits／tokens 一致但 hash gate 仍拒絕。兩次 dump 確認原因後，
+byte-copy 修正重新跑 exact 及八次交錯成本測試，warm state／expert state、
+32 full logits／outputs、posterior schema／122 arrays 與 base isolation 全通過。
+有效的 LRU 測速與修正後 warm 成本樣本均無 system swapout；LRU 並未升為預設。
+MLX／RSS 皆低於 +1 GB，兩份 raw read-back audit 通過。
+
+LRU 成本與暖 B4 成本的分母不同；後者不含 drafter、拒絕恢復或輸出串流 P95。
+未執行其他模型或 App build。完整 failed／passed logs、source versions 與限制見
+[實作結果](../research/SSD_FEATURE_IMPLEMENTATION_RESULTS_2026-09-07.md) 和
+[證據索引](benchmarks/2026-09-07-ssd-feature-implementation/summary.json)。
+
+## 2026-09-07：SSD 三方向第一輪 gate
+
+新 sparse-fill 原型的 8K／16K 數值比對分別通過 384／768 個 Prefill 中間結果、
+32 步完整 logits／token，以及 122 個 cache-state arrays／schema。
+每長度八次有效 ABBA／BAAB 皆為 64 tokens、輸出完全一致，ANE active 無 fallback、
+system swapout 為零；獨立重新讀取 metrics、status、prompt hash、medians、P95、
+次序分半與 peak 差額通過。8K 第一輪六次紀錄因 control 的 4 pages swapout
+整輪排除，原資料保留，再於 quiet window 後重跑。速度未達 5%，未採用。
+
+MLX max(candidate)-min(control)：8K +147,468 bytes；16K +507,908 bytes。
+RSS 同算法：8K +573,440 bytes；16K +212,992 bytes；全部小於 +1,000,000,000 bytes。
+Component 覆蓋 exact QMM、跨 chunk／layer 重用、read error drain／恢復、取消前
+ownership release。新候選因速度 gate 失敗，未宣稱完成完整 runtime cancellation
+與多 request lifecycle 驗收。
+
+後兩方向為 CPU-only trace 分析：三份 baseline Decode miss-mask bits 共 90,720
+全部重現；政策／配額四組獨立 ablation 與 OrderedDict LRU 六組重算一致。
+這些檢查不證明實際 SSD 裝置流量、wall-time、speculation 回復或全流程峰值。
+本輪 runtime unittest **360 項通過**，研究 component **3 項通過**；source hashes
+與開始時一致，未改 production。詳見
+[原始資料與 source archive](benchmarks/2026-09-07-ssd-three-directions/summary.json)。

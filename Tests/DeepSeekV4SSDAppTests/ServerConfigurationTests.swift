@@ -5,6 +5,48 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  @MainActor
+  func testSSDSettingsDefaultOnMigrateAndPreserveExplicitOff() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      XCTAssertEqual(settings.recentExpertCache, true)
+      XCTAssertEqual(settings.qwenShortBlock, kind == .qwen3_8FlashNext)
+      settings.slots = 900
+      var old = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+      old.removeValue(forKey: "recentExpertCache")
+      old.removeValue(forKey: "qwenShortBlock")
+      let decoded = try JSONDecoder().decode(
+        ModelAdvancedSettings.self, from: JSONSerialization.data(withJSONObject: old))
+      decoded.save(for: kind, defaults: isolated.defaults)
+      settings = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+      XCTAssertEqual(settings.slots, 900)
+      XCTAssertEqual(settings.recentExpertCache, true)
+      XCTAssertEqual(settings.qwenShortBlock, kind == .qwen3_8FlashNext)
+      for enabled in [false, true] {
+        settings.recentExpertCache = enabled
+        settings.qwenShortBlock = enabled
+        settings.save(for: kind, defaults: isolated.defaults)
+        let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+        XCTAssertEqual(restored.recentExpertCache, enabled)
+        XCTAssertEqual(restored.qwenShortBlock, enabled && kind == .qwen3_8FlashNext)
+        let catalog = try ModelLibrary.makeServerCatalog(
+          models: [installedModel(kind)], aliases: [:], settings: [kind: restored],
+          powerSavingLimitGBps: nil)
+        let runtime = try XCTUnwrap(catalog.models.first).runtime
+        XCTAssertEqual(runtime.expertEvictionPolicy, enabled ? "lru" : "lfu")
+        XCTAssertEqual(runtime.qwenShortBlock, enabled && kind == .qwen3_8FlashNext)
+      }
+    }
+    for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
+      for label in ["Keep recently used experts", "Verify up to four tokens together"] {
+        XCTAssertNotEqual(L10n.string(label, language: language), label)
+      }
+    }
+  }
+
   func testAdvancedSettingsLockOnlyForTheActiveModel() {
     let qwen = "qwen3.8-flash-next-fp8"
     XCTAssertFalse(
@@ -457,18 +499,21 @@ final class ServerConfigurationTests: XCTestCase {
         "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
         "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
         "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch", "qwen_grouped_decode",
-        "qwen_grouped_experts",
+        "qwen_grouped_experts", "expert_eviction_policy", "qwen_short_block",
         "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
     XCTAssertEqual(runtime["qwen_grouped_decode"] as? Bool, false)
+    XCTAssertEqual(runtime["expert_eviction_policy"] as? String, "lru")
+    XCTAssertEqual(runtime["qwen_short_block"] as? Bool, false)
     XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
     let qwenRuntime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
     XCTAssertEqual(qwenRuntime["qwen_grouped_decode"] as? Bool, false)
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
+    XCTAssertEqual(qwenRuntime["qwen_short_block"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["qwen_grouped_experts"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")

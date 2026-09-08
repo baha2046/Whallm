@@ -391,6 +391,8 @@ final class ModelLibrary: ObservableObject {
           batchedExpertPrefill: true,
           qwenNextLayerPrefetch: false,
           qwenGroupedExperts: settings.qwenGroupedExperts == true,
+          expertEvictionPolicy: settings.recentExpertCache == true ? "lru" : "lfu",
+          qwenShortBlock: settings.qwenShortBlock == true,
           anePrefill: modelKind == .qwen3_8FlashNext,
           anePrefillRatio: settings.anePrefillRatio ?? 0.25,
           fp4IndexCache: true,
