@@ -1,7 +1,8 @@
 # Project context
 
 This project builds a memory-bounded Apple Silicon runtime for
-`DeepSeek-V4-Flash-0731` and `Qwen3.8-Flash-Next`.
+`DeepSeek-V4-Flash-0731`, `DeepSeek-V4.1-Flash`, and
+`Qwen3.8-Flash-Next`.
 
 ## Ubiquitous language
 
@@ -20,6 +21,8 @@ This project builds a memory-bounded Apple Silicon runtime for
 - **main model**: The 43 target-model layers. It excludes DSpark.
 - **DSpark**: The optional speculative decoding module stored under `mtp.*`.
 - **N-gram store**: Qwen FP8 N-gram rows stored in `ngram.bin` for read-only row lookup.
+- **Engram store**: DeepSeek V4.1 FP8 embedding rows and E8M0 scales stored in
+  layer-specific files for read-only row lookup.
 - **model kind**: The runtime family selected by manifest format and `modelKind`.
 
 ## Current scope
@@ -30,3 +33,6 @@ M3 adds measured SSD expert streaming.
 M4 adds chunked prefill, FP8 KV cache, validated longer contexts, and a measured DSpark decision.
 
 Each checkpoint revision is fixed. Code must reject incompatible model shapes and tensor layouts.
+DeepSeek V4.1 support is text-only and uses the exact `deepseek_v41` MLX architecture.
+Its vision tower, MTP/DSpark, reusable prompt cache, and layer-major prefill are outside
+the current support boundary.

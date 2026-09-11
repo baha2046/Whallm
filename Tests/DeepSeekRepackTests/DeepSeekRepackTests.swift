@@ -4,6 +4,80 @@ import XCTest
 @testable import DeepSeekRepack
 
 final class DeepSeekRepackTests: XCTestCase {
+  func testDeepSeekV41ContractDecodesPinnedArchitecture() throws {
+    let config = try JSONDecoder().decode(
+      DeepSeekV41Config.self,
+      from: Data(
+        """
+        {
+          "architectures": ["DeepseekV41ForCausalLM"],
+          "model_type": "deepseek_v41",
+          "text_config": {
+            "model_type": "deepseek_v41_text",
+            "hidden_size": 5120,
+            "moe_intermediate_size": 2304,
+            "n_routed_experts": 384,
+            "n_shared_experts": 1,
+            "num_experts_per_tok": 6,
+            "num_hidden_layers": 40,
+            "max_position_embeddings": 1048576,
+            "engram_layer_ids": [1, 14],
+            "engram_num_embeddings": [384006168, 384016682],
+            "engram_head_dim": 256,
+            "kv_source_layer_ids": [2, 8, 14, 20],
+            "index_source_layer_ids": [2, 8, 14, 20, 24, 28, 32, 36]
+          },
+          "quantization_config": {
+            "quant_method": "fp8",
+            "expert_dtype": "fp4",
+            "scale_fmt": "ue8m0",
+            "weight_block_size": [32, 32]
+          }
+        }
+        """.utf8
+      )
+    )
+
+    XCTAssertNoThrow(try DeepSeekV41Contract.validate(config))
+    XCTAssertEqual(DeepSeekV41Contract.expertBlobSize, 18_800_640)
+    XCTAssertEqual(DeepSeekV41Contract.engram.tables.map(\.layer), [1, 14])
+    XCTAssertEqual(
+      DeepSeekV41Contract.companionPaths,
+      [
+        "config.json", "tokenizer/tokenizer.json", "tokenizer/tokenizer_config.json",
+        "encoding/encoding.py",
+      ]
+    )
+    XCTAssertTrue(DeepSeekV41Contract.isTextCommon("layers.0.attn.wq_a.weight"))
+    XCTAssertTrue(DeepSeekV41Contract.isTextCommon("embed.weight"))
+    XCTAssertFalse(DeepSeekV41Contract.isTextCommon("visual.encoder.weight"))
+  }
+
+  func testDSparkInstallRejectsDeepSeekV41BeforeRepair() throws {
+    let manifest = InstalledManifest(
+      formatVersion: 3,
+      modelID: DeepSeekV41Contract.modelID,
+      revision: DeepSeekV41Contract.revision,
+      layerCount: DeepSeekV41Contract.layerCount,
+      expertCount: DeepSeekV41Contract.expertCount,
+      selectedExpertCount: DeepSeekV41Contract.selectedExpertCount,
+      expertBlobSize: DeepSeekV41Contract.expertBlobSize,
+      files: [],
+      commonTensors: [],
+      expertRegions: DeepSeekV41Contract.expertRegions,
+      modelKind: .deepSeekV41,
+      maximumContext: DeepSeekV41Contract.maximumContext,
+      engram: DeepSeekV41Contract.engram
+    )
+
+    XCTAssertThrowsError(try DeepSeekV4Checkpoint.validateDSparkInstallTarget(manifest)) {
+      XCTAssertEqual(
+        $0 as? RepackError,
+        .incompatibleModel("installed model is not DeepSeek-V4-Flash-0731")
+      )
+    }
+  }
+
   func testPlannerCreatesCanonicalExpertLayout() throws {
     let fixture = makePlannerFixture()
     let plan = try RepackPlanner.makePlan(index: fixture.index, tensors: fixture.tensors)

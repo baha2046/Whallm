@@ -1952,6 +1952,11 @@ def _validate_approximation_runtime(options: GenerationOptions, runtime: Any) ->
             "approximation.mode is not supported with DSpark.",
             param="approximation.mode",
         )
+    if bool(getattr(runtime, "_is_deepseek_v41", False)):
+        raise APIError(
+            "approximation.mode is not supported for DeepSeek V4.1.",
+            param="approximation.mode",
+        )
 
 
 def _tool_request(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], ToolChoice]:

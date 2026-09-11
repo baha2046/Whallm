@@ -444,6 +444,7 @@ final class ServerConfigurationTests: XCTestCase {
     deepSeek.slots = 700
     deepSeek.defaultTemperature = 0.4
     deepSeek.dsparkEnabled = true
+    let deepSeekV41 = ModelAdvancedSettings.defaults(for: .deepSeekV41)
     var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
     qwen.slots = 900
     qwen.mtpEnabled = true
@@ -455,26 +456,37 @@ final class ServerConfigurationTests: XCTestCase {
           .deepSeekV4,
           issues: [InstalledFileIssue(path: "common.bin", kind: .checksumMismatch)]
         ),
+        installedModel(.deepSeekV41),
         installedModel(.qwen3_8FlashNext, hasMTP: true),
         installedModel(.deepSeekV4, hasDSpark: true),
       ],
       aliases: [.deepSeekV4: "work-model"],
-      settings: [.deepSeekV4: deepSeek, .qwen3_8FlashNext: qwen],
+      settings: [
+        .deepSeekV4: deepSeek,
+        .deepSeekV41: deepSeekV41,
+        .qwen3_8FlashNext: qwen,
+      ],
       powerSavingLimitGBps: 2
     )
 
     XCTAssertEqual(
       catalog.models.map(\.id),
-      ["deepseek-v4-flash-0731", "qwen3.8-flash-next-fp8"]
+      ["deepseek-v4-flash-0731", "deepseek-v4.1-flash", "qwen3.8-flash-next-fp8"]
     )
     XCTAssertEqual(catalog.models[0].alias, "work-model")
     XCTAssertTrue(catalog.models[0].runtime.dsparkEnabled)
     XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
-    XCTAssertTrue(catalog.models[1].runtime.mtpEnabled)
-    XCTAssertEqual(catalog.models[1].runtime.mtpSlots, 512)
-    XCTAssertEqual(catalog.models[1].defaults.temperature, 0.7)
-    XCTAssertEqual(catalog.models[1].defaults.topP, 0.8)
-    XCTAssertEqual(catalog.models[1].defaults.topK, 20)
+    XCTAssertFalse(catalog.models[1].runtime.layerMajorPrefill)
+    XCTAssertFalse(catalog.models[1].runtime.fp8KVCache)
+    XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 1)
+    XCTAssertFalse(catalog.models[1].runtime.persistentPromptCache)
+    XCTAssertFalse(catalog.models[1].runtime.dsparkEnabled)
+    XCTAssertFalse(catalog.models[1].runtime.mtpEnabled)
+    XCTAssertTrue(catalog.models[2].runtime.mtpEnabled)
+    XCTAssertEqual(catalog.models[2].runtime.mtpSlots, 512)
+    XCTAssertEqual(catalog.models[2].defaults.temperature, 0.7)
+    XCTAssertEqual(catalog.models[2].defaults.topP, 0.8)
+    XCTAssertEqual(catalog.models[2].defaults.topK, 20)
     XCTAssertEqual(catalog.availableModels[0].requestName, "work-model")
 
     let object = try XCTUnwrap(
@@ -510,7 +522,13 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(runtime["qwen_short_block"] as? Bool, false)
     XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
-    let qwenRuntime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
+    let v41Runtime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
+    XCTAssertEqual(v41Runtime["layer_major_prefill"] as? Bool, false)
+    XCTAssertEqual(v41Runtime["fp8_kv_cache"] as? Bool, false)
+    XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 1)
+    XCTAssertEqual(v41Runtime["persistent_prompt_cache"] as? Bool, false)
+    XCTAssertEqual(models[1]["model_kind"] as? String, "deepseek-v4.1")
+    let qwenRuntime = try XCTUnwrap(models[2]["runtime"] as? [String: Any])
     XCTAssertEqual(qwenRuntime["qwen_grouped_decode"] as? Bool, false)
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["qwen_short_block"] as? Bool, true)
@@ -651,9 +669,11 @@ private func installedModel(
     hasMTP: hasMTP,
     hasDSpark: hasDSpark,
     modelKind: modelKind,
-    modelID: modelKind == .deepSeekV4
-      ? "deepseek-ai/DeepSeek-V4-Flash-0731"
-      : "Qwen/Qwen3.8-Flash-Next-FP8"
+    modelID: switch modelKind {
+    case .deepSeekV4: "deepseek-ai/DeepSeek-V4-Flash-0731"
+    case .deepSeekV41: "deepseek-ai/DeepSeek-V4.1-Flash"
+    case .qwen3_8FlashNext: "Qwen/Qwen3.8-Flash-Next-FP8"
+    }
   )
 }
 

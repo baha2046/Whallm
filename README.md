@@ -19,13 +19,15 @@
 Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
 Whallm lets an M-series Mac run all 284B parameters of the pinned
 `DeepSeek-V4-Flash-0731` checkpoint by streaming routed experts from SSD. It
-also supports the pinned `Qwen3.8-Flash-Next-FP8` text checkpoint.
+also supports the pinned `DeepSeek-V4.1-Flash` and
+`Qwen3.8-Flash-Next-FP8` text checkpoints.
 
 ## Memory guidance
 
 | Model | Recorded peak memory |
 | --- | ---: |
 | `DeepSeek-V4-Flash-0731` | 32.84–35.70 GiB |
+| `DeepSeek-V4.1-Flash` | Not yet measured |
 | `Qwen3.8-Flash-Next-FP8` | 20.92–22.75 GiB |
 
 These v1.1.4 results cover chat prompts with 1,024 to 16,384 input tokens. They
@@ -80,7 +82,7 @@ server → Chat in the app or connect Codex**
 1. Download the latest `Whallm-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest).
 2. Extract the ZIP and open `Whallm.app`.
-3. Open the **Model** page. Select DeepSeek or Qwen, and then select
+3. Open the **Model** page. Select DeepSeek V4, DeepSeek V4.1, or Qwen, and then select
    **Download Model**. The app checks the required storage. Qwen downloads the
    published MXFP4 installed model. You can stop the download and resume it
    later.
@@ -134,11 +136,12 @@ for more options.
 
 ### How it works
 
-- The main model has 284B total parameters and about 13B active parameters per
-  token.
+- DeepSeek V4 Flash 0731 has 284B total parameters and about 13B active
+  parameters per token.
 - Common tensors stay in unified memory.
 - Routed experts use checkpoint-native FP4 weights and stream from SSD when
   needed.
+- DeepSeek V4.1 engram embedding rows are also fetched from SSD on demand.
 - The runtime uses an FP8 KV cache and a bounded expert cache to control memory
   use.
 - The installed model is verified against the pinned checkpoint revision.
@@ -148,7 +151,7 @@ for more options.
   runtime before it loads the new runtime.
 - The Model page can load or unload a model. A loaded model moves to the
   **Loaded** section.
-- The DeepSeek layer-major prefill threshold is configurable. Its default is
+- The DeepSeek V4 Flash 0731 layer-major prefill threshold is configurable. Its default is
   1,024 uncached prompt tokens.
 
 ### Model storage and DSpark
@@ -162,6 +165,12 @@ for more options.
   DSpark.
 - Qwen downloads a verified MXFP4 installed model. Model installation does not
   quantize the Qwen checkpoint on the user's Mac.
+- DeepSeek V4.1 installs the exact pinned Hugging Face text checkpoint. Its
+  expert and engram files alone require at least 491,535,862,800 bytes
+  (457.78 GiB), before common tensors and metadata. The app calculates the
+  complete requirement from the repack plan.
+- DeepSeek V4.1 does not install or enable vision, MTP/DSpark, or reusable
+  prompt-cache state.
 
 ### OpenAI-compatible server
 
@@ -175,8 +184,9 @@ The server supports these endpoints:
 - `POST /api/models/load`
 - `POST /api/models/unload`
 
-The fixed API model IDs are `deepseek-v4-flash-0731` and
-`qwen3.8-flash-next-fp8`. Each model's **Advanced Settings** view lets you set an
+The fixed API model IDs are `deepseek-v4-flash-0731`,
+`deepseek-v4.1-flash`, and `qwen3.8-flash-next-fp8`. The CLI also accepts
+`deepseek-flash` as a DeepSeek V4.1 alias. Each model's **Advanced Settings** view lets you set an
 optional Alias. Valid changes are saved automatically. Generation requests
 accept the API model ID or its Alias. The chat model picker shows only the
 installed models that were available when the server started. Restart the
@@ -199,8 +209,14 @@ requests.
 
 ### Current limits
 
-- The runtime supports only the two pinned checkpoint revisions in the current
+- The runtime supports only the three pinned checkpoint revisions in the current
   documentation.
+- DeepSeek V4.1 support is text-only. Vision, MTP/DSpark, layer-major prefill,
+  persistent prompt cache, and prompt-cache reuse are disabled for this model.
+- DeepSeek V4.1 contract, native FP8/MLX loading, SSD Engram lookup, cache,
+  parser, full Python runtime suite, and core build validation pass in this
+  worktree. A complete checkpoint install and full-model generation have not
+  yet been run, so no memory or performance claim is made for V4.1.
 - Qwen supports text only. Qwen vision, video, MTP, and DSpark are not supported.
 - Qwen full-model SHA-256, text, thinking, tool call, greedy 4K, prompt cache,
   and packaged App validation passed on the recorded M5 Pro environment. See
@@ -214,6 +230,8 @@ requests.
 
 Read the [current documentation](docs/README.md) for the model contract,
 runtime design, validation, performance, and research conclusions.
+See [DeepSeek V4.1 support](docs/DEEPSEEK_V41.md) for its exact contract and
+current validation boundary.
 
 Whallm is not affiliated with DeepSeek. Review the model terms before
 you download and use the model.

@@ -107,6 +107,7 @@ struct CLI {
     }
     switch value {
     case "deepseek-v4", "deepseek-v4-flash-0731": return .deepSeekV4
+    case "deepseek-v4.1", "deepseek-v4.1-flash", "deepseek-flash": return .deepSeekV41
     case "qwen3.8-flash-next": return .qwen3_8FlashNext
     default: throw RepackError.invalidPlan("unknown model \(value)")
     }
@@ -115,6 +116,7 @@ struct CLI {
   private static func makePlan(model: ModelKind) async throws -> RepackPlan {
     switch model {
     case .deepSeekV4: return try await DeepSeekV4Checkpoint().makeRepackPlan()
+    case .deepSeekV41: return try await DeepSeekV41Checkpoint().makeRepackPlan()
     case .qwen3_8FlashNext: return try await QwenFlashNextCheckpoint().makeRepackPlan()
     }
   }
@@ -164,9 +166,9 @@ struct CLI {
     print(
       """
       Usage:
-        dsv4-repack inspect [--model qwen3.8-flash-next]
-        dsv4-repack plan [--model qwen3.8-flash-next] --output plan.json
-        dsv4-repack repack [--model qwen3.8-flash-next] --output MODEL.dsv4 [--plan plan.json]
+        dsv4-repack inspect [--model deepseek-v4.1|qwen3.8-flash-next]
+        dsv4-repack plan [--model deepseek-v4.1|qwen3.8-flash-next] --output plan.json
+        dsv4-repack repack [--model deepseek-v4.1|qwen3.8-flash-next] --output MODEL.dsv4 [--plan plan.json]
         dsv4-repack verify --model deepseek-v4-flash-0731.dsv4
         dsv4-repack install-dspark --model deepseek-v4-flash-0731.dsv4
         dsv4-repack install-mtp --model qwen3.8-flash-next.dsv4

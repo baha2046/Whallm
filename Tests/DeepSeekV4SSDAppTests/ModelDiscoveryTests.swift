@@ -125,8 +125,12 @@ final class ModelDiscoveryTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suite) }
     let library = ModelLibrary(defaults: defaults)
 
-    XCTAssertEqual(ModelLibrary.supportedModelKinds, [.deepSeekV4, .qwen3_8FlashNext])
+    XCTAssertEqual(
+      ModelLibrary.supportedModelKinds,
+      [.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext]
+    )
     XCTAssertNil(library.usableModel(for: .deepSeekV4))
+    XCTAssertNil(library.usableModel(for: .deepSeekV41))
     XCTAssertNil(library.usableModel(for: .qwen3_8FlashNext))
     XCTAssertTrue(library.needsSelectedModelDownload)
 
@@ -143,6 +147,7 @@ final class ModelDiscoveryTests: XCTestCase {
     let library = ModelLibrary(defaults: defaults)
 
     XCTAssertEqual(library.plannedInstalledBytes(for: .deepSeekV4), 166_878_580_480)
+    XCTAssertNil(library.plannedInstalledBytes(for: .deepSeekV41))
     XCTAssertEqual(library.plannedInstalledBytes(for: .qwen3_8FlashNext), 125_291_490_955)
   }
 

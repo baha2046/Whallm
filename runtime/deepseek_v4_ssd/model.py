@@ -430,8 +430,7 @@ class _StreamingSwitchGLU(nn.Module):
             else np.asarray(indices, dtype=np.int32)
         )
         if (
-            x.shape[0] == 1
-            and x.shape[1] == 1
+            self._is_single_token(x)
             and getattr(self.cache, "ready_expert_decode", False)
             and not getattr(
                 self.cache,
@@ -496,7 +495,7 @@ class _StreamingSwitchGLU(nn.Module):
         selected: np.ndarray,
         resident,
     ) -> mx.array:
-        if x.shape[0] == 1 and x.shape[1] == 1:
+        if self._is_single_token(x):
             outputs = []
             for expert in selected.reshape(-1):
                 weights = resident.individual_weights[resident.slots[int(expert)]]
@@ -521,6 +520,12 @@ class _StreamingSwitchGLU(nn.Module):
         grouped = mx.concatenate(outputs, axis=0)
         restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
         return restored.reshape(*selected.shape, -1)
+
+    @staticmethod
+    def _is_single_token(x: mx.array) -> bool:
+        return (x.ndim == 2 and x.shape[0] == 1) or (
+            x.ndim == 3 and x.shape[0] == 1 and x.shape[1] == 1
+        )
 
     def _gather_qmm(
         self,
@@ -846,6 +851,16 @@ def load_model(
         if config.power_saving_limit_gbps is not None
         else None
     )
+    if installed_model.is_deepseek_v41:
+        from .deepseek_v41_ssd import load as load_deepseek_v41
+
+        return load_deepseek_v41(
+            installed_model,
+            config,
+            raw_config,
+            _load_common_weights(installed_model),
+            read_limiter,
+        )
     if installed_model.is_qwen:
         if config.staged_expert_streaming:
             raise ValueError(

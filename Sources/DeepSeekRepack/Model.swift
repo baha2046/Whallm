@@ -7,6 +7,7 @@ struct CompanionFile: Sendable {
 
 public enum ModelKind: String, Codable, Equatable, Sendable {
   case deepSeekV4 = "deepseek-v4"
+  case deepSeekV41 = "deepseek-v4.1"
   case qwen3_8FlashNext = "qwen3.8-flash-next"
 }
 
@@ -251,6 +252,39 @@ public struct NGramDescriptor: Codable, Equatable, Sendable {
   }
 }
 
+public struct EngramTableDescriptor: Codable, Equatable, Sendable {
+  public let layer: Int
+  public let weightFile: String
+  public let scaleFile: String
+  public let rows: Int
+  public let dimension: Int
+  public let blockSize: Int
+
+  public init(
+    layer: Int,
+    weightFile: String,
+    scaleFile: String,
+    rows: Int,
+    dimension: Int,
+    blockSize: Int
+  ) {
+    self.layer = layer
+    self.weightFile = weightFile
+    self.scaleFile = scaleFile
+    self.rows = rows
+    self.dimension = dimension
+    self.blockSize = blockSize
+  }
+}
+
+public struct EngramDescriptor: Codable, Equatable, Sendable {
+  public let tables: [EngramTableDescriptor]
+
+  public init(tables: [EngramTableDescriptor]) {
+    self.tables = tables
+  }
+}
+
 public struct ExpertConversion: Codable, Equatable, Sendable {
   public let tensor: String
   public let sourceFile: String
@@ -321,6 +355,7 @@ public struct RepackPlan: Codable, Equatable, Sendable {
   public let maximumContext: Int?
   public let expertQuantization: ExpertQuantizationDescriptor?
   public let ngram: NGramDescriptor?
+  public let engram: EngramDescriptor?
   public let expertConversions: [ExpertConversion]?
 
   public var installedBytes: UInt64 { files.reduce(0) { $0 + $1.size } }
@@ -343,6 +378,7 @@ public struct RepackPlan: Codable, Equatable, Sendable {
     maximumContext: Int? = nil,
     expertQuantization: ExpertQuantizationDescriptor? = nil,
     ngram: NGramDescriptor? = nil,
+    engram: EngramDescriptor? = nil,
     expertConversions: [ExpertConversion]? = nil
   ) {
     self.formatVersion = formatVersion
@@ -362,6 +398,7 @@ public struct RepackPlan: Codable, Equatable, Sendable {
     self.maximumContext = maximumContext
     self.expertQuantization = expertQuantization
     self.ngram = ngram
+    self.engram = engram
     self.expertConversions = expertConversions
   }
 }
@@ -389,6 +426,7 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
   public let maximumContext: Int?
   public let expertQuantization: ExpertQuantizationDescriptor?
   public let ngram: NGramDescriptor?
+  public let engram: EngramDescriptor?
 
   public init(
     formatVersion: Int,
@@ -406,7 +444,8 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     modelKind: ModelKind? = nil,
     maximumContext: Int? = nil,
     expertQuantization: ExpertQuantizationDescriptor? = nil,
-    ngram: NGramDescriptor? = nil
+    ngram: NGramDescriptor? = nil,
+    engram: EngramDescriptor? = nil
   ) {
     self.formatVersion = formatVersion
     self.modelID = modelID
@@ -424,6 +463,7 @@ public struct InstalledManifest: Codable, Equatable, Sendable {
     self.maximumContext = maximumContext
     self.expertQuantization = expertQuantization
     self.ngram = ngram
+    self.engram = engram
   }
 }
 

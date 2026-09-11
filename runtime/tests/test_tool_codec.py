@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from deepseek_v4_ssd.tool_codec import (
+    DeepSeekV41ToolStreamParser,
     ToolCall,
     ToolChoice,
     ToolCodec,
@@ -105,6 +106,34 @@ def parse_message_from_completion_text(text, thinking_mode):
         self.assertEqual(content, "Summary")
         self.assertEqual(name, "get_weather")
         self.assertEqual(arguments, '{"city": "台\\"北", "days": 2}')
+        self.assertTrue(parser.matches(calls))
+
+    def test_v41_tool_stream_parser_handles_single_character_fragments(self):
+        raw = (
+            'plan</think>Summary\n\n<｜DSML｜ calls>\n'
+            '<｜DSML｜ invoke name="get_weather">\n'
+            '<｜DSML｜ parameter name="city" string="true">Paris'
+            '</｜DSML｜ parameter>\n'
+            '<｜DSML｜ parameter name="days" string="false">2'
+            '</｜DSML｜ parameter>\n'
+            '</｜DSML｜ invoke>\n</｜DSML｜ calls>'
+        )
+        parser = DeepSeekV41ToolStreamParser("thinking")
+        deltas = [delta for character in raw for delta in parser.feed(character)]
+        deltas.extend(parser.finish())
+
+        reasoning = "".join(delta.reasoning_content for delta in deltas)
+        content = "".join(delta.content for delta in deltas)
+        name = next(delta.tool_name for delta in deltas if delta.tool_name)
+        arguments = "".join(
+            delta.arguments for delta in deltas if delta.tool_index == 0
+        )
+        calls = (ToolCall(name, arguments),)
+
+        self.assertEqual(reasoning, "plan")
+        self.assertEqual(content, "Summary")
+        self.assertEqual(name, "get_weather")
+        self.assertEqual(arguments, '{"city": "Paris", "days": 2}')
         self.assertTrue(parser.matches(calls))
 
 

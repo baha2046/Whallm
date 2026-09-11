@@ -3,7 +3,11 @@
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-08。
+最後核對日期是 2026-09-11。
+目前 working tree 新增固定 revision 的 `DeepSeek-V4.1-Flash` text-only 支援：
+Swift repack、manifest format 3、MLX `deepseek_v41` runtime、SSD expert／Engram
+查找、V4.1 DSML tool parser、App 模型管理與 API model ID 已接入。
+完整 checkpoint 安裝與 full-model generation 尚未執行，因此沒有 V4.1 記憶體或效能結論。
 已發布 [Whallm 1.1.6](https://github.com/yanun0323/Whallm/releases/tag/v1.1.6)，
 標籤對應 `195420b`，已包含 `origin/codex/ssd-prefill-pipeline`（`8e69efb`）與六個缺漏研究來源檔。
 本次 Python 375 項、Swift 66 項及包內 Python 371 項通過；排除範圍見 [驗證紀錄](VALIDATION.md)。
@@ -88,6 +92,8 @@ gate，並完成剩餘 training／
 ANE／native trace／physical-I/O directions 的本機 prerequisite closure audit。
 DeepSeek checkpoint revision 是
 `7872f01b1d1fe23eabc4c98b48bffcef5a386062`。
+DeepSeek V4.1 checkpoint revision 是
+`dba1be0a40aa45a94ad051997016db3960a90277`。
 Qwen FP8 checkpoint revision 是
 `bcd9f01ddc9cff2316eb84281bebcd5b058bddce`。
 Qwen installed model revision 是
@@ -103,6 +109,7 @@ Qwen installed model revision 是
 | [效能與瓶頸](PERFORMANCE.md) | 指標定義、瓶頸判讀、A/B 方法與 profiling 流程。 |
 | [研究結論](RESEARCH.md) | 已採用、未採用、延後研究與 DSpark 決策。 |
 | [Qwen 支援](QWEN.md) | Qwen checkpoint、installed model、runtime、API 和目前驗證邊界。 |
+| [DeepSeek V4.1 支援](DEEPSEEK_V41.md) | V4.1 checkpoint、MLX 等價架構、installed model、runtime 與驗證邊界。 |
 
 專案使用方式仍以根目錄的 [README](../README.md) 為入口。
 
@@ -124,7 +131,11 @@ greedy 4K、prompt cache 和舊安裝路徑的 packaged App 驗證都已通過�
 目前 direct published installed model 下載路徑已通過 file 續傳單元測試。
 目前尚未重新執行完整 125 GB 的 App direct download。
 
-App 的 Model 頁面固定顯示 DeepSeek 與 Qwen。
+DeepSeek V4.1 text model 已完成程式碼整合，但尚未完成 full-checkpoint 驗證。
+目前只宣告 pinned contract、repack、manifest、tool parser、Swift build 與
+dependency-light Python regression 的證據；不宣告完整生成、記憶體或吞吐已通過。
+
+App 的 Model 頁面固定顯示 DeepSeek V4、DeepSeek V4.1 與 Qwen。
 使用者可以管理尚未安裝的模型。
 Server 頁面只顯示 server 狀態、系統檢查和 server 設定。
 啟動按鈕不依賴 Model 頁面的選擇。

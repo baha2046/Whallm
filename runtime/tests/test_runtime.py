@@ -48,6 +48,7 @@ from deepseek_v4_ssd.generation import (
     _RawEvalCacheList,
     _approximation_mode,
     _decode_cache_state,
+    _deepseek_v41_prefill,
     _encode_cache_state,
     _persistence_cache_state,
     _restore_persistence_cache,
@@ -128,6 +129,50 @@ class ModelRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "DSpark"):
             with _approximation_mode(dspark, "learned-route-drop-lowest-1"):
                 pass
+
+        deepseek_v41 = SimpleNamespace(
+            _is_qwen=False,
+            _is_deepseek_v41=True,
+            model=object(),
+        )
+        with self.assertRaisesRegex(ValueError, "DeepSeek V4.1"):
+            with _approximation_mode(
+                deepseek_v41,
+                "learned-route-drop-lowest-1",
+            ):
+                pass
+
+    def test_v41_warm_prompt_uses_plain_chunked_prefill(self):
+        runtime = ModelRuntime.__new__(ModelRuntime)
+        runtime._is_qwen = False
+        runtime._is_deepseek_v41 = True
+        runtime.model = SimpleNamespace(mtp=None)
+        runtime._encode_prompt = lambda _: [1, 2, 3]
+        runtime._generation_lock = threading.Lock()
+        runtime._generation_stream = mx.new_stream(mx.gpu)
+        runtime.config = SimpleNamespace(prefill_step_size=2)
+        runtime.expert_cache = object()
+
+        with (
+            patch(
+                "deepseek_v4_ssd.generation._make_prompt_cache",
+                return_value=["cache"],
+            ),
+            patch(
+                "deepseek_v4_ssd.generation._deepseek_v41_prefill"
+            ) as v41_prefill,
+            patch("deepseek_v4_ssd.generation.layer_major_prefill") as legacy_prefill,
+        ):
+            processed = runtime.warm_prompt("hello")
+
+        self.assertEqual(processed, 2)
+        v41_prefill.assert_called_once_with(
+            runtime.model,
+            [1, 2],
+            ["cache"],
+            2,
+        )
+        legacy_prefill.assert_not_called()
 
     def test_prompt_cache_is_isolated_by_approximation_mode(self):
         runtime = ModelRuntime.__new__(ModelRuntime)
@@ -3502,23 +3547,31 @@ class MXFP4Tests(unittest.TestCase):
             ),
         )
         switch = _StreamingSwitchGLU(0, cache, lambda up, _gate: up)
-        source = mx.ones((1, 1, 32), dtype=mx.bfloat16)
-        selected = mx.array([[[1, 0]]])
-
-        actual = switch(source, selected)
         reference_cache = SimpleNamespace(
             get_many=lambda _layer, _selected: ResidentExperts(
                 tuple(experts), {0: 0, 1: 1}
             )
         )
-        expected = _StreamingSwitchGLU(
-            0,
-            reference_cache,
-            lambda up, _gate: up,
-        )(source, selected)
-        mx.eval(actual, expected)
+        for source, selected in (
+            (
+                mx.ones((1, 1, 32), dtype=mx.bfloat16),
+                mx.array([[[1, 0]]]),
+            ),
+            (
+                mx.ones((1, 32), dtype=mx.bfloat16),
+                mx.array([[1, 0]]),
+            ),
+        ):
+            with self.subTest(source_shape=source.shape):
+                actual = switch(source, selected)
+                expected = _StreamingSwitchGLU(
+                    0,
+                    reference_cache,
+                    lambda up, _gate: up,
+                )(source, selected)
+                mx.eval(actual, expected)
 
-        self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
+                self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
 
     def test_staged_ready_experts_finish_w2_before_down_projection(self):
         def quantized(value: float):

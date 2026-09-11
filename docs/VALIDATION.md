@@ -1,5 +1,33 @@
 # 驗證紀錄
 
+## 2026-09-11：DeepSeek V4.1 text-only working tree
+
+目前 working tree 新增固定 `deepseek-ai/DeepSeek-V4.1-Flash` revision
+`dba1be0a40aa45a94ad051997016db3960a90277` 的 text-only 支援。
+MLX 架構來源是同日公開、Apache-2.0 的 `deepseek_v41` port；Whallm vendored
+版本保留第三方授權，並將 routed experts 與兩個 Engram table 改為 SSD lookup。
+
+已通過：
+
+- Python 全 runtime AST parse。
+- App 內附 Python、MLX 0.32.2 與 mlx-lm 0.31.3 執行 V4.1 manifest、
+  native FP8/MXFP8、strict quantized load、SSD Engram lookup、cache ceiling
+  與單字元分片 DSML parser；相關 focused suite **37 項通過**。
+- Kiro review 後新增 warmup、approximation、RoPE growth、2-D ready-expert、
+  token-map immutability、strict shape validation 與 tiny adapter forward 回歸；
+  focused regression subset **14 項通過**。
+- 同一套 App 內附 Python 執行完整 runtime suite，**389 項通過**。
+- `swift build --target DeepSeekRepack`。
+- `swift build --target dsv4-repack`。
+
+本機 command-line developer tools 缺少可解析的 `XCTest` 與 `SwiftUIMacros`
+plugin，因此完整 Swift test 與 App target build 無法在此 host 完成；這是環境阻擋，
+不是通過證據。所有 Swift source 已另以 compiler frontend 完成 syntax parse。
+tiny synthetic V4.1 adapter 已走過 production loader 與真實 forward；尚未下載或
+repack 完整 checkpoint，也尚未執行 full-model generation、記憶體或效能測量。
+vision、MTP/DSpark、layer-major prefill、persistent prompt cache 與 prompt-cache reuse
+不在目前 V4.1 支援範圍。
+
 ## 2026-09-08：Whallm 1.1.6 發布
 
 本機 master 已 fast-forward 合併 `origin/codex/ssd-prefill-pipeline`，來源 commit

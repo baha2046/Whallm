@@ -37,6 +37,7 @@ from .model import (
 )
 from .tool_codec import (
     AssistantTurn,
+    DeepSeekV41ToolStreamParser,
     QwenToolStreamParser,
     ToolChoice,
     ToolCodec,
@@ -55,7 +56,15 @@ APPROXIMATION_MODES = frozenset(
 )
 
 
-def _uses_layer_major_prefill(config: Any, *, is_qwen: bool, token_count: int) -> bool:
+def _uses_layer_major_prefill(
+    config: Any,
+    *,
+    is_qwen: bool,
+    is_deepseek_v41: bool = False,
+    token_count: int,
+) -> bool:
+    if is_deepseek_v41:
+        return False
     threshold = (
         128
         if is_qwen
@@ -105,6 +114,8 @@ def _approximation_mode(runtime: Any, mode: str):
         return
     if getattr(runtime, "_is_qwen", False):
         raise ValueError("approximation mode is not supported for Qwen")
+    if getattr(runtime, "_is_deepseek_v41", False):
+        raise ValueError("approximation mode is not supported for DeepSeek V4.1")
     if getattr(runtime.model, "dspark", None) is not None:
         raise ValueError("approximation mode is not supported with DSpark")
 
@@ -223,6 +234,19 @@ def _qwen_layer_major_prefill(
         mx.eval(hidden)
         if layer_index + 1 == len(core.layers):
             return hidden
+
+
+def _deepseek_v41_prefill(
+    model,
+    token_ids: list[int],
+    cache,
+    step_size: int,
+) -> None:
+    for start in range(0, len(token_ids), step_size):
+        check_cancelled()
+        tokens = mx.array(token_ids[start : start + step_size])[None]
+        logits = model(tokens, cache=cache)
+        mx.eval(logits)
 
 
 @dataclass
@@ -1912,9 +1936,14 @@ class RuntimeMetrics:
 class ModelRuntime:
     """Keep one installed model resident and serialize all generation."""
 
+    _is_deepseek_v41 = False
+
     def __init__(self, installed: InstalledModel, config: RuntimeConfig):
         self.installed = installed
         self._is_qwen = bool(getattr(installed, "is_qwen", False))
+        self._is_deepseek_v41 = bool(
+            getattr(installed, "is_deepseek_v41", False)
+        )
         self._model_id = getattr(installed, "model_id", "deepseek-v4")
         self._revision = getattr(installed, "revision", "")
         self._manifest_format = getattr(installed, "format_version", 1)
@@ -1936,6 +1965,8 @@ class ModelRuntime:
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
         if self._is_qwen and getattr(config, "dspark_enabled", False):
             raise ValueError("Qwen3.8-Flash-Next does not support DSpark")
+        if self._is_deepseek_v41 and getattr(config, "dspark_enabled", False):
+            raise ValueError("DeepSeek V4.1 does not support DSpark")
         if not self._is_qwen and getattr(config, "mtp_enabled", False):
             raise ValueError("MTP is supported only by Qwen3.8-Flash-Next")
         with mx.stream(self._generation_stream):
@@ -2009,6 +2040,8 @@ class ModelRuntime:
     def make_tool_stream_parser(self, thinking_mode: str):
         if self._is_qwen:
             return QwenToolStreamParser(thinking_mode)
+        if self._is_deepseek_v41:
+            return DeepSeekV41ToolStreamParser(thinking_mode)
         return ToolStreamParser(thinking_mode)
 
     def stream(
@@ -2092,6 +2125,7 @@ class ModelRuntime:
                 use_layer_major = _uses_layer_major_prefill(
                     self.config,
                     is_qwen=self._is_qwen,
+                    is_deepseek_v41=self._is_deepseek_v41,
                     token_count=len(generation_prompt),
                 )
                 self.metrics.start(
@@ -2527,6 +2561,13 @@ class ModelRuntime:
                             False,
                         ),
                     )
+                elif self._is_deepseek_v41:
+                    _deepseek_v41_prefill(
+                        self.model,
+                        tokens[:-1],
+                        cache,
+                        step_size,
+                    )
                 else:
                     layer_major_prefill(
                         self.model,
@@ -2553,6 +2594,12 @@ class ModelRuntime:
         prompt_tokens: list[int],
         approximation_mode: str = EXACT_APPROXIMATION_MODE,
     ) -> _PromptCacheEntry:
+        if self._is_deepseek_v41:
+            return _PromptCacheEntry(
+                _make_prompt_cache(self.model),
+                [],
+                approximation_mode,
+            )
         matches = [
             entry
             for entry in self._prompt_caches
@@ -2738,6 +2785,8 @@ class ModelRuntime:
         *,
         persist: bool = False,
     ) -> None:
+        if self._is_deepseek_v41:
+            return
         self._prompt_caches = [
             cached
             for cached in self._prompt_caches
@@ -2778,6 +2827,8 @@ class ModelRuntime:
         )
 
     def _open_prompt_cache_directory(self) -> Path | None:
+        if self._is_deepseek_v41:
+            return None
         if not getattr(self.config, "persistent_prompt_cache", True):
             return None
         revision = getattr(self.installed, "revision", None)

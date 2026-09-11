@@ -13,6 +13,9 @@ from typing import Any
 ENCODER_SHA256 = (
     "abc0d26120250dda0ae077dc64aa28836026e61e970854aaeb792445e6a0dde6"
 )
+V41_ENCODER_SHA256 = (
+    "502bdaec8a3fd88ebc24c4721a7038fbe42f2063c664638127056107920035c1"
+)
 
 
 @dataclass(frozen=True)
@@ -166,7 +169,10 @@ class ToolStreamParser:
         if end < 0:
             return
         header = self._buffer[: end + 1]
-        match = re.fullmatch(r'<｜DSML｜invoke name="([A-Za-z0-9_-]{1,64})">', header)
+        match = re.fullmatch(
+            re.escape(self._invoke_start) + r' name="([A-Za-z0-9_-]{1,64})">',
+            header,
+        )
         if match is None:
             self.failed = True
             return
@@ -198,7 +204,8 @@ class ToolStreamParser:
             return
         header = self._buffer[: end + 1]
         match = re.fullmatch(
-            r'<｜DSML｜parameter name="([^"]+)" string="(true|false)">',
+            re.escape(self._parameter_start)
+            + r' name="([^"]+)" string="(true|false)">',
             header,
         )
         if match is None:
@@ -269,6 +276,15 @@ class ToolStreamParser:
         return 0
 
 
+class DeepSeekV41ToolStreamParser(ToolStreamParser):
+    _tool_start = "\n\n<｜DSML｜ calls>"
+    _tools_end = "</｜DSML｜ calls>"
+    _invoke_start = "<｜DSML｜ invoke"
+    _invoke_end = "</｜DSML｜ invoke>"
+    _parameter_start = "<｜DSML｜ parameter"
+    _parameter_end = "</｜DSML｜ parameter>"
+
+
 class ToolCodec:
     """Use the pinned DeepSeek-V4 encoder through one small interface."""
 
@@ -289,10 +305,18 @@ class ToolCodec:
                         model_root / "tokenizer", trust_remote_code=True
                     )
                 return QwenToolCodec(tokenizer)
-        path = model_root / "encoding" / "encoding_dsv4.py"
+            if manifest.get("modelKind") == "deepseek-v4.1":
+                path = model_root / "encoding" / "encoding.py"
+                expected_digest = V41_ENCODER_SHA256
+            else:
+                path = model_root / "encoding" / "encoding_dsv4.py"
+                expected_digest = ENCODER_SHA256
+        else:
+            path = model_root / "encoding" / "encoding_dsv4.py"
+            expected_digest = ENCODER_SHA256
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        if digest != ENCODER_SHA256:
-            raise RuntimeError("DeepSeek-V4 encoder checksum does not match")
+        if digest != expected_digest:
+            raise RuntimeError("DeepSeek encoder checksum does not match")
         spec = importlib.util.spec_from_file_location(
             f"_deepseek_v4_encoding_{abs(hash(path))}",
             path,

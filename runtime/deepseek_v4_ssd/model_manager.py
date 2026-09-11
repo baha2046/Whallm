@@ -24,10 +24,12 @@ CATALOG_VERSION = 1
 MAX_GENERATION_TOKENS = 272_000
 MODEL_IDS = {
     "deepseek-v4": "deepseek-v4-flash-0731",
+    "deepseek-v4.1": "deepseek-v4.1-flash",
     "qwen3.8-flash-next": "qwen3.8-flash-next-fp8",
 }
 MODEL_OWNERS = {
     "deepseek-v4": "deepseek-ai",
+    "deepseek-v4.1": "deepseek-ai",
     "qwen3.8-flash-next": "Qwen",
 }
 
@@ -184,11 +186,17 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
         raise ModelCatalogError("grouped Decode requires Qwen with MTP disabled")
     if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
         raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
+    if model_kind == "deepseek-v4.1" and runtime.dspark_enabled:
+        raise ModelCatalogError("DeepSeek V4.1 does not support DSpark")
     if model_kind != "qwen3.8-flash-next" and runtime.mtp_enabled:
         raise ModelCatalogError("MTP is supported only by Qwen3.8-Flash-Next")
     if model_kind == "qwen3.8-flash-next" and runtime.staged_expert_streaming:
         raise ModelCatalogError(
             "Qwen3.8-Flash-Next does not support staged expert streaming"
+        )
+    if model_kind == "deepseek-v4.1" and runtime.staged_expert_streaming:
+        raise ModelCatalogError(
+            "DeepSeek V4.1 does not support staged expert streaming"
         )
     if (
         model_kind == "qwen3.8-flash-next"
@@ -196,6 +204,13 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
     ):
         raise ModelCatalogError(
             "Qwen3.8-Flash-Next does not support adaptive expert prefill"
+        )
+    if (
+        model_kind == "deepseek-v4.1"
+        and runtime.adaptive_expert_prefill_threshold is not None
+    ):
+        raise ModelCatalogError(
+            "DeepSeek V4.1 does not support adaptive expert prefill"
         )
     defaults = _parse_defaults(value["defaults"], f"{prefix}.defaults")
     return ModelSpec(

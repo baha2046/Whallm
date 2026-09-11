@@ -234,7 +234,13 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.recentExpertCache = true
     settings.qwenShortBlock = modelKind == .qwen3_8FlashNext
     settings.qwenGroupedExperts = modelKind == .qwen3_8FlashNext
-    if modelKind == .qwen3_8FlashNext {
+    if modelKind == .deepSeekV41 {
+      settings.slots = 768
+      settings.layerMajorPrefill = false
+      settings.promptCacheEntries = 1
+      settings.bf16KVCache = true
+      settings.dsparkEnabled = false
+    } else if modelKind == .qwen3_8FlashNext {
       settings.slots = 4_096
       settings.mtpEnabled = false
       settings.defaultMaxTokens = 262_144
@@ -254,7 +260,15 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
       ? (settings.qwenShortBlock ?? true) : false
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
-    if modelKind == .qwen3_8FlashNext {
+    if modelKind == .deepSeekV41 {
+      settings.layerMajorPrefill = false
+      settings.bf16KVCache = true
+      settings.promptCacheEntries = 1
+      settings.qwenGroupedExperts = false
+      settings.mtpEnabled = false
+      settings.mtpSlots = settings.mtpSlots ?? 32
+      settings.dsparkEnabled = false
+    } else if modelKind == .qwen3_8FlashNext {
       settings.bf16KVCache = false
       settings.qwenGroupedExperts = settings.qwenGroupedExperts ?? true
       settings.mtpEnabled = settings.mtpEnabled ?? false
@@ -378,6 +392,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
       switch legacy.publicModel {
       case "Qwen/Qwen3.8-Flash-Next-FP8", "qwen3.8-flash-next-fp8":
         identifiedKind = .qwen3_8FlashNext
+      case "deepseek-v4.1-flash", "deepseek-ai/DeepSeek-V4.1-Flash", "deepseek-flash":
+        identifiedKind = .deepSeekV41
       case "deepseek-v4-flash-0731", "deepseek-ai/DeepSeek-V4-Flash-0731":
         identifiedKind = .deepSeekV4
       default:

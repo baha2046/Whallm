@@ -6,6 +6,8 @@ from pathlib import Path
 
 DEEPSEEK_MODEL_ID = "deepseek-ai/DeepSeek-V4-Flash-0731"
 DEEPSEEK_REVISION = "7872f01b1d1fe23eabc4c98b48bffcef5a386062"
+DEEPSEEK_V41_MODEL_ID = "deepseek-ai/DeepSeek-V4.1-Flash"
+DEEPSEEK_V41_REVISION = "dba1be0a40aa45a94ad051997016db3960a90277"
 QWEN_MODEL_ID = "Qwen/Qwen3.8-Flash-Next-FP8"
 QWEN_REVISION = "bcd9f01ddc9cff2316eb84281bebcd5b058bddce"
 
@@ -23,6 +25,14 @@ EXPERT_REGIONS = (
     ("w2.scale", "F8_E8M0", (4_096, 64), 8_650_752, 262_144),
     ("w3.weight", "I8", (2_048, 2_048), 8_912_896, 4_194_304),
     ("w3.scale", "F8_E8M0", (2_048, 128), 13_107_200, 262_144),
+)
+DEEPSEEK_V41_EXPERT_REGIONS = (
+    ("w1.weight", "I8", (2_304, 2_560), 0, 5_898_240),
+    ("w1.scale", "F8_E8M0", (2_304, 160), 5_898_240, 368_640),
+    ("w2.weight", "I8", (5_120, 1_152), 6_266_880, 5_898_240),
+    ("w2.scale", "F8_E8M0", (5_120, 72), 12_165_120, 368_640),
+    ("w3.weight", "I8", (2_304, 2_560), 12_533_760, 5_898_240),
+    ("w3.scale", "F8_E8M0", (2_304, 160), 18_432_000, 368_640),
 )
 QWEN_EXPERT_REGIONS = (
     ("gate_up.weight", "U32", (1_280, 320), 0, 1_638_400),
@@ -78,6 +88,21 @@ class MTP:
 
 
 @dataclass(frozen=True)
+class EngramTable:
+    layer: int
+    weight_file: str
+    scale_file: str
+    rows: int
+    dimension: int
+    block_size: int
+
+
+@dataclass(frozen=True)
+class Engram:
+    tables: tuple[EngramTable, ...]
+
+
+@dataclass(frozen=True)
 class InstalledModel:
     root: Path
     model_id: str
@@ -94,6 +119,7 @@ class InstalledModel:
     expert_quantization: ExpertQuantization | None = None
     ngram: NGram | None = None
     mtp: MTP | None = None
+    engram: Engram | None = None
     dspark_layer_count: int = 0
     dspark_block_size: int = 0
     dspark_noise_token_id: int = 0
@@ -110,6 +136,10 @@ class InstalledModel:
         return self.model_kind == "qwen3.8-flash-next"
 
     @property
+    def is_deepseek_v41(self) -> bool:
+        return self.model_kind == "deepseek-v4.1"
+
+    @property
     def has_mtp(self) -> bool:
         return self.mtp is not None
 
@@ -119,7 +149,9 @@ class InstalledModel:
         with (root / "manifest.json").open("rb") as file:
             raw = json.load(file)
 
-        if raw.get("formatVersion") == 2:
+        if raw.get("formatVersion") == 3:
+            contract = _deepseek_v41_contract(raw)
+        elif raw.get("formatVersion") == 2:
             contract = _qwen_contract(raw)
         elif raw.get("formatVersion") == 1:
             contract = _deepseek_contract(raw)
@@ -220,6 +252,23 @@ class InstalledModel:
                 common_tensors=mtp_common_tensors,
             )
 
+        engram_raw = raw.get("engram")
+        engram: Engram | None = None
+        if engram_raw is not None:
+            engram = Engram(
+                tables=tuple(
+                    EngramTable(
+                        layer=item["layer"],
+                        weight_file=item["weightFile"],
+                        scale_file=item["scaleFile"],
+                        rows=item["rows"],
+                        dimension=item["dimension"],
+                        block_size=item["blockSize"],
+                    )
+                    for item in engram_raw["tables"]
+                )
+            )
+
         return cls(
             root=root,
             model_id=raw["modelID"],
@@ -236,6 +285,7 @@ class InstalledModel:
             expert_quantization=contract.get("expert_quantization"),
             ngram=contract.get("ngram"),
             mtp=mtp,
+            engram=engram,
             dspark_layer_count=dspark["layerCount"] if dspark is not None else 0,
             dspark_block_size=dspark["blockSize"] if dspark is not None else 0,
             dspark_noise_token_id=dspark["noiseTokenID"] if dspark is not None else 0,
@@ -245,6 +295,81 @@ class InstalledModel:
             dspark_markov_rank=dspark["markovRank"] if dspark is not None else 0,
             dspark_common_tensors=dspark_common_tensors,
         )
+
+
+def _deepseek_v41_contract(raw: dict) -> dict:
+    layer_count = 40
+    expert_count = 384
+    expert_blob_size = 18_800_640
+    expected = (
+        raw.get("modelKind") == "deepseek-v4.1"
+        and raw.get("modelID") == DEEPSEEK_V41_MODEL_ID
+        and raw.get("revision") == DEEPSEEK_V41_REVISION
+        and raw.get("layerCount") == layer_count
+        and raw.get("expertCount") == expert_count
+        and raw.get("selectedExpertCount") == 6
+        and raw.get("expertBlobSize") == expert_blob_size
+        and raw.get("maximumContext") == 1_048_576
+        and raw.get("dspark") is None
+        and raw.get("mtp") is None
+        and raw.get("ngram") is None
+        and raw.get("expertQuantization") is None
+    )
+    if not expected:
+        raise ValueError("installed model does not match the pinned V4.1 contract")
+    tables = (
+        (1, 384_006_168),
+        (14, 384_016_682),
+    )
+    expected_engram = {
+        "tables": [
+            {
+                "layer": layer,
+                "weightFile": f"engram/layer_{layer:02d}.weight.bin",
+                "scaleFile": f"engram/layer_{layer:02d}.scale.bin",
+                "rows": rows,
+                "dimension": 256,
+                "blockSize": 32,
+            }
+            for layer, rows in tables
+        ]
+    }
+    if raw.get("engram") != expected_engram:
+        raise ValueError("installed model has an invalid V4.1 engram contract")
+    required = {
+        "common.bin",
+        "config.json",
+        "encoding/encoding.py",
+        "tokenizer/tokenizer.json",
+        "tokenizer/tokenizer_config.json",
+        *(f"experts/layer_{layer:02d}.bin" for layer in range(layer_count)),
+        *(f"engram/layer_{layer:02d}.weight.bin" for layer, _ in tables),
+        *(f"engram/layer_{layer:02d}.scale.bin" for layer, _ in tables),
+    }
+    files = {item.get("path"): item.get("size") for item in raw.get("files", [])}
+    if any(
+        files.get(f"experts/layer_{layer:02d}.bin")
+        != expert_count * expert_blob_size
+        for layer in range(layer_count)
+    ):
+        raise ValueError("installed V4.1 expert layer has an invalid size")
+    for layer, rows in tables:
+        if files.get(f"engram/layer_{layer:02d}.weight.bin") != rows * 256:
+            raise ValueError("installed V4.1 engram weight table has an invalid size")
+        if files.get(f"engram/layer_{layer:02d}.scale.bin") != rows * 8:
+            raise ValueError("installed V4.1 engram scale table has an invalid size")
+    return {
+        "required": required,
+        "allowed": required,
+        "model_kind": "deepseek-v4.1",
+        "layer_count": layer_count,
+        "expert_count": expert_count,
+        "selected_expert_count": 6,
+        "expert_blob_size": expert_blob_size,
+        "maximum_context": 1_048_576,
+        "expert_regions": DEEPSEEK_V41_EXPERT_REGIONS,
+        "engram": expected_engram,
+    }
 
 
 def _deepseek_contract(raw: dict) -> dict:

@@ -212,9 +212,13 @@ struct Repacker {
         }
         return InstalledFile(path: file.path, size: size, sha256: try sha256(url))
       }
-      let companions = requestedCompanions
-        ?? (plan.modelKind == .qwen3_8FlashNext
-          ? QwenContract.companions : ModelContract.companions)
+      let companions = requestedCompanions ?? {
+        switch plan.modelKind {
+        case .deepSeekV41: DeepSeekV41Contract.companions
+        case .qwen3_8FlashNext: QwenContract.companions
+        case .deepSeekV4, .none: ModelContract.companions
+        }
+      }()
       for companion in companions {
         let data = try await read(path: companion.source)
         let url = try safeFileURL(root: partial, path: companion.destination)
@@ -244,7 +248,8 @@ struct Repacker {
         modelKind: plan.modelKind,
         maximumContext: plan.maximumContext,
         expertQuantization: plan.expertQuantization,
-        ngram: plan.ngram
+        ngram: plan.ngram,
+        engram: plan.engram
       )
       let encoder = JSONEncoder()
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -905,7 +910,8 @@ public enum InstalledModel {
       modelKind: current.modelKind,
       maximumContext: current.maximumContext,
       expertQuantization: current.expertQuantization,
-      ngram: current.ngram
+      ngram: current.ngram,
+      engram: current.engram
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -927,6 +933,9 @@ public enum InstalledModel {
 
   static func decodeManifest(_ data: Data) throws -> InstalledManifest {
     let manifest = try JSONDecoder().decode(InstalledManifest.self, from: data)
+    if manifest.formatVersion == 3 || manifest.modelKind == .deepSeekV41 {
+      return try DeepSeekV41Contract.validate(manifest)
+    }
     if manifest.formatVersion == 2 || manifest.modelKind == .qwen3_8FlashNext {
       return try validateQwenManifest(manifest)
     }

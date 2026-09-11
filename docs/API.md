@@ -12,6 +12,18 @@ server 一次只執行一個 generation request。
 本 API 是相容子集。
 本 API 不是 OpenAI API 的完整實作。
 
+固定 API model ID 如下：
+
+| model kind | API model ID |
+| --- | --- |
+| `deepseek-v4` | `deepseek-v4-flash-0731` |
+| `deepseek-v4.1` | `deepseek-v4.1-flash` |
+| `qwen3.8-flash-next` | `qwen3.8-flash-next-fp8` |
+
+每個 model catalog entry 可以設定另外的 Alias。CLI repack model selector 也接受
+`deepseek-flash` 作為 DeepSeek V4.1 的相容名稱；HTTP API 仍以 catalog 內的
+API model ID 或 Alias 為準。
+
 ## 啟動 server
 
 使用 APP：

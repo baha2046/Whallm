@@ -749,6 +749,20 @@ class ServerTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.param, "approximation.mode")
 
+    def test_approximation_rejects_deepseek_v41_runtime(self):
+        options = GenerationOptions(
+            approximation_mode="learned-route-drop-lowest-1"
+        )
+        runtime = SimpleNamespace(
+            _is_deepseek_v41=True,
+            config=SimpleNamespace(dspark_enabled=False),
+        )
+
+        with self.assertRaises(APIError) as raised:
+            _validate_approximation_runtime(options, runtime)
+
+        self.assertEqual(raised.exception.param, "approximation.mode")
+
     def test_generation_token_limit_is_272000(self):
         self.assertEqual(_options({"max_tokens": 272_000}, ServerDefaults()).max_tokens, 272_000)
         with self.assertRaises(APIError):

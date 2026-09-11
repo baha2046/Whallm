@@ -1,7 +1,8 @@
 # 架構與目前實作
 
 Whallm 在 Apple Silicon 上執行固定的
-`DeepSeek-V4-Flash-0731` 或 `Qwen3.8-Flash-Next-FP8` checkpoint。
+`DeepSeek-V4-Flash-0731`、`DeepSeek-V4.1-Flash` 或
+`Qwen3.8-Flash-Next-FP8` checkpoint。
 runtime 將 common tensor 保留在統一記憶體。
 runtime 只在 router 選到 routed expert 時讀取 expert blob。
 
@@ -53,9 +54,13 @@ installed model
 
 Qwen 使用 manifest format 2。
 format 2 新增 `modelKind`、`maximumContext`、`expertQuantization` 和 `ngram`。
-DeepSeek 保留 manifest format 1。現有 installed model 不需要轉換。
+DeepSeek V4 Flash 0731 保留 manifest format 1。
+DeepSeek V4.1 使用 manifest format 3，加入固定的 `engram` table descriptor。
+現有 installed model 不需要轉換。
 
 Qwen 的完整合約和資料路徑請見 [Qwen 支援](QWEN.md)。
+DeepSeek V4.1 的完整合約和資料路徑請見
+[DeepSeek V4.1 支援](DEEPSEEK_V41.md)。
 
 ## Checkpoint 合約
 

@@ -1795,12 +1795,14 @@ private struct ModelAdvancedView: View {
               value: anePrefillRatio
             )
           }
-          Divider()
-          toggleField(
-            "Use layer-major prefill",
-            hint: "Loads routed experts by layer during prefill.",
-            value: $settings.layerMajorPrefill
-          )
+          if modelKind != .deepSeekV41 {
+            Divider()
+            toggleField(
+              "Use layer-major prefill",
+              hint: "Loads routed experts by layer during prefill.",
+              value: $settings.layerMajorPrefill
+            )
+          }
           if modelKind == .qwen3_8FlashNext {
             Divider()
             toggleField(
@@ -1827,18 +1829,20 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!settings.layerMajorPrefill)
           }
-          Divider()
-          integerField(
-            "Prompt cache entries",
-            hint: "Number of linear conversations to keep. The recommended value is 2.",
-            value: $settings.promptCacheEntries
-          )
-          Divider()
-          integerField(
-            "Prompt cache GiB",
-            hint: "Memory limit for all prompt caches. The recommended value is 8.",
-            value: $settings.promptCacheMemoryGiB
-          )
+          if modelKind != .deepSeekV41 {
+            Divider()
+            integerField(
+              "Prompt cache entries",
+              hint: "Number of linear conversations to keep. The recommended value is 2.",
+              value: $settings.promptCacheEntries
+            )
+            Divider()
+            integerField(
+              "Prompt cache GiB",
+              hint: "Memory limit for all prompt caches. The recommended value is 8.",
+              value: $settings.promptCacheMemoryGiB
+            )
+          }
           Divider()
           SettingRow(
             "Warmup prompt",

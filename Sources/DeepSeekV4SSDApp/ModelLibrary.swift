@@ -7,6 +7,7 @@ extension ModelKind {
   var displayName: String {
     switch self {
     case .deepSeekV4: "DeepSeek-V4-Flash-0731"
+    case .deepSeekV41: "DeepSeek-V4.1-Flash"
     case .qwen3_8FlashNext: "Qwen3.8-Flash-Next"
     }
   }
@@ -14,13 +15,14 @@ extension ModelKind {
   var modelKindLabel: String {
     switch self {
     case .deepSeekV4: "DeepSeek V4"
+    case .deepSeekV41: "DeepSeek V4.1"
     case .qwen3_8FlashNext: "Qwen3.8 Flash Next"
     }
   }
 
   var assistantName: String {
     switch self {
-    case .deepSeekV4: "DeepSeek"
+    case .deepSeekV4, .deepSeekV41: "DeepSeek"
     case .qwen3_8FlashNext: "Qwen"
     }
   }
@@ -28,6 +30,7 @@ extension ModelKind {
   var apiModelID: String {
     switch self {
     case .deepSeekV4: "deepseek-v4-flash-0731"
+    case .deepSeekV41: "deepseek-v4.1-flash"
     case .qwen3_8FlashNext: "qwen3.8-flash-next-fp8"
     }
   }
@@ -104,10 +107,20 @@ enum InstalledModelDiscovery {
     guard let manifest = try? InstalledModel.loadManifest(at: root) else { return nil }
     let paths = Set(manifest.files.map(\.path))
     let modelKind = manifest.modelKind ?? .deepSeekV4
-    let requiredPaths =
-      modelKind == .qwen3_8FlashNext
-      ? ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"]
-      : ["common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json"]
+    let requiredPaths: [String]
+    switch modelKind {
+    case .deepSeekV4:
+      requiredPaths = [
+        "common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json",
+      ]
+    case .deepSeekV41:
+      requiredPaths = [
+        "common.bin", "config.json", "encoding/encoding.py", "tokenizer/tokenizer.json",
+        "engram/layer_01.weight.bin", "engram/layer_14.weight.bin",
+      ]
+    case .qwen3_8FlashNext:
+      requiredPaths = ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"]
+    }
     guard requiredPaths.allSatisfy(paths.contains) else { return nil }
     let expectedLayerSize = UInt64(manifest.expertCount) * manifest.expertBlobSize
     var totalSize: UInt64 = 0
@@ -236,7 +249,9 @@ struct ModelOperationProgress: Equatable {
 
 @MainActor
 final class ModelLibrary: ObservableObject {
-  static let supportedModelKinds: [ModelKind] = [.deepSeekV4, .qwen3_8FlashNext]
+  static let supportedModelKinds: [ModelKind] = [
+    .deepSeekV4, .deepSeekV41, .qwen3_8FlashNext,
+  ]
   static let qwenMTPInstalledBytes: UInt64 = 1_518_071_296
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
@@ -384,7 +399,7 @@ final class ModelLibrary: ObservableObject {
           layerMajorPrefillThreshold: settings.layerMajorPrefillThreshold ?? 1_024,
           promptCacheEntries: settings.promptCacheEntries,
           promptCacheMemoryGiB: settings.promptCacheMemoryGiB,
-          persistentPromptCache: true,
+          persistentPromptCache: modelKind != .deepSeekV41,
           persistentPromptCacheEntries: 8,
           promptCacheDirectory: nil,
           moePrefillStepSize: 0,
@@ -447,6 +462,8 @@ final class ModelLibrary: ObservableObject {
     let legacyDefaults: Set<String> = [
       "deepseek-v4-flash-0731",
       "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "deepseek-v4.1-flash",
+      "deepseek-ai/DeepSeek-V4.1-Flash",
       "qwen3.8-flash-next-fp8",
       "Qwen/Qwen3.8-Flash-Next-FP8",
     ]
@@ -601,6 +618,8 @@ final class ModelLibrary: ObservableObject {
       case .deepSeekV4:
         bytes = try await DeepSeekV4Checkpoint()
           .makeRepackPlan(includeDSpark: true).installedBytes
+      case .deepSeekV41:
+        bytes = try await DeepSeekV41Checkpoint().makeRepackPlan().installedBytes
       case .qwen3_8FlashNext:
         bytes = try await QwenInstalledModelArtifact().installedBytes()
       }
@@ -768,9 +787,11 @@ final class ModelLibrary: ObservableObject {
   }
 
   private func defaultDownloadDestination(for modelKind: ModelKind) -> URL {
-    let name =
-      modelKind == .qwen3_8FlashNext
-      ? "qwen3.8-flash-next.dsv4" : "deepseek-v4-flash-0731.dsv4"
+    let name = switch modelKind {
+    case .deepSeekV4: "deepseek-v4-flash-0731.dsv4"
+    case .deepSeekV41: "deepseek-v4.1-flash.dsv4"
+    case .qwen3_8FlashNext: "qwen3.8-flash-next.dsv4"
+    }
     return rootURL.appending(path: name, directoryHint: .isDirectory)
   }
 
@@ -812,6 +833,11 @@ final class ModelLibrary: ObservableObject {
           to: destination,
           includeDSpark: true
         ) { [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
+        }
+        needsAudit = true
+      case .deepSeekV41:
+        _ = try await DeepSeekV41Checkpoint().repack(to: destination) { [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
         }
         needsAudit = true
@@ -883,6 +909,13 @@ final class ModelLibrary: ObservableObject {
       case .deepSeekV4:
         _ = try await DeepSeekV4Checkpoint().repair(at: url, invalidFiles: invalidFiles) {
           [weak self] progress in
+          Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
+        }
+        needsAudit = true
+      case .deepSeekV41:
+        _ = try await DeepSeekV41Checkpoint().repair(
+          at: url, invalidFiles: invalidFiles
+        ) { [weak self] progress in
           Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
         }
         needsAudit = true

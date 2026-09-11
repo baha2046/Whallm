@@ -23,10 +23,13 @@ def raw_model(
     path: str | None = None,
 ) -> dict:
     qwen = model_kind == "qwen3.8-flash-next"
+    deepseek_v41 = model_kind == "deepseek-v4.1"
     return {
         "id": (
             "qwen3.8-flash-next-fp8"
             if qwen
+            else "deepseek-v4.1-flash"
+            if deepseek_v41
             else "deepseek-v4-flash-0731"
         ),
         "alias": alias,
@@ -91,7 +94,7 @@ class FakeRuntime:
 
 class ModelCatalogTests(unittest.TestCase):
     def test_legacy_catalog_without_either_grouped_field_loads(self):
-        for kind in ("deepseek-v4", "qwen3.8-flash-next"):
+        for kind in ("deepseek-v4", "deepseek-v4.1", "qwen3.8-flash-next"):
             with self.subTest(kind=kind):
                 model = raw_model(kind)
                 model["runtime"].pop("qwen_grouped_decode")
@@ -104,7 +107,7 @@ class ModelCatalogTests(unittest.TestCase):
                 )
 
     def test_grouped_experts_remains_optional_for_existing_catalogs(self):
-        for kind in ("deepseek-v4", "qwen3.8-flash-next"):
+        for kind in ("deepseek-v4", "deepseek-v4.1", "qwen3.8-flash-next"):
             model = raw_model(kind)
             model["runtime"].pop("qwen_grouped_experts")
             model["runtime"]["slots"] = 4096 if kind == "qwen3.8-flash-next" else 1152
@@ -112,6 +115,24 @@ class ModelCatalogTests(unittest.TestCase):
             self.assertEqual(parsed.runtime.qwen_grouped_experts, kind == "qwen3.8-flash-next")
             self.assertEqual(parsed.runtime.slots, model["runtime"]["slots"])
             self.assertFalse(parsed.runtime.mtp_enabled)
+
+    def test_v41_catalog_uses_exact_api_identity_and_rejects_unsupported_modes(self):
+        model = raw_model("deepseek-v4.1", alias="deepseek-flash")
+        parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+        self.assertEqual(parsed.id, "deepseek-v4.1-flash")
+        self.assertEqual(parsed.alias, "deepseek-flash")
+        self.assertEqual(parsed.owner, "deepseek-ai")
+
+        for field, value in (
+            ("dspark_enabled", True),
+            ("mtp_enabled", True),
+            ("staged_expert_streaming", True),
+            ("adaptive_expert_prefill_threshold", 0.5),
+        ):
+            invalid = raw_model("deepseek-v4.1")
+            invalid["runtime"][field] = value
+            with self.subTest(field=field), self.assertRaises(ModelCatalogError):
+                parse_model_catalog({"version": 1, "models": [invalid]})
 
     def test_grouped_experts_requires_boolean_and_preserves_catalog_validation(self):
         model = raw_model("qwen3.8-flash-next")

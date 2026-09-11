@@ -203,6 +203,7 @@ public struct DeepSeekV4Checkpoint: Sendable {
     progress: (@Sendable (RepackProgress) -> Void)? = nil
   ) async throws -> InstalledManifest {
     let manifest = try InstalledModel.loadManifest(at: output)
+    try Self.validateDSparkInstallTarget(manifest)
     if manifest.dspark != nil {
       return try InstalledModel.verify(at: output)
     }
@@ -217,6 +218,12 @@ public struct DeepSeekV4Checkpoint: Sendable {
       invalidFiles: dsparkFiles,
       progress: progress
     )
+  }
+
+  static func validateDSparkInstallTarget(_ manifest: InstalledManifest) throws {
+    guard (manifest.modelKind ?? .deepSeekV4) == .deepSeekV4 else {
+      throw RepackError.incompatibleModel("installed model is not DeepSeek-V4-Flash-0731")
+    }
   }
 
   private func readTensors(index: CheckpointIndex) async throws -> [String: SafeTensor] {
