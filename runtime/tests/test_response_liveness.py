@@ -7,7 +7,11 @@ import struct
 import threading
 import time
 import unittest
+from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import patch
+
+import mlx.core as mx
 
 from runtime.tests.test_server import FakeRuntime
 from deepseek_v4_ssd.cancellation import check_cancelled
@@ -167,21 +171,43 @@ class ResponseLivenessTests(unittest.TestCase):
             load.assert_not_called()
 
     def test_disconnect_during_prefill_stops_before_first_token_then_recovers(self):
+        from deepseek_v4_ssd.cancellation import _cancellation
+        from deepseek_v4_ssd.model import layer_major_prefill
+        calls = []
+
+        class Layer:
+            def __call__(layer, hidden, *_):
+                calls.append(True)
+                self.entered.set()
+                if not self.release.is_set():
+                    # Simulate a running batch. The real prefill loop must notice
+                    # cancellation when this batch returns, before the next one.
+                    if not _cancellation.get().wait(3):
+                        raise TimeoutError('server did not observe disconnect')
+                return hidden + 1
+
+        model = SimpleNamespace(model=SimpleNamespace(
+            embed_tokens=lambda tokens: tokens[..., None].astype(mx.float32),
+            pipeline_layers=[Layer(), Layer()],
+            args=SimpleNamespace(hc_mult=1, sliding_window=4),
+        ))
         def stream(prompt, options):
-            self.entered.set()
             try:
-                while not self.release.is_set():
-                    check_cancelled()
-                    time.sleep(0.005)
+                with patch('deepseek_v4_ssd.model.deepseek_v4.create_attention_mask', return_value=None):
+                    layer_major_prefill(model, [1, 2, 3, 4],
+                                        [SimpleNamespace(offset=0) for _ in range(2)], 2,
+                                        SimpleNamespace(pin_layer=lambda _: nullcontext()))
                 yield GeneratedPiece('unused', 1, 5, 1, 'stop')
             finally:
                 self.closed.set()
         self.runtime.stream = stream
         with patch('deepseek_v4_ssd.server.RESPONSE_HEARTBEAT_SECONDS', 3600):
             response, _ = self.start()
+            self.assertTrue(self.entered.wait(1))
             response.close()
             self.connection.close()
             self.assertTrue(self.closed.wait(1))
+            self.assertEqual(len(calls), 1)
             self.assertTrue(self.manager._generation_lock.acquire(timeout=1))
             self.manager._generation_lock.release()
         # Cancellation belongs to one request; the next request must still work.

@@ -23,6 +23,8 @@ import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
 
+from ..cancellation import check_cancelled
+
 from .attention import Attention
 from .cache import ModelCache
 from .config import ModelArgs
@@ -141,6 +143,7 @@ class Model(nn.Module):
         pre_mix = make_identity_pre_mix(b, n, self.hc_mult)
         shared = SharedState()
         for layer in self.layers:
+            check_cancelled()
             if layer.engram is not None:
                 h = layer.engram(h, hashes[:, :, layer.engram.layer_hash_index])
             if self._break_sharing and not layer.attn.is_kv_source and layer.attn.ratio:

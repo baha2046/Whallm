@@ -14,6 +14,7 @@ from mlx_lm.models.cache import CacheList
 from mlx_lm.models.switch_layers import _gather_sort, _scatter_unsort
 
 from .dspark import VerificationMetrics, load_dspark_model
+from .cancellation import check_cancelled
 from .expert_cache import BatchedExperts, ExpertCache, _ReadLimiter
 from .fp8_cache import CorrectPoolingCache, MXFP8PoolingCache
 from .manifest import InstalledModel, Tensor
@@ -182,6 +183,7 @@ def _plan_adaptive_prefill_layer(
     tiles = []
     started = time.perf_counter()
     for start in range(0, attention_output.shape[1], moe_step_size):
+        check_cancelled()
         end = min(start + moe_step_size, attention_output.shape[1])
         residual = attention_output[:, start:end]
         value, post, combine = layer.ffn_hc(residual)
@@ -239,6 +241,7 @@ def layer_major_prefill(
     """Populate the prompt cache while keeping one layer's experts resident."""
     if not token_ids:
         return
+    check_cancelled()
     core = model.model
     if len(prompt_cache) != len(core.pipeline_layers):
         raise ValueError("prompt cache does not match the main model layers")
@@ -250,6 +253,11 @@ def layer_major_prefill(
         if not batched_experts:
             raise ValueError("adaptive expert prefill requires batched experts")
 
+    # Whole-layer prefill has its own expert buffers. Retaining decode slots
+    # here would stack both allocations, including on subsequent requests.
+    release_slots = getattr(expert_cache, "release_prefill_slots", None)
+    if batched_experts and callable(release_slots):
+        release_slots()
     inputs = mx.array(token_ids)[None]
     hidden = core.embed_tokens(inputs)
     hidden = mx.broadcast_to(
@@ -263,6 +271,7 @@ def layer_major_prefill(
     for layer_index, (layer, layer_cache) in enumerate(
         zip(core.pipeline_layers, prompt_cache)
     ):
+        check_cancelled()
         if not all(
             hasattr(layer, name)
             for name in ("attn_hc", "attn_norm", "attn", "ffn_hc", "ffn_norm", "ffn")
@@ -270,6 +279,7 @@ def layer_major_prefill(
             outputs = []
             with expert_cache.pin_layer(layer_index):
                 for start in range(0, len(token_ids), step_size):
+                    check_cancelled()
                     end = min(start + step_size, len(token_ids))
                     chunk = hidden[:, start:end]
                     chunk_ids = inputs[:, start:end]
@@ -313,6 +323,7 @@ def layer_major_prefill(
 
         outputs = []
         for start in range(0, len(token_ids), step_size):
+            check_cancelled()
             end = min(start + step_size, len(token_ids))
             chunk = hidden[:, start:end]
             mask_cache = (
@@ -339,6 +350,7 @@ def layer_major_prefill(
             outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
         )
         mx.eval(attention_output)
+        check_cancelled()
         _clear_memory_cache()
         if adaptive_expert_threshold is not None and use_batched:
             tiles, expert_union, plan_seconds = _plan_adaptive_prefill_layer(
@@ -371,6 +383,7 @@ def layer_major_prefill(
                 if batched is None:
                     raise RuntimeError("adaptive expert prefill has no batched weights")
                 for tile in tiles:
+                    check_cancelled()
                     output = _finish_adaptive_prefill_tile(layer, tile, batched)
                     if callable(record_compute_submit):
                         record_compute_submit(layer_index)
@@ -394,6 +407,7 @@ def layer_major_prefill(
             if use_batched and layer_index + 1 < last_layer:
                 prefetch(layer_index + 1)
             for start in range(0, len(token_ids), moe_step_size):
+                check_cancelled()
                 end = min(start + moe_step_size, len(token_ids))
                 residual = attention_output[:, start:end]
                 value, post, combine = layer.ffn_hc(residual)

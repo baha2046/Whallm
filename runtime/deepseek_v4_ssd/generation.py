@@ -2033,6 +2033,9 @@ class ModelRuntime:
                                 )
                 finally:
                     if not completed:
+                        discard = getattr(self.expert_cache, "discard_prefetched_layers", None)
+                        if discard is not None:
+                            discard()
                         # Drain submitted work before another request can reuse
                         # expert buffers. Never run MLX cleanup on the observer.
                         mx.synchronize(self._generation_stream)

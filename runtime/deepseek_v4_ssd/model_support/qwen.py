@@ -171,6 +171,9 @@ def _qwen_layer_major_prefill(
     core = model.model
     if len(prompt_cache) != len(core.layers):
         raise ValueError("prompt cache does not match the Qwen model layers")
+    release_slots = getattr(expert_cache, "release_prefill_slots", None)
+    if callable(release_slots):
+        release_slots()
     record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
     inputs = mx.array(token_ids)[None]
     hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))

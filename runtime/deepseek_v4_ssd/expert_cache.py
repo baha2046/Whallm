@@ -16,6 +16,8 @@ from typing import Iterator
 import mlx.core as mx
 import numpy as np
 
+from .cancellation import cancel_and_drain, check_cancelled, wait_for_futures
+
 from .io_metrics import (
     EXPERT_FILE_CACHE_POLICIES,
     PageCacheReadClassification,
@@ -975,6 +977,36 @@ class ExpertCache:
         with self._lock:
             return len(self._entries)
 
+    def release_prefill_slots(self) -> None:
+        """Release decode storage before batched prefill; caller holds the request lock."""
+        with self._lock:
+            if (
+                self._pinned_layers
+                or self._batched_layer is not None
+                or self._active_speculative_prefetch is not None
+                or self._speculative_pinned_keys
+            ):
+                raise RuntimeError("cannot release expert slots while they are in use")
+        self.discard_prefetched_layers()
+        mx.synchronize()
+        with self._lock:
+            # Preserve direct, staged, grouped and bounded Qwen storage layouts.
+            self._pool = type(self._pool)(self.model, self.slots)
+            self._entries.clear()
+            self._free_slots = list(reversed(range(self.slots)))
+            self._heap.clear()
+            self._layer_counts = [0] * self.layer_count
+            self._clock = 0
+            self._last_decay = 0
+        mx.clear_cache()
+
+    def discard_prefetched_layers(self) -> None:
+        """Abandon unused layer reads; caller holds the request lock."""
+        with self._lock:
+            pending = list(self._prefetched_layers.values())
+            self._prefetched_layers.clear()
+        cancel_and_drain(future for job in pending for future in job.futures)
+
     @contextmanager
     def qwen_decode_request(self):
         """Scope the final Prefill token and Decode dispatch to one request."""
@@ -1135,6 +1167,7 @@ class ExpertCache:
         layer: int,
         experts: list[int] | tuple[int, ...] | None = None,
     ) -> None:
+        check_cancelled()
         if not 0 <= layer < self.layer_count:
             return
         selected = (
@@ -1200,7 +1233,7 @@ class ExpertCache:
         deadline = time.perf_counter()
         was_ready = all(future.done() for future in job.futures)
         wait_started = time.perf_counter()
-        reads = tuple(future.result() for future in job.futures)
+        reads = wait_for_futures(job.futures)
         future_wait_seconds = time.perf_counter() - wait_started
         elapsed = max(
             (read.finished - read.started for read in reads),
@@ -1367,6 +1400,7 @@ class ExpertCache:
         return handle
 
     def get_many(self, layer: int, expert_ids: list[int]) -> ResidentExperts:
+        check_cancelled()
         if not 0 <= layer < self.layer_count:
             raise ValueError(f"invalid layer {layer}")
         frequencies = Counter(expert_ids)
@@ -1420,16 +1454,8 @@ class ExpertCache:
             for expert in missing
         }
         try:
-            for future in futures.values():
-                future.result()
+            wait_for_futures(futures.values())
         except Exception:
-            for future in futures.values():
-                future.cancel()
-            for future in futures.values():
-                try:
-                    future.result()
-                except Exception:
-                    pass
             with self._lock:
                 self._release_slots(layer, assigned)
             raise

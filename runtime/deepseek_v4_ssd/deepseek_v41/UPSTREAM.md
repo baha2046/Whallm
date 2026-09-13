@@ -8,3 +8,5 @@ Whallm omits the upstream conversion, loading, generation, and streaming
 entrypoints because those responsibilities are owned by Whallm. Local runtime
 adaptations add checkpoint-native quantized output projection support, bounded
 cache growth, and SSD-backed routed experts and Engram tables.
+The model's layer loop checks Whallm's request cancellation flag so disconnected
+requests can stop during Prefill as well as Decode.

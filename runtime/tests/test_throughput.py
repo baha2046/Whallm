@@ -204,8 +204,17 @@ class ThroughputTests(unittest.TestCase):
         self.assertTrue(self.runtime.entered.wait(3))
         connection.shutdown(socket.SHUT_RDWR)
         connection.close()
+        # The App immediately asks to unload after cancellation. The endpoint
+        # must wait for generation to unwind before closing the runtime.
+        unload = Request(
+            self.url.replace("api/benchmark/throughput", "api/models/unload"),
+            data=json.dumps({"model": "deepseek-v4-flash-0731"}).encode(),
+            headers={"Authorization": "Bearer secret", "Content-Type": "application/json"},
+        )
+        with urlopen(unload, timeout=5) as response:
+            self.assertEqual(response.status, 200)
         self.assertTrue(self.runtime.finished.wait(3))
-        # Acquiring the manager lock proves the cancelled request has unwound.
-        with self.manager.request("deepseek-v4-flash-0731"):
-            self.assertIs(self.runtime.config, self.original_config)
+        self.assertIs(self.runtime.config, self.original_config)
+        self.assertTrue(self.runtime.closed)
+        self.assertIsNone(self.manager.status_snapshot()["loaded_model"])
         self.assertFalse(self.server.metrics.snapshot()["generating"])

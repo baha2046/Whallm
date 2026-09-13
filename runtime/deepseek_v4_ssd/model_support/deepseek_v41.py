@@ -31,6 +31,29 @@ class DeepSeekV41Support(ModelSupport):
         from ..tool_codec import DeepSeekV41ToolStreamParser
         return DeepSeekV41ToolStreamParser(thinking_mode)
 
+    @staticmethod
+    def _model_cache(cache):
+        from ..deepseek_v41_ssd import DeepSeekV41PromptCache
+        if len(cache) != 1 or not isinstance(cache[0], DeepSeekV41PromptCache):
+            raise ValueError("DeepSeek V4.1 requires its singleton model cache")
+        return cache[0]
+
+    def clone_cache(self, cache):
+        from copy import copy
+        source = self._model_cache(cache)
+        target = copy(source)
+        target.restore_persistence_state(source.persistence_state())
+        return [target]
+
+    def snapshot_cache(self, cache):
+        return [self._model_cache(cache).persistence_state()]
+
+    def restore_cache(self, cache, state):
+        target = self._model_cache(cache)
+        if not isinstance(state, list) or len(state) != 1:
+            raise ValueError("DeepSeek V4.1 requires one saved model cache")
+        target.restore_persistence_state(state[0])
+
 def _deepseek_v41_contract(raw: dict) -> dict:
     from ..manifest import (DEEPSEEK_V41_MODEL_ID, DEEPSEEK_V41_REVISION, DEEPSEEK_V41_EXPERT_REGIONS)
     layer_count = 40

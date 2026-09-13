@@ -91,11 +91,77 @@ class DeepSeekV41PromptCache:
 
     @state.setter
     def state(self, _: object) -> None:
-        raise ValueError("DeepSeek V4.1 prompt cache restoration is not supported")
+        raise ValueError("Restore DeepSeek V4.1 cache through its model support")
+
+    def persistence_state(self):
+        cache = self.cache
+        layers = []
+        for layer in cache.layers:
+            layers.append({
+                "win_kv": layer.win_kv,
+                "comp_kv": layer.comp_kv,
+                "index_k": layer.index_k,
+                "kv_state": layer.comp_state.kv_state if layer.comp_state else None,
+                "score_state": layer.comp_state.score_state if layer.comp_state else None,
+            })
+        return {
+            "kind": "deepseek_v41", "version": 1,
+            "offset": cache.offset, "capacity": cache.max_seq_len,
+            "layers": layers,
+            # Engram history is mutable NumPy data; capture it before decoding resumes.
+            "engram_ids": mx.array(cache.engram_ids.copy()) if cache.engram_ids is not None else None,
+        }
+
+    def restore_persistence_state(self, state):
+        from .deepseek_v41.cache import ModelCache
+
+        if not isinstance(state, dict) or state.get("kind") != "deepseek_v41" or state.get("version") != 1:
+            raise ValueError("Invalid DeepSeek V4.1 prompt cache schema")
+        offset, capacity = state.get("offset"), state.get("capacity")
+        if (type(offset) is not int or type(capacity) is not int
+                or not 0 <= offset <= capacity <= self.cache.args.max_seq_len or capacity < 1):
+            raise ValueError("Invalid DeepSeek V4.1 prompt cache position")
+        saved_layers = state.get("layers")
+        if not isinstance(saved_layers, list) or len(saved_layers) != len(self.cache.layers):
+            raise ValueError("DeepSeek V4.1 prompt cache layer count does not match")
+        first = self.cache.layers[0]
+        restored = ModelCache(self.cache.args, first.win_kv.shape[0], capacity, first.dtype)
+
+        def restore_array(saved, expected):
+            if expected is None:
+                if saved is not None:
+                    raise ValueError("Unexpected DeepSeek V4.1 prompt cache array")
+                return None
+            if not isinstance(saved, mx.array) or saved.shape != expected.shape or saved.dtype != expected.dtype:
+                raise ValueError("DeepSeek V4.1 prompt cache array shape or dtype does not match")
+            return mx.array(saved)
+
+        for layer, saved in zip(restored.layers, saved_layers):
+            if not isinstance(saved, dict) or set(saved) != {"win_kv", "comp_kv", "index_k", "kv_state", "score_state"}:
+                raise ValueError("Invalid DeepSeek V4.1 layer cache")
+            for name in ("win_kv", "comp_kv", "index_k"):
+                setattr(layer, name, restore_array(saved[name], getattr(layer, name)))
+            for name in ("kv_state", "score_state"):
+                expected = getattr(layer.comp_state, name) if layer.comp_state else None
+                value = restore_array(saved[name], expected)
+                if layer.comp_state:
+                    setattr(layer.comp_state, name, value)
+        history = state.get("engram_ids")
+        if restored.engram_ids is None:
+            if history is not None:
+                raise ValueError("Unexpected DeepSeek V4.1 Engram history")
+        else:
+            if not isinstance(history, mx.array) or history.shape != restored.engram_ids.shape or history.dtype != mx.int64:
+                raise ValueError("Invalid DeepSeek V4.1 Engram history")
+            restored.engram_ids = np.array(history, dtype=np.int64, copy=True)
+        restored.offset = offset
+        # Publish only after every field has been checked.
+        self.cache = restored
 
     @property
     def nbytes(self) -> int:
-        return sum(int(array.nbytes) for array in self.state)
+        history = self.cache.engram_ids
+        return sum(int(array.nbytes) for array in self.state) + (history.nbytes if history is not None else 0)
 
     @property
     def is_trimmable(self) -> bool:

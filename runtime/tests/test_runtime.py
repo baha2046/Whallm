@@ -163,6 +163,7 @@ class ModelRuntimeTests(unittest.TestCase):
                 "deepseek_v4_ssd.model_support.deepseek_v41._deepseek_v41_prefill"
             ) as v41_prefill,
             patch("deepseek_v4_ssd.model.layer_major_prefill") as legacy_prefill,
+            patch.object(runtime, "_store_prompt_cache") as store,
         ):
             processed = runtime.warm_prompt("hello")
 
@@ -174,6 +175,8 @@ class ModelRuntimeTests(unittest.TestCase):
             2,
         )
         legacy_prefill.assert_not_called()
+        self.assertEqual(store.call_args.args[0].tokens, [1, 2])
+        self.assertTrue(store.call_args.kwargs["persist"])
 
     def test_prompt_cache_is_isolated_by_approximation_mode(self):
         runtime = ModelRuntime.__new__(ModelRuntime)
