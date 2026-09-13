@@ -1,8 +1,58 @@
-<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>Whallm</title>
+        <item>
+            <title>1.1.7</title>
+            <pubDate>Sun, 13 Sep 2026 18:16:16 +0800</pubDate>
+            <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev</link>
+            <sparkle:channel>dev</sparkle:channel>
+            <sparkle:version>1.1.7d1</sparkle:version>
+            <sparkle:shortVersionString>1.1.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## What's new in 1.1.7-dev
+
+This is a pre-release for testing. Stable update checks will continue to offer official releases only. Select **dev** in **Settings → Updates** to receive development updates.
+
+### App updates and settings
+
+- Added **stable/dev update sources**, backed by a shared, signed Sparkle update feed. The dev source also accepts newer stable releases.
+- Added **Automatically check for updates**, connected directly to Sparkle's saved preference. Turning it off still allows manual update checks.
+- Moved update controls into a dedicated **Updates** section and aligned the source selector with the other controls on the right.
+- Added English, Simplified Chinese, and Traditional Chinese labels for the new settings.
+
+### DeepSeek V4.1 Flash preview
+
+- Added initial text-only support for the pinned DeepSeek V4.1 Flash checkpoint across installation planning, repacking, model discovery, the API catalog, SSD expert/Engram loading, and tool-call parsing.
+- Fixed V4.1 installation dispatch in the command-line repacker.
+- Set the Advanced Settings slot default and recommendation to **1152**. Existing saved slot settings are preserved.
+- The model list now displays the verified planned weight size of **501.38 GB** without fetching an installation plan just to display the size. This is a storage estimate from the repack plan, not measured download traffic.
+
+### Runtime controls
+
+- Added **Off / Memory / Disk** prompt-cache choices where supported, with **Memory** as the default. V4.1 prompt-cache reuse remains disabled.
+- Fixed explicit command-line runtime settings being ignored when starting the server with a model catalog.
+- Added controls for prefetch workers, MoE prefill batch size, and LRU/LFU expert-cache eviction.
+- Added an optional DeepSeek approximation setting, disabled by default, and Qwen automatic sampling, enabled by default, with manual temperature/top-p/top-k controls when automatic sampling is off.
+- Qwen's option to verify up to four tokens together now defaults to **off**. Explicitly saved choices are preserved.
+- Moved **Log Level** to the Logs page.
+- Unified model installation and runtime support around shared model descriptions so the app and bundled runtime use the same model defaults and supported features.
+
+### Validation and known limits
+
+- Development validation passed **403 Python tests** and **77 Swift tests**; three Swift tests were skipped because installed-model fixtures were unavailable.
+- Update-setting tests cover saved source selection, Sparkle preference synchronization, development-build version ordering, and localized labels. The Updates layout and controls were also checked in the app.
+- Packaged checks cover strict code-signature verification, all three localizations, and startup without access to the project's build directory for both the app and an extracted ZIP copy.
+- V4.1 remains experimental: a complete checkpoint installation and full-model generation have not been validated. Vision, MTP/DSpark, prompt-cache reuse, and layer-major prefill are not supported for V4.1 in this release. No V4.1 throughput, memory-use, or output-quality claim is made.
+- Selecting stable after installing a dev build does not downgrade the app. A newer stable build can replace it; build `1.1.7d1` sorts before the future stable `1.1.7` build.
+- This release retains MLX/MLX Metal **0.32.2**. It does not switch the mlx-lm dependency to the planned owned fork, and it does not claim new full-model performance improvements.
+]]></description>
+            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.7-dev/Whallm-macOS-arm64.zip" length="185990175" type="application/octet-stream" sparkle:edSignature="Jx1vZfjpzvn/XYu74K5lYAVcxASJO14MD8uwIVaR7VqlSK9sPVD1eX5iuau8NYwwiruar6tZi8UAQZXvsh0JDA=="/>
+        </item>
         <item>
             <title>1.1.6</title>
             <pubDate>Tue, 08 Sep 2026 09:50:31 +0800</pubDate>
@@ -33,10 +83,11 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 - These are bounded tests on an M2 Max. Confirmation on the issue reporter's M1 Ultra and broader workload coverage remain open. No universal speedup or memory reduction is claimed.
 - Earlier short-block output/state parity and memory measurements used MLX 0.32.1; the complete real-model short-block/MTP and long-context matrix has not been rerun on 0.32.2.
 ]]></description>
-            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.6/Whallm-macOS-arm64.zip" length="185797200" type="application/octet-stream" sparkle:edSignature="EB3tIrMpoe7u7ocBmwvIn3ZUjWlR24+M+Zatcp/RIEQLVDYnmwtbU+yyBvwcuBoXIU6lFcWmlluaUjkPPxuDBA=="></enclosure>
+            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.6/Whallm-macOS-arm64.zip" length="185797200" type="application/octet-stream" sparkle:edSignature="EB3tIrMpoe7u7ocBmwvIn3ZUjWlR24+M+Zatcp/RIEQLVDYnmwtbU+yyBvwcuBoXIU6lFcWmlluaUjkPPxuDBA=="/>
         </item>
     </channel>
-</rss><!-- sparkle-signatures:
-edSignature: NFTbz3+k8iKvcUccNR4s9hB/bgUf+lYzLZUdopYdcp+5IDAbOBHerMEM9CeajtTres4o+/fVU78cY9hHqEU3DA==
-length: 3508
+</rss>
+<!-- sparkle-signatures:
+edSignature: hyFU7jtXGdf172wiHa2ouINDnGxOsdGbF9O4yNEuAYpZEXupBiTQLtaF5DsYtEBLGB5JGwZ+xpMB4nWtpwmTDQ==
+length: 7924
 -->
