@@ -1,5 +1,37 @@
 # 驗證紀錄
 
+## 2026-09-13：Whallm 1.1.7-dev 預發布
+
+已發布 [v1.1.7-dev](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev)，
+Release 名稱 `Whallm 1.1.7-dev`，標記為 pre-release；最新正式版仍為 `v1.1.6`。
+Tag 對應 `32de5c8c33d76b36f4c2a0be7d2e9120e576a63d`；App 版本 `1.1.7`、
+內部 build `1.1.7d1`，Sparkle channel `dev`。
+
+- Python 403 項、Swift 77 項通過；Swift 3 項缺少 installed-model fixture 略過。
+  三種模型描述檢查及 CLI 四項離線安裝分派檢查通過。
+- `build local` 先以 ad-hoc 簽章完成，App／ZIP 的簽章、三語系隔離啟動及包內
+  模型描述檢查通過；再以 Developer ID 簽章並透過 `deepseek_ssd` 完成 Apple 公證。
+- 公證 submission `c3749b71-661f-4808-855f-ab410d0b7692` 為 Accepted。
+  上傳前及 GitHub 重新下載後，App／ZIP 解壓副本均通過嚴格簽章、公證票據、
+  Gatekeeper、三語系檔案與禁止讀取專案 `.build`／Swift resource bundle 的啟動檢查。
+- Release commit、乾淨工作目錄、本機 tag 與遠端 tag 在打包前和上傳前核對一致；
+  GitHub Release 使用 `--verify-tag --prerelease --latest=false` 建立。
+- GitHub Release body、Sparkle 內嵌 Markdown 與
+  `Packaging/ReleaseNotes/1.1.7.md` 英文內容相同。
+- `gh-pages` commit `d34e08a` 已部署，公開 appcast 與 Release 附件逐位元相同且
+  Sparkle 簽章有效；保留 stable 1.1.6 與 dev 1.1.7d1。
+- 使用獨立 bundle ID、版本設為 1.1.6 的 App 副本實測：stable 顯示已是最新版，
+  dev 找到 1.1.7 更新並顯示完整英文 release notes；未執行 Sparkle 原地安裝。
+  未修改已安裝 App 的來源選擇，驗證副本已關閉。
+- 未重跑完整模型生成或效能量測；V4.1 完整安裝與生成仍未驗證。
+
+SHA-256：
+
+- `Whallm-macOS-arm64.zip`：`78a0f7fbca928e3dd4c8111705c612f55479fd8bfafc3ca66200637e4610bd6c`
+- `appcast.xml`：`ddb9a03cdbdea05dead56a9bc7da1fb0a0786df7f7075e6715123384f994e72a`
+
+原始測試、公證／發布記錄、下載副本與核對摘要位於 `scratch/release-1.1.7-dev/`。
+
 ## 2026-09-13：Updates 區塊與靠右對齊
 
 - Settings 將更新設定移至獨立 Updates 區塊；stable／dev 的固定寬度容器改為靠右對齊。

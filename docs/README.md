@@ -1,6 +1,9 @@
 # Whallm 文件
 
-正在準備 `v1.1.7-dev` 預發布版本，包含下列本機變更。
+已發布 [Whallm 1.1.7-dev](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev)，
+對應 commit `32de5c8`，包含下列變更。GitHub 下載成品的簽章、公證與三語隔離啟動
+均通過；stable 保持 1.1.6，dev 可找到本次更新。`dist` 為本次已公證成品。
+詳見 [發布驗證](VALIDATION.md#2026-09-13whallm-117-dev-預發布)。
 英文變更說明見 [1.1.7-dev release notes](../Packaging/ReleaseNotes/1.1.7.md)。
 App 更新來源與自動檢查設定見 [App 更新](UPDATES.md)。
 
@@ -16,7 +19,7 @@ Whallm 的舊名稱是 DeepSeekV4SSD。
 App 可選不使用／記憶體／磁碟。Log Level 移至 Log 頁面，Qwen 四 token 合批預設關閉。
 完整入口差異見 [命令列與 UI 功能對照](FEATURE_MATRIX.md)，本次驗證見
 [快取設定與介面驗證](VALIDATION.md#2026-09-12快取模式與設定介面)。
-這些修改已於 2026-09-13 完成本機封裝與 App／ZIP 驗證，尚未發布；
+這些修改已於 2026-09-13 完成本機封裝與 App／ZIP 驗證，並納入 1.1.7-dev；
 詳見 [本機封裝驗證](VALIDATION.md#2026-09-13build-local)。以下舊封裝與 release 紀錄保留當時範圍。
 
 已決定自行維護官方 mlx-lm fork；自有 repo 與本機相容分支已準備，
@@ -24,14 +27,14 @@ App 可選不使用／記憶體／磁碟。Log Level 移至 Log 頁面，Qwen �
 見 [fork 狀態](MLX_LM_FORK.md)。使用者已選定模型支援套件：三種模型的安裝、
 載入、Prefill、狀態與對話格式已接到共用入口，App／Python 使用同一份模型描述。
 目前結構與接入方式見 [模型支援套件](MODEL_PACKAGES.md)。
-目前 working tree 新增固定 revision 的 `DeepSeek-V4.1-Flash` text-only 支援：
+1.1.7-dev 新增固定 revision 的 `DeepSeek-V4.1-Flash` text-only 支援：
 Swift repack、manifest format 3、MLX `deepseek_v41` runtime、SSD expert／Engram
 查找、V4.1 DSML tool parser、App 模型管理與 API model ID 已接入。
 完整 checkpoint 安裝與 full-model generation 尚未執行，因此沒有 V4.1 記憶體或效能結論。
 PR #10 本機修正已補齊 CLI V4.1 安裝分派，並修正 Swift 測試編譯錯誤；
 Swift 68 項通過、3 項 fixture 略過、1 項 Keychain 測試排除，CLI 四項離線檢查通過。
 詳見 [本機修正驗證](VALIDATION.md#2026-09-12pr-10-本機修正與驗證)。
-目前 `dist` 已更新為包含上述修正的 1.1.6 本機封裝：App 與 ZIP 解壓副本的
+2026-09-12 曾建立包含上述修正的 1.1.6 本機封裝（歷史紀錄）：App 與 ZIP 解壓副本的
 簽章、三語系隔離啟動皆通過，包內 V4.1 10 項測試通過；未公證或發布。
 詳見 [本機封裝驗證](VALIDATION.md#2026-09-12pr-10-修正版本-build-local)。
 已發布 [Whallm 1.1.6](https://github.com/yanun0323/Whallm/releases/tag/v1.1.6)，
