@@ -22,6 +22,8 @@ from .io_metrics import (
     configure_expert_file_cache_policy,
     page_cache_residency_snapshot,
 )
+from .expert_layout import _fused_slot_regions, _qwen_slot_regions
+from .model_support import support_for_installed
 from .manifest import InstalledModel, Tensor
 
 
@@ -426,81 +428,6 @@ class _ReadLimiter:
             return count
 
 
-def _fused_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
-    source = {region.name: region for region in model.expert_regions}
-    required = {
-        "w1.weight",
-        "w1.scale",
-        "w2.weight",
-        "w2.scale",
-        "w3.weight",
-        "w3.scale",
-    }
-    if set(source) != required:
-        raise ValueError("expert blob does not contain the required regions")
-    w1 = source["w1.weight"]
-    w3 = source["w3.weight"]
-    w1_scale = source["w1.scale"]
-    w3_scale = source["w3.scale"]
-    if w1.dtype != w3.dtype or w1.shape[1:] != w3.shape[1:]:
-        raise ValueError("w1 and w3 weights cannot use one fused projection")
-    if w1_scale.dtype != w3_scale.dtype or w1_scale.shape[1:] != w3_scale.shape[1:]:
-        raise ValueError("w1 and w3 scales cannot use one fused projection")
-
-    regions = {}
-    offset = 0
-
-    def add(name: str, template: Tensor) -> None:
-        nonlocal offset
-        regions[name] = Tensor(
-            name,
-            template.dtype,
-            template.shape,
-            offset,
-            template.length,
-        )
-        offset += template.length
-
-    add("w3.weight", w3)
-    add("w1.weight", w1)
-    regions["w13.weight"] = Tensor(
-        "w13.weight",
-        w3.dtype,
-        (w3.shape[0] + w1.shape[0], *w3.shape[1:]),
-        0,
-        w3.length + w1.length,
-    )
-    add("w2.weight", source["w2.weight"])
-    scale_offset = offset
-    add("w3.scale", w3_scale)
-    add("w1.scale", w1_scale)
-    regions["w13.scale"] = Tensor(
-        "w13.scale",
-        w3_scale.dtype,
-        (w3_scale.shape[0] + w1_scale.shape[0], *w3_scale.shape[1:]),
-        scale_offset,
-        w3_scale.length + w1_scale.length,
-    )
-    add("w2.scale", source["w2.scale"])
-    if offset != model.expert_blob_size:
-        raise ValueError("fused expert slot size does not match the manifest")
-    return regions
-
-
-def _qwen_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
-    regions = {region.name: region for region in model.expert_regions}
-    if set(regions) != {
-        "gate_up.weight",
-        "gate_up.scale",
-        "down.weight",
-        "down.scale",
-    }:
-        raise ValueError("Qwen expert blob does not contain the required regions")
-    if sum(region.length for region in regions.values()) != model.expert_blob_size:
-        raise ValueError("Qwen expert slot size does not match the manifest")
-    return regions
-
-
 def _staged_slot_regions(
     model: InstalledModel,
 ) -> tuple[dict[str, Tensor], dict[str, Tensor]]:
@@ -561,9 +488,8 @@ class _SlotPool:
         self._source_regions = {
             region.name: region for region in model.expert_regions
         }
-        self._regions = (
-            _qwen_slot_regions(model) if model.is_qwen else _fused_slot_regions(model)
-        )
+        self._layout = support_for_installed(model).expert_layout
+        self._regions = self._layout.regions(model)
         self._slots: list[mx.array | None] = [None] * slots
         self._views: list[memoryview | None] = [None] * slots
         self._loaded = bytearray(slots)
@@ -589,29 +515,7 @@ class _SlotPool:
             if not self._loaded[slot] or array is None:
                 raise RuntimeError("expert slot is empty")
             arrays.append(array)
-        if self._model.is_qwen:
-            return tuple(
-                QwenExpertWeights(
-                    gate_up=self._array(array, "gate_up.weight"),
-                    gate_up_scales=self._array(array, "gate_up.scale"),
-                    down=self._array(array, "down.weight"),
-                    down_scales=self._array(array, "down.scale"),
-                )
-                for array in arrays
-            )
-        return tuple(
-            ExpertWeights(
-                w1=self._array(array, "w1.weight"),
-                w1_scales=self._array(array, "w1.scale"),
-                w2=self._array(array, "w2.weight"),
-                w2_scales=self._array(array, "w2.scale"),
-                w3=self._array(array, "w3.weight"),
-                w3_scales=self._array(array, "w3.scale"),
-                w13=self._array(array, "w13.weight"),
-                w13_scales=self._array(array, "w13.scale"),
-            )
-            for array in arrays
-        )
+        return self._layout.individual(arrays, self._array)
 
     def _array(self, packed: mx.array, name: str) -> mx.array:
         region = self._regions[name]
@@ -661,23 +565,7 @@ class _SlotPool:
         self._loaded[slot] = 0
 
     def batched(self, packed: mx.array) -> BatchedExperts:
-        if self._model.is_qwen:
-            return QwenBatchedExperts(
-                gate_up=self._batched_array(packed, "gate_up.weight"),
-                gate_up_scales=self._batched_array(packed, "gate_up.scale"),
-                down=self._batched_array(packed, "down.weight"),
-                down_scales=self._batched_array(packed, "down.scale"),
-            )
-        return BatchedExperts(
-            w1=self._batched_array(packed, "w1.weight"),
-            w1_scales=self._batched_array(packed, "w1.scale"),
-            w2=self._batched_array(packed, "w2.weight"),
-            w2_scales=self._batched_array(packed, "w2.scale"),
-            w3=self._batched_array(packed, "w3.weight"),
-            w3_scales=self._batched_array(packed, "w3.scale"),
-            w13=self._batched_array(packed, "w13.weight"),
-            w13_scales=self._batched_array(packed, "w13.scale"),
-        )
+        return self._layout.batched(packed, self._batched_array)
 
     def _batched_array(self, packed: mx.array, name: str) -> mx.array:
         region = self._regions[name]
@@ -727,7 +615,8 @@ class _StagedSlotPool(_SlotPool):
         self._source_regions = {
             region.name: region for region in model.expert_regions
         }
-        self._regions = _fused_slot_regions(model)
+        self._layout = support_for_installed(model).expert_layout
+        self._regions = self._layout.regions(model)
         self._w13_regions, self._w2_regions = _staged_slot_regions(model)
         self._w13_size = sum(
             region.length
@@ -840,7 +729,7 @@ class _QwenArenaSlotPool(_SlotPool):
     PAGE_SLOTS = 1024
 
     def __init__(self, model: InstalledModel, slots: int) -> None:
-        if not model.is_qwen or model.expert_blob_size % 4:
+        if not support_for_installed(model).descriptor.supports("groupedDecode") or model.expert_blob_size % 4:
             raise ValueError("Qwen arena requires aligned Qwen expert blobs")
         super().__init__(model, slots)
         self.page_slots = min(self.PAGE_SLOTS, (2**31 - 1) // (model.expert_blob_size // 4))
@@ -934,7 +823,7 @@ class ExpertCache:
         eviction_policy: str = "lfu",
         qwen_short_block: bool = False,
     ) -> None:
-        if qwen_grouped_decode and (not installed_model.is_qwen or staged_expert_streaming):
+        if qwen_grouped_decode and (not support_for_installed(installed_model).descriptor.supports("groupedDecode") or staged_expert_streaming):
             raise ValueError("grouped Decode requires Qwen without staged streaming")
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
@@ -984,7 +873,7 @@ class ExpertCache:
         self.qwen_short_block_reason = "disabled"
         if qwen_short_block:
             self.qwen_short_block_reason = "unsupported cache layout or mode"
-            if (installed_model.is_qwen and slots >= 4 * installed_model.selected_expert_count
+            if (support_for_installed(installed_model).descriptor.supports("shortBlock") and slots >= 4 * installed_model.selected_expert_count
                     and not staged_expert_streaming and not qwen_grouped_decode):
                 from .qwen_resident_block import BoundedArenaPool
                 try:

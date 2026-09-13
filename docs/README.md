@@ -1,20 +1,46 @@
 # Whallm 文件
 
+正在準備 `v1.1.7-dev` 預發布版本，包含下列本機變更。
+英文變更說明見 [1.1.7-dev release notes](../Packaging/ReleaseNotes/1.1.7.md)。
+App 更新來源與自動檢查設定見 [App 更新](UPDATES.md)。
+
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-11。
+最後核對日期是 2026-09-13。
+
+模型進階設定新增 DeepSeek 近似模式（預設關閉）、Qwen 自動取樣（預設開啟，
+關閉後可使用手動 T／P／K）、預讀工作數、MoE 輸入分批大小及 LRU／LFU 選單。
+見 [功能對照](FEATURE_MATRIX.md) 與 [驗證紀錄](VALIDATION.md)。
+本機工作目錄已修正 catalog 模式忽略 CLI 設定的問題；Prompt cache 預設改為記憶體，
+App 可選不使用／記憶體／磁碟。Log Level 移至 Log 頁面，Qwen 四 token 合批預設關閉。
+完整入口差異見 [命令列與 UI 功能對照](FEATURE_MATRIX.md)，本次驗證見
+[快取設定與介面驗證](VALIDATION.md#2026-09-12快取模式與設定介面)。
+這些修改已於 2026-09-13 完成本機封裝與 App／ZIP 驗證，尚未發布；
+詳見 [本機封裝驗證](VALIDATION.md#2026-09-13build-local)。以下舊封裝與 release 紀錄保留當時範圍。
+
+已決定自行維護官方 mlx-lm fork；自有 repo 與本機相容分支已準備，
+389 項 runtime 測試及 1 項 V4 小模型測試通過，dependency 尚未切換。
+見 [fork 狀態](MLX_LM_FORK.md)。使用者已選定模型支援套件：三種模型的安裝、
+載入、Prefill、狀態與對話格式已接到共用入口，App／Python 使用同一份模型描述。
+目前結構與接入方式見 [模型支援套件](MODEL_PACKAGES.md)。
 目前 working tree 新增固定 revision 的 `DeepSeek-V4.1-Flash` text-only 支援：
 Swift repack、manifest format 3、MLX `deepseek_v41` runtime、SSD expert／Engram
 查找、V4.1 DSML tool parser、App 模型管理與 API model ID 已接入。
 完整 checkpoint 安裝與 full-model generation 尚未執行，因此沒有 V4.1 記憶體或效能結論。
+PR #10 本機修正已補齊 CLI V4.1 安裝分派，並修正 Swift 測試編譯錯誤；
+Swift 68 項通過、3 項 fixture 略過、1 項 Keychain 測試排除，CLI 四項離線檢查通過。
+詳見 [本機修正驗證](VALIDATION.md#2026-09-12pr-10-本機修正與驗證)。
+目前 `dist` 已更新為包含上述修正的 1.1.6 本機封裝：App 與 ZIP 解壓副本的
+簽章、三語系隔離啟動皆通過，包內 V4.1 10 項測試通過；未公證或發布。
+詳見 [本機封裝驗證](VALIDATION.md#2026-09-12pr-10-修正版本-build-local)。
 已發布 [Whallm 1.1.6](https://github.com/yanun0323/Whallm/releases/tag/v1.1.6)，
 標籤對應 `195420b`，已包含 `origin/codex/ssd-prefill-pipeline`（`8e69efb`）與六個缺漏研究來源檔。
 本次 Python 375 項、Swift 66 項及包內 Python 371 項通過；排除範圍見 [驗證紀錄](VALIDATION.md)。
 GitHub 下載 ZIP 的簽章、公證與三語隔離啟動均通過，release notes 與分支原稿一致。
-目前 `dist` 為 1.1.6 正式成品；以下較早的本機封裝紀錄均為歷史驗證。
-依使用者要求，Model Advanced Settings 已加入預設開啟的 LRU 快取，以及 Qwen
-最多四字詞合批確認；舊偏好自動遷移，手動關閉值保留，下次載入模型時生效。
+該次 `dist` 為 1.1.6 正式成品；目前本機封裝見本頁開頭，以下較早紀錄均為歷史驗證。
+Model Advanced Settings 提供預設開啟的 LRU 快取，以及預設關閉的 Qwen
+最多四字詞合批確認；舊偏好缺欄位時採用目前預設，明確儲存值保留，下次載入模型時生效。
 合批已接入聊天生成，使用已知文字提出候選及主模型抽樣；不支援的模式、太大的 state
 或沒有候選時使用逐字計算。狀態位元複製修正始終生效。
 4096 slots 的實際開關配對，生成文字、完整 state 及後續對話快取一致，最終額外 MLX
@@ -260,8 +286,8 @@ Aggregate Decode logical expert bytes 減少 15.14%。
 Decode throughput change 中位數是 +8.37%。
 五個 workload 的 Decode p95 change 中位數都沒有 regression。
 2026-09-01 後續使用者決定把 candidate 設為一般 DeepSeek request 的預設模式。
-API、CLI 和 APP request 未指定 mode 時會使用 `learned-route-drop-lowest-1`。
-Client 可以明確指定 `exact`。
+這是當時的預設；2026-09-13 起 API、CLI 和 App 改為預設 Exact。
+App 可開啟近似模式，API／CLI 也可明確指定 `learned-route-drop-lowest-1`。
 Qwen 和啟用 DSpark 的 DeepSeek 維持 exact。
 研究合約位於
 [`research/APPROXIMATE_MODE_2026-09-01.md`](../research/APPROXIMATE_MODE_2026-09-01.md)。

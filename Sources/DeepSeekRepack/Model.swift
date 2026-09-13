@@ -1,14 +1,39 @@
 import Foundation
 
-struct CompanionFile: Sendable {
+public struct CompanionFile: Sendable {
   let source: String
   let destination: String
 }
 
-public enum ModelKind: String, Codable, Equatable, Sendable {
-  case deepSeekV4 = "deepseek-v4"
-  case deepSeekV41 = "deepseek-v4.1"
-  case qwen3_8FlashNext = "qwen3.8-flash-next"
+public struct ModelKind: RawRepresentable, Codable, Hashable, Sendable {
+  public let rawValue: String
+
+  public init?(rawValue: String) {
+    guard ModelPackages.descriptors.contains(where: { $0.kind == rawValue }) else { return nil }
+    self.rawValue = rawValue
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let value = try container.decode(String.self)
+    guard let kind = Self(rawValue: value) else {
+      throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unknown model kind")
+    }
+    self = kind
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(rawValue)
+  }
+
+  public var descriptor: ModelPackageDescriptor {
+    ModelPackages.descriptors.first(where: { $0.kind == rawValue })!
+  }
+
+  public static let deepSeekV4 = Self(rawValue: "deepseek-v4")!
+  public static let deepSeekV41 = Self(rawValue: "deepseek-v4.1")!
+  public static let qwen3_8FlashNext = Self(rawValue: "qwen3.8-flash-next")!
 }
 
 enum ModelContract {

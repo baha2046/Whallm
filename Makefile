@@ -41,7 +41,7 @@ package:
 ane-bridge:
 	./Scripts/build-ane-bridge.sh
 
-## release: sign, notarize, and publish a Sparkle update to GitHub Releases
+## release: publish a signed update (CHANNEL=stable or dev, DEV_BUILD=1)
 release:
 	./Scripts/release.sh
 

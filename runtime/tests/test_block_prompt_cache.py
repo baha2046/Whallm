@@ -201,7 +201,7 @@ class BlockPromptCacheTests(unittest.TestCase):
                     return_value=tokenizer,
                 ),
                 patch(
-                    "deepseek_v4_ssd.generation.make_prompt_cache",
+                    "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                     side_effect=lambda _model: [_FixtureCache()],
                 ),
                 patch(

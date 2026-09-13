@@ -4,7 +4,7 @@ import SwiftUI
 
 struct ContentView: View {
   @ObservedObject var server: ServerController
-  let checkForUpdates: () -> Void
+  @ObservedObject var appUpdater: AppUpdater
   @StateObject private var modelLibrary = ModelLibrary()
   @StateObject private var chatSession = ChatSession()
   // SwiftUI can reconstruct this value repeatedly; defer credential access to .task.
@@ -164,12 +164,12 @@ struct ContentView: View {
         clearHistory: server.clearPerformanceHistory
       )
     case .logs:
-      LogsView(server: server, language: selectedLanguage)
+      LogsView(server: server, configuration: $configuration, language: selectedLanguage)
     case .settings:
       SettingsView(
         languageCode: $languageCode,
         language: selectedLanguage,
-        checkForUpdates: checkForUpdates
+        appUpdater: appUpdater
       )
     }
   }
@@ -690,28 +690,6 @@ private struct ServerView: View {
       Divider()
 
       SettingRow(
-        "Log level",
-        hint:
-          "Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content.",
-        language: language
-      ) {
-        Picker(
-          L10n.string("Log level", language: language),
-          selection: $configuration.logLevel
-        ) {
-          ForEach(ServerLogLevel.allCases) { level in
-            Text(L10n.string(level.localizationKey, language: language)).tag(level)
-          }
-        }
-        .labelsHidden()
-        .pickerStyle(.segmented)
-        .frame(width: 240, alignment: .trailing)
-      }
-      .disabled(server.isActive)
-
-      Divider()
-
-      SettingRow(
         "API key",
         hint: "Optional for local use",
         language: language
@@ -792,7 +770,7 @@ private struct ServerView: View {
             modelLibrary.startVerification(selectedModel)
           }
           .disabled(server.isActive || modelLibrary.isBusy)
-          if selectedModel.modelKind == .deepSeekV4, !selectedModel.hasDSpark {
+          if selectedModel.modelKind.descriptor.supports("dspark"), !selectedModel.hasDSpark {
             Button(L10n.string("Install DSpark (10.12 GiB)")) {
               modelLibrary.startDSparkInstallation(selectedModel)
             }
@@ -1525,7 +1503,7 @@ func shouldShowModelDownloadReason(
 }
 
 func shouldShowMTPDownloadButton(_ model: InstalledModelInfo?) -> Bool {
-  model?.modelKind == .qwen3_8FlashNext && model?.hasMTP == false
+  model?.modelKind.descriptor.supports("mtp") == true && model?.hasMTP == false
 }
 
 func modelAdvancedSettingsAreLocked(
@@ -1727,25 +1705,45 @@ private struct ModelAdvancedView: View {
             hint: "Default token limit for each request.",
             value: $settings.defaultMaxTokens
           )
-          if modelKind == .deepSeekV4 {
+          if modelKind.descriptor.supports("adaptiveSampling") {
             Divider()
-            doubleField(
-              "Temperature",
-              hint: "A higher value increases output variation.",
-              value: $settings.defaultTemperature
+            toggleField(
+              "Use adaptive sampling",
+              hint: "Chooses sampling values for chat or thinking. Turn off to use the values below.",
+              value: qwenAdaptiveSampling
             )
+          }
+          if modelKind.descriptor.editableSettings.contains("sampling") {
+            Group {
+              Divider()
+              doubleField(
+                "Temperature",
+                hint: "A higher value increases output variation.",
+                value: $settings.defaultTemperature
+              )
+              Divider()
+              doubleField(
+                "Top P",
+                hint: "A lower value reduces the candidate token range.",
+                value: $settings.defaultTopP
+              )
+              Divider()
+              integerField(
+                "Top K",
+                hint: "0 disables Top K.",
+                value: $settings.defaultTopK
+              )
+            }
+            .disabled(modelKind.descriptor.supports("adaptiveSampling") && qwenAdaptiveSampling.wrappedValue)
+          }
+          if modelKind.descriptor.supports("approximation") {
             Divider()
-            doubleField(
-              "Top P",
-              hint: "A lower value reduces the candidate token range.",
-              value: $settings.defaultTopP
+            toggleField(
+              "Use approximate mode",
+              hint: "Off uses Exact mode. Approximate mode is not used with DSpark.",
+              value: approximationEnabled
             )
-            Divider()
-            integerField(
-              "Top K",
-              hint: "0 disables Top K.",
-              value: $settings.defaultTopK
-            )
+            .disabled(settings.dsparkEnabled)
           }
         }
         .appCard()
@@ -1756,23 +1754,37 @@ private struct ModelAdvancedView: View {
         VStack(spacing: 0) {
           integerField(
             "Slots",
-            hint: modelKind == .qwen3_8FlashNext
-              ? "Number of routed experts in the Active Parameters Cache. The recommended value is 4096."
-              : "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.",
+            hint: L10n.string(
+              "Number of routed experts in the Active Parameters Cache. The recommended value is %lld.",
+              language: language, Int64(modelKind.descriptor.defaults.slots)),
             value: $settings.slots
           )
           Divider()
-          toggleField(
-            "Keep recently used experts",
-            hint: "Keeps recently used expert data in the same cache capacity. Changes apply on next load.",
-            value: recentExpertCache
-          )
+          SettingRow(
+            "Expert cache eviction",
+            hint: "LRU keeps recently used experts. LFU keeps frequently used experts.",
+            language: language
+          ) {
+            Picker(L10n.string("Expert cache eviction", language: language), selection: expertEvictionPolicy) {
+              Text(L10n.string("LRU (recently used)", language: language)).tag("lru")
+              Text(L10n.string("LFU (frequently used)", language: language)).tag("lfu")
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .frame(width: 240)
+          }
           Divider()
           integerField(
             "Read workers",
             hint:
               "Number of workers that read expert blobs at the same time. The recommended value is 4.",
             value: $settings.readWorkers
+          )
+          Divider()
+          integerField(
+            "Prefetch read workers",
+            hint: "Number of workers that read expert data ahead of time. The default is 2.",
+            value: prefetchReadWorkers
           )
           Divider()
           integerField(
@@ -1786,7 +1798,13 @@ private struct ModelAdvancedView: View {
             hint: "0 selects 128, 256, or 1024 based on the prompt length.",
             value: $settings.prefillStepSize
           )
-          if modelKind == .qwen3_8FlashNext {
+          Divider()
+          integerField(
+            "MoE prefill step size",
+            hint: "Number of input tokens processed together by MoE. 0 selects automatically.",
+            value: moePrefillStepSize
+          )
+          if modelKind.descriptor.supports("anePrefill") {
             Divider()
             doubleField(
               "ANE Prefill share",
@@ -1795,7 +1813,7 @@ private struct ModelAdvancedView: View {
               value: anePrefillRatio
             )
           }
-          if modelKind != .deepSeekV41 {
+          if modelKind.descriptor.supports("layerMajorPrefill") {
             Divider()
             toggleField(
               "Use layer-major prefill",
@@ -1803,13 +1821,15 @@ private struct ModelAdvancedView: View {
               value: $settings.layerMajorPrefill
             )
           }
-          if modelKind == .qwen3_8FlashNext {
+          if modelKind.descriptor.supports("shortBlock") {
             Divider()
             toggleField(
               "Verify up to four tokens together",
               hint: "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.",
               value: qwenShortBlock
             )
+          }
+          if modelKind.descriptor.supports("groupedExperts") {
             Divider()
             toggleField(
               "Prefill acceleration",
@@ -1819,7 +1839,7 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!settings.layerMajorPrefill || mtpEnabled.wrappedValue)
           }
-          if modelKind == .deepSeekV4 {
+          if modelKind.descriptor.editableSettings.contains("prefillThreshold") {
             Divider()
             integerField(
               "Layer-major prefill threshold",
@@ -1829,19 +1849,36 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!settings.layerMajorPrefill)
           }
-          if modelKind != .deepSeekV41 {
+          if modelKind.descriptor.supports("promptCache") {
             Divider()
-            integerField(
-              "Prompt cache entries",
-              hint: "Number of linear conversations to keep. The recommended value is 2.",
-              value: $settings.promptCacheEntries
-            )
-            Divider()
-            integerField(
-              "Prompt cache GiB",
-              hint: "Memory limit for all prompt caches. The recommended value is 8.",
-              value: $settings.promptCacheMemoryGiB
-            )
+            SettingRow(
+              "Prompt cache",
+              hint: "Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again.",
+              language: language
+            ) {
+              Picker(L10n.string("Prompt cache", language: language), selection: promptCacheMode) {
+                ForEach(PromptCacheMode.allCases) { mode in
+                  Text(L10n.string(mode.localizationKey, language: language)).tag(mode)
+                }
+              }
+              .labelsHidden()
+              .pickerStyle(.segmented)
+              .frame(width: 260)
+            }
+            if promptCacheMode.wrappedValue != .off {
+              Divider()
+              integerField(
+                "Prompt cache entries",
+                hint: "Number of linear conversations to keep. The recommended value is 2.",
+                value: $settings.promptCacheEntries
+              )
+              Divider()
+              integerField(
+                "Prompt cache GiB",
+                hint: "Memory limit for all prompt caches. The recommended value is 8.",
+                value: $settings.promptCacheMemoryGiB
+              )
+            }
           }
           Divider()
           SettingRow(
@@ -1855,7 +1892,7 @@ private struct ModelAdvancedView: View {
             )
             .appInput(width: 340)
           }
-          if modelKind == .qwen3_8FlashNext {
+          if modelKind.descriptor.supports("mtp") {
             Divider()
             toggleField(
               "Use MTP",
@@ -1874,13 +1911,15 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
           }
-          if modelKind == .deepSeekV4 {
+          if modelKind.descriptor.editableSettings.contains("kvCachePrecision") {
             Divider()
             toggleField(
               "Use BF16 KV cache",
               hint: "Stores the KV cache in BF16 format.",
               value: $settings.bf16KVCache
             )
+          }
+          if modelKind.descriptor.supports("dspark") {
             Divider()
             toggleField(
               "Use DSpark",
@@ -1932,16 +1971,38 @@ private struct ModelAdvancedView: View {
     )
   }
 
-  private var recentExpertCache: Binding<Bool> {
+
+  private var prefetchReadWorkers: Binding<Int> {
+    Binding(get: { settings.prefetchReadWorkers ?? 2 }, set: { settings.prefetchReadWorkers = $0 })
+  }
+
+  private var moePrefillStepSize: Binding<Int> {
+    Binding(get: { settings.moePrefillStepSize ?? 0 }, set: { settings.moePrefillStepSize = $0 })
+  }
+
+  private var approximationEnabled: Binding<Bool> {
+    Binding(get: { settings.approximationEnabled ?? false }, set: { settings.approximationEnabled = $0 })
+  }
+
+  private var qwenAdaptiveSampling: Binding<Bool> {
+    Binding(get: { settings.qwenAdaptiveSampling ?? true }, set: { settings.qwenAdaptiveSampling = $0 })
+  }
+
+  private var expertEvictionPolicy: Binding<String> {
+    Binding(get: { settings.recentExpertCache ?? true ? "lru" : "lfu" },
+            set: { settings.recentExpertCache = $0 == "lru" })
+  }
+
+  private var promptCacheMode: Binding<PromptCacheMode> {
     Binding(
-      get: { settings.recentExpertCache ?? true },
-      set: { settings.recentExpertCache = $0 }
+      get: { settings.promptCacheMode ?? .memory },
+      set: { settings.promptCacheMode = $0 }
     )
   }
 
   private var qwenShortBlock: Binding<Bool> {
     Binding(
-      get: { settings.qwenShortBlock ?? true },
+      get: { settings.qwenShortBlock ?? false },
       set: { settings.qwenShortBlock = $0 }
     )
   }
@@ -2011,10 +2072,31 @@ func powerSavingLegendFrame(index: Int, count: Int, totalWidth: CGFloat) -> CGRe
 
 private struct LogsView: View {
   @ObservedObject var server: ServerController
+  @Binding var configuration: ServerConfiguration
   let language: AppLanguage
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
+      SettingRow(
+        "Log level",
+        hint:
+          "Applies the next time the server starts. Debug logs the full JSON body of every request and may contain sensitive content.",
+        language: language
+      ) {
+        Picker(
+          L10n.string("Log level", language: language),
+          selection: $configuration.logLevel
+        ) {
+          ForEach(ServerLogLevel.allCases) { level in
+            Text(L10n.string(level.localizationKey, language: language)).tag(level)
+          }
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 240, alignment: .trailing)
+      }
+      .disabled(server.isActive)
+
       SectionHeader(title: L10n.string("Server log", language: language))
       ScrollView {
         Text(
@@ -2044,7 +2126,7 @@ private struct LogsView: View {
 private struct SettingsView: View {
   @Binding var languageCode: String
   let language: AppLanguage
-  let checkForUpdates: () -> Void
+  @ObservedObject var appUpdater: AppUpdater
 
   var body: some View {
     ScrollView {
@@ -2096,19 +2178,58 @@ private struct SettingsView: View {
             .frame(minWidth: 180, alignment: .trailing)
           }
 
-          Divider()
+        }
+        .appCard()
 
+        SectionHeader(title: L10n.string("Updates", language: language))
+          .padding(.top, 12)
+
+        VStack(alignment: .leading, spacing: 0) {
           SettingRow(
             "Software Updates",
             hint: "Check GitHub Releases for a newer app version.",
             language: language
           ) {
-            Button(action: checkForUpdates) {
+            Button(action: appUpdater.checkForUpdates) {
               Label(
                 L10n.string("Check for Updates…", language: language),
                 systemImage: "arrow.clockwise"
               )
             }
+            .disabled(!appUpdater.canCheckForUpdates)
+          }
+
+          Divider()
+          SettingRow(
+            "Update source",
+            hint: "Stable includes official releases. Dev also includes test versions.",
+            language: language
+          ) {
+            Picker(L10n.string("Update source", language: language), selection: $appUpdater.channel) {
+              ForEach(UpdateChannel.allCases) { channel in
+                Text(channel.rawValue).tag(channel)
+              }
+            }
+            .labelsHidden()
+            .pickerStyle(.segmented)
+            .frame(width: 220, alignment: .trailing)
+            .disabled(!appUpdater.canCheckForUpdates)
+          }
+
+          Divider()
+          SettingRow(
+            "Automatically check for updates",
+            hint: "Check for new versions in the background.",
+            language: language
+          ) {
+            Toggle(
+              L10n.string("Automatically check for updates", language: language),
+              isOn: Binding(
+                get: { appUpdater.automaticallyChecksForUpdates },
+                set: { appUpdater.setAutomaticallyChecksForUpdates($0) })
+            )
+            .labelsHidden()
+            .toggleStyle(.switch)
           }
         }
         .appCard()

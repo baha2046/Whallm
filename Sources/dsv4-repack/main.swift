@@ -38,24 +38,15 @@ struct CLI {
       let printer = ProgressPrinter()
       let outputURL = URL(fileURLWithPath: output)
       let progress: @Sendable (RepackProgress) -> Void = { printer.update($0) }
-      let manifest: InstalledManifest
+      let plan: RepackPlan
       if let planPath = optionalValue(after: "--plan", in: arguments) {
         let data = try Data(contentsOf: URL(fileURLWithPath: planPath))
-        let plan = try JSONDecoder().decode(RepackPlan.self, from: data)
-        if plan.modelKind == .qwen3_8FlashNext {
-          manifest = try await QwenFlashNextCheckpoint().repack(
-            plan: plan, to: outputURL, progress: progress)
-        } else {
-          manifest = try await DeepSeekV4Checkpoint().repack(
-            plan: plan, to: outputURL, progress: progress)
-        }
-      } else if try modelSelection(in: arguments) == .qwen3_8FlashNext {
-        manifest = try await QwenFlashNextCheckpoint().repack(
-          to: outputURL, progress: progress)
+        plan = try JSONDecoder().decode(RepackPlan.self, from: data)
       } else {
-        manifest = try await DeepSeekV4Checkpoint().repack(
-          to: outputURL, progress: progress)
+        plan = try await makePlan(model: modelSelection(in: arguments))
       }
+      let manifest = try await ModelPackages.package(for: plan.modelKind ?? .deepSeekV4)
+        .repack(plan: plan, to: outputURL, progress: progress)
       print("installed: \(output)")
       print("files: \(manifest.files.count)")
     case "verify":
@@ -114,11 +105,7 @@ struct CLI {
   }
 
   private static func makePlan(model: ModelKind) async throws -> RepackPlan {
-    switch model {
-    case .deepSeekV4: return try await DeepSeekV4Checkpoint().makeRepackPlan()
-    case .deepSeekV41: return try await DeepSeekV41Checkpoint().makeRepackPlan()
-    case .qwen3_8FlashNext: return try await QwenFlashNextCheckpoint().makeRepackPlan()
-    }
+    try await ModelPackages.package(for: model).makeRepackPlan()
   }
 
   private static func optionalValue(after option: String, in arguments: [String]) -> String? {

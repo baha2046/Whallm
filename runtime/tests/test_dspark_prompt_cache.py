@@ -158,7 +158,7 @@ class DSparkPromptCacheTests(unittest.TestCase):
             ),
         ]
         with patch(
-            "deepseek_v4_ssd.generation.make_prompt_cache",
+            "deepseek_v4_ssd.model_support.state.make_prompt_cache",
             side_effect=lambda _model: [_FixtureCache()],
         ):
             for candidate, prompt in cases:
@@ -197,7 +197,7 @@ class DSparkPromptCacheTests(unittest.TestCase):
                 second._scan_persistent_dspark_prompt_caches(dspark)
             )
             with patch(
-                "deepseek_v4_ssd.generation.make_prompt_cache",
+                "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                 side_effect=lambda _model: [_FixtureCache()],
             ):
                 acquired, source = second._acquire_dspark_prompt_cache(
@@ -250,7 +250,7 @@ class DSparkPromptCacheTests(unittest.TestCase):
             descriptors = runtime._scan_persistent_dspark_prompt_caches(dspark)
             runtime._persistent_dspark_prompt_caches = descriptors
             with patch(
-                "deepseek_v4_ssd.generation.make_prompt_cache",
+                "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                 side_effect=lambda _model: [_FixtureCache()],
             ):
                 acquired, source = runtime._acquire_dspark_prompt_cache(

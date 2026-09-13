@@ -22,16 +22,11 @@ from .model import (
 
 CATALOG_VERSION = 1
 MAX_GENERATION_TOKENS = 272_000
-MODEL_IDS = {
-    "deepseek-v4": "deepseek-v4-flash-0731",
-    "deepseek-v4.1": "deepseek-v4.1-flash",
-    "qwen3.8-flash-next": "qwen3.8-flash-next-fp8",
-}
-MODEL_OWNERS = {
-    "deepseek-v4": "deepseek-ai",
-    "deepseek-v4.1": "deepseek-ai",
-    "qwen3.8-flash-next": "Qwen",
-}
+from .model_support import get_support
+from .model_support.catalog import DESCRIPTORS
+
+MODEL_IDS = {item.kind: item.api_model_id for item in DESCRIPTORS}
+MODEL_OWNERS = {item.kind: item.owner for item in DESCRIPTORS}
 
 
 class ModelCatalogError(ValueError):
@@ -55,6 +50,8 @@ class ModelDefaults:
     temperature: float
     top_p: float
     top_k: int
+    approximation_mode: str = "exact"
+    qwen_adaptive_sampling: bool = True
 
 
 @dataclass(frozen=True)
@@ -182,37 +179,13 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
         )
 
     runtime = _parse_runtime(value["runtime"], f"{prefix}.runtime", model_kind)
-    if runtime.qwen_grouped_decode and (model_kind != "qwen3.8-flash-next" or runtime.mtp_enabled):
-        raise ModelCatalogError("grouped Decode requires Qwen with MTP disabled")
-    if model_kind == "qwen3.8-flash-next" and runtime.dspark_enabled:
-        raise ModelCatalogError("Qwen3.8-Flash-Next does not support DSpark")
-    if model_kind == "deepseek-v4.1" and runtime.dspark_enabled:
-        raise ModelCatalogError("DeepSeek V4.1 does not support DSpark")
-    if model_kind != "qwen3.8-flash-next" and runtime.mtp_enabled:
-        raise ModelCatalogError("MTP is supported only by Qwen3.8-Flash-Next")
-    if model_kind == "qwen3.8-flash-next" and runtime.staged_expert_streaming:
-        raise ModelCatalogError(
-            "Qwen3.8-Flash-Next does not support staged expert streaming"
-        )
-    if model_kind == "deepseek-v4.1" and runtime.staged_expert_streaming:
-        raise ModelCatalogError(
-            "DeepSeek V4.1 does not support staged expert streaming"
-        )
-    if (
-        model_kind == "qwen3.8-flash-next"
-        and runtime.adaptive_expert_prefill_threshold is not None
-    ):
-        raise ModelCatalogError(
-            "Qwen3.8-Flash-Next does not support adaptive expert prefill"
-        )
-    if (
-        model_kind == "deepseek-v4.1"
-        and runtime.adaptive_expert_prefill_threshold is not None
-    ):
-        raise ModelCatalogError(
-            "DeepSeek V4.1 does not support adaptive expert prefill"
-        )
+    try:
+        get_support(model_kind).validate_config(runtime)
+    except ValueError as error:
+        raise ModelCatalogError(str(error)) from error
     defaults = _parse_defaults(value["defaults"], f"{prefix}.defaults")
+    if defaults.approximation_mode != "exact" and not get_support(model_kind).descriptor.supports("approximation"):
+        raise ModelCatalogError(f"{prefix}.defaults.approximation_mode is not supported by this model")
     return ModelSpec(
         id=model_id,
         alias=alias,
@@ -231,7 +204,7 @@ def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
         raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
         config = RuntimeConfig(**{
-            "qwen_grouped_experts": model_kind == "qwen3.8-flash-next",
+            "qwen_grouped_experts": get_support(model_kind).descriptor.supports("groupedExperts"),
             **value,
         })
     except TypeError as error:
@@ -251,7 +224,7 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "prefill_step_size": 0,
         "memory_limit_gib": 0,
         "layer_major_prefill_threshold": 1,
-        "prompt_cache_entries": 1,
+        "prompt_cache_entries": 0,
         "prompt_cache_memory_gib": 1,
         "persistent_prompt_cache_entries": 1,
         "moe_prefill_step_size": 0,
@@ -340,13 +313,16 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
 
 
 def _parse_defaults(value: Any, prefix: str) -> ModelDefaults:
-    if not isinstance(value, dict) or set(value) != {
-        "max_tokens",
-        "temperature",
-        "top_p",
-        "top_k",
-    }:
+    required = {"max_tokens", "temperature", "top_p", "top_k"}
+    optional = {"approximation_mode", "qwen_adaptive_sampling"}
+    if not isinstance(value, dict) or not required <= set(value) <= required | optional:
         raise ModelCatalogError(f"{prefix} has invalid fields")
+    approximation = value.get("approximation_mode", "exact")
+    if approximation not in ("exact", "learned-route-drop-lowest-1"):
+        raise ModelCatalogError(f"{prefix}.approximation_mode is not supported")
+    adaptive = value.get("qwen_adaptive_sampling", True)
+    if type(adaptive) is not bool:
+        raise ModelCatalogError(f"{prefix}.qwen_adaptive_sampling must be a boolean")
     max_tokens = value["max_tokens"]
     temperature = value["temperature"]
     top_p = value["top_p"]
@@ -369,7 +345,7 @@ def _parse_defaults(value: Any, prefix: str) -> ModelDefaults:
         0 <= top_k <= 248_320
     ):
         raise ModelCatalogError(f"{prefix}.top_k must be between 0 and 248320")
-    return ModelDefaults(max_tokens, float(temperature), float(top_p), top_k)
+    return ModelDefaults(max_tokens, float(temperature), float(top_p), top_k, approximation, adaptive)
 
 
 def _zero_runtime_metrics() -> dict[str, Any]:

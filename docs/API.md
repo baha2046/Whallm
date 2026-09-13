@@ -49,6 +49,30 @@ MODEL=/path/to/model.dsv4 HOST=127.0.0.1 PORT=11434 make server
 兩個參數不能同時使用。
 server 可以在沒有 installed model 的狀態下啟動。
 
+2026-09-12 起，搭配 `--model-catalog` 時，明確給定的 runtime 與預設生成參數會
+覆寫每個 catalog entry 的對應欄位；未給定的參數保留 JSON 設定，不套入 CLI 預設。
+覆寫後重新檢查型別、數值範圍及模型支援；對其中任何模型無效就拒絕啟動。
+`--public-model` 與 `--warmup-prompt-file` 仍只適用於 `--model`，catalog 要逐模型設定。
+
+Prompt cache 預設只使用記憶體，直接生成 CLI 與 server 都支援：
+
+| 選項 | 效果 |
+| --- | --- |
+| `--prompt-cache off` | 不保存或重用跨請求狀態；不建立、掃描或寫入磁碟快取。 |
+| `--prompt-cache memory` | 僅在記憶體重用；卸載模型或結束程序後消失。 |
+| `--prompt-cache disk` | 記憶體重用加上磁碟保存，可跨重啟恢復。 |
+| `--persistent-prompt-cache` | 啟用磁碟保存，相容底層 boolean 設定。 |
+| `--no-persistent-prompt-cache` | 停用磁碟保存，保留記憶體快取。 |
+| `--prompt-cache-directory PATH` | 指定磁碟快取根目錄；本身不啟用磁碟模式。 |
+| `--prompt-cache-entries N` | 記憶體 entry 上限，預設 2；0 停用跨請求快取。 |
+| `--prompt-cache-memory-gib N` | 記憶體快取限額，預設 8。 |
+
+`--prompt-cache` 與正／負的 persistent boolean 選項互斥，以免意圖衝突。
+JSON 沿用 `prompt_cache_entries`、`persistent_prompt_cache`、`prompt_cache_directory`，
+沒有新增必要欄位。既有 JSON 明確設定的磁碟模式仍保留，除非被命令列覆寫。
+App 舊偏好沒有模式欄位時採用記憶體；不會刪除原有磁碟檔案。
+完整命令列與 UI 功能對照見 [功能對照表](FEATURE_MATRIX.md)。
+
 APP 使用版本化 JSON model catalog 啟動 server。
 下列範例包含一個 installed model：
 
@@ -72,6 +96,13 @@ APP 使用版本化 JSON model catalog 啟動 server。
 }
 ```
 
+`defaults` 的四個原有欄位仍為必要欄位，另接受兩個選用欄位：
+
+- `approximation_mode`：省略為 `exact`；只有 DeepSeek V4 可選 `learned-route-drop-lowest-1`。DSpark 啟用時預設仍固定 Exact。
+- `qwen_adaptive_sampling`：boolean，省略為 `true`。Qwen 開啟時依聊天／思考模式選取 T／P／K；關閉時使用此 entry 的三個數值。其他取樣懲罰維持模式規則。
+
+舊 catalog 不需新增欄位即可載入。Client 明確傳入的取樣或近似模式仍優先於模型預設。
+
 實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
 相容舊 catalog 時，以下新增欄位可各自省略：
 
@@ -83,7 +114,7 @@ APP 使用版本化 JSON model catalog 啟動 server。
 - `expert_eviction_policy`：省略為 `lfu`，可選 `lru`。兩者使用相同容量、每層配額、
   pinned 與讀取保護。新版 App 的「保留最近使用的專家資料」預設開啟，明確傳入 `lru`；
   手動關閉傳入 `lfu`，舊 catalog 省略時仍維持 LFU。
-- `qwen_short_block`：省略為 `false`，新版 App 在 Qwen 預設明確傳入 `true`。
+- `qwen_short_block`：省略為 `false`，新版 App 在 Qwen 預設明確傳入 `false`。
   最多四個 token 共用 expert acquisition，以主模型逐字抽樣確認；不需額外草稿模型。
   開關在下次載入生效。MTP、非 Qwen、非 canonical layout、slots 小於四倍 top-k
   或超過 4096、不相容的 cache mode 均不啟用 native 路徑。
@@ -221,6 +252,13 @@ server 會先驗證並更新 entry，再載入模型。
 }
 ```
 
+`defaults` 的四個原有欄位仍為必要欄位，另接受兩個選用欄位：
+
+- `approximation_mode`：省略為 `exact`；只有 DeepSeek V4 可選 `learned-route-drop-lowest-1`。DSpark 啟用時預設仍固定 Exact。
+- `qwen_adaptive_sampling`：boolean，省略為 `true`。Qwen 開啟時依聊天／思考模式選取 T／P／K；關閉時使用此 entry 的三個數值。其他取樣懲罰維持模式規則。
+
+舊 catalog 不需新增欄位即可載入。Client 明確傳入的取樣或近似模式仍優先於模型預設。
+
 實際的 `runtime` object 必須包含既有 `RuntimeConfig` snake-case 欄位。
 相容舊 catalog 時，以下新增欄位可各自省略：
 
@@ -230,7 +268,7 @@ server 會先驗證並更新 entry，再載入模型。
   可關閉，Qwen 開啟 MTP 時不作用。App 的 Qwen「Prefill 加速」開關會明確傳入此欄位。
 
 - `expert_eviction_policy`：省略為 `lfu`，可選 `lru`；未知值、boolean 與 null 都拒絕。
-- `qwen_short_block`：省略為 `false`，必須是 boolean；新版 App 的 Qwen 預設開啟。
+- `qwen_short_block`：省略為 `false`，必須是 boolean；新版 App 的 Qwen 預設關閉。
 
 三個 Qwen 欄位提供時皆必須是 boolean；其他必要欄位仍不可省略，未知欄位仍會被拒絕。
 Loaded 或 Loading 的模型不能更新 entry。
@@ -246,10 +284,10 @@ Loaded 或 Loading 的模型不能更新 entry。
 | --- | --- |
 | `model` | 必須是目前 model catalog 內的 API model ID 或 Alias。名稱比對區分大小寫。 |
 | `max_tokens` | 1 至 272,000。預設值是 272,000。 |
-| `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 依模式使用 0.7 或 1.0。 |
-| `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 依模式使用 0.8 或 0.95。 |
-| `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 兩種模式都使用 20。 |
-| `approximation` | 選用 object。一般 DeepSeek 未提供時使用 `learned-route-drop-lowest-1`。Qwen 和 DSpark 使用 `exact`。 |
+| `temperature` | 0 至 2。DeepSeek 預設 0.2。Qwen 自動取樣開啟時依模式使用 0.7 或 1.0，關閉時使用模型預設。 |
+| `top_p` | 0.000001 至 1。DeepSeek 預設 0.98。Qwen 自動取樣開啟時依模式使用 0.8 或 0.95，關閉時使用模型預設。 |
+| `top_k` | 0 或正整數。DeepSeek 預設 0。Qwen 自動取樣開啟時兩種模式都使用 20，關閉時使用模型預設。 |
+| `approximation` | 選用 object。未提供時使用模型的 `defaults.approximation_mode`（預設 `exact`）。Qwen 和 DSpark 使用 `exact`。 |
 | `stream` | 必須是 boolean。 |
 | `stream_options.include_usage` | 必須是 boolean。只影響 streaming response。 |
 | `n` | 只接受 `1`。 |
@@ -259,8 +297,9 @@ Loaded 或 Loading 的模型不能更新 entry。
 
 ### DeepSeek approximate mode
 
-一般 DeepSeek request 預設使用 `learned-route-drop-lowest-1`。
-Client 不需要加入額外欄位。
+一般 DeepSeek request 預設使用 `exact`。
+App 的 Use approximate mode 預設關閉；開啟後將模型預設設為
+`learned-route-drop-lowest-1`，Client 不需要加入額外欄位。
 Response 會明確回報實際 mode。
 
 Client 也可以明確指定這個 mode：
@@ -293,8 +332,8 @@ Qwen 和啟用 DSpark 的 DeepSeek 在沒有 `approximation` 欄位時使用 exa
 未知 mode 會回傳 HTTP 400。
 Qwen 和 DSpark 不支援 approximate mode。
 
-直接使用 Python CLI 時，一般 DeepSeek 也預設使用 approximate mode。
-下列參數可以切回 exact：
+直接使用 Python CLI 時，一般 DeepSeek 也預設使用 Exact。
+下列參數可以明確指定 Exact；需要近似模式時改為 `learned-route-drop-lowest-1`：
 
 ```sh
 PYTHONPATH=runtime .venv/bin/python -m deepseek_v4_ssd.cli \
@@ -712,13 +751,12 @@ Nonresident 是 expert-file-specific page-cache-miss proxy，不是 physical SSD
 `performance.dspark_hash_prefetch_*_page_cache_*` 分別保存 draft 與 exact hash-prefetch
 useful／wasted partition。Probe 本身會改變 timing，不應在服務模式預設開啟。
 `runtime.expert_file_cache_policy` 是 `cached` 或 `bypass`；預設為 `cached`。
-`runtime.expert_eviction_policy` 是 `lfu` 或 `lru`；預設為 `lfu`。CLI 與單模型
-Python server 使用 `--expert-eviction-policy lru` 選用；catalog 模式在 model entry
+`runtime.expert_eviction_policy` 是 `lfu` 或 `lru`；預設為 `lfu`。CLI 與 Python server 使用 `--expert-eviction-policy lru` 選用；catalog 模式在 model entry
 的 `runtime.expert_eviction_policy` 指定。CLI metrics 與 server status 會回報策略。
 此設定傳至 main／DSpark／MTP 的 expert cache；真實數值／效能驗證範圍以
 研究結果為準，不代表各模型均會加速。2026-09-08 依使用者要求，App 新增此開關並
 預設採用 LRU；Python CLI／舊 catalog 的省略預設不變。
-CLI／單模型 server 可用 `--qwen-short-block`／`--no-qwen-short-block`；catalog 以
+CLI／server 可用 `--qwen-short-block`／`--no-qwen-short-block`；catalog 以
 `qwen_short_block` 控制。Server status 的 `qwen_short_block_ready`／`qwen_short_block_reason`
 表示模型 cache 是否支援；`performance.qwen_short_block` 分別回報 enabled、active、
 rounds、proposed_tokens、accepted_tokens、memory_fallbacks。active 表示本請求採用該生成器，

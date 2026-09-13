@@ -9,9 +9,14 @@ runtime 只在 router 選到 routed expert 時讀取 expert blob。
 本文件描述目前程式碼。
 本文件不描述研究中的預期設計。
 
-2026-09-08 的 Model Advanced Settings 新增「保留最近使用的專家資料」及 Qwen
-「一次確認最多四個字詞」，兩者預設開啟。缺少新欄位的舊設定會遷移為開啟，明確的
-關閉值會保留；catalog 將設定傳入 runtime，載入中的模型維持既有設定鎖定規則。
+2026-09-12 已接入 [模型支援套件](MODEL_PACKAGES.md)：Swift `ModelPackage` 與
+Python `ModelSupport` 分別處理安裝及 runtime 差異，`ModelPackages.json` 共用
+模型身分、App 顯示與設定資料。`ExpertCache` 由套件選擇 expert layout，
+共用讀取和 slot 管理；詳細責任、相容範圍及新增模型步驟見該文件。
+
+Model Advanced Settings 的「保留最近使用的專家資料」預設開啟；Qwen
+「一次確認最多四個字詞」自 2026-09-12 起預設關閉。舊設定缺少欄位時採用目前預設，
+已明確儲存的開關值保留；catalog 將設定傳入 runtime，載入中的模型維持既有設定鎖定規則。
 LRU 不增加 slots；Qwen 合批使用 production `qwen_block_generation.py`、
 `qwen_short_block.py`、`qwen_resident_block.py` 與包內 Metal header，沒有 research
 import 或全域 monkeypatch。它從已知文字提出最多三個候選，主模型以 T=1 dense/state
@@ -228,7 +233,9 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `expert_page_cache_probe` | `false` | Research-only `mincore` pre-read page-residency classification；不是 physical SSD counter。 |
 | `expert_file_cache_policy` | `cached` | Expert descriptor policy；research-only `bypass` 使用 Darwin `F_NOCACHE` 並停用 read-ahead。 |
 | `expert_eviction_policy` | `lfu` | 固定容量 expert cache 的淘汰排序，可選 `lru`；保留相同每層配額、pinning、in-flight 保護與 heap 清理。CLI／server／catalog 可 opt-in，舊 catalog 省略時仍用 LFU，App UI 預設不變。 |
-| `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數。 |
+| `prompt_cache_entries` | 2 | 記憶體 prompt cache timeline 數；0 停用跨請求快取（也不讀寫磁碟快取）。 |
+| `persistent_prompt_cache` | `false` | 預設僅使用記憶體；`true` 額外保存磁碟快取。 |
+| `prompt_cache_directory` | `null` | 磁碟模式的根目錄；null 使用 `~/.dsmodel/prompt-cache`。 |
 | `prompt_cache_memory_gib` | 8 | 記憶體 prompt cache 上限。 |
 | persistent cache entries | 8 | normal 和 DSpark 各自的 revision 專用磁碟 payload 上限。normal format 5 依 reuse count 和 access recency 執行 eviction。 |
 | `memory_limit_gib` | 0 | 0 使用模型安全自動上限。Qwen 自動上限不超過 48 GiB。DeepSeek 使用 Metal 建議上限。正值設定 MLX memory limit，wired limit 不超過 Metal 建議上限。 |
@@ -378,6 +385,12 @@ indexer 預設另外建立 MXFP4 index cache。
 
 ### Prompt cache
 
+runtime 與 App 預設只使用記憶體快取，不建立或讀寫磁碟快取目錄。
+App 的 Model Advanced Settings 提供「不使用／記憶體／磁碟」；修改在下次載入模型時生效。
+舊 App 設定沒有模式欄位時遷移為記憶體；既有磁碟檔案不刪除。
+`--prompt-cache off|memory|disk` 提供相同選擇；off 以 `prompt_cache_entries=0` 停用
+跨請求保存與重用，單次生成所需的 KV state 仍存在。DeepSeek V4.1 不支援此功能。
+
 runtime 預設保留兩個記憶體 timeline。
 runtime 把記憶體用量限制在 8 GiB。
 每個記憶體 entry 都包含 `approximation_mode`。
@@ -385,10 +398,10 @@ Exact request 只重用 exact entry。
 `learned-route-drop-lowest-1` request 只重用相同 mode 的 entry。
 Approximate entry 不會寫入 persistent prompt cache。
 
-runtime 預設把最多八個完成 entry 寫到：
+選擇磁碟模式後，runtime 把最多八個 entry 寫到：
 
 ```text
-~/.dsmodel/prompt-cache/<checkpoint-revision>/
+~/.dsmodel/prompt-cache/<model-id>/<checkpoint-revision>/format-<manifest-format>/
 ```
 
 一般 target-only persistent cache 使用 format 5。每個 identity 從完整 cache contract
@@ -400,7 +413,9 @@ contract、所有 block descriptors 與 terminal key；任一欄位不符即忽�
 1／2 因缺少足以證明相容性的 contract 而不再載入；format 4 也不再載入，避免重用可能
 含有 mutable-state alias 的舊 prefill checkpoint。
 
-非 layer-major prefill 會額外保留最多兩個 bounded disk checkpoints：第一個完成的 prefill
+非 layer-major prefill 會暫存最多兩個輸入快照，完成請求後加入受筆數限制的記憶體快取；
+只有磁碟模式另外寫入磁碟。這讓記憶體模式也能重用短輸入的最後一個 token 前的狀態。
+兩個快照分別是：第一個完成的 prefill
 chunk 與最後一個 `prompt[:-1]` checkpoint；完成 request timeline 仍照常保存。Checkpoint
 會在 prefill callback 當下深複製並 materialize cache state，避免 Qwen `ArraysCache` 的可變
 state list 被後續 final-token evaluation 或 decode 改寫。新 prompt 即使只剩一個 token 要
@@ -416,11 +431,12 @@ Format 5 scanner 忽略 DSpark bundle，format 3 scanner 也忽略一般 entry�
 無法載入、缺少任一 context、revision／target layers 不符或只有半份檔案的 cache entry。
 兩個 namespace 各自套用 entry 上限與 eviction，不會互相 prune。
 
-### Default approximate routing
+### Exact 與選用近似模式
 
-一般 DeepSeek API 和 command-line request 預設使用
-`learned-route-drop-lowest-1`。
-Client 可以明確指定 `exact`。
+一般 DeepSeek API 和 command-line request 預設使用 `exact`。
+App 的 Use approximate mode 預設關閉；開啟後 catalog 的
+`defaults.approximation_mode` 會改為 `learned-route-drop-lowest-1`。
+Client 可以明確覆寫 mode。
 Qwen 和啟用 DSpark 的 DeepSeek 預設使用 `exact`。
 `GenerationOptions.approximation_mode` 的內部安全預設仍是 `exact`；server 和 CLI
 會依 model kind 與 DSpark 狀態選擇實際預設。
@@ -428,7 +444,7 @@ Runtime 持有 generation lock 時，會暫時把 40 個 learned router 從 top-
 三個 hash router 保持 top-6。
 Runtime 使用 `finally` 還原 learned router，因此正常完成、錯誤和中止都會回到 top-6。
 Qwen 和 DSpark 會拒絕這個 mode。
-APP request 會使用一般 DeepSeek 預設，因此預設執行 approximate mode。
+App request 沿用模型設定；DSpark 開啟時固定使用 Exact。
 
 ## DSpark
 

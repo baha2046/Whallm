@@ -62,6 +62,7 @@ from deepseek_v4_ssd.io_metrics import (
     page_cache_residency_snapshot,
 )
 from deepseek_v4_ssd.manifest import InstalledModel, Tensor
+from deepseek_v4_ssd.model_support import get_support
 from deepseek_v4_ssd.model import (
     RuntimeConfig,
     _ORIGINAL_SPARSE_POOLED_ATTENTION,
@@ -145,7 +146,7 @@ class ModelRuntimeTests(unittest.TestCase):
     def test_v41_warm_prompt_uses_plain_chunked_prefill(self):
         runtime = ModelRuntime.__new__(ModelRuntime)
         runtime._is_qwen = False
-        runtime._is_deepseek_v41 = True
+        runtime.support = get_support("deepseek-v4.1")
         runtime.model = SimpleNamespace(mtp=None)
         runtime._encode_prompt = lambda _: [1, 2, 3]
         runtime._generation_lock = threading.Lock()
@@ -155,13 +156,13 @@ class ModelRuntimeTests(unittest.TestCase):
 
         with (
             patch(
-                "deepseek_v4_ssd.generation._make_prompt_cache",
+                "deepseek_v4_ssd.model_support.state.make_cache",
                 return_value=["cache"],
             ),
             patch(
-                "deepseek_v4_ssd.generation._deepseek_v41_prefill"
+                "deepseek_v4_ssd.model_support.deepseek_v41._deepseek_v41_prefill"
             ) as v41_prefill,
-            patch("deepseek_v4_ssd.generation.layer_major_prefill") as legacy_prefill,
+            patch("deepseek_v4_ssd.model.layer_major_prefill") as legacy_prefill,
         ):
             processed = runtime.warm_prompt("hello")
 
@@ -176,6 +177,7 @@ class ModelRuntimeTests(unittest.TestCase):
 
     def test_prompt_cache_is_isolated_by_approximation_mode(self):
         runtime = ModelRuntime.__new__(ModelRuntime)
+        runtime.config = RuntimeConfig()
         runtime.model = object()
         runtime._prompt_caches = [
             _PromptCacheEntry(["exact"], [1, 2], "exact"),
@@ -279,7 +281,7 @@ class ModelRuntimeTests(unittest.TestCase):
                     encode=lambda *_args, **_kwargs: [1],
                 ),
             ),
-            patch("deepseek_v4_ssd.generation.make_prompt_cache", return_value=[]),
+            patch("deepseek_v4_ssd.model_support.state.make_prompt_cache", return_value=[]),
             patch(
                 "deepseek_v4_ssd.generation.make_sampler",
                 return_value=sampler,
@@ -394,7 +396,7 @@ class ModelRuntimeTests(unittest.TestCase):
                 errors.append(error)
 
         with (
-            patch("deepseek_v4_ssd.generation.make_prompt_cache", return_value=[]),
+            patch("deepseek_v4_ssd.model_support.state.make_prompt_cache", return_value=[]),
             patch(
                 "deepseek_v4_ssd.generation.stream_generate",
                 side_effect=fake_stream_generate,
@@ -468,7 +470,7 @@ class ModelRuntimeTests(unittest.TestCase):
                     encode=lambda *_args, **_kwargs: [1, 2, 3, 4],
                 ),
             ),
-            patch("deepseek_v4_ssd.generation.make_prompt_cache", return_value=[cache]),
+            patch("deepseek_v4_ssd.model_support.state.make_prompt_cache", return_value=[cache]),
             patch(
                 "deepseek_v4_ssd.generation.stream_generate",
                 side_effect=fake_stream_generate,
@@ -528,7 +530,7 @@ class ModelRuntimeTests(unittest.TestCase):
                 return_value=tokenizer,
             ),
             patch(
-                "deepseek_v4_ssd.generation.make_prompt_cache",
+                "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                 return_value=[cache],
             ) as make_cache,
             patch(
@@ -591,7 +593,7 @@ class ModelRuntimeTests(unittest.TestCase):
                 return_value=tokenizer,
             ),
             patch(
-                "deepseek_v4_ssd.generation.make_prompt_cache",
+                "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                 side_effect=caches,
             ) as make_cache,
             patch(
@@ -641,8 +643,8 @@ class ModelRuntimeTests(unittest.TestCase):
                     encode=lambda prompt, **_options: prompts[prompt],
                 ),
             ),
-            patch("deepseek_v4_ssd.generation.make_prompt_cache", return_value=cache),
-            patch("deepseek_v4_ssd.generation.layer_major_prefill") as prefill,
+            patch("deepseek_v4_ssd.model_support.state.make_prompt_cache", return_value=cache),
+            patch("deepseek_v4_ssd.model.layer_major_prefill") as prefill,
             patch(
                 "deepseek_v4_ssd.generation.stream_generate",
                 side_effect=fake_stream_generate,
@@ -715,7 +717,7 @@ class ModelRuntimeTests(unittest.TestCase):
                     return_value=tokenizer,
                 ),
                 patch(
-                    "deepseek_v4_ssd.generation.make_prompt_cache",
+                    "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                     side_effect=lambda _model: [Cache()],
                 ),
                 patch(
@@ -800,7 +802,7 @@ class ModelRuntimeTests(unittest.TestCase):
                     return_value=tokenizer,
                 ),
                 patch(
-                    "deepseek_v4_ssd.generation.make_prompt_cache",
+                    "deepseek_v4_ssd.model_support.state.make_prompt_cache",
                     side_effect=lambda _model: [MutableCache()],
                 ),
                 patch(

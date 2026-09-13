@@ -34,14 +34,14 @@ class CLITests(unittest.TestCase):
                     self.assertFalse(config.mtp_enabled)
 
 
-    def test_approximation_default_is_model_aware_and_exact_can_override(self):
+    def test_approximation_defaults_to_exact_and_explicit_modes_are_model_aware(self):
         self.assertEqual(
             _select_approximation_mode(
                 None,
                 is_qwen=False,
                 dspark_enabled=False,
             ),
-            "learned-route-drop-lowest-1",
+            "exact",
         )
         for is_qwen, dspark_enabled in ((True, False), (False, True)):
             with self.subTest(is_qwen=is_qwen, dspark_enabled=dspark_enabled):

@@ -38,26 +38,27 @@ def fixture(root, count=128):
 
 class PipelineTests(unittest.TestCase):
     def test_scoped_dispatch_restores_hooks_after_exception_and_falls_back_without_banks(self):
-        from deepseek_v4_ssd import generation, qwen4_exp
+        from deepseek_v4_ssd import qwen4_exp
+        from deepseek_v4_ssd.model_support import qwen as qwen_support
         from research.ssd_prefill_pipeline_run import install_pipeline
         original = qwen4_exp.StreamingExperts.__call__
-        original_prefill = generation._qwen_layer_major_prefill
+        original_prefill = qwen_support._qwen_layer_major_prefill
         with self.assertRaisesRegex(RuntimeError, 'stop'):
             with install_pipeline('pipeline'):
                 self.assertIsNot(qwen4_exp.StreamingExperts.__call__, original)
                 raise RuntimeError('stop')
         self.assertIs(qwen4_exp.StreamingExperts.__call__, original)
-        self.assertIs(generation._qwen_layer_major_prefill, original_prefill)
+        self.assertIs(qwen_support._qwen_layer_major_prefill, original_prefill)
         with tempfile.TemporaryDirectory() as d:
             model = fixture(Path(d))
             cache = SimpleNamespace(model=model, file_cache_policy='cached', _read_limiter=None,
                 expert_directory=model.root / 'experts')
-            with patch.object(generation, '_qwen_layer_major_prefill', return_value='original') as fallback, \
+            with patch.object(qwen_support, '_qwen_layer_major_prefill', return_value='original') as fallback, \
                  patch('research.ssd_prefill_pipeline_run.ExpertBanks', side_effect=AssertionError('allocated')):
                 with install_pipeline('pipeline') as state:
-                    self.assertEqual(generation._qwen_layer_major_prefill(None,[0]*2048,None,1024,cache),'original')
+                    self.assertEqual(qwen_support._qwen_layer_major_prefill(None,[0]*2048,None,1024,cache),'original')
                     cache.file_cache_policy='bypass'
-                    self.assertEqual(generation._qwen_layer_major_prefill(None,[0]*2,None,1024,cache),'original')
+                    self.assertEqual(qwen_support._qwen_layer_major_prefill(None,[0]*2,None,1024,cache),'original')
                     self.assertTrue(all(not e['eligible'] for e in state['events']))
                 self.assertEqual(fallback.call_count,2)
 

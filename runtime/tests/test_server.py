@@ -700,9 +700,7 @@ class ServerTests(unittest.TestCase):
 
     def test_generation_defaults_match_app_defaults(self):
         options = _options({}, ServerDefaults())
-        expected = GenerationOptions(
-            approximation_mode="learned-route-drop-lowest-1"
-        )
+        expected = GenerationOptions(approximation_mode="exact")
         self.assertEqual(options, expected)
         self.assertEqual(
             _options({}, ServerDefaults(), thinking_mode="thinking"),
@@ -993,7 +991,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(json.loads(completion_body)["model"], "work-model")
         self.assertEqual(json.loads(response_body)["model"], "work-model")
 
-    def test_generation_defaults_to_approximation_and_reports_actual_mode(self):
+    def test_generation_defaults_to_exact_and_reports_actual_mode(self):
         status, _, body = self.request(
             "/v1/chat/completions",
             method="POST",
@@ -1006,11 +1004,11 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(
             response["approximation"],
-            {"mode": "learned-route-drop-lowest-1"},
+            {"mode": "exact"},
         )
         self.assertEqual(
             self.runtime.last_options.approximation_mode,
-            "learned-route-drop-lowest-1",
+            "exact",
         )
 
     def test_generation_can_explicitly_use_exact_mode(self):

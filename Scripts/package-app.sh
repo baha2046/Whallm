@@ -9,8 +9,10 @@ zip_path=$output_root/Whallm-macOS-arm64.zip
 app_version=${APP_VERSION:-1.0.0}
 build_version=${BUILD_VERSION:-$app_version}
 
-if [[ $app_version != <->(|.<->)(|.<->) || $build_version != <->(|.<->)(|.<->) ]]; then
-  print -u2 "APP_VERSION and BUILD_VERSION must contain one to three numeric parts."
+if [[ $app_version != <->(|.<->)(|.<->) ||
+      ( $build_version != <->(|.<->)(|.<->) &&
+        $build_version != <->(|.<->)(|.<->)d<1-255> ) ]]; then
+  print -u2 "APP_VERSION must be numeric; BUILD_VERSION may also end in d1 through d255."
   exit 1
 fi
 
@@ -76,6 +78,11 @@ ditto "$project_root/Native/ANEBridge/LICENSE" \
   "$app_path/Contents/Resources/ANEBridge-LICENSE"
 ditto "$resource_bundle" "$app_path/Contents/Resources/${resource_bundle:t}"
 ditto "$project_root/runtime" "$app_path/Contents/Resources/runtime"
+model_packages=$project_root/Sources/DeepSeekRepack/Resources/ModelPackages.json
+ditto "$model_packages" "$app_path/Contents/Resources/ModelPackages.json"
+ditto "$model_packages" "$app_path/Contents/Resources/runtime/deepseek_v4_ssd/model_support/ModelPackages.json"
+PYTHONPATH="$app_path/Contents/Resources/runtime" \
+  $python_executable -m deepseek_v4_ssd.model_support
 for localization in "$project_root/Sources/DeepSeekV4SSDApp/Resources"/*.lproj; do
   ditto "$localization" "$app_path/Contents/Resources/${localization:t}"
 done

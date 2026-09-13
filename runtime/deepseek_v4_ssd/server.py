@@ -12,10 +12,12 @@ import sys
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Iterator
 from urllib.parse import urlsplit
+
+from .model import _apply_prompt_cache_mode
 
 from .cancellation import GenerationCancelled, cancellation_scope, check_cancelled
 
@@ -29,6 +31,7 @@ from .generation import (
 )
 from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .manifest import InstalledModel
+from .model_support import get_support, support_for_installed, support_for_runtime
 from .model_manager import (
     MODEL_IDS,
     ModelCatalogError,
@@ -47,25 +50,6 @@ from .tool_codec import ToolChoice, ToolStreamDelta, ToolStreamParser
 RESPONSE_HEARTBEAT_SECONDS = 10.0
 MAX_REQUEST_BYTES = 1_048_576
 MAX_GENERATION_TOKENS = 272_000
-_QWEN_SAMPLING_DEFAULTS = {
-    "chat": {
-        "temperature": 0.7,
-        "top_p": 0.8,
-        "top_k": 20,
-        "min_p": 0.0,
-        "presence_penalty": 1.5,
-        "repetition_penalty": 1.0,
-    },
-    "thinking": {
-        "temperature": 1.0,
-        "top_p": 0.95,
-        "top_k": 20,
-        "min_p": 0.0,
-        "presence_penalty": 0.0,
-        "repetition_penalty": 1.0,
-    },
-}
-_CODEX_SHELL_TOOLS = {"exec_command"}
 
 
 class APIError(Exception):
@@ -431,15 +415,15 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         runtime = model.runtime
         tools, tool_choice = _tool_request(payload)
         messages = _messages(payload.get("messages"))
-        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
+        support = support_for_runtime(runtime)
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
-            qwen=qwen,
+            support=support,
         )
         options, stream = self._common(
             payload,
             model.defaults,
-            qwen=qwen,
+            support=support,
             dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode=thinking_mode,
         )
@@ -550,18 +534,18 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             request["max_tokens"] = request["max_output_tokens"]
         messages = _response_messages(payload)
         tools, tool_choice, response_tools = _response_tool_request(payload)
-        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
-        if _use_qwen_codex_tool_first(qwen, messages, tool_choice, response_tools):
+        support = support_for_runtime(runtime)
+        if support.prefer_tool_first(messages, tool_choice, response_tools):
             tool_choice = ToolChoice("required")
         thinking_mode, reasoning_effort = _reasoning_settings(
             payload,
             responses_api=True,
-            qwen=qwen,
+            support=support,
         )
         options, stream = self._common(
             request,
             model.defaults,
-            qwen=qwen,
+            support=support,
             dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode=thinking_mode,
         )
@@ -1010,11 +994,11 @@ class OpenAIHandler(BaseHTTPRequestHandler):
 
     def _completion(self, payload: dict[str, Any], model: ModelRequest) -> None:
         runtime = model.runtime
-        qwen = getattr(getattr(runtime, "installed", None), "is_qwen", False)
+        support = support_for_runtime(runtime)
         options, stream = self._common(
             payload,
             model.defaults,
-            qwen=qwen,
+            support=support,
             dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
             thinking_mode="chat",
         )
@@ -1066,6 +1050,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         defaults: ServerDefaults | ModelDefaults,
         *,
         qwen: bool = False,
+        support=None,
         dspark: bool = False,
         thinking_mode: str = "chat",
     ) -> tuple[GenerationOptions, bool]:
@@ -1101,14 +1086,11 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                     "stream_options.include_usage must be a boolean.",
                     param="stream_options.include_usage",
                 )
+        support = support or get_support("qwen3.8-flash-next" if qwen else "deepseek-v4")
         return _options(
-            payload,
-            defaults,
-            qwen=qwen,
-            approximation_default=(
-                EXACT_APPROXIMATION_MODE
-                if qwen or dspark
-                else LEARNED_ROUTE_DROP_LOWEST_1
+            payload, defaults, support=support,
+            approximation_default=support.default_approximation(
+                dspark, getattr(defaults, "approximation_mode", "exact"),
             ),
             thinking_mode=thinking_mode,
         ), stream
@@ -1480,6 +1462,7 @@ def _reasoning_settings(
     *,
     responses_api: bool = False,
     qwen: bool = False,
+    support=None,
 ) -> tuple[str, str]:
     thinking_mode = payload.get("thinking_mode")
     if thinking_mode is not None:
@@ -1501,27 +1484,8 @@ def _reasoning_settings(
         raise APIError(f"{param} must be a string.", param=param)
     if effort not in {None, "none", *_REASONING_EFFORT_MAP}:
         raise APIError(f"{param} is invalid.", param=param)
-    if qwen:
-        thinking_mode = (
-            "thinking"
-            if thinking_mode == "thinking" or effort not in {None, "none"}
-            else "chat"
-        )
-    elif thinking_mode is None:
-        thinking_mode = "chat" if effort in {None, "none"} else "thinking"
-    native_effort = (
-        {
-            "minimal": "low",
-            "low": "low",
-            "medium": "medium",
-            "high": "xhigh",
-            "xhigh": "xhigh",
-            "max": "xhigh",
-        }.get(effort, "low")
-        if qwen
-        else _REASONING_EFFORT_MAP.get(effort, "low")
-    )
-    return thinking_mode, native_effort
+    support = support or get_support("qwen3.8-flash-next" if qwen else "deepseek-v4")
+    return support.reasoning_settings(thinking_mode, effort)
 
 
 def _response_messages(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1680,14 +1644,8 @@ def _use_qwen_codex_tool_first(
     tool_choice: ToolChoice,
     response_tools: dict[str, dict[str, str]],
 ) -> bool:
-    return (
-        qwen
-        and tool_choice.mode == "auto"
-        and not any(message.get("role") == "tool" for message in messages)
-        and any(
-            tool.get("name") in _CODEX_SHELL_TOOLS
-            for tool in response_tools.values()
-        )
+    return qwen and get_support("qwen3.8-flash-next").prefer_tool_first(
+        messages, tool_choice, response_tools,
     )
 
 
@@ -1862,9 +1820,11 @@ def _options(
     defaults: ServerDefaults | ModelDefaults,
     *,
     qwen: bool = False,
-    approximation_default: str = LEARNED_ROUTE_DROP_LOWEST_1,
+    support=None,
+    approximation_default: str = EXACT_APPROXIMATION_MODE,
     thinking_mode: str = "chat",
 ) -> GenerationOptions:
+    support = support or get_support("qwen3.8-flash-next" if qwen else "deepseek-v4")
     if "approximation" not in payload:
         approximation_mode = approximation_default
     else:
@@ -1887,9 +1847,9 @@ def _options(
                 "approximation.mode is not supported.",
                 param="approximation.mode",
             )
-        if qwen and approximation_mode != EXACT_APPROXIMATION_MODE:
+        if not support.descriptor.supports("approximation") and approximation_mode != EXACT_APPROXIMATION_MODE:
             raise APIError(
-                "approximation.mode is not supported for Qwen.",
+                f"approximation.mode is not supported for {support.option_error_name}.",
                 param="approximation.mode",
             )
     max_tokens = payload.get(
@@ -1903,20 +1863,7 @@ def _options(
             f"max_tokens must be between 1 and {MAX_GENERATION_TOKENS}.",
             param="max_tokens",
         )
-    sampling_defaults = (
-        _QWEN_SAMPLING_DEFAULTS[
-            "thinking" if thinking_mode == "thinking" else "chat"
-        ]
-        if qwen
-        else {
-            "temperature": defaults.temperature,
-            "top_p": defaults.top_p,
-            "top_k": defaults.top_k,
-            "min_p": 0.0,
-            "presence_penalty": 0.0,
-            "repetition_penalty": 1.0,
-        }
-    )
+    sampling_defaults = support.sampling_defaults(defaults, thinking_mode)
     temperature = _number(
         payload.get("temperature", sampling_defaults["temperature"]),
         "temperature",
@@ -1952,9 +1899,9 @@ def _validate_approximation_runtime(options: GenerationOptions, runtime: Any) ->
             "approximation.mode is not supported with DSpark.",
             param="approximation.mode",
         )
-    if bool(getattr(runtime, "_is_deepseek_v41", False)):
+    if not support_for_runtime(runtime).descriptor.supports("approximation"):
         raise APIError(
-            "approximation.mode is not supported for DeepSeek V4.1.",
+            f"approximation.mode is not supported for {support_for_runtime(runtime).option_error_name}.",
             param="approximation.mode",
         )
 
@@ -2288,7 +2235,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-batched-expert-prefill", action="store_true")
     parser.add_argument(
         "--qwen-grouped-experts", action=argparse.BooleanOptionalAction, default=True,
-        help="group Qwen Prefill rows by expert (default: on when MTP is off; --model only)",
+        help="group Qwen Prefill rows by expert (default: on when MTP is off)",
     )
     parser.add_argument(
         "--no-ane-prefill",
@@ -2298,7 +2245,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--ane-prefill-ratio", type=float, default=0.25)
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
-    parser.add_argument("--no-persistent-prompt-cache", action="store_true")
+    cache_mode = parser.add_mutually_exclusive_group()
+    cache_mode.add_argument("--prompt-cache", choices=("off", "memory", "disk"),
+                            help="reuse prompts: off, memory (default), or disk")
+    cache_mode.add_argument("--persistent-prompt-cache", action=argparse.BooleanOptionalAction,
+                            default=False, help="save prompt cache to disk (default: off)")
     parser.add_argument("--prompt-cache-directory")
     parser.add_argument("--warmup-prompt-file")
     parser.add_argument("--bf16-kv-cache", action="store_true")
@@ -2331,7 +2282,7 @@ def _parser() -> argparse.ArgumentParser:
                         help="Reuse resident Qwen experts across up to four verified tokens")
     parser.add_argument(
         "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
-        help="expert eviction ranking for the single-model runtime (default LFU)",
+        help="expert eviction ranking (default LFU)",
     )
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
@@ -2376,6 +2327,44 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _explicit_arguments(argv: list[str]) -> set[str]:
+    parser = _parser()
+    for action in parser._actions:
+        action.default = argparse.SUPPRESS
+    return set(vars(parser.parse_args(argv)))
+
+
+def _catalog_overrides(specs, arguments, config, explicit):
+    renamed = {
+        "bf16_kv_cache": "fp8_kv_cache",
+        "no_layer_major_prefill": "layer_major_prefill",
+        "no_batched_expert_prefill": "batched_expert_prefill",
+        "no_ane_prefill": "ane_prefill",
+        "no_fp4_index_cache": "fp4_index_cache",
+        "no_ready_expert_decode": "ready_expert_decode",
+        "mtp": "mtp_enabled",
+        "dspark": "dspark_enabled",
+        "no_dspark_fallback": "dspark_fallback_enabled",
+    }
+    runtime = asdict(config)
+    overrides = {
+        renamed.get(name, name): runtime[renamed.get(name, name)]
+        for name in explicit
+        if renamed.get(name, name) in runtime
+    }
+    models = []
+    for spec in specs:
+        model = spec.to_json()
+        merged = replace(spec.runtime, **overrides)
+        model["runtime"] = asdict(_apply_prompt_cache_mode(merged, arguments.prompt_cache))
+        for name in ("max_tokens", "temperature", "top_p", "top_k"):
+            option = f"default_{name}"
+            if option in explicit:
+                model["defaults"][name] = getattr(arguments, option)
+        models.append(model)
+    return parse_model_catalog({"version": 1, "models": models})
+
+
 def main() -> None:
     parser = _parser()
     arguments = parser.parse_args()
@@ -2399,7 +2388,7 @@ def main() -> None:
         ane_prefill_ratio=arguments.ane_prefill_ratio,
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
-        persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
+        persistent_prompt_cache=arguments.persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
         expert_page_cache_probe=arguments.expert_page_cache_probe,
@@ -2422,10 +2411,12 @@ def main() -> None:
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
-    try:
-        validate_runtime_config(config)
-    except ValueError as error:
-        parser.error(str(error))
+    config = _apply_prompt_cache_mode(config, arguments.prompt_cache)
+    if not arguments.model_catalog:
+        try:
+            validate_runtime_config(config)
+        except ValueError as error:
+            parser.error(str(error))
 
     if arguments.model_catalog and (
         arguments.public_model is not None or arguments.warmup_prompt_file is not None
@@ -2436,7 +2427,10 @@ def main() -> None:
 
     if arguments.model_catalog:
         try:
-            model_specs = load_model_catalog(arguments.model_catalog)
+            model_specs = _catalog_overrides(
+                load_model_catalog(arguments.model_catalog), arguments, config,
+                _explicit_arguments(sys.argv[1:]),
+            )
         except ModelCatalogError as error:
             parser.error(str(error))
     elif arguments.model:
@@ -2446,9 +2440,10 @@ def main() -> None:
             parser.error(str(error))
         if installed.model_kind not in MODEL_IDS:
             parser.error(f"unsupported model kind: {installed.model_kind}")
-        if installed.is_qwen and arguments.dspark:
-            parser.error("Qwen3.8-Flash-Next does not support --dspark")
-        if arguments.mtp and not installed.is_qwen:
+        support = support_for_installed(installed)
+        if not support.descriptor.supports("dspark") and arguments.dspark:
+            parser.error(f"{support.option_error_name} does not support --dspark")
+        if arguments.mtp and not support.descriptor.supports("mtp"):
             parser.error("--mtp is supported only by Qwen3.8-Flash-Next")
         if arguments.mtp and not installed.has_mtp:
             parser.error("--mtp requires an installed MTP sidecar")
@@ -2457,11 +2452,11 @@ def main() -> None:
         default_top_p = arguments.default_top_p
         default_top_k = arguments.default_top_k
         if default_temperature is None:
-            default_temperature = 0.7 if installed.is_qwen else 0.2
+            default_temperature = support.descriptor.defaults["temperature"]
         if default_top_p is None:
-            default_top_p = 0.8 if installed.is_qwen else 0.98
+            default_top_p = support.descriptor.defaults["topP"]
         if default_top_k is None:
-            default_top_k = 20 if installed.is_qwen else 0
+            default_top_k = support.descriptor.defaults["topK"]
         try:
             options = _options(
                 {
@@ -2471,11 +2466,8 @@ def main() -> None:
                     "top_k": default_top_k,
                 },
                 ServerDefaults(),
-                approximation_default=(
-                    EXACT_APPROXIMATION_MODE
-                    if installed.is_qwen or arguments.dspark
-                    else LEARNED_ROUTE_DROP_LOWEST_1
-                ),
+                approximation_default=support.default_approximation(arguments.dspark),
+                support=support,
             )
             model_specs = parse_model_catalog(
                 {

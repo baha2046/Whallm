@@ -336,3 +336,46 @@
 "Verify up to four tokens together" = "一次確認最多四個字詞";
 
 "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "文字重複時重用專家資料，每個字詞仍由模型確認。啟用 MTP、格式不支援或狀態快取過大時，使用原本的生成方式。下次載入模型時生效。";
+
+"Number of routed experts in the Active Parameters Cache. The recommended value is %lld." = "Active Parameters Cache 的 routed expert 數量。建議值是 %lld。";
+
+"Prompt cache" = "提示快取";
+
+"Off" = "不使用";
+
+"Disk" = "磁碟";
+
+"Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again." = "記憶體快取保留到模型卸載；磁碟快取可在重啟後重用；不使用則每次重新處理輸入。";
+
+"Use adaptive sampling" = "使用自動適應";
+
+"Chooses sampling values for chat or thinking. Turn off to use the values below." = "依一般對話或思考模式選擇參數。關閉後使用下方設定值。";
+
+"Use approximate mode" = "使用近似模式";
+
+"Off uses Exact mode. Approximate mode is not used with DSpark." = "關閉時使用 Exact 模式。啟用 DSpark 時不使用近似模式。";
+
+"Expert cache eviction" = "專家快取淘汰方式";
+
+"LRU keeps recently used experts. LFU keeps frequently used experts." = "LRU 保留最近使用的專家資料；LFU 保留使用次數較多的專家資料。";
+
+"LRU (recently used)" = "LRU（最近使用）";
+
+"LFU (frequently used)" = "LFU（使用次數）";
+
+"Prefetch read workers" = "預讀工作數";
+
+"Number of workers that read expert data ahead of time. The default is 2." = "提前讀取專家資料的工作數，預設為 2。";
+
+"MoE prefill step size" = "MoE 輸入分批大小";
+
+"Number of input tokens processed together by MoE. 0 selects automatically." = "MoE 每批一起處理的輸入 token 數。0 表示自動選擇。";
+
+"Prefetch workers must be greater than 0. MoE prefill step size must be 0 or greater." = "預讀工作數必須大於 0；MoE 輸入分批大小必須為 0 或正整數。";
+
+"Update source" = "更新來源";
+"Stable includes official releases. Dev also includes test versions." = "Stable 提供正式版本，Dev 也包含測試版本。";
+"Automatically check for updates" = "自動檢查更新";
+"Check for new versions in the background." = "在背景檢查新版本。";
+
+"Updates" = "更新";

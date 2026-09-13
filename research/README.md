@@ -3,6 +3,14 @@
 目前 runtime 行為以 [docs](../docs/README.md) 為準。
 本目錄保存研究問題、實驗與尚未採用的方向。
 
+## 2026-09-12：模組化 runtime 與自有 mlx-lm fork
+
+[設計研究與分階段 TODO](MODULAR_RUNTIME_2026-09-12.md) 比較輕量封裝、模型支援套件、
+細粒度組件框架；使用者已選定模型支援套件並完成第一輪改造，
+目前結構見 [模型支援套件](../docs/MODEL_PACKAGES.md)。
+自有 fork 已建立，本機相容來源通過 389 項 runtime 測試及 1 項 V4 小模型測試，
+尚未提交/推送或切換 dependency；目前狀態見 [fork 紀錄](../docs/MLX_LM_FORK.md)。
+
 ## 2026-09-07：SSD Streaming 架構原型
 
 最新 [功能實作結果](SSD_FEATURE_IMPLEMENTATION_RESULTS_2026-09-07.md)：runtime

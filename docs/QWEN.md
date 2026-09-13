@@ -368,7 +368,10 @@ Responses 的非 `none` `reasoning.effort` 也會選取思考模式。
 其他 request 使用非思考模式。
 Text Completions 固定使用非思考模式。
 
-明確的 `temperature`、`top_p` 和 `top_k` 會覆寫模式配置。
+上述模式配置在 `defaults.qwen_adaptive_sampling=true`（預設）時生效。
+設為 `false` 時，兩種模式都使用 catalog 的 `temperature`、`top_p`、`top_k`；
+其他懲罰參數仍依模式選擇。
+明確的 request `temperature`、`top_p` 和 `top_k` 會覆寫模型預設。
 明確的 `temperature: 0` 會使用 greedy sampling。
 正數 `temperature` 會使用 categorical sampling。
 Runtime 固定使用 MLX 0.32.1；0.32.0 的 compiled sampler 在背景執行緒可能
@@ -386,10 +389,10 @@ Runtime 固定使用 MLX 0.32.1；0.32.0 的 compiled sampler 在背景執行緒
 processor 不會檢查 prompt cache 已重用的 prefix。
 因此，這項配置不是完整 prompt 的重複偵測器。
 
-App 的 Qwen 進階設定只顯示 Max tokens。
-App 不顯示 Temperature、Top P 或 Top K。
-Qwen 儲存設定會在 normalization 時更新為 `0.7 / 0.8 / 20`。
-DeepSeek 仍顯示並使用三個欄位。
+App 的 Qwen 進階設定顯示 Max tokens、Temperature、Top P、Top K，
+以及預設開啟的 Use adaptive sampling。開啟時三個手動欄位停用，值仍會保留；
+關閉後才使用手動值。新設定的手動初值是 `0.7 / 0.8 / 20`，
+舊設定缺少自動取樣開關時採用開啟。
 
 Qwen 不支援 `--dspark`。
 Qwen 可以使用預設關閉的 `--mtp` speculative decoding prototype。
@@ -397,7 +400,7 @@ Qwen3.8 的 Advanced Settings 提供 `Use MTP` 和 `MTP slots`。
 `Slot` 預設為 4,096。
 `Use MTP` 預設關閉，`MTP slots` 預設為 32。
 啟用 MTP 時，App 產生的 model catalog 會設定 `mtp_enabled=true`。
-App 不會變更 Qwen 的 sampling 設定。
+MTP 開關不會改寫上述取樣設定。
 Installed model 沒有 MTP sidecar 時，App 會停用 `Use MTP`。
 Installed model 沒有 MTP sidecar 時，模型列會顯示 MTP 下載按鈕。
 App 使用既有的 MTP installer 加入 sidecar，且不重新下載 Qwen 主模型。
@@ -441,6 +444,12 @@ MLX peak memory 是 15,182,206,210 bytes。
 warm prompt cache 重用 4,095 個 token，並在 0.214 秒產生相同 token。
 兩次 output token SHA-256 都是
 `6dfb97632210ac38a071667cf8be7df83a16178e12f1248e45b2a3d24b3b2bd1`。
+
+2026-09-12：App 與 Python 的跨請求 prompt cache 預設改為僅使用記憶體。
+App 可切換不使用／記憶體／磁碟；CLI 使用 `--prompt-cache off|memory|disk`。
+Qwen「Verify up to four tokens together」新設定與缺少欄位的舊設定預設關閉，
+明確儲存的 true／false 保留。下列完整模型效能數字是當時條件的歷史紀錄，
+不是本次新預設的重新測量。
 
 2026-09-03 針對 GitHub issue #5 的完整模型驗證使用隔離的 persistent cache 目錄。
 37-token prompt 會保存 36-token prefill checkpoint。相同 request 的 cold、同 process

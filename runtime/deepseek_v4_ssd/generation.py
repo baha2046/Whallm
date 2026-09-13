@@ -27,6 +27,16 @@ from .expert_cache import CacheMetrics
 from .fp8_cache import MXFP8PoolingCache
 from .io_metrics import ProcessDiskIO, process_disk_io_snapshot
 from .manifest import InstalledModel
+from .model_support import get_support, support_for_installed, support_for_runtime
+from .model_support.state import (
+    _RawEvalCacheList,
+    _make_prompt_cache, _clone_cache_state, _cache_state_arrays, _cache_state_nbytes,
+    _encode_cache_state, _decode_cache_state, _persistence_item, _persistence_cache_state,
+    _restore_persistence_item, _restore_persistence_cache,
+)
+# Compatibility imports for existing research scripts; runtime uses its package.
+from .model_support.qwen import _qwen_layer_major_prefill
+from .model_support.deepseek_v41 import _deepseek_v41_prefill
 from .model import (
     RuntimeConfig,
     _cache_arrays,
@@ -63,16 +73,10 @@ def _uses_layer_major_prefill(
     is_deepseek_v41: bool = False,
     token_count: int,
 ) -> bool:
-    if is_deepseek_v41:
-        return False
-    threshold = (
-        128
-        if is_qwen
-        else getattr(config, "layer_major_prefill_threshold", 1_024)
+    kind = "deepseek-v4.1" if is_deepseek_v41 else (
+        "qwen3.8-flash-next" if is_qwen else "deepseek-v4"
     )
-    return bool(
-        getattr(config, "layer_major_prefill", True) and token_count >= threshold
-    )
+    return get_support(kind).uses_layer_major_prefill(config, token_count)
 
 
 @contextmanager
@@ -112,37 +116,8 @@ def _approximation_mode(runtime: Any, mode: str):
     if mode == EXACT_APPROXIMATION_MODE:
         yield
         return
-    if getattr(runtime, "_is_qwen", False):
-        raise ValueError("approximation mode is not supported for Qwen")
-    if getattr(runtime, "_is_deepseek_v41", False):
-        raise ValueError("approximation mode is not supported for DeepSeek V4.1")
-    if getattr(runtime.model, "dspark", None) is not None:
-        raise ValueError("approximation mode is not supported with DSpark")
-
-    core = getattr(runtime.model, "model", runtime.model)
-    layers = getattr(core, "layers", None)
-    if layers is None:
-        raise ValueError("installed model does not expose DeepSeek layers")
-    changed = []
-    hash_layers = 0
-    try:
-        for layer in layers:
-            gate = layer.ffn.gate
-            if getattr(gate, "hash", False):
-                if gate.top_k != 6:
-                    raise ValueError("hash router does not match exact top-k contract")
-                hash_layers += 1
-                continue
-            if gate.top_k != 6:
-                raise ValueError("learned router does not match exact top-k contract")
-            gate.top_k = 5
-            changed.append(gate)
-        if len(changed) != 40 or hash_layers != 3:
-            raise ValueError("installed model layer split does not match approximation contract")
+    with support_for_runtime(runtime).approximation(runtime.model, mode):
         yield
-    finally:
-        for gate in changed:
-            gate.top_k = 6
 
 
 @dataclass(frozen=True)
@@ -164,89 +139,6 @@ class GeneratedPiece:
     prompt_tokens: int
     generation_tokens: int
     finish_reason: str | None
-
-
-class _RawEvalCacheList(CacheList):
-    @property
-    def state(self):
-        return _cache_arrays([self])
-
-    @state.setter
-    def state(self, value):
-        for cache, saved in zip(self.caches, value):
-            cache.state = saved
-
-
-def _make_prompt_cache(model: Any):
-    cache = make_prompt_cache(model)
-    for layer_cache in cache:
-        if isinstance(layer_cache, CacheList):
-            layer_cache.__class__ = _RawEvalCacheList
-    return cache
-
-
-def _qwen_layer_major_prefill(
-    model: Any,
-    token_ids: list[int],
-    prompt_cache: Any,
-    step_size: int,
-    expert_cache: Any,
-    next_layer_prefetch: bool = False,
-) -> mx.array | None:
-    """Populate Qwen caches while reading each complete expert layer once."""
-    if not token_ids:
-        return None
-    core = model.model
-    if len(prompt_cache) != len(core.layers):
-        raise ValueError("prompt cache does not match the Qwen model layers")
-    record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
-    inputs = mx.array(token_ids)[None]
-    hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
-    for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
-        check_cancelled()
-        outputs = []
-        with expert_cache.batched_layer(layer_index):
-            for start in range(0, len(token_ids), step_size):
-                check_cancelled()
-                end = min(start + step_size, len(token_ids))
-                chunk = hidden[:, start:end]
-                chunk_ids = inputs[:, start:end]
-                mask = (
-                    create_ssm_mask(
-                        chunk[..., : core.args.hidden_size],
-                        layer_cache,
-                    )
-                    if layer.layer_type == "linear_attention"
-                    else None
-                )
-                output = layer(chunk, chunk_ids, mask, layer_cache)
-                if (
-                    next_layer_prefetch
-                    and start == 0
-                    and layer_index + 1 < len(core.layers)
-                ):
-                    expert_cache.prefetch_layer(layer_index + 1)
-                if callable(record_compute_submit):
-                    record_compute_submit(layer_index)
-                eval_prompt_cache([layer_cache], output)
-                outputs.append(output)
-        hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
-        mx.eval(hidden)
-        if layer_index + 1 == len(core.layers):
-            return hidden
-
-
-def _deepseek_v41_prefill(
-    model,
-    token_ids: list[int],
-    cache,
-    step_size: int,
-) -> None:
-    for start in range(0, len(token_ids), step_size):
-        check_cancelled()
-        tokens = mx.array(token_ids[start : start + step_size])[None]
-        logits = model(tokens, cache=cache)
-        mx.eval(logits)
 
 
 @dataclass
@@ -387,138 +279,6 @@ def _prompt_cache_block_identity(
         )
         parent = block_key
     return contract_sha256, blocks, parent
-
-
-def _clone_cache_state(value: Any) -> Any:
-    if isinstance(value, mx.array):
-        return value + mx.zeros((), value.dtype)
-    if isinstance(value, tuple):
-        return tuple(_clone_cache_state(item) for item in value)
-    if isinstance(value, list):
-        return [_clone_cache_state(item) for item in value]
-    if isinstance(value, dict):
-        return {key: _clone_cache_state(item) for key, item in value.items()}
-    return copy.deepcopy(value)
-
-
-def _cache_state_arrays(value: Any) -> list[mx.array]:
-    if isinstance(value, mx.array):
-        return [value]
-    if isinstance(value, (tuple, list)):
-        return [array for item in value for array in _cache_state_arrays(item)]
-    if isinstance(value, dict):
-        return [array for item in value.values() for array in _cache_state_arrays(item)]
-    return []
-
-
-def _cache_state_nbytes(value: Any) -> int:
-    return sum(int(array.nbytes) for array in _cache_state_arrays(value))
-
-
-def _encode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
-    if isinstance(value, mx.array):
-        if value.size == 0:
-            return {
-                "empty_array": {
-                    "shape": list(value.shape),
-                    "dtype": str(value.dtype).rsplit(".", 1)[-1],
-                }
-            }
-        name = f"state_{len(arrays)}"
-        arrays[name] = value
-        return {"array": name}
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, (list, tuple)):
-        return {
-            "items": [_encode_cache_state(item, arrays) for item in value],
-            "tuple": isinstance(value, tuple),
-        }
-    if isinstance(value, dict):
-        return {
-            "mapping": [
-                [str(key), _encode_cache_state(item, arrays)]
-                for key, item in value.items()
-            ]
-        }
-    raise TypeError(f"unsupported prompt cache state value: {type(value).__name__}")
-
-
-def _decode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
-    if isinstance(value, dict) and "empty_array" in value:
-        description = value["empty_array"]
-        dtype = getattr(mx, description["dtype"])
-        return mx.empty(tuple(description["shape"]), dtype=dtype)
-    if isinstance(value, dict) and "array" in value:
-        return arrays[value["array"]]
-    if isinstance(value, dict) and "items" in value:
-        items = [_decode_cache_state(item, arrays) for item in value["items"]]
-        return tuple(items) if value.get("tuple") else items
-    if isinstance(value, dict) and "mapping" in value:
-        return {
-            key: _decode_cache_state(item, arrays)
-            for key, item in value["mapping"]
-        }
-    return value
-
-
-def _persistence_item(item: Any) -> dict[str, Any]:
-    if isinstance(item, MXFP8PoolingCache):
-        return {
-            "kind": "mxfp8_pooling",
-            "value": item.persistence_state(),
-        }
-    return {
-        "kind": "state",
-        "value": item.state,
-        "meta": getattr(item, "meta_state", ""),
-    }
-
-
-def _persistence_cache_state(cache: Any) -> list[dict[str, Any]]:
-    state = []
-    for layer_cache in cache:
-        if isinstance(layer_cache, CacheList):
-            state.append(
-                {
-                    "kind": "cache_list",
-                    "items": [_persistence_item(item) for item in layer_cache.caches],
-                }
-            )
-        else:
-            state.append(_persistence_item(layer_cache))
-    return state
-
-
-def _restore_persistence_item(target: Any, saved: dict[str, Any]) -> None:
-    kind = saved.get("kind")
-    if kind == "mxfp8_pooling":
-        if not isinstance(target, MXFP8PoolingCache):
-            raise ValueError("prompt cache type does not match the saved cache")
-        target.restore_persistence_state(saved["value"])
-        return
-    if kind != "state":
-        raise ValueError(f"unsupported prompt cache item kind: {kind}")
-    target.state = saved["value"]
-    meta = saved.get("meta", "")
-    if meta not in (None, ""):
-        target.meta_state = meta
-
-
-def _restore_persistence_cache(cache: Any, state: list[dict[str, Any]]) -> None:
-    if len(cache) != len(state):
-        raise ValueError("prompt cache layer count does not match")
-    for target, saved in zip(cache, state):
-        if saved.get("kind") == "cache_list":
-            if not isinstance(target, CacheList):
-                raise ValueError("prompt cache structure does not match")
-            items = saved["items"]
-            if len(target.caches) != len(items):
-                raise ValueError("prompt cache item count does not match")
-            for target_item, saved_item in zip(target.caches, items):
-                _restore_persistence_item(target_item, saved_item)
-        else:
-            _restore_persistence_item(target, saved)
 
 
 class RuntimeMetrics:
@@ -1936,22 +1696,17 @@ class RuntimeMetrics:
 class ModelRuntime:
     """Keep one installed model resident and serialize all generation."""
 
-    _is_deepseek_v41 = False
+    support = get_support("deepseek-v4")
 
     def __init__(self, installed: InstalledModel, config: RuntimeConfig):
         self.installed = installed
-        self._is_qwen = bool(getattr(installed, "is_qwen", False))
-        self._is_deepseek_v41 = bool(
-            getattr(installed, "is_deepseek_v41", False)
-        )
+        self.support = support_for_installed(installed)
+        self._closed = False
         self._model_id = getattr(installed, "model_id", "deepseek-v4")
         self._revision = getattr(installed, "revision", "")
         self._manifest_format = getattr(installed, "format_version", 1)
         self.config = config
-        if getattr(config, "qwen_grouped_decode", False) and (
-            not self._is_qwen or getattr(config, "mtp_enabled", False)
-        ):
-            raise ValueError("grouped Decode requires Qwen with MTP disabled")
+        self.support.validate_config(config)
         self.metrics = RuntimeMetrics()
         self._codec: ToolCodec | None = None
         self._prompt_caches: list[_PromptCacheEntry] = []
@@ -1963,12 +1718,6 @@ class ModelRuntime:
         self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
-        if self._is_qwen and getattr(config, "dspark_enabled", False):
-            raise ValueError("Qwen3.8-Flash-Next does not support DSpark")
-        if self._is_deepseek_v41 and getattr(config, "dspark_enabled", False):
-            raise ValueError("DeepSeek V4.1 does not support DSpark")
-        if not self._is_qwen and getattr(config, "mtp_enabled", False):
-            raise ValueError("MTP is supported only by Qwen3.8-Flash-Next")
         with mx.stream(self._generation_stream):
             self.model, self.expert_cache = load_model(installed, config)
             try:
@@ -1977,13 +1726,7 @@ class ModelRuntime:
                     trust_remote_code=True,
                 )
             except Exception:
-                dspark = getattr(self.model, "dspark", None)
-                if dspark is not None:
-                    dspark.expert_cache.close()
-                mtp_expert_cache = getattr(self.model, "mtp_expert_cache", None)
-                if mtp_expert_cache is not None:
-                    mtp_expert_cache.close()
-                self.expert_cache.close()
+                self.support.close(self.model, self.expert_cache)
                 raise
         self._prompt_cache_directory = self._open_prompt_cache_directory()
         if self._prompt_cache_directory is not None:
@@ -2023,7 +1766,7 @@ class ModelRuntime:
         reasoning_effort: str = "low",
     ) -> str:
         if self._codec is None:
-            self._codec = ToolCodec.open(self.installed.root, self.tokenizer)
+            self._codec = self.support.open_codec(self.installed.root, self.tokenizer)
         return self._codec.encode(
             messages,
             thinking_mode,
@@ -2034,15 +1777,11 @@ class ModelRuntime:
 
     def parse_chat(self, text: str, thinking_mode: str) -> AssistantTurn:
         if self._codec is None:
-            self._codec = ToolCodec.open(self.installed.root, self.tokenizer)
+            self._codec = self.support.open_codec(self.installed.root, self.tokenizer)
         return self._codec.parse(text, thinking_mode)
 
     def make_tool_stream_parser(self, thinking_mode: str):
-        if self._is_qwen:
-            return QwenToolStreamParser(thinking_mode)
-        if self._is_deepseek_v41:
-            return DeepSeekV41ToolStreamParser(thinking_mode)
-        return ToolStreamParser(thinking_mode)
+        return self.support.make_tool_stream_parser(thinking_mode)
 
     def stream(
         self,
@@ -2081,6 +1820,7 @@ class ModelRuntime:
                 dspark_prompt_cache_enabled = bool(
                     dspark is not None
                     and getattr(self.config, "dspark_prompt_cache", False)
+                    and self._prompt_cache_enabled()
                 )
                 dspark_prompt_cache_source = "disabled"
                 if dspark_prompt_cache_enabled:
@@ -2095,14 +1835,14 @@ class ModelRuntime:
                     dspark.restore_cache_state(dspark_entry.context_state)
                 elif mtp is not None:
                     entry = _PromptCacheEntry(
-                        _make_prompt_cache(self.model),
+                        self.support.new_cache(self.model),
                         [],
                         options.approximation_mode,
                     )
                 else:
                     entry = (
                         _PromptCacheEntry(
-                            _make_prompt_cache(self.model),
+                            self.support.new_cache(self.model),
                             [],
                             options.approximation_mode,
                         )
@@ -2122,11 +1862,8 @@ class ModelRuntime:
                     getattr(self.config, "prefill_step_size", 128),
                     len(generation_prompt),
                 )
-                use_layer_major = _uses_layer_major_prefill(
-                    self.config,
-                    is_qwen=self._is_qwen,
-                    is_deepseek_v41=self._is_deepseek_v41,
-                    token_count=len(generation_prompt),
+                use_layer_major = self.support.uses_layer_major_prefill(
+                    self.config, len(generation_prompt),
                 )
                 self.metrics.start(
                     len(prompt_tokens),
@@ -2143,7 +1880,8 @@ class ModelRuntime:
                 )
                 block_enabled = bool(getattr(self.config, "qwen_short_block", False))
                 use_short_block = bool(
-                    block_enabled and self._is_qwen and dspark is None and mtp is None
+                    block_enabled and self.support.descriptor.supports("shortBlock")
+                    and dspark is None and mtp is None
                     and getattr(self.expert_cache, "qwen_short_block_active", False)
                     and options.approximation_mode == EXACT_APPROXIMATION_MODE
                 )
@@ -2159,7 +1897,7 @@ class ModelRuntime:
                 def record_prefill_checkpoint(processed: int, total: int) -> None:
                     check_cancelled()
                     if (
-                        self._prompt_cache_directory is None
+                        not self._prompt_cache_enabled()
                         or options.approximation_mode != EXACT_APPROXIMATION_MODE
                         or use_layer_major
                         or processed <= 0
@@ -2175,7 +1913,7 @@ class ModelRuntime:
                         return
                     snapshot_started = time.perf_counter()
                     state = _clone_cache_state(
-                        _persistence_cache_state(prompt_cache)
+                        self.support.snapshot_cache(prompt_cache)
                     )
                     arrays = _cache_state_arrays(state)
                     if arrays:
@@ -2205,17 +1943,9 @@ class ModelRuntime:
                         prefilled_hidden = None
                         if use_layer_major:
                             with _route_phase(self.expert_cache, "prefill"):
-                                prefilled_hidden = _qwen_layer_major_prefill(
-                                    self.model,
-                                    prompt_tokens[:-1],
-                                    prompt_cache,
-                                    step_size,
-                                    self.expert_cache,
-                                    getattr(
-                                        self.config,
-                                        "qwen_next_layer_prefetch",
-                                        False,
-                                    ),
+                                prefilled_hidden = self.support.prefill(
+                                    self.model, prompt_tokens[:-1], prompt_cache,
+                                    step_size, self.expert_cache, self.config,
                                 )
                         yield from self._stream_mtp(
                             prompt_tokens,
@@ -2230,47 +1960,24 @@ class ModelRuntime:
                         return
                     if use_layer_major:
                         with _route_phase(self.expert_cache, "prefill"):
-                            if self._is_qwen:
-                                _qwen_layer_major_prefill(
-                                    self.model,
-                                    generation_prompt[:-1],
-                                    prompt_cache,
-                                    step_size,
-                                    self.expert_cache,
-                                    getattr(
-                                        self.config,
-                                        "qwen_next_layer_prefetch",
-                                        False,
-                                    ),
-                                )
-                            else:
-                                layer_major_prefill(
-                                    self.model,
-                                    generation_prompt[:-1],
-                                    prompt_cache,
-                                    step_size,
-                                    self.expert_cache,
-                                    getattr(self.config, "moe_prefill_step_size", 0),
-                                    getattr(self.config, "batched_expert_prefill", True),
-                                    getattr(
-                                        self.config,
-                                        "adaptive_expert_prefill_threshold",
-                                        None,
-                                    ),
-                                )
-                        snapshot_started = time.perf_counter()
-                        prefill_persist_entry = _PromptCacheEntry(
-                            copy.deepcopy(prompt_cache),
-                            list(prompt_tokens[:-1]),
-                            options.approximation_mode,
-                        )
-                        self.metrics.record_prompt_cache_snapshot(
-                            time.perf_counter() - snapshot_started
-                        )
-                        self._store_prompt_cache(
-                            prefill_persist_entry,
-                            persist=False,
-                        )
+                            self.support.prefill(
+                                self.model, generation_prompt[:-1], prompt_cache,
+                                step_size, self.expert_cache, self.config,
+                            )
+                        if self._prompt_cache_enabled():
+                            snapshot_started = time.perf_counter()
+                            prefill_persist_entry = _PromptCacheEntry(
+                                self.support.clone_cache(prompt_cache),
+                                list(prompt_tokens[:-1]),
+                                options.approximation_mode,
+                            )
+                            self.metrics.record_prompt_cache_snapshot(
+                                time.perf_counter() - snapshot_started
+                            )
+                            self._store_prompt_cache(
+                                prefill_persist_entry,
+                                persist=False,
+                            )
                         generation_prompt = generation_prompt[-1:]
                     with _use_mlx_lm_generation_stream(self._generation_stream):
                         if getattr(self.config, "qwen_grouped_decode", False):
@@ -2310,7 +2017,7 @@ class ModelRuntime:
                                 first_response = False
                                 step_seconds = time.perf_counter() - started
                                 cache_started = time.perf_counter()
-                                eval_prompt_cache(prompt_cache)
+                                self.support.evaluate_cache(prompt_cache)
                                 cache_seconds = time.perf_counter() - cache_started
                                 self.metrics.record(response, step_seconds, cache_seconds)
                                 if response.finish_reason != "stop":
@@ -2338,7 +2045,13 @@ class ModelRuntime:
                             self._persist_prompt_cache(prefill_persist_entry)
                         if options.approximation_mode == EXACT_APPROXIMATION_MODE:
                             for snapshot in prefill_persist_snapshots.values():
-                                self._persist_prompt_cache_snapshot(snapshot)
+                                if self._prompt_cache_directory is not None:
+                                    self._persist_prompt_cache_snapshot(snapshot)
+                                cache = self.support.new_cache(self.model)
+                                self.support.restore_cache(cache, snapshot.state)
+                                self._store_prompt_cache(_PromptCacheEntry(
+                                    cache, list(snapshot.tokens),
+                                ))
                         self._store_prompt_cache(entry, persist=True)
 
     def _stream_mtp(
@@ -2543,60 +2256,34 @@ class ModelRuntime:
             return 0
         with self._generation_lock:
             with mx.stream(self._generation_stream):
-                cache = _make_prompt_cache(self.model)
+                cache = self.support.new_cache(self.model)
                 step_size = _select_prefill_step_size(
                     getattr(self.config, "prefill_step_size", 128),
                     len(tokens) - 1,
                 )
-                if self._is_qwen:
-                    _qwen_layer_major_prefill(
-                        self.model,
-                        tokens[:-1],
-                        cache,
-                        step_size,
-                        self.expert_cache,
-                        getattr(
-                            self.config,
-                            "qwen_next_layer_prefetch",
-                            False,
-                        ),
-                    )
-                elif self._is_deepseek_v41:
-                    _deepseek_v41_prefill(
-                        self.model,
-                        tokens[:-1],
-                        cache,
-                        step_size,
-                    )
-                else:
-                    layer_major_prefill(
-                        self.model,
-                        tokens[:-1],
-                        cache,
-                        step_size,
-                        self.expert_cache,
-                        getattr(self.config, "moe_prefill_step_size", 0),
-                        getattr(self.config, "batched_expert_prefill", True),
-                        getattr(
-                            self.config,
-                            "adaptive_expert_prefill_threshold",
-                            None,
-                        ),
-                    )
+                self.support.prefill(
+                    self.model, tokens[:-1], cache, step_size, self.expert_cache, self.config,
+                )
                 self._store_prompt_cache(
                     _PromptCacheEntry(cache, tokens[:-1]),
                     persist=True,
                 )
         return len(tokens) - 1
 
+    def _prompt_cache_enabled(self) -> bool:
+        return (
+            self.support.descriptor.supports("promptCache")
+            and getattr(self.config, "prompt_cache_entries", 2) > 0
+        )
+
     def _acquire_prompt_cache(
         self,
         prompt_tokens: list[int],
         approximation_mode: str = EXACT_APPROXIMATION_MODE,
     ) -> _PromptCacheEntry:
-        if self._is_deepseek_v41:
+        if not self._prompt_cache_enabled():
             return _PromptCacheEntry(
-                _make_prompt_cache(self.model),
+                self.support.new_cache(self.model),
                 [],
                 approximation_mode,
             )
@@ -2610,13 +2297,13 @@ class ModelRuntime:
         if matches:
             entry = max(matches, key=lambda item: len(item.tokens))
             return _PromptCacheEntry(
-                copy.deepcopy(entry.cache),
+                self.support.clone_cache(entry.cache),
                 list(entry.tokens),
                 approximation_mode,
             )
         if approximation_mode != EXACT_APPROXIMATION_MODE:
             return _PromptCacheEntry(
-                _make_prompt_cache(self.model),
+                self.support.new_cache(self.model),
                 [],
                 approximation_mode,
             )
@@ -2633,7 +2320,7 @@ class ModelRuntime:
                 self._record_persistent_prompt_cache_hit(entry)
                 return loaded
         return _PromptCacheEntry(
-            _make_prompt_cache(self.model),
+            self.support.new_cache(self.model),
             [],
             approximation_mode,
         )
@@ -2656,9 +2343,9 @@ class ModelRuntime:
         self,
         entry: _DSparkPromptCacheEntry,
     ) -> _DSparkPromptCacheEntry:
-        target_cache = copy.deepcopy(entry.cache)
+        target_cache = self.support.clone_cache(entry.cache)
         context_state = _clone_cache_state(entry.context_state)
-        eval_prompt_cache(target_cache)
+        self.support.evaluate_cache(target_cache)
         context_arrays = _cache_state_arrays(context_state)
         if context_arrays:
             mx.eval(*context_arrays)
@@ -2701,7 +2388,7 @@ class ModelRuntime:
                 return self._clone_dspark_prompt_cache_entry(loaded), "persistent"
         return (
             _DSparkPromptCacheEntry(
-                _make_prompt_cache(self.model),
+                self.support.new_cache(self.model),
                 tuple(None for _ in getattr(dspark, "layers", ())),
                 [],
                 str(getattr(self.installed, "revision", "")),
@@ -2722,7 +2409,7 @@ class ModelRuntime:
             return
         snapshot_started = time.perf_counter()
         entry = _DSparkPromptCacheEntry(
-            copy.deepcopy(target_cache),
+            self.support.clone_cache(target_cache),
             _clone_cache_state(context_state),
             list(prompt_tokens[:processed]),
             str(getattr(self.installed, "revision", "")),
@@ -2730,7 +2417,7 @@ class ModelRuntime:
         )
         if not self._dspark_prompt_cache_contract_matches(entry, dspark):
             return
-        eval_prompt_cache(entry.cache)
+        self.support.evaluate_cache(entry.cache)
         context_arrays = _cache_state_arrays(entry.context_state)
         if context_arrays:
             mx.eval(*context_arrays)
@@ -2774,7 +2461,7 @@ class ModelRuntime:
 
     def _dspark_prompt_cache_bytes(self) -> int:
         return sum(
-            _cache_state_nbytes(_persistence_cache_state(entry.cache))
+            _cache_state_nbytes(self.support.snapshot_cache(entry.cache))
             + _cache_state_nbytes(entry.context_state)
             for entry in self._dspark_prompt_caches
         )
@@ -2785,7 +2472,7 @@ class ModelRuntime:
         *,
         persist: bool = False,
     ) -> None:
-        if self._is_deepseek_v41:
+        if not self._prompt_cache_enabled():
             return
         self._prompt_caches = [
             cached
@@ -2827,9 +2514,9 @@ class ModelRuntime:
         )
 
     def _open_prompt_cache_directory(self) -> Path | None:
-        if self._is_deepseek_v41:
+        if not self._prompt_cache_enabled():
             return None
-        if not getattr(self.config, "persistent_prompt_cache", True):
+        if not getattr(self.config, "persistent_prompt_cache", False):
             return None
         revision = getattr(self.installed, "revision", None)
         if not revision:
@@ -3032,15 +2719,15 @@ class ModelRuntime:
             arrays, metadata = mx.load(entry.path, return_metadata=True)
             schema = json.loads(metadata["state"])
             state = _decode_cache_state(schema, arrays)
-            cache = _make_prompt_cache(self.model)
+            cache = self.support.new_cache(self.model)
             if entry.format == 1:
                 if len(cache) != len(state):
                     return None
                 for target, saved in zip(cache, state):
                     target.state = saved
             else:
-                _restore_persistence_cache(cache, state)
-            eval_prompt_cache(cache)
+                self.support.restore_cache(cache, state)
+            self.support.evaluate_cache(cache)
             return _PromptCacheEntry(cache, list(entry.tokens))
         except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
             return None
@@ -3059,8 +2746,8 @@ class ModelRuntime:
             context_state = state["context"]
             if not isinstance(context_state, tuple):
                 return None
-            cache = _make_prompt_cache(self.model)
-            _restore_persistence_cache(cache, state["target"])
+            cache = self.support.new_cache(self.model)
+            self.support.restore_cache(cache, state["target"])
             loaded = _DSparkPromptCacheEntry(
                 cache,
                 context_state,
@@ -3070,7 +2757,7 @@ class ModelRuntime:
             )
             if not self._dspark_prompt_cache_contract_matches(loaded, dspark):
                 return None
-            eval_prompt_cache(cache)
+            self.support.evaluate_cache(cache)
             context_arrays = _cache_state_arrays(context_state)
             if context_arrays:
                 mx.eval(*context_arrays)
@@ -3081,7 +2768,7 @@ class ModelRuntime:
     def _persist_prompt_cache(self, entry: _PromptCacheEntry) -> None:
         self._persist_prompt_cache_state(
             entry.tokens,
-            _persistence_cache_state(entry.cache),
+            self.support.snapshot_cache(entry.cache),
         )
 
     def _persist_prompt_cache_snapshot(
@@ -3210,7 +2897,7 @@ class ModelRuntime:
         serialize_started = time.perf_counter()
         arrays: dict[str, mx.array] = {}
         state = {
-            "target": _persistence_cache_state(entry.cache),
+            "target": self.support.snapshot_cache(entry.cache),
             "context": entry.context_state,
         }
         schema = _encode_cache_state(state, arrays)
@@ -3319,17 +3006,9 @@ class ModelRuntime:
         self._persistent_prompt_caches.clear()
         self._dspark_prompt_caches.clear()
         self._persistent_dspark_prompt_caches.clear()
-        dspark = getattr(self.model, "dspark", None)
-        if dspark is not None:
-            dspark.reset_cache()
-            dspark.expert_cache.close()
-        mtp_expert_cache = getattr(self.model, "mtp_expert_cache", None)
-        if mtp_expert_cache is not None:
-            mtp_expert_cache.close()
-        ane_prefill = getattr(self.model, "ane_prefill", None)
-        if ane_prefill is not None:
-            ane_prefill.close()
-        self.expert_cache.close()
+        if not getattr(self, "_closed", False):
+            self._closed = True
+            self.support.close(self.model, self.expert_cache)
 
     def __enter__(self) -> ModelRuntime:
         return self

@@ -336,3 +336,46 @@
 "Verify up to four tokens together" = "Verify up to four tokens together";
 
 "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.";
+
+"Number of routed experts in the Active Parameters Cache. The recommended value is %lld." = "Number of routed experts in the Active Parameters Cache. The recommended value is %lld.";
+
+"Prompt cache" = "Prompt cache";
+
+"Off" = "Off";
+
+"Disk" = "Disk";
+
+"Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again." = "Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again.";
+
+"Use adaptive sampling" = "Use adaptive sampling";
+
+"Chooses sampling values for chat or thinking. Turn off to use the values below." = "Chooses sampling values for chat or thinking. Turn off to use the values below.";
+
+"Use approximate mode" = "Use approximate mode";
+
+"Off uses Exact mode. Approximate mode is not used with DSpark." = "Off uses Exact mode. Approximate mode is not used with DSpark.";
+
+"Expert cache eviction" = "Expert cache eviction";
+
+"LRU keeps recently used experts. LFU keeps frequently used experts." = "LRU keeps recently used experts. LFU keeps frequently used experts.";
+
+"LRU (recently used)" = "LRU (recently used)";
+
+"LFU (frequently used)" = "LFU (frequently used)";
+
+"Prefetch read workers" = "Prefetch read workers";
+
+"Number of workers that read expert data ahead of time. The default is 2." = "Number of workers that read expert data ahead of time. The default is 2.";
+
+"MoE prefill step size" = "MoE prefill step size";
+
+"Number of input tokens processed together by MoE. 0 selects automatically." = "Number of input tokens processed together by MoE. 0 selects automatically.";
+
+"Prefetch workers must be greater than 0. MoE prefill step size must be 0 or greater." = "Prefetch workers must be greater than 0. MoE prefill step size must be 0 or greater.";
+
+"Update source" = "Update source";
+"Stable includes official releases. Dev also includes test versions." = "Stable includes official releases. Dev also includes test versions.";
+"Automatically check for updates" = "Automatically check for updates";
+"Check for new versions in the background." = "Check for new versions in the background.";
+
+"Updates" = "Updates";

@@ -40,7 +40,7 @@ class RuntimeConfig:
     layer_major_prefill_threshold: int = 1_024
     prompt_cache_entries: int = 2
     prompt_cache_memory_gib: int = 8
-    persistent_prompt_cache: bool = True
+    persistent_prompt_cache: bool = False
     persistent_prompt_cache_entries: int = 8
     prompt_cache_directory: str | None = None
     moe_prefill_step_size: int = 0
@@ -72,6 +72,15 @@ class RuntimeConfig:
     adaptive_expert_prefill_threshold: float | None = None
     power_saving_limit_gbps: float | None = None
 
+
+def _apply_prompt_cache_mode(config: RuntimeConfig, mode: str | None) -> RuntimeConfig:
+    if mode is None:
+        return config
+    return replace(
+        config,
+        prompt_cache_entries=0 if mode == "off" else max(1, config.prompt_cache_entries),
+        persistent_prompt_cache=mode == "disk",
+    )
 
 def _validate_adaptive_expert_prefill_config(config: RuntimeConfig) -> None:
     threshold = getattr(config, "adaptive_expert_prefill_threshold", None)
@@ -829,8 +838,9 @@ def load_model(
     config: RuntimeConfig = RuntimeConfig(),
 ):
     _validate_adaptive_expert_prefill_config(config)
-    if config.qwen_grouped_decode and (not installed_model.is_qwen or config.mtp_enabled):
-        raise ValueError("grouped Decode requires Qwen with MTP disabled")
+    from .model_support import support_for_installed
+    support = support_for_installed(installed_model)
+    support.validate_config(config)
     if (
         config.power_saving_limit_gbps is not None
         and config.power_saving_limit_gbps not in _POWER_SAVING_LIMITS_GBPS
@@ -840,7 +850,7 @@ def load_model(
         )
     _configure_memory_limits(
         config,
-        automatic_cap_gib=48 if installed_model.is_qwen else 0,
+        automatic_cap_gib=support.descriptor.automatic_memory_gib,
     )
     mx.set_cache_limit(1024**3)
 
@@ -851,165 +861,9 @@ def load_model(
         if config.power_saving_limit_gbps is not None
         else None
     )
-    if installed_model.is_deepseek_v41:
-        from .deepseek_v41_ssd import load as load_deepseek_v41
-
-        return load_deepseek_v41(
-            installed_model,
-            config,
-            raw_config,
-            _load_common_weights(installed_model),
-            read_limiter,
-        )
-    if installed_model.is_qwen:
-        if config.staged_expert_streaming:
-            raise ValueError(
-                "Qwen3.8-Flash-Next does not support staged expert streaming"
-            )
-        if config.adaptive_expert_prefill_threshold is not None:
-            raise ValueError(
-                "Qwen3.8-Flash-Next does not support adaptive expert prefill"
-            )
-        from .qwen4_exp import load as load_qwen
-
-        model, cache = load_qwen(
-            installed_model,
-            config,
-            raw_config,
-            _load_common_weights(installed_model),
-            read_limiter,
-        )
-        model.mtp = None
-        model.mtp_expert_cache = None
-        if config.mtp_enabled:
-            try:
-                model.mtp, model.mtp_expert_cache = _load_qwen_mtp(
-                    installed_model,
-                    model.args,
-                    config,
-                    read_limiter,
-                )
-            except Exception:
-                cache.close()
-                raise
-        return model, cache
-    args = deepseek_v4.ModelArgs.from_dict(raw_config)
-
-    deepseek_v4.SwitchGLU = _EmptySwitchGLU
-    deepseek_v4.PoolingCache = (
-        MXFP8PoolingCache if config.fp8_kv_cache else CorrectPoolingCache
+    return support.load(
+        installed_model, config, raw_config, _load_common_weights(installed_model), read_limiter,
     )
-    MXFP8PoolingCache.fp4_index = config.fp4_index_cache
-    deepseek_v4.Compressor.__call__ = _correct_compressor
-    deepseek_v4.Indexer.__call__ = _correct_indexer
-    deepseek_v4._sparse_pooled_attention = _sparse_pooled_attention
-    model = deepseek_v4.Model(args)
-    cache = ExpertCache(
-        installed_model,
-        config.slots,
-        config.read_workers,
-        config.prefetch_read_workers,
-        route_trace_path=config.expert_route_trace,
-        ready_expert_decode=config.ready_expert_decode,
-        read_limiter=read_limiter,
-        page_cache_probe=config.expert_page_cache_probe,
-        file_cache_policy=config.expert_file_cache_policy,
-        eviction_policy=config.expert_eviction_policy,
-        staged_expert_streaming=config.staged_expert_streaming,
-    )
-    try:
-        if config.staged_expert_streaming:
-            if not config.ready_expert_decode:
-                raise ValueError(
-                    "staged expert streaming requires ready expert decode"
-                )
-            if config.dspark_enabled:
-                raise ValueError(
-                    "staged expert streaming prototype does not support DSpark"
-                )
-        if getattr(config, "dspark_prompt_cache", False):
-            if not config.dspark_enabled:
-                raise ValueError("DSpark prompt cache requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-        if not config.dspark_fallback_enabled and not config.dspark_enabled:
-            raise ValueError("disabling DSpark fallback requires DSpark")
-        if config.dspark_sequential_verification:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark sequential verification requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            if config.dspark_hash_prefetch:
-                raise ValueError(
-                    "DSpark sequential verification cannot use hash prefetch"
-                )
-        if config.dspark_hybrid_verification:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark hybrid verification requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            if config.dspark_sequential_verification:
-                raise ValueError(
-                    "DSpark hybrid and sequential verification are mutually exclusive"
-                )
-        if config.dspark_adaptive_block:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark adaptive block scheduling requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            if int(getattr(args, "num_hash_layers", 0)) < 1:
-                raise ValueError(
-                    "DSpark adaptive block scheduling requires target hash layers"
-                )
-        if config.dspark_hash_prefetch:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark hash prefetch requires DSpark to be enabled")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            hash_layers = min(args.num_hash_layers, installed_model.layer_count)
-            scratch_slots = (
-                hash_layers
-                * installed_model.selected_expert_count
-                * (installed_model.dspark_block_size + 1)
-            )
-            cache.configure_speculative_scratch(scratch_slots)
-        for layer_index, layer in enumerate(model.layers):
-            layer.ffn.switch_mlp = _StreamingSwitchGLU(
-                layer_index,
-                cache,
-                deepseek_v4.LimitedSwiGLU(args.swiglu_limit),
-            )
-        deepseek_v4.DeepseekV4MoE.__call__ = _streaming_moe
-
-        weights = model.sanitize(_load_common_weights(installed_model))
-        quantization = deepseek_v4.make_quantization_config(model)
-
-        def class_predicate(path: str, module: nn.Module):
-            if path in quantization:
-                return quantization[path]
-            if not hasattr(module, "to_quantized"):
-                return False
-            return f"{path}.scales" in weights
-
-        nn.quantize(
-            model,
-            group_size=quantization["group_size"],
-            bits=quantization["bits"],
-            mode=quantization["mode"],
-            class_predicate=class_predicate,
-        )
-        model.eval()
-        model.load_weights(list(weights.items()), strict=False)
-        model.dspark = None
-        if config.dspark_enabled and installed_model.has_dspark:
-            model.dspark = _load_dspark(
-                installed_model, model, args, config, read_limiter
-            )
-        mx.eval(model.parameters())
-        return model, cache
-    except Exception:
-        cache.close()
-        raise
 
 
 def forward_with_hidden(

@@ -40,6 +40,9 @@ When the user requests `release new version`:
    current.
 4. Require `CODE_SIGN_IDENTITY`, `NOTARY_PROFILE`, authenticated `gh`, and the
    Sparkle signing tools.
+   On this Mac, use `NOTARY_PROFILE=deepseek_ssd` (verified 2026-09-07).
+   Check it with `xcrun notarytool history --keychain-profile deepseek_ssd`
+   before asking the user for a profile name; credentials remain in Keychain.
 5. Before `gh release create`, require the release script to verify the final
    signed and notarized App, its ZIP, its localization files, and App startup
    without access to the project `.build` directory. Stop the release if a check

@@ -149,14 +149,8 @@ class InstalledModel:
         with (root / "manifest.json").open("rb") as file:
             raw = json.load(file)
 
-        if raw.get("formatVersion") == 3:
-            contract = _deepseek_v41_contract(raw)
-        elif raw.get("formatVersion") == 2:
-            contract = _qwen_contract(raw)
-        elif raw.get("formatVersion") == 1:
-            contract = _deepseek_contract(raw)
-        else:
-            raise ValueError("installed model has an unsupported manifest format")
+        from .model_support import support_for_manifest
+        contract = support_for_manifest(raw).manifest_contract(raw)
 
         files = {item["path"]: item["size"] for item in raw.get("files", [])}
         if len(files) != len(raw.get("files", [])):
@@ -297,214 +291,6 @@ class InstalledModel:
         )
 
 
-def _deepseek_v41_contract(raw: dict) -> dict:
-    layer_count = 40
-    expert_count = 384
-    expert_blob_size = 18_800_640
-    expected = (
-        raw.get("modelKind") == "deepseek-v4.1"
-        and raw.get("modelID") == DEEPSEEK_V41_MODEL_ID
-        and raw.get("revision") == DEEPSEEK_V41_REVISION
-        and raw.get("layerCount") == layer_count
-        and raw.get("expertCount") == expert_count
-        and raw.get("selectedExpertCount") == 6
-        and raw.get("expertBlobSize") == expert_blob_size
-        and raw.get("maximumContext") == 1_048_576
-        and raw.get("dspark") is None
-        and raw.get("mtp") is None
-        and raw.get("ngram") is None
-        and raw.get("expertQuantization") is None
-    )
-    if not expected:
-        raise ValueError("installed model does not match the pinned V4.1 contract")
-    tables = (
-        (1, 384_006_168),
-        (14, 384_016_682),
-    )
-    expected_engram = {
-        "tables": [
-            {
-                "layer": layer,
-                "weightFile": f"engram/layer_{layer:02d}.weight.bin",
-                "scaleFile": f"engram/layer_{layer:02d}.scale.bin",
-                "rows": rows,
-                "dimension": 256,
-                "blockSize": 32,
-            }
-            for layer, rows in tables
-        ]
-    }
-    if raw.get("engram") != expected_engram:
-        raise ValueError("installed model has an invalid V4.1 engram contract")
-    required = {
-        "common.bin",
-        "config.json",
-        "encoding/encoding.py",
-        "tokenizer/tokenizer.json",
-        "tokenizer/tokenizer_config.json",
-        *(f"experts/layer_{layer:02d}.bin" for layer in range(layer_count)),
-        *(f"engram/layer_{layer:02d}.weight.bin" for layer, _ in tables),
-        *(f"engram/layer_{layer:02d}.scale.bin" for layer, _ in tables),
-    }
-    files = {item.get("path"): item.get("size") for item in raw.get("files", [])}
-    if any(
-        files.get(f"experts/layer_{layer:02d}.bin")
-        != expert_count * expert_blob_size
-        for layer in range(layer_count)
-    ):
-        raise ValueError("installed V4.1 expert layer has an invalid size")
-    for layer, rows in tables:
-        if files.get(f"engram/layer_{layer:02d}.weight.bin") != rows * 256:
-            raise ValueError("installed V4.1 engram weight table has an invalid size")
-        if files.get(f"engram/layer_{layer:02d}.scale.bin") != rows * 8:
-            raise ValueError("installed V4.1 engram scale table has an invalid size")
-    return {
-        "required": required,
-        "allowed": required,
-        "model_kind": "deepseek-v4.1",
-        "layer_count": layer_count,
-        "expert_count": expert_count,
-        "selected_expert_count": 6,
-        "expert_blob_size": expert_blob_size,
-        "maximum_context": 1_048_576,
-        "expert_regions": DEEPSEEK_V41_EXPERT_REGIONS,
-        "engram": expected_engram,
-    }
-
-
-def _deepseek_contract(raw: dict) -> dict:
-    expected = (
-        raw.get("modelID") == MODEL_ID
-        and raw.get("revision") == REVISION
-        and raw.get("layerCount") == LAYER_COUNT
-        and raw.get("expertCount") == EXPERT_COUNT
-        and raw.get("selectedExpertCount") == SELECTED_EXPERT_COUNT
-        and raw.get("expertBlobSize") == EXPERT_BLOB_SIZE
-    )
-    if not expected:
-        raise ValueError("installed model does not match the pinned model contract")
-    dspark = raw.get("dspark")
-    if dspark is not None and not (
-        dspark.get("layerCount") == 3
-        and dspark.get("blockSize") == 5
-        and dspark.get("noiseTokenID") == 128_799
-        and dspark.get("targetLayerIDs") == [40, 41, 42]
-        and dspark.get("markovRank") == 256
-    ):
-        raise ValueError("installed model has an invalid DSpark contract")
-    required = {
-        "common.bin",
-        "config.json",
-        "encoding/encoding_dsv4.py",
-        "tokenizer/tokenizer.json",
-        *(f"experts/layer_{layer:02d}.bin" for layer in range(LAYER_COUNT)),
-    }
-    actual = {item.get("path") for item in raw.get("files", [])}
-    allowed = set(required)
-    allowed.update(actual.intersection(
-        {"generation_config.json", "tokenizer/tokenizer_config.json", "inference/config.json"}
-    ))
-    if dspark is not None:
-        dspark_files = {
-            "dspark/common.bin",
-            "inference/config.json",
-            *(f"dspark/experts/layer_{layer:02d}.bin" for layer in range(3)),
-        }
-        required.update(dspark_files)
-        allowed.update(dspark_files)
-    return {
-        "required": required,
-        "allowed": allowed,
-        "model_kind": "deepseek-v4",
-        "layer_count": LAYER_COUNT,
-        "expert_count": EXPERT_COUNT,
-        "selected_expert_count": SELECTED_EXPERT_COUNT,
-        "expert_blob_size": EXPERT_BLOB_SIZE,
-        "maximum_context": 1_048_576,
-        "expert_regions": EXPERT_REGIONS,
-    }
-
-
-def _qwen_contract(raw: dict) -> dict:
-    quantization = raw.get("expertQuantization") or {}
-    ngram = raw.get("ngram") or {}
-    expected = (
-        raw.get("modelKind") == "qwen3.8-flash-next"
-        and raw.get("modelID") == QWEN_MODEL_ID
-        and raw.get("revision") == QWEN_REVISION
-        and raw.get("layerCount") == 48
-        and raw.get("expertCount") == 512
-        and raw.get("selectedExpertCount") == 10
-        and raw.get("expertBlobSize") == 2_611_200
-        and raw.get("maximumContext") == 262_144
-        and quantization
-        == {"bits": 4, "conversionVersion": 2, "groupSize": 32, "mode": "mxfp4"}
-        and ngram.get("file") == "ngram.bin"
-        and ngram.get("dtype") == "F8_E4M3"
-        and ngram.get("rowBytes") == 160
-        and ngram.get("shardCount") == 128
-        and ngram.get("shardRowCount") == 2_500_012
-        and tuple(ngram.get("headOffsets", [])) == QWEN_NGRAM_HEAD_OFFSETS
-        and tuple(ngram.get("headVocabSizes", [])) == QWEN_NGRAM_HEAD_VOCAB_SIZES
-        and raw.get("dspark") is None
-    )
-    if not expected:
-        raise ValueError("installed model does not match the pinned Qwen model contract")
-    required = {
-        "common.bin",
-        "ngram.bin",
-        "config.json",
-        "generation_config.json",
-        "tokenizer/tokenizer.json",
-        "tokenizer/tokenizer_config.json",
-        "tokenizer/chat_template.jinja",
-        "tokenizer/vocab.json",
-        "tokenizer/merges.txt",
-        *(f"experts/layer_{layer:02d}.bin" for layer in range(48)),
-    }
-    file_sizes = {item.get("path"): item.get("size") for item in raw.get("files", [])}
-    if file_sizes.get("ngram.bin") != 128 * 2_500_012 * 160:
-        raise ValueError("installed Qwen N-gram file has an invalid size")
-    mtp = raw.get("mtp")
-    if mtp is not None:
-        common_tensors = mtp.get("commonTensors")
-        if not (
-            mtp.get("layerCount") == 1
-            and mtp.get("useDedicatedEmbeddings") is False
-            and isinstance(common_tensors, list)
-            and len(common_tensors) == 29
-        ):
-            raise ValueError("installed Qwen model has an invalid MTP contract")
-        mtp_files = {"mtp/common.bin", "mtp/experts/layer_00.bin"}
-        required.update(mtp_files)
-        if (
-            file_sizes.get("mtp/common.bin") != 181_136_896
-            or file_sizes.get("mtp/experts/layer_00.bin") != 512 * 2_611_200
-        ):
-            raise ValueError("installed Qwen MTP file has an invalid size")
-    return {
-        "required": required,
-        "allowed": required,
-        "model_kind": "qwen3.8-flash-next",
-        "layer_count": 48,
-        "expert_count": 512,
-        "selected_expert_count": 10,
-        "expert_blob_size": 2_611_200,
-        "maximum_context": 262_144,
-        "expert_regions": QWEN_EXPERT_REGIONS,
-        "expert_quantization": ExpertQuantization("mxfp4", 4, 32, 2),
-        "ngram": NGram(
-            "ngram.bin",
-            "F8_E4M3",
-            160,
-            128,
-            2_500_012,
-            tuple(ngram["headOffsets"]),
-            tuple(ngram["headVocabSizes"]),
-        ),
-    }
-
-
 def _validate_tensors(
     tensors: tuple[Tensor, ...],
     file_size: int,
@@ -523,3 +309,16 @@ def _validate_tensors(
         for item in tensors
     ):
         raise ValueError(f"installed {label} tensor table is invalid")
+
+# Compatibility entry points for offline contract checks. Runtime dispatches via packages.
+def _deepseek_contract(raw):
+    from .model_support.deepseek_v4 import _deepseek_contract as validate
+    return validate(raw)
+
+def _deepseek_v41_contract(raw):
+    from .model_support.deepseek_v41 import _deepseek_v41_contract as validate
+    return validate(raw)
+
+def _qwen_contract(raw):
+    from .model_support.qwen import _qwen_contract as validate
+    return validate(raw)

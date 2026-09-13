@@ -56,9 +56,21 @@ Each expert blob is 18,800,640 bytes. The 40 expert files contain
 288,777,830,400 bytes (268.95 GiB). The two Engram tables contain
 202,758,032,400 bytes (188.83 GiB). Those files require at least
 491,535,862,800 bytes (457.78 GiB) before `common.bin`, tokenizer files, and
-metadata. The app derives the complete required storage from the repack plan.
+metadata. The app uses a fixed display size of 501,382,643,728 bytes (501.38 GB),
+verified against the repack plan for revision `dba1be0a40aa45a94ad051997016db3960a90277`
+on 2026-09-13. This is the planned installed weight size, matching the existing
+UI size calculation; it excludes companion metadata and is not measured network traffic.
+The model list no longer fetches a plan just to display this size.
+
+For CLI installation, use `dsv4-repack repack --model deepseek-v4.1 --output MODEL.dsv4`.
+When `--plan plan.json` is supplied, the plan's `modelKind` selects the repacker;
+legacy plans without that field continue to select V4.
 
 ## Runtime path
+
+Advanced Settings defaults to 1152 slots. The recommendation text in English,
+Simplified Chinese, and Traditional Chinese uses the same model descriptor value.
+Existing saved slot settings are preserved.
 
 - Common native FP8 tensors are loaded into MLX MXFP8 modules. The checkpoint's
   32-by-32 E8M0 scales are expanded to the row-scale layout MLX expects.

@@ -293,27 +293,17 @@ class ToolCodec:
 
     @classmethod
     def open(cls, model_root: Path, tokenizer=None) -> ToolCodec:
+        from .model_support import get_support
         manifest_path = model_root / "manifest.json"
+        kind = "deepseek-v4"
         if manifest_path.is_file():
             with manifest_path.open("rb") as file:
                 manifest = json.load(file)
-            if manifest.get("modelKind") == "qwen3.8-flash-next":
-                if tokenizer is None:
-                    from transformers import AutoTokenizer
+            kind = manifest.get("modelKind", kind)
+        return get_support(kind).open_codec(model_root, tokenizer)
 
-                    tokenizer = AutoTokenizer.from_pretrained(
-                        model_root / "tokenizer", trust_remote_code=True
-                    )
-                return QwenToolCodec(tokenizer)
-            if manifest.get("modelKind") == "deepseek-v4.1":
-                path = model_root / "encoding" / "encoding.py"
-                expected_digest = V41_ENCODER_SHA256
-            else:
-                path = model_root / "encoding" / "encoding_dsv4.py"
-                expected_digest = ENCODER_SHA256
-        else:
-            path = model_root / "encoding" / "encoding_dsv4.py"
-            expected_digest = ENCODER_SHA256
+    @classmethod
+    def from_encoder(cls, path: Path, expected_digest: str) -> ToolCodec:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if digest != expected_digest:
             raise RuntimeError("DeepSeek encoder checksum does not match")

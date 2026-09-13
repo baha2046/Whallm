@@ -202,15 +202,33 @@ private struct RuntimeEnvironment {
   }
 }
 
+enum PromptCacheMode: String, Codable, CaseIterable, Identifiable {
+  case off, memory, disk
+
+  var id: String { rawValue }
+  var localizationKey: String {
+    switch self {
+    case .off: "Off"
+    case .memory: "Memory"
+    case .disk: "Disk"
+    }
+  }
+}
+
 struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   private static let legacyModelPreference = "modelAdvancedSettingsLegacyModelKind"
 
   var slots = 1_152
   var readWorkers = 4
+  var prefetchReadWorkers: Int? = 2
+  var moePrefillStepSize: Int? = 0
+  var approximationEnabled: Bool? = false
+  var qwenAdaptiveSampling: Bool? = true
   var memoryLimitGiB = 0
   var prefillStepSize = 0
   var layerMajorPrefill = true
   var layerMajorPrefillThreshold: Int? = 1_024
+  var promptCacheMode: PromptCacheMode?
   var promptCacheEntries = 2
   var promptCacheMemoryGiB = 8
   var warmupPromptPath = ""
@@ -231,23 +249,19 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
 
   static func defaults(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = ModelAdvancedSettings()
+    let descriptor = modelKind.descriptor
     settings.recentExpertCache = true
-    settings.qwenShortBlock = modelKind == .qwen3_8FlashNext
-    settings.qwenGroupedExperts = modelKind == .qwen3_8FlashNext
-    if modelKind == .deepSeekV41 {
-      settings.slots = 768
-      settings.layerMajorPrefill = false
-      settings.promptCacheEntries = 1
-      settings.bf16KVCache = true
-      settings.dsparkEnabled = false
-    } else if modelKind == .qwen3_8FlashNext {
-      settings.slots = 4_096
-      settings.mtpEnabled = false
-      settings.defaultMaxTokens = 262_144
-      settings.defaultTemperature = 0.7
-      settings.defaultTopP = 0.8
-      settings.defaultTopK = 20
-    }
+    settings.qwenShortBlock = false
+    settings.promptCacheMode = descriptor.supports("promptCache") ? .memory : .off
+    settings.qwenGroupedExperts = descriptor.supports("groupedExperts")
+    settings.slots = descriptor.defaults.slots
+    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill")
+    settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
+    settings.bf16KVCache = descriptor.defaults.bf16KVCache
+    settings.defaultMaxTokens = descriptor.defaults.maxTokens
+    settings.defaultTemperature = descriptor.defaults.temperature
+    settings.defaultTopP = descriptor.defaults.topP
+    settings.defaultTopK = descriptor.defaults.topK
     return settings
   }
 
@@ -255,33 +269,31 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
 
   func normalized(for modelKind: ModelKind) -> ModelAdvancedSettings {
     var settings = self
+    let descriptor = modelKind.descriptor
+    settings.promptCacheMode = descriptor.supports("promptCache")
+      ? (settings.promptCacheMode ?? .memory) : .off
+    settings.prefetchReadWorkers = settings.prefetchReadWorkers ?? 2
+    settings.moePrefillStepSize = settings.moePrefillStepSize ?? 0
+    settings.approximationEnabled = descriptor.supports("approximation")
+      && (settings.approximationEnabled ?? false)
+    settings.qwenAdaptiveSampling = settings.qwenAdaptiveSampling ?? true
     settings.recentExpertCache = settings.recentExpertCache ?? true
-    settings.qwenShortBlock = modelKind == .qwen3_8FlashNext
-      ? (settings.qwenShortBlock ?? true) : false
+    settings.qwenShortBlock = descriptor.supports("shortBlock")
+      ? (settings.qwenShortBlock ?? false) : false
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
-    if modelKind == .deepSeekV41 {
-      settings.layerMajorPrefill = false
-      settings.bf16KVCache = true
-      settings.promptCacheEntries = 1
-      settings.qwenGroupedExperts = false
-      settings.mtpEnabled = false
-      settings.mtpSlots = settings.mtpSlots ?? 32
-      settings.dsparkEnabled = false
-    } else if modelKind == .qwen3_8FlashNext {
-      settings.bf16KVCache = false
-      settings.qwenGroupedExperts = settings.qwenGroupedExperts ?? true
-      settings.mtpEnabled = settings.mtpEnabled ?? false
-      settings.mtpSlots = settings.mtpSlots ?? 32
-      settings.dsparkEnabled = false
-      settings.defaultTemperature = 0.7
-      settings.defaultTopP = 0.8
-      settings.defaultTopK = 20
-    } else {
-      settings.qwenGroupedExperts = false
-      settings.mtpEnabled = false
-      settings.mtpSlots = settings.mtpSlots ?? 32
+    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && settings.layerMajorPrefill
+    if !descriptor.editableSettings.contains("kvCachePrecision") {
+      settings.bf16KVCache = descriptor.defaults.bf16KVCache
     }
+    if !descriptor.supports("promptCache") {
+      settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
+    }
+    settings.qwenGroupedExperts = descriptor.supports("groupedExperts")
+      ? (settings.qwenGroupedExperts ?? true) : false
+    settings.mtpEnabled = descriptor.supports("mtp") ? (settings.mtpEnabled ?? false) : false
+    settings.mtpSlots = settings.mtpSlots ?? 32
+    settings.dsparkEnabled = descriptor.supports("dspark") && settings.dsparkEnabled
     return settings
   }
 
@@ -320,6 +332,9 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
           "Read workers must be greater than 0. Memory limit and prefill step size must be 0 or greater."
         ))
     }
+    guard (prefetchReadWorkers ?? 2) >= 1, (moePrefillStepSize ?? 0) >= 0 else {
+      throw ConfigurationError(L10n.string("Prefetch workers must be greater than 0. MoE prefill step size must be 0 or greater."))
+    }
     guard (layerMajorPrefillThreshold ?? 1_024) >= 1 else {
       throw ConfigurationError(
         L10n.string("Layer-major prefill threshold must be greater than 0."))
@@ -349,7 +364,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     {
       throw ConfigurationError(L10n.string("The warmup prompt file cannot be read."))
     }
-    if modelKind == .qwen3_8FlashNext, dsparkEnabled {
+    if !modelKind.descriptor.supports("dspark"), dsparkEnabled {
       throw ConfigurationError(L10n.string("Qwen3.8-Flash-Next does not support DSpark."))
     }
   }
@@ -752,12 +767,16 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let temperature: Double
       let topP: Double
       let topK: Int
+      let approximationMode: String?
+      let qwenAdaptiveSampling: Bool?
 
       enum CodingKeys: String, CodingKey {
         case maxTokens = "max_tokens"
         case temperature
         case topP = "top_p"
         case topK = "top_k"
+        case approximationMode = "approximation_mode"
+        case qwenAdaptiveSampling = "qwen_adaptive_sampling"
       }
     }
 

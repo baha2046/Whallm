@@ -19,6 +19,7 @@ import mlx.core as mx
 import numpy as np
 
 from deepseek_v4_ssd import generation, qwen4_exp as qwen
+from deepseek_v4_ssd.model_support import qwen as qwen_support
 from deepseek_v4_ssd.ane_prefill import ANEPrefillController
 from research.ssd_prefill_pipeline import ExpertBanks, qwen_pipeline, workspace_bound
 
@@ -36,7 +37,7 @@ def install_pipeline(mode, *, observe_tensors=False):
     if mode not in ("control", "pipeline"):
         raise ValueError("unknown pipeline mode")
     events, tensors, ane = [], [], []
-    original_prefill = generation._qwen_layer_major_prefill
+    original_prefill = qwen_support._qwen_layer_major_prefill
     original_experts = qwen.StreamingExperts.__call__
     original_close = ANEPrefillController.close
     original_load = generation.load_model
@@ -106,7 +107,7 @@ def install_pipeline(mode, *, observe_tensors=False):
         finally:
             events.append(dict(model_load_seconds=time.perf_counter() - started))
 
-    with patch.object(generation, '_qwen_layer_major_prefill', prefill), \
+    with patch.object(qwen_support, '_qwen_layer_major_prefill', prefill), \
          patch.object(generation, 'load_model', load), \
          patch.object(qwen.StreamingExperts, '__call__', normal), \
          patch.object(ANEPrefillController, 'close', close):

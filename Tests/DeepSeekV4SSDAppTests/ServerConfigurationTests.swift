@@ -6,13 +6,13 @@ import XCTest
 
 final class ServerConfigurationTests: XCTestCase {
   @MainActor
-  func testSSDSettingsDefaultOnMigrateAndPreserveExplicitOff() throws {
+  func testSSDSettingsDefaultsMigrateAndPreserveExplicitChoices() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
     for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(settings.recentExpertCache, true)
-      XCTAssertEqual(settings.qwenShortBlock, kind == .qwen3_8FlashNext)
+      XCTAssertEqual(settings.qwenShortBlock, false)
       settings.slots = 900
       var old = try XCTUnwrap(
         JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
@@ -24,7 +24,7 @@ final class ServerConfigurationTests: XCTestCase {
       settings = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
       XCTAssertEqual(settings.slots, 900)
       XCTAssertEqual(settings.recentExpertCache, true)
-      XCTAssertEqual(settings.qwenShortBlock, kind == .qwen3_8FlashNext)
+      XCTAssertEqual(settings.qwenShortBlock, false)
       for enabled in [false, true] {
         settings.recentExpertCache = enabled
         settings.qwenShortBlock = enabled
@@ -42,6 +42,106 @@ final class ServerConfigurationTests: XCTestCase {
     }
     for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
       for label in ["Keep recently used experts", "Verify up to four tokens together"] {
+        XCTAssertNotEqual(L10n.string(label, language: language), label)
+      }
+    }
+  }
+
+  @MainActor
+  func testPromptCacheModesMigrateSaveAndReachRuntime() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      XCTAssertEqual(settings.promptCacheMode, .memory)
+      var old = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+      old.removeValue(forKey: "promptCacheMode")
+      isolated.defaults.set(try JSONSerialization.data(withJSONObject: old),
+        forKey: "modelAdvancedSettings.\(kind.rawValue)")
+      settings = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+      XCTAssertEqual(settings.promptCacheMode, .memory)
+      for mode in PromptCacheMode.allCases {
+        settings.promptCacheMode = mode
+        settings.save(for: kind, defaults: isolated.defaults)
+        let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+        XCTAssertEqual(restored.promptCacheMode, mode)
+        let catalog = try ModelLibrary.makeServerCatalog(
+          models: [installedModel(kind)], aliases: [:], settings: [kind: restored],
+          powerSavingLimitGBps: nil)
+        let runtime = try XCTUnwrap(catalog.models.first).runtime
+        XCTAssertEqual(runtime.promptCacheEntries, mode == .off ? 0 : settings.promptCacheEntries)
+        XCTAssertEqual(runtime.persistentPromptCache, mode == .disk)
+      }
+    }
+    XCTAssertEqual(ModelAdvancedSettings.defaults(for: .deepSeekV41).promptCacheMode, .off)
+    for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
+      for key in ["Prompt cache", "Off", "Memory", "Disk"] {
+        XCTAssertNotEqual(L10n.string(key, language: language), key)
+      }
+    }
+  }
+
+  @MainActor
+  func testNewAdvancedControlsMigratePersistAndReachCatalog() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      var old = try XCTUnwrap(
+        JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+      for key in ["prefetchReadWorkers", "moePrefillStepSize", "approximationEnabled", "qwenAdaptiveSampling"] {
+        old.removeValue(forKey: key)
+      }
+      old["recentExpertCache"] = false
+      let decoded = try JSONDecoder().decode(ModelAdvancedSettings.self,
+        from: JSONSerialization.data(withJSONObject: old))
+      decoded.save(for: kind, defaults: isolated.defaults)
+      settings = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+      XCTAssertEqual(settings.prefetchReadWorkers, 2)
+      XCTAssertEqual(settings.moePrefillStepSize, 0)
+      XCTAssertEqual(settings.approximationEnabled, false)
+      XCTAssertEqual(settings.qwenAdaptiveSampling, true)
+      XCTAssertEqual(settings.recentExpertCache, false)
+      settings.prefetchReadWorkers = 3
+      settings.moePrefillStepSize = 64
+      settings.approximationEnabled = true
+      settings.defaultTemperature = 0.4
+      settings.defaultTopP = 0.6
+      settings.defaultTopK = 7
+      for adaptive in [false, true] {
+        settings.qwenAdaptiveSampling = adaptive
+        settings.save(for: kind, defaults: isolated.defaults)
+        let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+        XCTAssertEqual(restored.defaultTemperature, 0.4)
+        XCTAssertEqual(restored.defaultTopP, 0.6)
+        XCTAssertEqual(restored.defaultTopK, 7)
+        let catalog = try ModelLibrary.makeServerCatalog(
+          models: [installedModel(kind)], aliases: [:], settings: [kind: restored],
+          powerSavingLimitGBps: nil)
+        let entry = try XCTUnwrap(catalog.models.first)
+        XCTAssertEqual(entry.runtime.prefetchReadWorkers, 3)
+        XCTAssertEqual(entry.runtime.moePrefillStepSize, 64)
+        XCTAssertEqual(entry.runtime.expertEvictionPolicy, "lfu")
+        XCTAssertEqual(entry.defaults.qwenAdaptiveSampling, adaptive)
+        XCTAssertEqual(entry.defaults.approximationMode,
+          kind == .deepSeekV4 ? "learned-route-drop-lowest-1" : "exact")
+      }
+      settings.prefetchReadWorkers = 0
+      XCTAssertThrowsError(try settings.validate(for: kind))
+      settings.prefetchReadWorkers = 2
+      settings.moePrefillStepSize = -1
+      XCTAssertThrowsError(try settings.validate(for: kind))
+    }
+    var deepSeek = ModelAdvancedSettings.defaults(for: .deepSeekV4)
+    deepSeek.approximationEnabled = true
+    deepSeek.dsparkEnabled = true
+    let catalog = try ModelLibrary.makeServerCatalog(
+      models: [installedModel(.deepSeekV4, hasDSpark: true)], aliases: [:],
+      settings: [.deepSeekV4: deepSeek], powerSavingLimitGBps: nil)
+    XCTAssertEqual(catalog.models.first?.defaults.approximationMode, "exact")
+    for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
+      for label in ["Use adaptive sampling", "Use approximate mode", "Expert cache eviction", "Prefetch read workers", "MoE prefill step size"] {
         XCTAssertNotEqual(L10n.string(label, language: language), label)
       }
     }
@@ -274,9 +374,9 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restoredDeepSeek.layerMajorPrefillThreshold, 1_024)
     XCTAssertEqual(restoredQwen.slots, 900)
     XCTAssertEqual(restoredQwen.defaultMaxTokens, 262_144)
-    XCTAssertEqual(restoredQwen.defaultTemperature, 0.7)
-    XCTAssertEqual(restoredQwen.defaultTopP, 0.8)
-    XCTAssertEqual(restoredQwen.defaultTopK, 20)
+    XCTAssertEqual(restoredQwen.defaultTemperature, 1.0)
+    XCTAssertEqual(restoredQwen.defaultTopP, 0.95)
+    XCTAssertEqual(restoredQwen.defaultTopK, 3)
     XCTAssertFalse(restoredQwen.bf16KVCache)
     XCTAssertTrue(restoredQwen.mtpEnabled == true)
     XCTAssertEqual(restoredQwen.mtpSlots, 512)
@@ -478,7 +578,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
     XCTAssertFalse(catalog.models[1].runtime.layerMajorPrefill)
     XCTAssertFalse(catalog.models[1].runtime.fp8KVCache)
-    XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 1)
+    XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 0)
     XCTAssertFalse(catalog.models[1].runtime.persistentPromptCache)
     XCTAssertFalse(catalog.models[1].runtime.dsparkEnabled)
     XCTAssertFalse(catalog.models[1].runtime.mtpEnabled)
@@ -525,13 +625,13 @@ final class ServerConfigurationTests: XCTestCase {
     let v41Runtime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
     XCTAssertEqual(v41Runtime["layer_major_prefill"] as? Bool, false)
     XCTAssertEqual(v41Runtime["fp8_kv_cache"] as? Bool, false)
-    XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 1)
+    XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 0)
     XCTAssertEqual(v41Runtime["persistent_prompt_cache"] as? Bool, false)
     XCTAssertEqual(models[1]["model_kind"] as? String, "deepseek-v4.1")
     let qwenRuntime = try XCTUnwrap(models[2]["runtime"] as? [String: Any])
     XCTAssertEqual(qwenRuntime["qwen_grouped_decode"] as? Bool, false)
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
-    XCTAssertEqual(qwenRuntime["qwen_short_block"] as? Bool, true)
+    XCTAssertEqual(qwenRuntime["qwen_short_block"] as? Bool, false)
     XCTAssertEqual(qwenRuntime["qwen_grouped_experts"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
@@ -662,18 +762,15 @@ private func installedModel(
   hasDSpark: Bool = false,
   issues: [InstalledFileIssue] = []
 ) -> InstalledModelInfo {
-  InstalledModelInfo(
+  let modelID = modelKind.descriptor.checkpointModelID
+  return InstalledModelInfo(
     url: URL(fileURLWithPath: "/tmp/\(modelKind.rawValue).dsv4"),
     size: 1,
     quickIssues: issues,
     hasMTP: hasMTP,
     hasDSpark: hasDSpark,
     modelKind: modelKind,
-    modelID: switch modelKind {
-    case .deepSeekV4: "deepseek-ai/DeepSeek-V4-Flash-0731"
-    case .deepSeekV41: "deepseek-ai/DeepSeek-V4.1-Flash"
-    case .qwen3_8FlashNext: "Qwen/Qwen3.8-Flash-Next-FP8"
-    }
+    modelID: modelID
   )
 }
 

@@ -18,6 +18,8 @@ from .generation import (
 )
 from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .manifest import InstalledModel
+from .model_support import get_support, support_for_installed
+from .model import _apply_prompt_cache_mode
 from .model import (
     RuntimeConfig,
     _POWER_SAVING_LIMITS_GBPS,
@@ -39,18 +41,16 @@ def _token_sha256(tokens) -> str:
 def _select_approximation_mode(
     requested: str | None,
     *,
-    is_qwen: bool,
+    is_qwen: bool = False,
     dspark_enabled: bool,
+    support=None,
 ) -> str:
-    mode = requested
-    if mode is None:
-        mode = (
-            EXACT_APPROXIMATION_MODE
-            if is_qwen or dspark_enabled
-            else LEARNED_ROUTE_DROP_LOWEST_1
-        )
-    if mode != EXACT_APPROXIMATION_MODE and (is_qwen or dspark_enabled):
-        raise ValueError("--approximation is not supported by Qwen or DSpark")
+    support = support or get_support("qwen3.8-flash-next" if is_qwen else "deepseek-v4")
+    mode = requested or support.default_approximation(dspark_enabled)
+    if mode != EXACT_APPROXIMATION_MODE and (
+        not support.descriptor.supports("approximation") or dspark_enabled
+    ):
+        raise ValueError("--approximation is not supported by this model or DSpark")
     return mode
 
 
@@ -107,7 +107,11 @@ def main() -> None:
         help="experimental Qwen Decode with resident grouped QMM (MTP disabled)",
     )
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
-    parser.add_argument("--no-persistent-prompt-cache", action="store_true")
+    cache_mode = parser.add_mutually_exclusive_group()
+    cache_mode.add_argument("--prompt-cache", choices=("off", "memory", "disk"),
+                            help="reuse prompts: off, memory (default), or disk")
+    cache_mode.add_argument("--persistent-prompt-cache", action=argparse.BooleanOptionalAction,
+                            default=False, help="save prompt cache to disk (default: off)")
     parser.add_argument("--prompt-cache-directory")
     parser.add_argument("--bf16-kv-cache", action="store_true")
     parser.add_argument("--no-fp4-index-cache", action="store_true")
@@ -190,17 +194,18 @@ def main() -> None:
         installed = InstalledModel.open(arguments.model)
     except (OSError, ValueError, json.JSONDecodeError) as error:
         parser.error(str(error))
-    if installed.is_qwen and arguments.dspark:
-        parser.error("Qwen3.8-Flash-Next does not support --dspark")
+    support = support_for_installed(installed)
+    if not support.descriptor.supports("dspark") and arguments.dspark:
+        parser.error(f"{support.option_error_name} does not support --dspark")
     try:
         approximation_mode = _select_approximation_mode(
             arguments.approximation,
-            is_qwen=installed.is_qwen,
+            support=support,
             dspark_enabled=arguments.dspark,
         )
     except ValueError as error:
         parser.error(str(error))
-    if arguments.mtp and not installed.is_qwen:
+    if arguments.mtp and not support.descriptor.supports("mtp"):
         parser.error("--mtp is supported only by Qwen3.8-Flash-Next")
     if arguments.mtp and not installed.has_mtp:
         parser.error("--mtp requires an installed MTP sidecar")
@@ -208,11 +213,11 @@ def main() -> None:
     top_p = arguments.top_p
     top_k = arguments.top_k
     if temperature is None:
-        temperature = 1.0 if installed.is_qwen else 0.2
+        temperature = support.cli_sampling_defaults()["temperature"]
     if top_p is None:
-        top_p = 0.95 if installed.is_qwen else 0.98
+        top_p = support.cli_sampling_defaults()["top_p"]
     if top_k is None:
-        top_k = 20 if installed.is_qwen else 0
+        top_k = support.cli_sampling_defaults()["top_k"]
     if not 0 <= temperature <= 2:
         parser.error("--temperature must be between zero and two")
     if not 0 < top_p <= 1:
@@ -233,8 +238,8 @@ def main() -> None:
         parser.error("--moe-prefill-step-size must be zero or greater")
     if arguments.layer_major_prefill_threshold < 1:
         parser.error("--layer-major-prefill-threshold must be greater than zero")
-    if arguments.prompt_cache_entries < 1:
-        parser.error("--prompt-cache-entries must be greater than zero")
+    if arguments.prompt_cache_entries < 0:
+        parser.error("--prompt-cache-entries must be zero or greater")
     if arguments.prompt_cache_memory_gib < 1:
         parser.error("--prompt-cache-memory-gib must be greater than zero")
     if not 0 <= arguments.dspark_confidence_threshold <= 1:
@@ -269,9 +274,9 @@ def main() -> None:
         )
     if arguments.dspark and arguments.expert_route_trace:
         parser.error("--expert-route-trace currently requires DSpark to be disabled")
-    if arguments.qwen_grouped_experts and not installed.is_qwen:
+    if arguments.qwen_grouped_experts and not support.descriptor.supports("groupedExperts"):
         parser.error("--qwen-grouped-experts requires Qwen3.8-Flash-Next")
-    if arguments.qwen_next_layer_prefetch and not installed.is_qwen:
+    if arguments.qwen_next_layer_prefetch and not support.descriptor.supports("groupedExperts"):
         parser.error("--qwen-next-layer-prefetch requires Qwen3.8-Flash-Next")
     if arguments.qwen_next_layer_prefetch and arguments.no_layer_major_prefill:
         parser.error("--qwen-next-layer-prefetch requires layer-major Prefill")
@@ -293,12 +298,12 @@ def main() -> None:
         qwen_next_layer_prefetch=arguments.qwen_next_layer_prefetch,
         qwen_grouped_decode=arguments.qwen_grouped_decode,
         qwen_grouped_experts=(
-            installed.is_qwen if arguments.qwen_grouped_experts is None
+            support.descriptor.supports("groupedExperts") if arguments.qwen_grouped_experts is None
             else arguments.qwen_grouped_experts
         ),
         prompt_cache_entries=arguments.prompt_cache_entries,
         prompt_cache_memory_gib=arguments.prompt_cache_memory_gib,
-        persistent_prompt_cache=not arguments.no_persistent_prompt_cache,
+        persistent_prompt_cache=arguments.persistent_prompt_cache,
         prompt_cache_directory=arguments.prompt_cache_directory,
         fp4_index_cache=not arguments.no_fp4_index_cache,
         mtp_enabled=arguments.mtp,
@@ -322,6 +327,7 @@ def main() -> None:
         ready_expert_decode=not arguments.no_ready_expert_decode,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
+    config = _apply_prompt_cache_mode(config, arguments.prompt_cache)
     runtime = ModelRuntime.open(arguments.model, config)
     prompt_token_sha256 = _token_sha256(runtime._encode_prompt(prompt_text))
 
@@ -434,7 +440,7 @@ def main() -> None:
             "batched_expert_prefill": config.batched_expert_prefill,
             "qwen_grouped_experts": bool(
                 config.qwen_grouped_experts
-                and installed.is_qwen
+                and support.descriptor.supports("mtp")
                 and not config.mtp_enabled
             ),
             "ane_prefill": config.ane_prefill,

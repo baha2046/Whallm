@@ -1,5 +1,198 @@
 # 驗證紀錄
 
+## 2026-09-13：Updates 區塊與靠右對齊
+
+- Settings 將更新設定移至獨立 Updates 區塊；stable／dev 的固定寬度容器改為靠右對齊。
+- 使用獨立 App 副本查看實際畫面，確認分組及來源選項與按鈕、開關右緣對齊。
+- Swift 77 項通過、3 項缺少 fixture 略過；`git diff --check` 通過。
+- 重新執行本機 `make package`，App 與 ZIP 解壓副本的簽章、三語隔離啟動及
+  包內模型描述驗證皆通過。未公證或發布新版。
+- 原始記錄位於 `scratch/update-layout-2026-09-13/`。
+
+## 2026-09-13：更新來源與自動檢查
+
+基準為 `codex/pr10-fixes`、`5565c23` 加目前未提交修改。
+
+- Settings 新增 stable／dev 來源與自動檢查開關；App 選單與設定頁共用同一個
+  Sparkle updater。Swift 77 項通過、3 項缺少 fixture 略過，包含四項新增更新設定測試。
+- 實際使用獨立 bundle ID 的封裝副本，確認 stable／dev 及自動檢查開／關皆可操作，
+  偏好確實保存；關閉自動檢查後仍能手動檢查。對公開 Pages 清單檢查得到
+  「1.1.6 已是最新版本」，沒有下載或安裝其他 App。驗證副本已關閉。
+- 真正執行 Sparkle `generate_appcast --channel dev --maximum-versions 1`，
+  確認保留既有正式版並加入 dev，重新生成清單的簽章驗證通過。
+  此測試使用本機 ZIP 與 `example.invalid` 下載網址，未發布測試清單。
+- 發布腳本離線替身檢查涵蓋 stable、dev、打包失敗停止發布，以及下載驗證完成後
+  才推送 Pages；不代表實際完成一次正式或 dev 發布。錯誤 channel、超出範圍的
+  DEV_BUILD、不相符的 dev BUILD_VERSION 都會提早拒絕。zsh 語法與 make dry run 通過。
+- `gh-pages` 已建立（`d54e64b`），Pages 根目錄已部署；從公開網址下載的清單與
+  已發布 v1.1.6 清單逐位元相同，Sparkle 簽章驗證通過。SHA-256：
+  `5d08e384ebf2507f9f7c4143969c52bcff7882e0d3663c2d2e0d34072730cc3c`。
+- 本機 `make package` 成功；App 與 ZIP 解壓副本的嚴格簽章、三語系隔離啟動、
+  包內模型描述驗證全部通過。只使用 ad-hoc 簽章，未發布新版 App。
+- 沒有已發布 dev App，因此尚未實測 dev ZIP 的完整下載／安裝。
+
+流程與參數見 [App 更新](UPDATES.md)。原始測試、封裝與清單記錄位於
+`scratch/update-channels-2026-09-13/`。
+
+## 2026-09-13：V4.1 slots 1152 與本機封裝
+
+基準為 `codex/pr10-fixes`、`5565c23` 加目前未提交修改。
+
+- V4.1 Advanced Settings 的 slots 預設值改為 1152；三語建議文案讀取同一份
+  模型描述。已確認包內英文、簡中、繁中文案皆為 1152，既有個人設定保留。
+- `make test`：73 項通過、3 項缺少 fixture 略過；Python 完整 suite 403 項通過。
+- `env -u NOTARY_PROFILE CODE_SIGN_IDENTITY=- make package` 成功，產生
+  `dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip`。
+- App 與 ZIP 解壓副本均通過 `codesign --verify --deep --strict`，並在禁止讀取
+  專案 `.build` 與 Swift resource bundle 時完成三語 L10n 初始化且保持運行。
+  語系檔由 `Contents/Resources` 載入，優先於 `Bundle.module`。
+- 兩份 App 的 Swift／Python 模型描述一致；包內 Python 在禁止讀取專案
+  `.build`、`.venv`、`Sources` 時仍可載入三種模型支援套件。
+- 使用本機 ad-hoc 簽章；未公證或發布，未執行完整模型生成或效能量測。
+
+測試與封裝原始記錄：`scratch/build-local-v41-slots-1152-2026-09-13/`。
+
+## 2026-09-13：build local
+
+基準為 `codex/pr10-fixes`、`5565c23` 加目前未提交修改，包含最新模型進階設定。
+同日再次封裝，已包含 V4.1 固定顯示大小 501,382,643,728 bytes；
+重新執行下列完整測試與 App／ZIP 驗證，全部通過。
+
+- Python 完整 suite 403 項通過；`swift test` 73 項通過、3 項缺少 fixture 略過。
+- `env -u NOTARY_PROFILE CODE_SIGN_IDENTITY=- make package` 成功，產生
+  `dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip`，使用本機 ad-hoc 簽章。
+- App 與 ZIP 解壓版本均通過 `codesign --verify --deep --strict`。
+- 兩份 App 均在禁止讀取專案 `.build` 與 Swift resource bundle 的環境下，
+  分別以英文、簡中、繁中啟動並維持運行，輸出 L10n 初始化完成標記；
+  確認直接使用 `Contents/Resources` 語系檔，沒有進入 `Bundle.module`。
+- 兩份 App 的 Swift／Python 模型描述一致，包內 Python 在禁止讀取專案
+  `.build`、`.venv`、`Sources` 時仍能載入三種模型支援套件。
+- 未建立 tag、未公證、未上傳或發布；沒有重新進行完整模型生成或效能量測。
+
+## 2026-09-13：模型進階設定
+
+基準為 `codex/pr10-fixes`、`5565c23` 加目前未提交修改。
+
+- Python 完整 suite：403 項通過。Swift `swift test`：73 項通過、3 項缺少 fixture 略過，無失敗。
+- 自動測試覆蓋舊設定遷移、新欄位保存與 catalog 傳遞、輸入範圍驗證、
+  Qwen 聊天／思考的自動與手動值、API 明確值優先、DeepSeek 預設 Exact 及 DSpark 限制。
+- 使用獨立 bundle ID 的開發 App，確認 Qwen 自動取樣預設開啟、關閉後可編輯，
+  再開啟會保留手動值；LRU／LFU 選單可切換。修改預讀工作數為 3、MoE 分批大小為 64，
+  返回後重新開啟仍保留；DeepSeek 近似模式預設關閉且可切換。已查看實際畫面。
+- 本次沒有載入完整模型做生成、品質或效能量測，也沒有重新封裝或發布。
+
+## 2026-09-12：快取模式與設定介面
+
+基準為 `codex/pr10-fixes`、`5565c23` 加目前未提交修改。這是功能驗證，
+沒有重新量測完整 Qwen 模型的速度、記憶體峰值或 SSD 寫入量，也沒有重新封裝或發布。
+
+- Python：`PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests -p 'test_*.py'`，
+  **400 項通過**。
+- Swift：`swift test --skip AppKeychainTests`，**72 項通過、3 項缺少 fixture 略過**。
+  目前沒有名為 AppKeychainTests 的 suite，因此該 skip 沒有排除案例；
+  `ServerConfigurationTests.testAPIKeyRoundTripsThroughIsolatedKeychainItem` 本次也通過。
+- `git diff --check` 通過。
+- 新的 runtime 測試逐一驗證 off／memory／disk：同程序重複輸入及重啟後的未快取
+  token 數分別為 `[48,48,48]`、`[48,1,48]`、`[48,1,1]`。每次重用還原的是
+  checkpoint 當下值 47，不是後續改寫的 999；off／memory 不建立快取目錄。
+  這是小型可控模型替身，不是完整 Qwen 的新量測。
+- catalog 測試覆蓋 `--no-persistent-prompt-cache`、目錄、筆數、slots、取樣參數與
+  三種 mode 的明確覆寫；未指定的 4096 slots 保留。驗證依合併後的模型設定執行，
+  能沿用 JSON 的 DSpark 開啟值，也會拒絕非法覆寫。
+- Swift 測試覆蓋快取模式的舊偏好遷移、三種模式保存與 JSON 傳遞、V4.1 固定關閉、
+  Qwen 合批新預設關閉，以及已儲存 true／false 的保留；三語 label 檢查通過。
+- 使用獨立 bundle ID 的開發預覽，實際檢查 Log 頁面的 Debug／Info 切換、Server
+  頁面移除 Log Level、Qwen 合批預設關閉、Memory 預設選取、Off 隱藏容量欄位，
+  Disk 恢復容量欄位，最後切回 Memory。已查看實際畫面；沒有啟動模型生成服務。
+  預覽使用獨立偏好，不修改已安裝 App 的設定，完成後已關閉。
+  補充啟動失敗紀錄：最初的臨時預覽於 23:35:55、23:35:59、23:36:29 三次
+  因找不到 `@rpath/Sparkle.framework/Versions/B/Sparkle` 而在進入 App 前中止
+  （macOS report：DYLD / Library missing / SIGABRT）。原因是臨時 bundle 的
+  framework 放置位置不在該 debug executable 的搜尋路徑內；後續以
+  `DYLD_FRAMEWORK_PATH` 指向開發框架目錄才完成上述 UI 檢查。
+  這項啟動方式不能視為可分發 App 的封裝驗證。
+
+功能與入口的完整核對見 [命令列與 UI 功能對照](FEATURE_MATRIX.md)。
+測試檔為 `runtime/tests/test_prompt_cache_modes.py` 與
+`Tests/DeepSeekV4SSDAppTests/ServerConfigurationTests.swift`。
+
+## 2026-09-12：模型支援套件
+
+在 `codex/pr10-fixes`、基底 `5565c2396465724dc4372e91720956b89cd34200`
+加本機未提交修改，完成 [模型支援套件](MODEL_PACKAGES.md) 的接入驗證。
+
+- Python runtime **396 項通過**，涵蓋既有三個模型與新增套件測試。
+- Swift **70 項通過、3 項缺少 installed model fixture 略過**；
+  另排除 `testAPIKeyRoundTripsThroughIsolatedKeychainItem`，不列為通過。
+- CLI 四項離線安裝計畫分派檢查通過。
+- 第四個小型 MLX 模型只加入描述與套件註冊，沿用 manifest 結構版本 1，
+  經 `ModelManager` 完成載入、生成、串流中斷、後續請求及卸載；資源僅關閉一次。
+- 描述資料重複 ID、不安全路徑、未知實作、manifest 身分不符，以及 V4.1
+  不支援的快取還原與近似模式均有拒絕檢查。V4.1 預設請求改用 exact。
+- 設定 UI 改由模型描述控制預設值與可見選項；slots 提示使用模型預設值，
+  修正 V4.1 顯示 1152 而實際預設 768 的差異。
+- `make package` 產生本機 ad hoc 簽章的 1.1.6 測試成品，位於
+  `scratch/model-packages-2026-09-12/package/`；既有 `dist/` 與已安裝 App 未替換。
+  App 與 ZIP 解壓副本均通過 deep/strict 簽章、三語系資源與六次隔離啟動。
+  Swift 在禁止讀取專案 `.build` 的條件下載入模型描述與主 App 語系資源；
+  包內 Python 在禁止讀取專案 `.build`、`.venv`、`Sources` 的條件下確認
+  三個套件完整註冊，兩份包內描述資料逐 byte 相同。未公證、建立 tag 或上傳。
+
+原始記錄與來源 SHA-256 保留於 `scratch/model-packages-2026-09-12/`。
+機器可讀摘要為該目錄的 `summary.json`，包含 ZIP SHA-256；包內 43 個 runtime
+Python 檔案與本次工作目錄逐檔相同。
+這是功能與打包驗證；沒有新的完整 checkpoint、輸出品質、速度或記憶體測量。
+自有 mlx-lm fork 的 dependency 切換尚未完成，見 [fork 狀態](MLX_LM_FORK.md)。
+
+## 2026-09-12：PR #10 修正版本 build local
+
+在 `codex/pr10-fixes`（基底 `5565c2396465724dc4372e91720956b89cd34200`
+加本機未提交修正）完成本機封裝，App 與 build version 沿用 `1.1.6`。
+執行 `make package APP_VERSION=1.1.6 BUILD_VERSION=1.1.6 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=`，
+產生 `dist/Whallm.app` 和 `dist/Whallm-macOS-arm64.zip`。
+
+- 封裝前 Python runtime 389 項通過；Swift 68 項通過、3 項因缺少 installed model
+  fixture 略過，另排除 `testAPIKeyRoundTripsThroughIsolatedKeychainItem`。
+- CLI 四項離線分派檢查通過。
+- App 與 ZIP 暫存解壓副本均通過 `codesign --verify --deep --strict`。
+- 兩份 App 的英文、簡中、繁中資源均存在且通過 plist 檢查。六次隔離啟動
+  均禁止讀取專案 `.build` 與包內 Swift module bundle，完成實際 L10n 查找、
+  輸出對應語言的 ready marker，持續存活三秒後由檢查程序結束。
+  這確認各語言先從 `Contents/Resources` 載入，不需存取 `Bundle.module`。
+- 包內 Python 在禁止讀取專案 `.build` 與 `.venv` 的條件下，V4.1 10 項測試通過；
+  測試後 App 簽章再次驗證通過。
+
+ZIP SHA-256：`e2044db213402bf67d5a95716ce6a093b3b5df67e464a6d4072ee7b612b736a4`。
+原始記錄保留於 `scratch/build-local-pr10-2026-09-12/`。
+本次為本機 ad hoc 簽章成品，未建立 tag、公證或上傳，未替換已安裝 App。
+完整 V4.1 checkpoint 安裝與模型生成仍未驗證。
+
+## 2026-09-12：PR #10 本機修正與驗證
+
+以 PR #10 的 `5565c2396465724dc4372e91720956b89cd34200` 為基礎，
+本地分支 `codex/pr10-fixes` 修正以下兩項問題：
+
+- CLI `repack --model deepseek-v4.1` 與讀取 V4.1 `--plan` 共用依
+  `modelKind` 選擇 repacker 的流程，避免落入舊版 V4；舊 plan 未提供
+  `modelKind` 時仍使用 V4。
+- Swift 測試先將 `switch` 結果存入區域變數，再傳給 `modelID`，修正編譯錯誤。
+
+本機 Apple Swift 6.3.3 驗證：
+
+- `swift test --skip ServerConfigurationTests.testAPIKeyRoundTripsThroughIsolatedKeychainItem`：
+  執行 71 項，68 項通過、3 項 fixture 測試略過、零失敗；另排除一項 Keychain
+  互動測試。App 與 CLI targets 均在此次測試中完成編譯。
+- `.venv/bin/python Scripts/check_repack_cli.py .build/debug/dsv4-repack`：
+  舊格式 V4、明確指定 V4、V4.1、Qwen 共四項離線檢查通過。相同檢查對
+  PR 原始 CLI 在 V4.1 案例失敗，確認能偵測本次修正的分派錯誤。
+  檢查使用故意不相容的 plan，確認由正確模型的驗證器拒絕；不下載權重。
+- 本次 review 在未修改的 PR revision 執行 Python runtime suite，389 項通過；
+  後續修正未變動 Python runtime。
+
+UI 程式已接入 V4.1 模型列、下載／修復、載入／卸載及進階設定。
+此次只確認程式接線、編譯及上述測試，未做完整模型安裝、生成或 UI 操作驗證，
+也未重新封裝 App。
+
 ## 2026-09-11：DeepSeek V4.1 text-only working tree
 
 目前 working tree 新增固定 `deepseek-ai/DeepSeek-V4.1-Flash` revision

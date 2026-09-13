@@ -4,36 +4,10 @@ import DeepSeekRepack
 import Foundation
 
 extension ModelKind {
-  var displayName: String {
-    switch self {
-    case .deepSeekV4: "DeepSeek-V4-Flash-0731"
-    case .deepSeekV41: "DeepSeek-V4.1-Flash"
-    case .qwen3_8FlashNext: "Qwen3.8-Flash-Next"
-    }
-  }
-
-  var modelKindLabel: String {
-    switch self {
-    case .deepSeekV4: "DeepSeek V4"
-    case .deepSeekV41: "DeepSeek V4.1"
-    case .qwen3_8FlashNext: "Qwen3.8 Flash Next"
-    }
-  }
-
-  var assistantName: String {
-    switch self {
-    case .deepSeekV4, .deepSeekV41: "DeepSeek"
-    case .qwen3_8FlashNext: "Qwen"
-    }
-  }
-
-  var apiModelID: String {
-    switch self {
-    case .deepSeekV4: "deepseek-v4-flash-0731"
-    case .deepSeekV41: "deepseek-v4.1-flash"
-    case .qwen3_8FlashNext: "qwen3.8-flash-next-fp8"
-    }
-  }
+  var displayName: String { descriptor.displayName }
+  var modelKindLabel: String { descriptor.kindLabel }
+  var assistantName: String { descriptor.assistantName }
+  var apiModelID: String { descriptor.apiModelID }
 }
 
 enum ModelAliasError: LocalizedError, Equatable {
@@ -107,20 +81,7 @@ enum InstalledModelDiscovery {
     guard let manifest = try? InstalledModel.loadManifest(at: root) else { return nil }
     let paths = Set(manifest.files.map(\.path))
     let modelKind = manifest.modelKind ?? .deepSeekV4
-    let requiredPaths: [String]
-    switch modelKind {
-    case .deepSeekV4:
-      requiredPaths = [
-        "common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json",
-      ]
-    case .deepSeekV41:
-      requiredPaths = [
-        "common.bin", "config.json", "encoding/encoding.py", "tokenizer/tokenizer.json",
-        "engram/layer_01.weight.bin", "engram/layer_14.weight.bin",
-      ]
-    case .qwen3_8FlashNext:
-      requiredPaths = ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"]
-    }
+    let requiredPaths = modelKind.descriptor.requiredPaths
     guard requiredPaths.allSatisfy(paths.contains) else { return nil }
     let expectedLayerSize = UInt64(manifest.expertCount) * manifest.expertBlobSize
     var totalSize: UInt64 = 0
@@ -217,7 +178,7 @@ enum ModelOperationPhase: Equatable {
   case preparingRepair
   case repairing
   case installingDSpark
-  case installingQwen
+  case installingArtifact(String)
 
   var label: String {
     switch self {
@@ -230,7 +191,7 @@ enum ModelOperationPhase: Equatable {
     case .preparingRepair: L10n.string("Preparing repair")
     case .repairing: L10n.string("Downloading damaged data again")
     case .installingDSpark: L10n.string("Installing DSpark")
-    case .installingQwen: L10n.string("Downloading the Qwen MXFP4 installed model")
+    case .installingArtifact(let label): L10n.string(label)
     }
   }
 }
@@ -249,9 +210,9 @@ struct ModelOperationProgress: Equatable {
 
 @MainActor
 final class ModelLibrary: ObservableObject {
-  static let supportedModelKinds: [ModelKind] = [
-    .deepSeekV4, .deepSeekV41, .qwen3_8FlashNext,
-  ]
+  static let supportedModelKinds: [ModelKind] = ModelPackages.descriptors.compactMap {
+    ModelKind(rawValue: $0.kind)
+  }
   static let qwenMTPInstalledBytes: UInt64 = 1_518_071_296
   static let rootPreference = "modelLibraryRoot"
   private static let activeDownloadPreference = "modelDownloadWasActive"
@@ -274,6 +235,8 @@ final class ModelLibrary: ObservableObject {
   @Published private(set) var verificationIssues: [InstalledFileIssue]?
   @Published private(set) var installationBytesByModel: [String: UInt64] = [
     ModelKind.deepSeekV4.rawValue: 166_878_580_480,
+    // Pinned V4.1 revision dba1be0: repack plan installed weight bytes.
+    ModelKind.deepSeekV41.rawValue: 501_382_643_728,
     ModelKind.qwen3_8FlashNext.rawValue: 125_291_490_955,
   ]
   @Published private(set) var planningModelKinds: Set<String> = []
@@ -391,24 +354,24 @@ final class ModelLibrary: ObservableObject {
         runtime: ModelCatalog.Entry.Runtime(
           slots: settings.slots,
           readWorkers: settings.readWorkers,
-          prefetchReadWorkers: 2,
+          prefetchReadWorkers: settings.prefetchReadWorkers ?? 2,
           prefillStepSize: settings.prefillStepSize,
           fp8KVCache: !settings.bf16KVCache,
           memoryLimitGiB: settings.memoryLimitGiB,
           layerMajorPrefill: settings.layerMajorPrefill,
           layerMajorPrefillThreshold: settings.layerMajorPrefillThreshold ?? 1_024,
-          promptCacheEntries: settings.promptCacheEntries,
+          promptCacheEntries: settings.promptCacheMode == .off ? 0 : settings.promptCacheEntries,
           promptCacheMemoryGiB: settings.promptCacheMemoryGiB,
-          persistentPromptCache: modelKind != .deepSeekV41,
+          persistentPromptCache: settings.promptCacheMode == .disk,
           persistentPromptCacheEntries: 8,
           promptCacheDirectory: nil,
-          moePrefillStepSize: 0,
+          moePrefillStepSize: settings.moePrefillStepSize ?? 0,
           batchedExpertPrefill: true,
           qwenNextLayerPrefetch: false,
           qwenGroupedExperts: settings.qwenGroupedExperts == true,
           expertEvictionPolicy: settings.recentExpertCache == true ? "lru" : "lfu",
           qwenShortBlock: settings.qwenShortBlock == true,
-          anePrefill: modelKind == .qwen3_8FlashNext,
+          anePrefill: modelKind.descriptor.supports("anePrefill"),
           anePrefillRatio: settings.anePrefillRatio ?? 0.25,
           fp4IndexCache: true,
           mtpEnabled: settings.mtpEnabled == true && model.hasMTP,
@@ -434,7 +397,10 @@ final class ModelLibrary: ObservableObject {
           maxTokens: settings.defaultMaxTokens,
           temperature: settings.defaultTemperature,
           topP: settings.defaultTopP,
-          topK: settings.defaultTopK
+          topK: settings.defaultTopK,
+          approximationMode: settings.approximationEnabled == true && !settings.dsparkEnabled
+            ? "learned-route-drop-lowest-1" : "exact",
+          qwenAdaptiveSampling: settings.qwenAdaptiveSampling ?? true
         ),
         warmupPromptPath: settings.warmupPromptPath.isEmpty
           ? nil : settings.warmupPromptPath
@@ -527,7 +493,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   func mtpDownloadBlock(for model: InstalledModelInfo) -> ModelDownloadBlock? {
-    guard model.modelKind == .qwen3_8FlashNext, !model.hasMTP else { return nil }
+    guard model.modelKind.descriptor.supports("mtp"), !model.hasMTP else { return nil }
     guard !preflightChecks.contains(where: { $0.blocksDownload && $0.status == .failed }) else {
       return .unsupportedArchitecture
     }
@@ -613,16 +579,7 @@ final class ModelLibrary: ObservableObject {
     planningModelKinds.insert(key)
     installationPlanErrors.removeValue(forKey: key)
     do {
-      let bytes: UInt64
-      switch modelKind {
-      case .deepSeekV4:
-        bytes = try await DeepSeekV4Checkpoint()
-          .makeRepackPlan(includeDSpark: true).installedBytes
-      case .deepSeekV41:
-        bytes = try await DeepSeekV41Checkpoint().makeRepackPlan().installedBytes
-      case .qwen3_8FlashNext:
-        bytes = try await QwenInstalledModelArtifact().installedBytes()
-      }
+      let bytes = try await ModelPackages.package(for: modelKind).installedBytes()
       planningModelKinds.remove(key)
       installationBytesByModel[key] = bytes
     } catch {
@@ -717,7 +674,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   func startDSparkInstallation(_ model: InstalledModelInfo) {
-    guard !isBusy, !model.hasDSpark, model.modelKind == .deepSeekV4 else { return }
+    guard !isBusy, !model.hasDSpark, model.modelKind.descriptor.supports("dspark") else { return }
     downloadModelKind = nil
     operationPhase = .installingDSpark
     operationProgress = nil
@@ -729,7 +686,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   func startMTPInstallation(_ model: InstalledModelInfo) {
-    guard !isBusy, !model.hasMTP, model.modelKind == .qwen3_8FlashNext else { return }
+    guard !isBusy, !model.hasMTP, model.modelKind.descriptor.supports("mtp") else { return }
     refreshPreflight()
     if let block = mtpDownloadBlock(for: model) {
       message = block.message
@@ -787,11 +744,7 @@ final class ModelLibrary: ObservableObject {
   }
 
   private func defaultDownloadDestination(for modelKind: ModelKind) -> URL {
-    let name = switch modelKind {
-    case .deepSeekV4: "deepseek-v4-flash-0731.dsv4"
-    case .deepSeekV41: "deepseek-v4.1-flash.dsv4"
-    case .qwen3_8FlashNext: "qwen3.8-flash-next.dsv4"
-    }
+    let name = modelKind.descriptor.directoryName
     return rootURL.appending(path: name, directoryHint: .isDirectory)
   }
 
@@ -826,27 +779,12 @@ final class ModelLibrary: ObservableObject {
     modelKind: ModelKind
   ) async {
     do {
-      let needsAudit: Bool
-      switch modelKind {
-      case .deepSeekV4:
-        _ = try await DeepSeekV4Checkpoint().repack(
-          to: destination,
-          includeDSpark: true
-        ) { [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
-        }
-        needsAudit = true
-      case .deepSeekV41:
-        _ = try await DeepSeekV41Checkpoint().repack(to: destination) { [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .downloading) }
-        }
-        needsAudit = true
-      case .qwen3_8FlashNext:
-        _ = try await QwenInstalledModelArtifact().install(to: destination) { [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
-        }
-        needsAudit = false
+      let package = ModelPackages.package(for: modelKind)
+      let phase: ModelOperationPhase = package.installationLabel.map(ModelOperationPhase.installingArtifact) ?? .downloading
+      _ = try await package.install(to: destination) { [weak self] progress in
+        Task { @MainActor in self?.updateRepackProgress(progress, phase: phase) }
       }
+      let needsAudit = !package.verifiesInstallation
       try Task.checkCancellation()
       let issues = needsAudit ? try await audit(destination).issues : []
       verificationModelPath = destination.path
@@ -904,28 +842,12 @@ final class ModelLibrary: ObservableObject {
       downloadStart = nil
       let invalidFiles = Set(verification.issues.map(\.path))
       let modelKind = verification.manifest.modelKind ?? .deepSeekV4
-      let needsAudit: Bool
-      switch modelKind {
-      case .deepSeekV4:
-        _ = try await DeepSeekV4Checkpoint().repair(at: url, invalidFiles: invalidFiles) {
-          [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
-        }
-        needsAudit = true
-      case .deepSeekV41:
-        _ = try await DeepSeekV41Checkpoint().repair(
-          at: url, invalidFiles: invalidFiles
-        ) { [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .repairing) }
-        }
-        needsAudit = true
-      case .qwen3_8FlashNext:
-        _ = try await QwenInstalledModelArtifact().repair(at: url, invalidFiles: invalidFiles) {
-          [weak self] progress in
-          Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingQwen) }
-        }
-        needsAudit = false
+      let package = ModelPackages.package(for: modelKind)
+      let phase: ModelOperationPhase = package.installationLabel.map(ModelOperationPhase.installingArtifact) ?? .repairing
+      _ = try await package.repair(at: url, invalidFiles: invalidFiles) { [weak self] progress in
+        Task { @MainActor in self?.updateRepackProgress(progress, phase: phase) }
       }
+      let needsAudit = !package.verifiesInstallation
       try Task.checkCancellation()
       let issues = needsAudit ? try await audit(url).issues : []
       verificationIssues = issues

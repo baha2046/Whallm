@@ -15,7 +15,7 @@ let package = Package(
     .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2")
   ],
   targets: [
-    .target(name: "DeepSeekRepack"),
+    .target(name: "DeepSeekRepack", resources: [.process("Resources")]),
     .executableTarget(name: "dsv4-repack", dependencies: ["DeepSeekRepack"]),
     .executableTarget(
       name: "DeepSeekV4SSDApp",

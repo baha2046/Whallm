@@ -147,7 +147,7 @@ final class ModelDiscoveryTests: XCTestCase {
     let library = ModelLibrary(defaults: defaults)
 
     XCTAssertEqual(library.plannedInstalledBytes(for: .deepSeekV4), 166_878_580_480)
-    XCTAssertNil(library.plannedInstalledBytes(for: .deepSeekV41))
+    XCTAssertEqual(library.plannedInstalledBytes(for: .deepSeekV41), 501_382_643_728)
     XCTAssertEqual(library.plannedInstalledBytes(for: .qwen3_8FlashNext), 125_291_490_955)
   }
 

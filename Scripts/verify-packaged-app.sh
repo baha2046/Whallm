@@ -40,6 +40,26 @@ verify_localizations() {
   done
 }
 
+verify_model_packages() {
+  local target=$1
+  local catalog=$target/Contents/Resources/ModelPackages.json
+  local runtime_catalog=$target/Contents/Resources/runtime/deepseek_v4_ssd/model_support/ModelPackages.json
+  [[ -f $catalog && -f $runtime_catalog ]] || {
+    print -u2 "Model package catalog is missing."
+    exit 1
+  }
+  cmp "$catalog" "$runtime_catalog"
+  local profile="(version 1)(allow default)"
+  profile+="(deny file-read* (subpath \"$project_root/.build\"))"
+  profile+="(deny file-read* (subpath \"$project_root/.venv\"))"
+  profile+="(deny file-read* (subpath \"$project_root/Sources\"))"
+  PYTHONHOME="$target/Contents/Frameworks/Python.framework/Versions/Current" \
+  PYTHONPATH="$target/Contents/Resources/runtime:$target/Contents/Resources/python/site-packages" \
+  PYTHONDONTWRITEBYTECODE=1 \
+    sandbox-exec -p "$profile" "$target/Contents/MacOS/python3" \
+      -m deepseek_v4_ssd.model_support
+}
+
 launch_without_module_bundle_access() {
   local target=$1
   local module_bundle=$target/Contents/Resources/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle
@@ -77,6 +97,13 @@ launch_without_module_bundle_access() {
       sed -n '1,160p' "$log_path" >&2
       exit 1
     fi
+    if ! /usr/bin/grep -Eq '^WHALLM_MODEL_PACKAGES_READY:[1-9][0-9]*$' "$log_path"; then
+      kill -TERM "$app_pid"
+      wait "$app_pid" || true
+      print -u2 "Packaged App did not load its model packages."
+      sed -n '1,160p' "$log_path" >&2
+      exit 1
+    fi
     print "Localization initialized without Keychain: $language"
     kill -TERM "$app_pid"
     wait "$app_pid" || true
@@ -90,6 +117,7 @@ launch_without_module_bundle_access() {
 
 verify_signature "$app_path"
 verify_localizations "$app_path"
+verify_model_packages "$app_path"
 launch_without_module_bundle_access "$app_path"
 
 ditto -x -k "$zip_path" "$verification_root/extracted"
@@ -100,6 +128,7 @@ extracted_app=$verification_root/extracted/Whallm.app
 }
 verify_signature "$extracted_app"
 verify_localizations "$extracted_app"
+verify_model_packages "$extracted_app"
 launch_without_module_bundle_access "$extracted_app"
 
 print "Packaged App verification passed: $app_path"

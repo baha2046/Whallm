@@ -23,7 +23,9 @@ This project builds a memory-bounded Apple Silicon runtime for
 - **N-gram store**: Qwen FP8 N-gram rows stored in `ngram.bin` for read-only row lookup.
 - **Engram store**: DeepSeek V4.1 FP8 embedding rows and E8M0 scales stored in
   layer-specific files for read-only row lookup.
-- **model kind**: The runtime family selected by manifest format and `modelKind`.
+- **model kind**: The stable identity that selects a model support package.
+- **model support package**: The installation rules, model loading, conversation format,
+  and state operations needed to support one model kind.
 
 ## Current scope
 
