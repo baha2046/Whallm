@@ -5,6 +5,7 @@ project_root=${0:A:h:h}
 app_path=${1:?Usage: verify-packaged-app.sh APP_PATH ZIP_PATH}
 zip_path=${2:?Usage: verify-packaged-app.sh APP_PATH ZIP_PATH}
 require_notarization=${REQUIRE_NOTARIZATION:-0}
+expected_local_build=${EXPECTED_LOCAL_BUILD:-}
 verification_root=$(mktemp -d)
 trap 'rm -rf "$verification_root"' EXIT
 
@@ -105,6 +106,15 @@ launch_without_module_bundle_access() {
       exit 1
     fi
     print "Localization initialized without Keychain: $language"
+    if [[ -n $expected_local_build ]]; then
+      if ! /usr/bin/grep -Fxq "WHALLM_LOCAL_BUILD:$expected_local_build" "$log_path"; then
+        kill -TERM "$app_pid"
+        wait "$app_pid" || true
+        print -u2 "Packaged App has the wrong local-build feature configuration."
+        exit 1
+      fi
+      print "Local-build features verified: $expected_local_build"
+    fi
     kill -TERM "$app_pid"
     wait "$app_pid" || true
   done

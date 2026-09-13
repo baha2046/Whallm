@@ -1,6 +1,6 @@
 # 命令列與 UI 功能對照
 
-核對日期：2026-09-13。基準為 `codex/pr10-fixes`（`5565c23`）加目前未提交修改，
+核對日期：2026-09-13。基準為 `develop`（`0204409`）加目前未提交修改，
 不是已發布的 v1.1.6 成品。表格依目前程式入口逐項核對，不代表所有模型都已完成實機驗證。
 
 - **CLI**：`python -m deepseek_v4_ssd.cli`，直接生成一次。
@@ -12,8 +12,11 @@
 
 ## 本次變更
 
+Throughput 頁面的測試流程、數據定義與限制見 [Throughput](THROUGHPUT.md)。
+
 | 功能 | 命令列 | UI | 預設／行為 |
 | --- | --- | --- | --- |
+| 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
 | 關閉跨請求快取 | CLI／Server：`--prompt-cache off` | Model → Advanced Settings → Prompt cache → 不使用 | 每次重新處理輸入；單次生成仍需 KV state |
 | 記憶體快取 | CLI／Server：`--prompt-cache memory` | 同上 → 記憶體 | **新預設**；不建立、讀取或寫入磁碟快取 |
 | 磁碟快取 | CLI／Server：`--prompt-cache disk` | 同上 → 磁碟 | 記憶體重用加磁碟保存，可跨重啟恢復 |
@@ -65,7 +68,7 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 | 工具定義、tool choice、工具結果 | API request 欄位 | 僅顯示工具呼叫 | **App 不執行工具**，也沒有工具定義編輯器 |
 | 思考模式／reasoning effort | API request 欄位 | 顯示思考內容；無完整模式控制項 | 支援值與模型差異見 API 文件 |
 | Exact／近似模式 | CLI：`--approximation`；JSON `defaults.approximation_mode`；API request 欄位 | DeepSeek V4 → Use approximate mode | 預設關閉（Exact）；DSpark 啟用時停用 |
-| 最大輸出 token | CLI：`--max-tokens`；Server：`--default-max-tokens`；API | Model → Advanced Settings → Max tokens | 仍受模型 context 上限限制 |
+| 最大輸出 token | CLI：`--max-tokens`；Server：`--default-max-tokens`；API | Model → Advanced Settings → Max tokens | App 各模型預設 8192；保留已保存設定；仍受模型 context 上限限制 |
 | Temperature／Top P／Top K | CLI：`--temperature`／`--top-p`／`--top-k`；Server：`--default-temperature`／`--default-top-p`／`--default-top-k`；API | DeepSeek V4 與 Qwen 的進階設定可調 | Qwen 關閉 Use adaptive sampling 後使用手動值；V4.1 UI 不提供調整 |
 | Qwen 自動取樣 | JSON `defaults.qwen_adaptive_sampling` | Use adaptive sampling | 預設開啟，依聊天／思考模式選值；關閉後使用已儲存的 T／P／K，API 明確值仍優先 |
 | 暖機 prompt | Server：`--warmup-prompt-file`；JSON `warmup_prompt_path` | Model → Advanced Settings → Warmup prompt | catalog 必須逐模型設定檔案 |

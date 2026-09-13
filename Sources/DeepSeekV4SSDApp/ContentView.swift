@@ -7,6 +7,7 @@ struct ContentView: View {
   @ObservedObject var appUpdater: AppUpdater
   @StateObject private var modelLibrary = ModelLibrary()
   @StateObject private var chatSession = ChatSession()
+  @StateObject private var throughputSession = ThroughputSession()
   // SwiftUI can reconstruct this value repeatedly; defer credential access to .task.
   @State private var configuration = ServerConfiguration.load(defaults: .standard, apiKey: "")
   @State private var didLoadConfiguration = false
@@ -71,7 +72,10 @@ struct ContentView: View {
     .background(AppTheme.pageBackground)
     .preferredColorScheme(.dark)
     .environment(\.locale, selectedLanguage.locale)
-    .onDisappear { chatSession.stopGenerating() }
+    .onDisappear {
+      chatSession.stopGenerating()
+      throughputSession.cancel()
+    }
     .task {
       if !didLoadConfiguration {
         let loaded = ServerConfiguration.localDefault
@@ -163,6 +167,9 @@ struct ContentView: View {
         language: selectedLanguage,
         clearHistory: server.clearPerformanceHistory
       )
+    case .throughput:
+      ThroughputView(configuration: configuration, server: server, modelLibrary: modelLibrary,
+        session: throughputSession, language: selectedLanguage)
     case .logs:
       LogsView(server: server, configuration: $configuration, language: selectedLanguage)
     case .settings:
@@ -263,12 +270,13 @@ private enum AppPage: String, CaseIterable, Identifiable {
   case advanced
   case chat
   case metric
+  case throughput
   case logs
   case settings
 
   var id: String { rawValue }
 
-  static let primaryPages: [AppPage] = [.server, .model, .advanced, .chat, .metric, .logs]
+  static let primaryPages: [AppPage] = [.server, .model, .advanced, .chat, .metric, .throughput, .logs]
 
   var icon: String {
     switch self {
@@ -277,6 +285,7 @@ private enum AppPage: String, CaseIterable, Identifiable {
     case .advanced: "slider.horizontal.3"
     case .chat: "bubble"
     case .metric: "gauge.with.dots.needle.50percent"
+    case .throughput: "speedometer"
     case .logs: "doc.text"
     case .settings: "gearshape"
     }
@@ -289,18 +298,19 @@ private enum AppPage: String, CaseIterable, Identifiable {
     case .advanced: L10n.string("Advance", language: language)
     case .chat: L10n.string("Chat", language: language)
     case .metric: L10n.string("Metric", language: language)
+    case .throughput: L10n.string("Throughput", language: language)
     case .logs: L10n.string("Logs", language: language)
     case .settings: L10n.string("Settings", language: language)
     }
   }
 }
 
-private enum AppLayout {
+enum AppLayout {
   // Change this value to set the visible page content width.
   static let contentWidth: CGFloat = 880
 }
 
-private enum AppTheme {
+enum AppTheme {
   static let pageBackground = Color(red: 0.095, green: 0.095, blue: 0.1)
   static let sidebarBackground = Color(red: 0.12, green: 0.12, blue: 0.125)
   static let cardBackground = Color(red: 0.15, green: 0.15, blue: 0.155)

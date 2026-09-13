@@ -242,7 +242,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var dsparkEnabled = false
   var dsparkSlots = 768
   var dsparkConfidenceThreshold = 0.6
-  var defaultMaxTokens = 272_000
+  var defaultMaxTokens = 8_192
   var defaultTemperature = 0.2
   var defaultTopP = 0.98
   var defaultTopK = 0

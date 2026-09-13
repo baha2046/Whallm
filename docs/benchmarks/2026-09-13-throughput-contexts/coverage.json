@@ -1,0 +1,225 @@
+{
+  "date": "2026-09-13",
+  "base_commit": "0204409212ee8e7c508403d56211c8f628abeb20",
+  "working_tree_changes_included": true,
+  "evidence": "Offline tokenizer counts and exact prefix hashes; no model generation or throughput measurements.",
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "transformers": "5.12.1",
+    "tokenizers": "0.22.2"
+  },
+  "encoding": "Same BOS/add_special_tokens rule as ModelRuntime._encode_prompt. Original token prefix only, no chat template, no repetition. 200K = 204800 tokens.",
+  "tokenizers": [
+    {
+      "name": "qwen3.8-flash-next",
+      "checkpoint": "Qwen/Qwen3.8-Flash-Next-FP8",
+      "checkpoint_revision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
+      "files": {
+        "chat_template.jinja": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041",
+        "merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+        "tokenizer.json": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3",
+        "tokenizer_config.json": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27",
+        "vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"
+      }
+    },
+    {
+      "name": "deepseek-v4.1-flash",
+      "checkpoint": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "checkpoint_revision": "dba1be0a40aa45a94ad051997016db3960a90277",
+      "files": {
+        "tokenizer.json": "c90dfa01249db1be4245780a052ede752e1361c612ac6d08e2bdada7d599476b",
+        "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547"
+      }
+    },
+    {
+      "name": "deepseek-v4-flash",
+      "checkpoint": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "checkpoint_revision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
+      "files": {
+        "tokenizer.json": "8f9f37ca37fdc4f5fd36d5cf4d3b0e8392edb4e894fd10cc0d70b4957c8633cf",
+        "tokenizer_config.json": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547"
+      }
+    }
+  ],
+  "bundled": [
+    {
+      "context": "code",
+      "tokenizer": "qwen3.8-flash-next",
+      "tokens": 252447,
+      "covers_200k": true,
+      "corpus_sha256": "92a52a1a74b2e12f99fa3f584d339eaaf0f435e35a3a2a843dcd4606e8a1b59f",
+      "prefix_200k_token_sha256": "c99e9bd3d4ed68a32e0fcff80dc439e018041ead14b55a63832eb7e2d63ebe26"
+    },
+    {
+      "context": "novel",
+      "tokenizer": "qwen3.8-flash-next",
+      "tokens": 311730,
+      "covers_200k": true,
+      "corpus_sha256": "4ee728ea3b3520e321146b81172cdbacd06ee7f4255748cf92568b6f257f2c29",
+      "prefix_200k_token_sha256": "06f58405e1daeff65403b6729bf235114438c9d68365af3a8065d303f3f654b9"
+    },
+    {
+      "context": "code",
+      "tokenizer": "deepseek-v4.1-flash",
+      "tokens": 249700,
+      "covers_200k": true,
+      "corpus_sha256": "92a52a1a74b2e12f99fa3f584d339eaaf0f435e35a3a2a843dcd4606e8a1b59f",
+      "prefix_200k_token_sha256": "adfbc74c3c53dd208c5b92530f3743358f5667611fe61317a0f4723164b079a8"
+    },
+    {
+      "context": "novel",
+      "tokenizer": "deepseek-v4.1-flash",
+      "tokens": 309191,
+      "covers_200k": true,
+      "corpus_sha256": "4ee728ea3b3520e321146b81172cdbacd06ee7f4255748cf92568b6f257f2c29",
+      "prefix_200k_token_sha256": "72a3e4db5166545f64360b38bcdc5dd1143aae804c728b0295b0a571a76c78e2"
+    },
+    {
+      "context": "code",
+      "tokenizer": "deepseek-v4-flash",
+      "tokens": 249700,
+      "covers_200k": true,
+      "corpus_sha256": "92a52a1a74b2e12f99fa3f584d339eaaf0f435e35a3a2a843dcd4606e8a1b59f",
+      "prefix_200k_token_sha256": "adfbc74c3c53dd208c5b92530f3743358f5667611fe61317a0f4723164b079a8"
+    },
+    {
+      "context": "novel",
+      "tokenizer": "deepseek-v4-flash",
+      "tokens": 309191,
+      "covers_200k": true,
+      "corpus_sha256": "4ee728ea3b3520e321146b81172cdbacd06ee7f4255748cf92568b6f257f2c29",
+      "prefix_200k_token_sha256": "72a3e4db5166545f64360b38bcdc5dd1143aae804c728b0295b0a571a76c78e2"
+    }
+  ],
+  "candidate_scope": "Code candidates: all .py/.go files (including tests), sorted by archive path, excluding vendor and .git; each appears once with file header. Local Whallm: Sources/**/*.swift plus top-level runtime/deepseek_v4_ssd/*.py. Books: UTF-8, LF, text between Gutenberg START/END markers, outer whitespace stripped plus trailing newline.",
+  "candidates": [
+    {
+      "name": "current-9kb",
+      "bytes": 9217,
+      "gzip_bytes": 2681,
+      "sha256": "33f0b780c4f8ad37846fd6a768be85870cbff18a10b05c9cc0b71d766231b47e",
+      "tokens": {
+        "qwen3.8-flash-next": 2254,
+        "deepseek-v4.1-flash": 2302
+      }
+    },
+    {
+      "name": "whallm-production-code",
+      "bytes": 1037236,
+      "gzip_bytes": 197926,
+      "sha256": "92a52a1a74b2e12f99fa3f584d339eaaf0f435e35a3a2a843dcd4606e8a1b59f",
+      "tokens": {
+        "qwen3.8-flash-next": 252447,
+        "deepseek-v4.1-flash": 249700
+      }
+    },
+    {
+      "name": "gollection",
+      "commit": "65078289ddbe8f043a54810cd51fc0745d9ba68e",
+      "files": 31,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source": "https://github.com/yanun0323/gollection",
+      "bytes": 79474,
+      "gzip_bytes": 13427,
+      "sha256": "3854a7167db71764763bde12fb6f5f0ad084c2c0e6cd02ed7cd87a10f665baca",
+      "tokens": {
+        "qwen3.8-flash-next": 29643,
+        "deepseek-v4.1-flash": 28303
+      }
+    },
+    {
+      "name": "clean_architecture",
+      "commit": "fc3a4e7b049c0fb078498f081676d1f4d50a9a61",
+      "files": 16,
+      "license": null,
+      "source": "https://github.com/yanun0323/clean_architecture",
+      "bytes": 27442,
+      "gzip_bytes": 6223,
+      "sha256": "12c6480761cdf82afcd85f43873fb99cc67b549e4811118f722efac8eef46607",
+      "tokens": {
+        "qwen3.8-flash-next": 8477,
+        "deepseek-v4.1-flash": 8390
+      }
+    },
+    {
+      "name": "sutando",
+      "commit": "f4e8dfcbf6970f108bb3a8c840ddb8282f7b0c6f",
+      "files": 29,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source": "https://github.com/yanun0323/sutando",
+      "bytes": 83707,
+      "gzip_bytes": 16124,
+      "sha256": "d370ea97c1d7d8c79e989bb4a2455dd1c8fdb87c9ae2321bcd39c2d3a860720b",
+      "tokens": {
+        "qwen3.8-flash-next": 27494,
+        "deepseek-v4.1-flash": 26767
+      }
+    },
+    {
+      "name": "mlx-lm",
+      "commit": "dcbcf786c0cf56f9a12fabe9468c887781431ae2",
+      "files": 207,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "source": "https://github.com/yanun0323/mlx-lm",
+      "bytes": 2133644,
+      "gzip_bytes": 341180,
+      "sha256": "74880a8f109345319b2037e2d5de3b289643142acd915f3e50ae09861b9c9208",
+      "tokens": {
+        "qwen3.8-flash-next": 558650,
+        "deepseek-v4.1-flash": 569349
+      }
+    },
+    {
+      "name": "hamlet",
+      "source": "https://www.gutenberg.org/ebooks/1524.txt.utf-8",
+      "bytes": 180462,
+      "gzip_bytes": 71582,
+      "sha256": "445bbb0ab53d60c0fca3689a18f6d5b036e6be0c38f3caf8c8349b55055f0478",
+      "tokens": {
+        "qwen3.8-flash-next": 52215,
+        "deepseek-v4.1-flash": 49265
+      }
+    },
+    {
+      "name": "moby-dick",
+      "source": "https://www.gutenberg.org/ebooks/2701.txt.utf-8",
+      "bytes": 1234509,
+      "gzip_bytes": 499739,
+      "sha256": "4ee728ea3b3520e321146b81172cdbacd06ee7f4255748cf92568b6f257f2c29",
+      "tokens": {
+        "qwen3.8-flash-next": 311730,
+        "deepseek-v4.1-flash": 309191
+      }
+    },
+    {
+      "name": "shakespeare",
+      "source": "https://www.gutenberg.org/ebooks/100.txt.utf-8",
+      "bytes": 5422620,
+      "gzip_bytes": 2098143,
+      "sha256": "bfb5a5764506115cbae33bfdf66014697ef69d06339f001db209d3f2a56c83fc",
+      "tokens": {
+        "qwen3.8-flash-next": 1567778,
+        "deepseek-v4.1-flash": 1469759
+      }
+    }
+  ]
+}

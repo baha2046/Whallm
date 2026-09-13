@@ -1,0 +1,210 @@
+{
+  "format_version": 1,
+  "snapshot_date": "2026-09-13",
+  "contexts": {
+    "code": {
+      "title": "Whallm Swift and Python source snapshot",
+      "file": "code.txt.gz",
+      "utf8_bytes": 1037236,
+      "gzip_bytes": 197926,
+      "sha256": "92a52a1a74b2e12f99fa3f584d339eaaf0f435e35a3a2a843dcd4606e8a1b59f",
+      "base_commit": "0204409212ee8e7c508403d56211c8f628abeb20",
+      "working_tree_changes_included": true,
+      "assembly": "Sorted Sources/**/*.swift, then runtime/deepseek_v4_ssd/*.py; each file prefixed with # File: <path> and a newline; entries joined with two newlines. Fixed snapshot, not regenerated during builds.",
+      "sources": [
+        {
+          "path": "Sources/DeepSeekRepack/Checkpoint.swift",
+          "sha256": "5376428f5499e848df0dab5ac07ffcd7251b5d6856c9fb568e2e109117319231"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/DeepSeekV41.swift",
+          "sha256": "0bc9f6f92d9d8a7652b8c8b89f58240211883c811e0ef7734ec7d64368dcfb8b"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/ExpertIOBenchmark.swift",
+          "sha256": "6609c05fdf1312ecb7ad6cda4a7dd560e33fe3bebfe9b9cc29c021b1529dd590"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/InstalledArtifact.swift",
+          "sha256": "cb1e3050fbf412fc354c96a8cc1c9b4525b072e3c0542a6432f4889c124aea41"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/MXFP4.swift",
+          "sha256": "4829b2cc1193c26526fd0594a16550b556b942dd4ea7ad1803ad204c608761c3"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/Model.swift",
+          "sha256": "47d4969bfab433cb629ca8812210c52af1d87e3411f763f1000fe79b912ad8a3"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/ModelPackage.swift",
+          "sha256": "f951fd58b376ac49a298896518a0aeb1cc978d6d2cca5e7679ec69018028ea63"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/ModelPackages/DeepSeekV41Package.swift",
+          "sha256": "6dbf654f54e6be38d16bf410ae9064ac34d049bbe449c5d276c0a1833b5930cd"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/ModelPackages/DeepSeekV4Package.swift",
+          "sha256": "63b5d8ef436dc128042b1a4431afb4b32faaa9c9ebcca4a2e8716a49f3edd5ba"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/ModelPackages/QwenPackage.swift",
+          "sha256": "d17e2600b194ffb4e9f2f5404efe2ae7eda0712c2d388e7f502c804531105a87"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/Qwen.swift",
+          "sha256": "f0b05a8112e7c275a89ad2c2d2f0c8ec630968b5cf67fccc5a4f40f4a7322d9c"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/RepackPlanner.swift",
+          "sha256": "3a20dc05db111eaaca383063fa57f332e3b00194ad4d522e44a8df5033d67e63"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/Repacker.swift",
+          "sha256": "b91a14aef3a500e7341522e550d40a7fdae1a48613dd3da97edd4de571b128ca"
+        },
+        {
+          "path": "Sources/DeepSeekRepack/SafeTensors.swift",
+          "sha256": "59b9cdb3208d1109517db60201d270071bd6911397f63eb92b946991950ec866"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/AppUpdater.swift",
+          "sha256": "9823fd392062f8df624f817e15473750c480c2a82c4626acfebad44d696348a9"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/ChatClient.swift",
+          "sha256": "247079d3e45bee005c6c720396daea2f4d0bb4f9eb49ad60b26816a90186dc62"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/ContentView.swift",
+          "sha256": "a88211dd1efef9ba3b62c8bc32fded63541c8bc51a26e31ebd81b326728021dd"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/DeepSeekV4SSDApp.swift",
+          "sha256": "5daf8686ef90408d880cfabd5c296626344cd9677fb4d31087a6bbdb69ee0fd6"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/Localization.swift",
+          "sha256": "cc18e5db565d53df39ddb9ab4dc4e9bc44a42f9792810cc562eab09156d35844"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/ModelLibrary.swift",
+          "sha256": "3622842d467d9c3531fbd0bb3586c915311031b0435276a64e9212ba16af04be"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/ServerController.swift",
+          "sha256": "44c7ab81afa58cae5002ff6243e32911bacd9ae0877d48d5602d5dd627882c0d"
+        },
+        {
+          "path": "Sources/DeepSeekV4SSDApp/ThroughputView.swift",
+          "sha256": "d44e2095b08400995900807c8f79d55f5d03b7d4f16769b0bda02e1444e0f41c"
+        },
+        {
+          "path": "Sources/dsv4-repack/main.swift",
+          "sha256": "5ce11f4349d909435c4adecb1d6a832c22da901e5173d919cee10a10d0fe7e18"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/__init__.py",
+          "sha256": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/ane_prefill.py",
+          "sha256": "2783fb1fef8573f53786e95a10e109484327b3506cdffc65035f15bebd1e4e9f"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/cancellation.py",
+          "sha256": "cb0fee03b23bf9f55dcef5e514fb0d2315448c219b95eea6a00720a1440d00ad"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/cli.py",
+          "sha256": "6aefb419f39e202726fa4c76886200fa8452199ea1be61bef874b0e5fbe9de2e"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/deepseek_v41_ssd.py",
+          "sha256": "4f9d63222a80d34bb1343bf037c5baa5d33ea6fc8551dd6ecc160480ca26812a"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/dspark.py",
+          "sha256": "a172908ff6e583cdae6d90cfd301997757f2969c057bdd91c65576281a0526d9"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/expert_cache.py",
+          "sha256": "485ad239e23edd52f73627521e225d8ea74e214b37a4b6b7991c0b6b9d3accdf"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/expert_layout.py",
+          "sha256": "ad910cfbdaf113f9611330b71c771b0a7fc0aafa4cb77a9cabf1b192aea45839"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/fp8_cache.py",
+          "sha256": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/generation.py",
+          "sha256": "135b05c1c5611a9e186d46b0725fabe34af48b062361246374efed74328764b7"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/io_metrics.py",
+          "sha256": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/manifest.py",
+          "sha256": "e713dffe28116258d641a1af5a2c07a41e2603f478e0cdc9fb999b422aa2786c"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/model.py",
+          "sha256": "5b416205696d21352c32480533bcc31aeb5831b79f4f4439ff568f31619fb015"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/model_manager.py",
+          "sha256": "15e483d06e66e52d18f3553826bffb3801743515d7408df0b2d0aa718c438c5f"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/qwen4_exp.py",
+          "sha256": "64a7d5473673d54f0725e4a5aaa2f7bbaa14beeffd172ad029129b0ef9f11dbb"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/qwen_block_generation.py",
+          "sha256": "43b9154fbc04c69327b347d79fe08296f7fb3ea2473feb4efa8a8110c9fe34f5"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/qwen_resident_block.py",
+          "sha256": "ae5f856551cab8cc222089646a1a7e092a0e1e5402a557215ff2920c4d4aac67"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/qwen_short_block.py",
+          "sha256": "4b3f36a759a731961b539c93e88096897146f75b6b60605aadc6a67c29b30961"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/route_trace.py",
+          "sha256": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/server.py",
+          "sha256": "b3cb839d015e8fa5e4509153fa9d3acfccfdb2eab6db0849cfecb09f9eba4d6f"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/throughput.py",
+          "sha256": "7b534ba655869151b0a1739cd79f9978cbdcd5c16170f9755418dba0d0422de5"
+        },
+        {
+          "path": "runtime/deepseek_v4_ssd/tool_codec.py",
+          "sha256": "030c9de4f2b91015248b69b298818ab7c3e4371748ca10bc6e6b7cd8d3397d09"
+        }
+      ]
+    },
+    "novel": {
+      "title": "Moby-Dick; or, The Whale — Herman Melville",
+      "file": "novel.txt.gz",
+      "utf8_bytes": 1234509,
+      "gzip_bytes": 499739,
+      "sha256": "4ee728ea3b3520e321146b81172cdbacd06ee7f4255748cf92568b6f257f2c29",
+      "source": "https://www.gutenberg.org/ebooks/2701",
+      "download": "https://www.gutenberg.org/ebooks/2701.txt.utf-8",
+      "edition_updated": "2026-09-07",
+      "preparation": "UTF-8, CRLF normalized to LF. Text between Gutenberg START/END marker lines, stripped of outer whitespace, with one trailing newline. Header and license retained in NOVEL-NOTICE.txt.",
+      "original_download_sha256": "907420db6c4b68c70e2988cd2ad9c8cf79138667a01b63376d18dd17fef1a18b"
+    }
+  }
+}

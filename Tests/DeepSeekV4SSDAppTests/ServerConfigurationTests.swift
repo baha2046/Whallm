@@ -5,6 +5,20 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  func testAllModelsDefaultTo8192OutputTokensAndPreserveSavedValues() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    for descriptor in ModelPackages.descriptors {
+      let kind = try XCTUnwrap(ModelKind(rawValue: descriptor.kind))
+      XCTAssertEqual(ModelAdvancedSettings.defaults(for: kind).defaultMaxTokens, 8_192)
+      XCTAssertEqual(ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults).defaultMaxTokens, 8_192)
+      var custom = ModelAdvancedSettings.defaults(for: kind)
+      custom.defaultMaxTokens = 4_096
+      custom.save(for: kind, defaults: isolated.defaults)
+      XCTAssertEqual(ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults).defaultMaxTokens, 4_096)
+    }
+  }
+
   @MainActor
   func testSSDSettingsDefaultsMigrateAndPreserveExplicitChoices() throws {
     let isolated = try isolatedDefaults()
@@ -373,7 +387,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(restoredDeepSeek.dsparkEnabled)
     XCTAssertEqual(restoredDeepSeek.layerMajorPrefillThreshold, 1_024)
     XCTAssertEqual(restoredQwen.slots, 900)
-    XCTAssertEqual(restoredQwen.defaultMaxTokens, 262_144)
+    XCTAssertEqual(restoredQwen.defaultMaxTokens, 8_192)
     XCTAssertEqual(restoredQwen.defaultTemperature, 1.0)
     XCTAssertEqual(restoredQwen.defaultTopP, 0.95)
     XCTAssertEqual(restoredQwen.defaultTopK, 3)

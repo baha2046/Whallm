@@ -379,3 +379,51 @@
 "Check for new versions in the background." = "Check for new versions in the background.";
 
 "Updates" = "Updates";
+
+/* Throughput benchmark */
+"Throughput" = "Throughput";
+"Run automatically loads the selected model." = "Run automatically loads the selected model.";
+"Select a model…" = "Select a model…";
+"Benchmark Context" = "Benchmark Context";
+"Context lengths" = "Context lengths";
+"Input tokens per test. Select one or more lengths." = "Input tokens per test. Select one or more lengths.";
+"Generation length" = "Generation length";
+"Maximum output tokens per test." = "Maximum output tokens per test.";
+"Install a model on the Model page to run a benchmark." = "Install a model on the Model page to run a benchmark.";
+"One request at a time. Prompt reuse is off; model settings apply." = "One request at a time. Prompt reuse is off; model settings apply.";
+"Run Benchmark" = "Run Benchmark";
+"Starting server…" = "Starting server…";
+"Loading model…" = "Loading model…";
+"Running benchmark…" = "Running benchmark…";
+"Benchmark complete" = "Benchmark complete";
+"Benchmark cancelled" = "Benchmark cancelled";
+"Benchmark failed" = "Benchmark failed";
+"The benchmark returned no result. Try again." = "The benchmark returned no result. Try again.";
+"The server is not ready. Check Logs and try again." = "The server is not ready. Check Logs and try again.";
+"Single request results" = "Single request results";
+"Input / Output" = "Input / Output";
+"TTFT (ms)" = "TTFT (ms)";
+"TPOT (ms)" = "TPOT (ms)";
+"PP tok/s" = "PP tok/s";
+"TG tok/s" = "TG tok/s";
+"Total (s)" = "Total (s)";
+"Peak MLX" = "Peak MLX";
+"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory." = "TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory.";
+"Output may end early. Loading time is excluded; no extra warm-up is performed." = "Output may end early. Loading time is excluded; no extra warm-up is performed.";
+"Output limit: %lld tokens" = "Output limit: %lld tokens";
+"Configuration" = "Configuration";
+
+"Code" = "Code";
+"Novel" = "Novel";
+"Whallm source code · bundled, without repetition" = "Whallm source code · bundled, without repetition";
+"Moby-Dick · bundled English novel, without repetition" = "Moby-Dick · bundled English novel, without repetition";
+"Result output" = "Result output";
+"Output format" = "Output format";
+"Plain text" = "Plain text";
+"JSON" = "JSON";
+"Markdown table" = "Markdown table";
+"Dry run (simulated)" = "Dry run (simulated)";
+"Dry run complete · simulated results" = "Dry run complete · simulated results";
+"Simulated results for UI debugging. No model is loaded." = "Simulated results for UI debugging. No model is loaded.";
+"Generate results" = "Generate results";
+"Select at least one context length." = "Select at least one context length.";

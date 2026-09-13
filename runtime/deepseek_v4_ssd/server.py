@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Iterator
 from urllib.parse import urlsplit
 
+from . import throughput
 from .model import _apply_prompt_cache_mode
 
 from .cancellation import GenerationCancelled, cancellation_scope, check_cancelled
@@ -388,6 +389,10 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             payload = self._request_json()
             with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
                 self._completion(payload, model)
+        elif path == "/api/benchmark/throughput":
+            self._authorize()
+            payload = self._request_json()
+            self._throughput(payload)
         elif path == "/api/models/load":
             self._authorize()
             payload = self._request_json()
@@ -407,6 +412,42 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             self._json(200, self._status())
         else:
             raise APIError("Route not found.", status=404, code="not_found")
+
+    def _throughput(self, payload: dict[str, Any]) -> None:
+        context = payload.get("context_length")
+        generation = payload.get("generation_length")
+        benchmark_context = payload.get("benchmark_context", "code")
+        if benchmark_context not in throughput.CONTEXT_TYPES:
+            raise APIError("Choose Code or Novel as the benchmark context.", param="benchmark_context")
+        if type(context) is not int or context not in throughput.CONTEXT_LENGTHS:
+            raise APIError("Choose a supported context length.", param="context_length")
+        if type(generation) is not int or generation not in throughput.GENERATION_LENGTHS:
+            raise APIError("Choose 128, 1024, or 4096 output tokens.", param="generation_length")
+        self._start_sse()
+        try:
+            with ClientConnection(self.connection):
+                self._sse({"phase": "loading"})
+                with self.app.model_manager.request(payload.get("model")) as model:
+                    runtime = model.runtime
+                    support = support_for_runtime(runtime)
+                    options, _ = self._common(
+                        {"max_tokens": generation}, model.defaults, support=support,
+                        dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
+                    )
+                    _validate_approximation_runtime(options, runtime)
+                    self._sse({"phase": "running", "generated": 0})
+                    result = throughput.run_trial(
+                        runtime, options, context, self.app.track,
+                        lambda count: self._sse({"phase": "running", "generated": count}),
+                        benchmark_context=benchmark_context,
+                    )
+                    self._sse({"result": {**result, "model": model.model_id}})
+        except (GenerationCancelled, BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+            return
+        except Exception as error:
+            self._sse({"error": {"message": str(error)}})
+        self._sse_done()
 
     def _put(self) -> None:
         raise APIError("Route not found.", status=404, code="not_found")

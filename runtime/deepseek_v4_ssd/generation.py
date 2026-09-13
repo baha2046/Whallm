@@ -1785,7 +1785,7 @@ class ModelRuntime:
 
     def stream(
         self,
-        prompt: str,
+        prompt: str | list[int],
         options: GenerationOptions,
     ) -> Iterator[GeneratedPiece]:
         check_cancelled()
@@ -1807,7 +1807,7 @@ class ModelRuntime:
             self, options.approximation_mode
         ), _qwen_decode_request(self):
             with mx.stream(self._generation_stream):
-                prompt_tokens = self._encode_prompt(prompt)
+                prompt_tokens = list(prompt) if isinstance(prompt, list) else self._encode_prompt(prompt)
                 available_tokens = getattr(
                     self.installed, "maximum_context", 1_048_576
                 ) - len(prompt_tokens)

@@ -48,6 +48,10 @@ Swift 與 Python 使用相同 bytes，包含：
 - App 快速檢查所需檔案、可用功能、可編輯設定及預設值。
 - 模型自動記憶體上限與 Prefill 門檻。
 
+App 的 Advanced Settings → Max tokens 在所有模型上預設為 **8192**。
+初次建立及重設預設使用此值；已保存的模型設定保留。它是 App server catalog 的
+預設輸出上限，並非模型輸入 context limit；Throughput 自己選擇的生成長度亦不受影響。
+
 `ModelKind` 改成經 catalog 驗證的字串型別；JSON 編碼仍是一個字串，
 既有三個常數、API ID、Alias、偏好設定鍵保持相容。
 App 模型列表、進階設定可見性、預設值和 Python catalog 使用描述資料。

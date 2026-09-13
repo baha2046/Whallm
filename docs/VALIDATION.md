@@ -1,5 +1,155 @@
 # 驗證紀錄
 
+## 2026-09-14：1.1.7-dev.2 Alpha 發布前檢查
+
+- 版本為 `1.1.7`／`1.1.7d2`，tag `v1.1.7-dev.2`，GitHub pre-release，更新來源 dev。
+- 重新執行 Python **412 項通過**、local Swift **82 項通過、3 項 fixture 略過**，
+  排除需要互動的 Keychain round-trip 案例。shell 腳本語法及 diff 空白檢查通過。
+- 本機封裝前置條件已由下方 local-only Dry run 紀錄完成；發布改用 distribution，
+  需在上傳前及下載後再次檢查公證、三語隔離啟動及 local 功能關閉。
+- Developer ID 與 `deepseek_ssd` 公證 profile 已於本輪確認可用。
+  原始 logs：`scratch/release-1.1.7-dev.2/`。本節是發布前檢查，公開成品結果另記。
+
+## 2026-09-14：local-only Dry run 與 Max tokens 8192
+
+- Dry run 以 `WHALLM_LOCAL_BUILD` 條件編譯；`make build/run/test/package` 啟用，
+  stable／dev 共用的 release 腳本強制 distribution，不編入模擬生成、不顯示選項。
+  發布組態的最佳化 binary 已編譯，啟動標記為 0，實際 Model 選單無 Dry run。
+- App 各模型 Advanced Settings 的 Max tokens 預設均為 **8192**，描述資料及設定
+  初始值一致。程式載入仍保留已儲存設定；依本次要求，也透過 UI 將這台電腦的
+  DeepSeek V4／V4.1／Qwen 現有 Max tokens 設為 8192，重新讀取偏好設定確認三者皆相符。
+- local 組態 Swift **82 項通過、3 項 fixture 略過**，另排除既有 Keychain 互動案例。
+  distribution 組態 **6 項針對性測試通過**，涵蓋禁止模擬生成及所有模型的新預設值；
+  Python model-support **7 項通過**。本輪未更動 Python runtime，未重跑其完整 suite。
+- `make package` 完成，沿用 1.1.7／1.1.7d1、ad hoc 簽章。App／ZIP 解壓副本通過
+  嚴格簽章、模型描述及六次三語隔離啟動，並從 binary 標記確認 local 功能為 1。
+  `.build` 與 module resource bundle 被拒絕時，L10n 仍從 `Contents/Resources` 初始化。
+- 故意以 `EXPECTED_LOCAL_BUILD=0` 驗證 local 成品，確認因組態不符而拒絕；發布前及
+  下載後均加入此檢查。僅驗證組態和阻擋機制，未執行公證、tag 或公開發布。
+- source、App、ZIP 三處描述資料及目前偏好設定的每個 Max tokens 皆為 8192。
+  已重新開啟成品。logs：`scratch/local-build-gate-2026-09-14/`。
+  ZIP SHA-256：`31a88634dc1b08bb7b322525f65534e98e21a7b4e25251561ec115ec86050682`。
+
+## 2026-09-14：Throughput Dry run build local
+
+- Model 新增 Dry run；選取立即依目前選項產生模擬结果，沒有 installed model 也可用。
+  可按「產生結果」重新生成，畫面與三種輸出皆標示 dry-run；模擬 slots 固定 2304。
+  不啟動 server、不載入模型，不屬於效能測量。
+- Swift **81 項通過、3 項 fixture 略過**，另排除既有 Keychain 互動案例。
+  新增測試確認空 catalog 下不啟動 server、選項正確、結果固定、三種輸出保留 dry-run
+  標記及空長度處理。既有 Chat 定時等待案例一輪失敗後，完整重跑通過；未修改該案例。
+  本輪未修改 Python，未重跑其 suite。
+- 無模型的開發 App 與最終封裝 App 均已確認選取 Dry run 後立即出現三筆結果。
+- `make package` 完成，沿用 1.1.7／1.1.7d1、ad hoc 簽章；App／ZIP 解壓副本通過
+  嚴格簽章、模型描述與六次三語隔離啟動。禁止 `.build` 及 module resource bundle 時，
+  L10n 仍從 `Contents/Resources` 初始化並存活。已重新開啟 App，未公證或發布。
+- 原始 logs：`scratch/throughput-dry-run-2026-09-14/`。
+  ZIP SHA-256：`9a71ea3e4aa60387d052c2894a50921b51d2dd27b832412f0a268114536bb40e`。
+
+## 2026-09-14：Throughput 結果排版與文字輸出 build local
+
+- 結果表格欄位填滿卡片寬度，窄視窗保留水平捲動。標題加入 runtime 回傳的當次 slots，
+  不讀取後續設定值。每筆結果均保存自己的 slots；舊 server 未提供時顯示破折號。
+- 新增純文字／JSON／Markdown table 輸出，使用可選取、不可編輯的原生文字區域。
+  純文字以空格對齊欄位；JSON 保留原始數值、素材與輸出 hash 及 finish reason。
+- 使用明確標示 UI preview 的三筆合成結果檢查滿寬表格、slots 標題、格式切換、
+  原生文字全選與長行捲動。預覽資料只存在 scratch App；已確認正式 binary 不含 fixture。
+  本輪未重新測量模型吞吐量，也未完成所有窄視窗與語言的視覺檢查。
+- Swift **80 項通過、3 項 fixture 略過**，另排除既有 Keychain 互動案例。
+  一輪完整測試中既有 Chat 導航案例在定時等待後未取得預期狀態；未修改該案例，
+  重跑完整 suite 通過。Python **412 項通過**，含非預設 slots 回傳與設定恢復檢查。
+- `make package` 完成，版本沿用 1.1.7／1.1.7d1、ad hoc 簽章。App 與 ZIP 解壓副本
+  的嚴格簽章、模型描述檢查及六次三語隔離啟動均通過；禁止讀取 `.build` 與 module
+  resource bundle 時，L10n 從 `Contents/Resources` 初始化並持續存活。
+- 使用 App 內建 Python，禁止讀取專案 `.build`、`.venv`、`runtime`、`Sources`，
+  **9 項 Throughput 測試通過**。封裝 runtime 與 source 相符。已開啟最終 App；未公證或發布。
+- 原始 logs：`scratch/throughput-output-2026-09-14/`。
+  ZIP SHA-256：`223f4725becf21a0d1840d77dea67cc9005c6e171165a8bb41240388be3aa812`。
+
+## 2026-09-13：Code／Novel 素材與 build local
+
+- Benchmark Context 改為 Code／Novel 下拉選單，選單、模型、生成選項及 Run 的
+  可見右緣保持對齊。已在開發 App 與最終 `dist/Whallm.app` 切換 Novel 並檢查畫面。
+- 移除 9 KB 重複片段，改用 Whallm 的 45 個原始碼檔案固定副本與《白鯨記》英文原文。
+  gzip 合計 **697665 bytes**，另附來源、授權與 hash。三種模型 tokenizer 均可直接
+  截取 204800 tokens；素材不足會報錯。完整來源比較見 [Throughput](THROUGHPUT.md)。
+- Swift **79 項通過、3 項 fixture 略過**，另排除既有 Keychain 互動案例；
+  Python **412 項通過**。涵蓋兩種素材的原文前綴、短素材拒絕、API 選擇與素材 hash、
+  非法選項在載入前拒絕，以及既有取消／錯誤後設定恢復。
+- `make package` 完成，版本 1.1.7／1.1.7d1、ad hoc 簽章。
+  App 及 ZIP 解壓副本通過嚴格簽章、模型描述檢查與六次三語隔離啟動；禁止讀取
+  `.build` 及 module resource bundle 時，三語皆從 `Contents/Resources` 初始化並存活。
+- App／ZIP 中兩份 gzip、來源 manifest 及兩份授權檔與 workspace 逐 byte 相符。
+  以 App 內建 Python 執行 **9 項 Throughput 測試通過**，禁止讀取專案 `.build`、
+  `.venv`、`runtime` 與 `Sources`，確認素材與功能不依賴開發目錄。
+- 已重新開啟最終 App。未公證、發布或進行 200K 模型生成；token 計數不代表測速結果。
+  [容量與輸入 hash 紀錄](benchmarks/2026-09-13-throughput-contexts/coverage.json)；
+  原始檢查 log：`scratch/throughput-corpora-2026-09-13/`。
+- ZIP SHA-256：`ff12c73dcd82987c39de517543cfcb12cc210cc631243a70d75783cc7008e1b4`。
+
+## 2026-09-13：Throughput 間距與右側對齊 build local
+
+- 依 oMLX 參考圖收緊 Throughput 版面：文字間距 2 pt、列內距 12 pt、
+  區塊左右內距 16 pt、內容寬度上限 760 pt；輸入選項靠左、間距 6 pt。
+  素材說明移至左側標題下，Run／Cancel 移入設定區塊底部。
+- 模型選單、Whallm Code、生成選項、Run／Cancel 的可見右緣對齊。
+  已檢查英文、繁體中文畫面及約 800 pt 寬的英文視窗；未完成所有窄視窗、
+  文字放大或其他語言的視覺檢查。測試流程與 runtime 未改動。
+- Swift **79 項通過、3 項 fixture 略過**，另排除既有 Keychain 互動案例；
+  Python **410 項通過**。
+- `make package` 完成，版本沿用 1.1.7／1.1.7d1、ad hoc 簽章。
+  App 與 ZIP 解壓副本的嚴格簽章、模型描述及六次三語隔離啟動全部通過；
+  禁止讀取 `.build` 及 module resource bundle 時仍能完成 L10n 初始化並持續存活。
+- 已重新開啟 `dist/Whallm.app`，確認最終 Throughput 排版與右緣一致。
+  未公證、發布或重新執行完整模型測速。
+- 原始 log 與 ZIP SHA-256：`scratch/throughput-spacing-build-2026-09-13/`。
+
+## 2026-09-13：Throughput build local
+
+- 使用 `make package APP_VERSION=1.1.7 BUILD_VERSION=1.1.7d1 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=`
+  完成本機封裝；`dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip` 已包含 Throughput。
+  版本號沿用 1.1.7／1.1.7d1，本次為 ad hoc 簽章，未公證或發布。
+- 封裝前 Python **410 項通過**；Swift **79 項通過、3 項 fixture 略過**，
+  排除 `ServerConfigurationTests.testAPIKeyRoundTripsThroughIsolatedKeychainItem`。
+- App 與 ZIP 的臨時解壓副本均通過 `codesign --verify --deep --strict`。
+- 兩個副本均禁止讀取專案 `.build` 及 Swift module resource bundle，
+  分別啟動英文、簡體中文、繁體中文；六次均完成 L10n 與模型描述初始化，
+  並持續存活至檢查結束。三語檔案皆位於 `Contents/Resources`。
+- 模型描述的包內 Python 檢查也禁止讀取 `.build`、`.venv` 與 `Sources`，均通過。
+- 內建 Throughput 素材為 **9217 bytes**，與原始碼中的素材一致；使用 App 內建 Python，
+  禁止讀取專案 `.build`、`.venv`、`runtime`、`Sources` 後，**七項 Throughput 測試通過**。
+  測試後再次確認 App 簽章有效。
+- 已正常開啟 `dist/Whallm.app`，確認 Throughput 頁面及全部選項可見；server 保持停止。
+  本次未重新執行完整模型測速，前一節的開發版實測範圍仍適用。
+- 原始 log 及 ZIP SHA-256：`scratch/throughput-build-local-2026-09-13/`。
+
+## 2026-09-13：Throughput 頁面
+
+基準為 `develop`、`0204409` 加本次未提交修改。功能與數據定義見
+[Throughput](THROUGHPUT.md)。
+
+- `swift test --skip ServerConfigurationTests.testAPIKeyRoundTripsThroughIsolatedKeychainItem`：
+  **79 項通過、3 項缺少 fixture 略過**，另排除一項既有 Keychain 互動測試。
+  新增三項涵蓋結果解析、串流進度／錯誤及三語文字查找。
+- Python 全套 **410 項通過**。新增七項涵蓋固定素材大小與八種精確輸入長度、
+  模型自動載入、實際輸出計數、設定恢復、長度與授權檢查、生成／素材錯誤、
+  checkpoint context limit 和 Prefill 期間斷線取消。
+- 三語 `Localizable.strings` 的 `plutil -lint` 及 `git diff --check` 通過。
+- 使用由 debug binary 建立的開發 App 副本，確認 Throughput 頁面的模型選單、
+  輸入多選、生成長度切換與執行中鎖定。這個副本僅用於開發畫面檢查，
+  不是 `build local` 的封裝成品。
+- 在本機 64 GB 主機、外接磁碟 installed model 上，透過 App 的 Run 完成
+  **Qwen 1K 輸入／128 輸出**；從停止的 server 自動啟動、載入模型、顯示進度，
+  最後表格顯示實際 1024／128 及本次各欄數據。
+- 另一筆 1K／1024 在 Prefill 期間按 Cancel，畫面顯示取消，收尾後 Run 恢復可用。
+  最後關閉開發副本，確認其 App 與 server 程序均已結束。
+- 實機檢查使用預設模型設定，目的是確認操作與生成可完成，**不是正式效能比較**。
+  尚未逐一實跑其他模型、全部長度及生成上限，也未完成正式 benchmark artifact。
+  完整流程實測後另將進度更新改為最多每 0.25 秒一次，並補上素材讀取錯誤回報；
+  最終程式已重新通過上述測試，未再重跑完整模型。
+- 測試 log 保存在 `scratch/throughput-validation-2026-09-13/`。
+  本次未重新封裝 `dist`、公證或發布。
+
 ## 2026-09-13：Whallm 1.1.7-dev 預發布
 
 已發布 [v1.1.7-dev](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev)，

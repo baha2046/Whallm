@@ -21,21 +21,21 @@ help:
 
 ## run: start the SwiftUI macOS app
 run:
-	swift run dsv4-app $(ARGS)
+	swift run -Xswiftc -DWHALLM_LOCAL_BUILD dsv4-app $(ARGS)
 
 ## build: build the Swift package
 build:
-	swift build $(ARGS)
+	swift build -Xswiftc -DWHALLM_LOCAL_BUILD $(ARGS)
 
 ## test: run all Swift tests
 test:
 	mkdir -p .build/debug/PackageFrameworks
 	ln -sfn "$(SPARKLE_FRAMEWORK_PATH)/Sparkle.framework" .build/debug/PackageFrameworks/Sparkle.framework
-	swift test $(ARGS)
+	swift test -Xswiftc -DWHALLM_LOCAL_BUILD $(ARGS)
 
-## package: build a distributable macOS app with Python and runtime
+## package: build a local macOS app with Python, runtime, and local debug features
 package:
-	./Scripts/package-app.sh
+	WHALLM_BUILD_FLAVOR=local ./Scripts/package-app.sh
 
 ## ane-bridge: build the private Apple Neural Engine runtime bridge
 ane-bridge:

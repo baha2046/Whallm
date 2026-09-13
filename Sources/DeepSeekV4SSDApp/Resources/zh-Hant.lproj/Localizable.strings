@@ -379,3 +379,51 @@
 "Check for new versions in the background." = "在背景檢查新版本。";
 
 "Updates" = "更新";
+
+/* Throughput benchmark */
+"Throughput" = "吞吐量";
+"Run automatically loads the selected model." = "執行時會自動載入所選模型。";
+"Select a model…" = "選擇模型⋯";
+"Benchmark Context" = "測試素材";
+"Context lengths" = "輸入長度";
+"Input tokens per test. Select one or more lengths." = "每次測試的輸入 token 數，可選多個長度。";
+"Generation length" = "生成長度";
+"Maximum output tokens per test." = "每次測試的輸出 token 上限。";
+"Install a model on the Model page to run a benchmark." = "請先到模型頁面安裝模型，再執行測試。";
+"One request at a time. Prompt reuse is off; model settings apply." = "依序執行測試，停用對話快取重用，其餘沿用模型設定。";
+"Run Benchmark" = "執行測試";
+"Starting server…" = "正在啟動伺服器⋯";
+"Loading model…" = "正在載入模型⋯";
+"Running benchmark…" = "正在測試⋯";
+"Benchmark complete" = "測試完成";
+"Benchmark cancelled" = "測試已取消";
+"Benchmark failed" = "測試失敗";
+"The benchmark returned no result. Try again." = "測試未傳回結果，請重試。";
+"The server is not ready. Check Logs and try again." = "伺服器尚未就緒，請查看日誌後重試。";
+"Single request results" = "單次請求結果";
+"Input / Output" = "輸入 / 輸出";
+"TTFT (ms)" = "首 token（ms）";
+"TPOT (ms)" = "每 token（ms）";
+"PP tok/s" = "輸入 tok/s";
+"TG tok/s" = "生成 tok/s";
+"Total (s)" = "總時間（s）";
+"Peak MLX" = "MLX 峰值";
+"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory." = "TTFT：首 token 等待時間；TPOT：每個輸出 token 的時間；PP：輸入速度；TG：生成速度。吞吐量為每秒輸入加輸出 token 數。MLX 峰值為模型配置的記憶體，不含整個系統。";
+"Output may end early. Loading time is excluded; no extra warm-up is performed." = "模型可能提早結束輸出。時間不含模型載入，測試前不額外預熱。";
+"Output limit: %lld tokens" = "輸出上限：%lld tokens";
+"Configuration" = "測試設定";
+
+"Code" = "Code";
+"Novel" = "Novel";
+"Whallm source code · bundled, without repetition" = "Whallm 原始碼 · App 內建，不重複補長";
+"Moby-Dick · bundled English novel, without repetition" = "《白鯨記》英文原文 · App 內建，不重複補長";
+"Result output" = "結果文字輸出";
+"Output format" = "輸出格式";
+"Plain text" = "純文字";
+"JSON" = "JSON";
+"Markdown table" = "Markdown 表格";
+"Dry run (simulated)" = "Dry run（模擬）";
+"Dry run complete · simulated results" = "Dry run 完成 · 模擬結果";
+"Simulated results for UI debugging. No model is loaded." = "用於 UI 除錯的模擬結果，不會載入模型。";
+"Generate results" = "產生結果";
+"Select at least one context length." = "請至少選擇一個輸入長度。";

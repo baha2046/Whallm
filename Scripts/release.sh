@@ -78,10 +78,10 @@ gh repo clone "$repository" "$pages_root" -- --branch gh-pages --single-branch -
 "$sparkle_tools/sign_update" --account deepseek_ssd --verify "$pages_root/appcast.xml"
 ditto "$pages_root/appcast.xml" "$release_root/appcast.xml"
 
-APP_VERSION=$version BUILD_VERSION=$build_version \
+WHALLM_BUILD_FLAVOR=distribution APP_VERSION=$version BUILD_VERSION=$build_version \
   "$project_root/Scripts/package-app.sh"
 
-REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
+EXPECTED_LOCAL_BUILD=0 REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
   "$project_root/dist/Whallm.app" "$archive_path"
 
 ditto "$archive_path" "$release_root/$archive_name"
@@ -104,7 +104,7 @@ gh release create "$tag" \
   "$release_root/$archive_name" \
   "$release_root/appcast.xml" \
   --repo "$repository" \
-  --title "Whallm ${tag#v}" \
+  --title "${RELEASE_TITLE:-Whallm ${tag#v}}" \
   --verify-tag \
   --notes-file "$notes_path" \
   "${release_arguments[@]}"
@@ -119,7 +119,7 @@ gh release download "$tag" \
   print -u2 "GitHub Release does not contain the ZIP and appcast.xml."
   exit 1
 }
-REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
+EXPECTED_LOCAL_BUILD=0 REQUIRE_NOTARIZATION=1 "$project_root/Scripts/verify-packaged-app.sh" \
   "$project_root/dist/Whallm.app" "$download_root/$archive_name"
 
 # Publish only after the downloaded release archive passes all checks.

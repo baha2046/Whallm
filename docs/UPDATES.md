@@ -44,8 +44,15 @@ make release VERSION=1.1.7 CHANNEL=dev DEV_BUILD=1
 ```
 
 上述版本僅為命令範例，不代表已發布。
-本次指定 tag 為 `v1.1.7-dev`，命令另外加入 `TAG=v1.1.7-dev`；Release 標題為
+第一個 dev 指定 tag 為 `v1.1.7-dev`，命令另外加入 `TAG=v1.1.7-dev`；Release 標題為
 `Whallm 1.1.7-dev`，內部 build 仍為 `1.1.7d1`。
+
+第二個 dev 的 Alpha 使用 `VERSION=1.1.7 CHANNEL=dev DEV_BUILD=2`，
+tag 為 `v1.1.7-dev.2`、內部 build 為 `1.1.7d2`。
+`RELEASE_TITLE='Whallm 1.1.7-dev.2 (Alpha)'` 可指定 GitHub 標題，
+`RELEASE_NOTES_FILE=Packaging/ReleaseNotes/1.1.7-dev.2.md` 指定獨立說明。
+Alpha 仍屬 dev 來源，不新增更新來源。發布一律使用 distribution build，
+排除 local-only Dry run；上傳前與下載後的隔離啟動都驗證此設定。
 
 Dev 的 Git tag 預設為 `v1.1.7-dev.1`，`CFBundleShortVersionString` 為 `1.1.7`，
 `CFBundleVersion` 為 `1.1.7d1`。`DEV_BUILD` 可用 1–255；提高它來發布下一個測試版。

@@ -20,6 +20,8 @@ struct DeepSeekV4SSDApp: App {
       _ = L10n.string("Server", language: language)
       let marker = "WHALLM_LOCALIZATION_READY:\(language.rawValue)\n"
       FileHandle.standardOutput.write(Data(marker.utf8))
+      let localBuildMarker = "WHALLM_LOCAL_BUILD:\(ThroughputSession.dryRunAvailable ? 1 : 0)\n"
+      FileHandle.standardOutput.write(Data(localBuildMarker.utf8))
       let packages = ModelPackages.descriptors
       for descriptor in packages {
         _ = ModelPackages.package(for: ModelKind(rawValue: descriptor.kind)!)

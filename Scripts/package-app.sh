@@ -8,6 +8,13 @@ app_path=$output_root/Whallm.app
 zip_path=$output_root/Whallm-macOS-arm64.zip
 app_version=${APP_VERSION:-1.0.0}
 build_version=${BUILD_VERSION:-$app_version}
+build_flavor=${WHALLM_BUILD_FLAVOR:-distribution}
+swift_build_arguments=(--package-path "$project_root" -c release)
+case $build_flavor in
+  local) swift_build_arguments+=(-Xswiftc -DWHALLM_LOCAL_BUILD) ;;
+  distribution) ;;
+  *) print -u2 "WHALLM_BUILD_FLAVOR must be local or distribution."; exit 1 ;;
+esac
 
 if [[ $app_version != <->(|.<->)(|.<->) ||
       ( $build_version != <->(|.<->)(|.<->) &&
@@ -52,9 +59,9 @@ if [[ ! -d $python_framework || ! -d $site_packages ]]; then
   exit 1
 fi
 
-swift build --package-path "$project_root" -c release --product dsv4-app
+swift build "${swift_build_arguments[@]}" --product dsv4-app
 "$project_root/Scripts/build-ane-bridge.sh" "$ane_bridge"
-binary_path=$(swift build --package-path "$project_root" -c release --show-bin-path)/dsv4-app
+binary_path=$(swift build "${swift_build_arguments[@]}" --show-bin-path)/dsv4-app
 resource_bundle=${binary_path:h}/DeepSeekV4SSD_DeepSeekV4SSDApp.bundle
 sparkle_framework=$project_root/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework
 
@@ -205,6 +212,7 @@ if [[ -n ${NOTARY_PROFILE:-} ]]; then
   ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 fi
 
+EXPECTED_LOCAL_BUILD=$([[ $build_flavor == local ]] && print 1 || print 0) \
 REQUIRE_NOTARIZATION=$([[ -n ${NOTARY_PROFILE:-} ]] && print 1 || print 0) \
   "$project_root/Scripts/verify-packaged-app.sh" "$app_path" "$zip_path"
 

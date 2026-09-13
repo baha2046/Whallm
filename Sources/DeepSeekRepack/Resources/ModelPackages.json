@@ -15,7 +15,7 @@
       "requiredPaths": ["common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json"],
       "features": ["layerMajorPrefill", "promptCache", "dspark", "stagedExpertStreaming", "adaptiveExpertPrefill", "approximation"],
       "editableSettings": ["sampling", "kvCachePrecision", "prefillThreshold"],
-      "defaults": {"slots": 1152, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 272000, "temperature": 0.2, "topP": 0.98, "topK": 0},
+      "defaults": {"slots": 1152, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 8192, "temperature": 0.2, "topP": 0.98, "topK": 0},
       "automaticMemoryGiB": 0,
       "prefillThreshold": null
     },
@@ -33,7 +33,7 @@
       "requiredPaths": ["common.bin", "config.json", "encoding/encoding.py", "tokenizer/tokenizer.json", "engram/layer_01.weight.bin", "engram/layer_14.weight.bin"],
       "features": [],
       "editableSettings": [],
-      "defaults": {"slots": 1152, "promptCacheEntries": 1, "bf16KVCache": true, "maxTokens": 272000, "temperature": 0.2, "topP": 0.98, "topK": 0},
+      "defaults": {"slots": 1152, "promptCacheEntries": 1, "bf16KVCache": true, "maxTokens": 8192, "temperature": 0.2, "topP": 0.98, "topK": 0},
       "automaticMemoryGiB": 0,
       "prefillThreshold": null
     },
@@ -51,7 +51,7 @@
       "requiredPaths": ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"],
       "features": ["layerMajorPrefill", "promptCache", "mtp", "anePrefill", "groupedExperts", "groupedDecode", "shortBlock", "adaptiveSampling"],
       "editableSettings": ["sampling"],
-      "defaults": {"slots": 4096, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 262144, "temperature": 0.7, "topP": 0.8, "topK": 20},
+      "defaults": {"slots": 4096, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 8192, "temperature": 0.7, "topP": 0.8, "topK": 20},
       "automaticMemoryGiB": 48,
       "prefillThreshold": 128
     }
