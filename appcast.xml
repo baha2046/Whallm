@@ -7,51 +7,39 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Whallm</title>
         <item>
             <title>1.1.7</title>
-            <pubDate>Sun, 13 Sep 2026 18:16:16 +0800</pubDate>
-            <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev</link>
+            <pubDate>Mon, 14 Sep 2026 02:30:41 +0800</pubDate>
+            <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2</link>
             <sparkle:channel>dev</sparkle:channel>
-            <sparkle:version>1.1.7d1</sparkle:version>
+            <sparkle:version>1.1.7d2</sparkle:version>
             <sparkle:shortVersionString>1.1.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## What's new in 1.1.7-dev
+            <description sparkle:format="markdown"><![CDATA[## Whallm 1.1.7-dev.2 — Alpha
 
-This is a pre-release for testing. Stable update checks will continue to offer official releases only. Select **dev** in **Settings → Updates** to receive development updates.
+This alpha adds a Throughput benchmark page and updates model defaults. Select **dev** in **Settings → Updates** to receive it. Stable users continue to receive official releases only.
 
-### App updates and settings
+### Throughput benchmark
 
-- Added **stable/dev update sources**, backed by a shared, signed Sparkle update feed. The dev source also accepts newer stable releases.
-- Added **Automatically check for updates**, connected directly to Sparkle's saved preference. Turning it off still allows manual update checks.
-- Moved update controls into a dedicated **Updates** section and aligned the source selector with the other controls on the right.
-- Added English, Simplified Chinese, and Traditional Chinese labels for the new settings.
+- Select an installed model and run the benchmark; the app loads the selected model automatically.
+- Choose **Code** or **Novel**. Both are bundled and work offline: a Whallm source snapshot and Herman Melville's *Moby-Dick*. Each contains enough tokens for 200K inputs with all three supported tokenizers, without repeating a short excerpt.
+- Select one or more context lengths from **1K to 200K**, with a generation limit of **128, 1024, or 4096** tokens.
+- View first-token latency, time per output token, input/output speed, total time, throughput, and peak MLX memory. Results include the slots used by that run.
+- Copy results as **plain text, JSON, or a Markdown table**. The results table fills the available width, and settings controls align on the right.
+- Cancel a running benchmark and retain completed results. Tests run one request at a time with prompt reuse disabled; model loading and input tokenization are excluded from timing, and no extra warm-up is performed.
 
-### DeepSeek V4.1 Flash preview
+### Model settings
 
-- Added initial text-only support for the pinned DeepSeek V4.1 Flash checkpoint across installation planning, repacking, model discovery, the API catalog, SSD expert/Engram loading, and tool-call parsing.
-- Fixed V4.1 installation dispatch in the command-line repacker.
-- Set the Advanced Settings slot default and recommendation to **1152**. Existing saved slot settings are preserved.
-- The model list now displays the verified planned weight size of **501.38 GB** without fetching an installation plan just to display the size. This is a storage estimate from the repack plan, not measured download traffic.
+- **Max tokens now defaults to 8192 for every model**. Explicitly saved values remain unchanged; reset or edit Advanced Settings to change an existing preference.
 
-### Runtime controls
+### Validation and alpha limits
 
-- Added **Off / Memory / Disk** prompt-cache choices where supported, with **Memory** as the default. V4.1 prompt-cache reuse remains disabled.
-- Fixed explicit command-line runtime settings being ignored when starting the server with a model catalog.
-- Added controls for prefetch workers, MoE prefill batch size, and LRU/LFU expert-cache eviction.
-- Added an optional DeepSeek approximation setting, disabled by default, and Qwen automatic sampling, enabled by default, with manual temperature/top-p/top-k controls when automatic sampling is off.
-- Qwen's option to verify up to four tokens together now defaults to **off**. Explicitly saved choices are preserved.
-- Moved **Log Level** to the Logs page.
-- Unified model installation and runtime support around shared model descriptions so the app and bundled runtime use the same model defaults and supported features.
-
-### Validation and known limits
-
-- Development validation passed **403 Python tests** and **77 Swift tests**; three Swift tests were skipped because installed-model fixtures were unavailable.
-- Update-setting tests cover saved source selection, Sparkle preference synchronization, development-build version ordering, and localized labels. The Updates layout and controls were also checked in the app.
-- Packaged checks cover strict code-signature verification, all three localizations, and startup without access to the project's build directory for both the app and an extracted ZIP copy.
-- V4.1 remains experimental: a complete checkpoint installation and full-model generation have not been validated. Vision, MTP/DSpark, prompt-cache reuse, and layer-major prefill are not supported for V4.1 in this release. No V4.1 throughput, memory-use, or output-quality claim is made.
-- Selecting stable after installing a dev build does not downgrade the app. A newer stable build can replace it; build `1.1.7d1` sorts before the future stable `1.1.7` build.
-- This release retains MLX/MLX Metal **0.32.2**. It does not switch the mlx-lm dependency to the planned owned fork, and it does not claim new full-model performance improvements.
+- Development checks passed 412 Python tests and 82 Swift tests. Three Swift tests require unavailable model fixtures and were skipped; the interactive Keychain round-trip test was excluded.
+- Packaging checks verify signatures, notarization, all three localizations, and isolated startup for both the app and an extracted ZIP copy.
+- **Dry run is available only in local builds.** This alpha excludes the simulated-results option and its generator.
+- Corpus coverage is an offline tokenizer check, not a measured 200K generation result. No new full-model speed or output-quality claim is made. Actual generation can end before the selected output limit.
+- DeepSeek V4.1 remains experimental and text-only; its previous unsupported features remain unchanged.
 ]]></description>
-            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.7-dev/Whallm-macOS-arm64.zip" length="185990175" type="application/octet-stream" sparkle:edSignature="Jx1vZfjpzvn/XYu74K5lYAVcxASJO14MD8uwIVaR7VqlSK9sPVD1eX5iuau8NYwwiruar6tZi8UAQZXvsh0JDA=="/>
+            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.7-dev.2/Whallm-macOS-arm64.zip" length="186839652" type="application/octet-stream" sparkle:edSignature="xPkXpqJbcjpGvxrQ/FVtv07svxNgvUDAmSMaZm1ObCloOoBRkSDVyX0RPK3nUTyY8ZjdSjIfzCW4FI+eTCPGAQ=="/>
         </item>
         <item>
             <title>1.1.6</title>
@@ -88,6 +76,6 @@ This is a pre-release for testing. Stable update checks will continue to offer o
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: hyFU7jtXGdf172wiHa2ouINDnGxOsdGbF9O4yNEuAYpZEXupBiTQLtaF5DsYtEBLGB5JGwZ+xpMB4nWtpwmTDQ==
-length: 7924
+edSignature: 1Wsbse+++p10UKj2moCsgxzelHrkPTEul0uoatzegs5iCmygVKEGTHw/mBOtm8gVhK4VkL6WSuxTfZo67oXsAw==
+length: 6620
 -->
