@@ -1,5 +1,123 @@
 # 驗證紀錄
 
+## 2026-09-14：共用 Prefill 中途取消
+
+- 來源為 `6821af3` 加目前工作樹修改。原先 V4 逐層 Prefill 未檢查取消旗標；
+  小型重現涵蓋 attention／MoE／fallback 及兩種分批長度，六個案例皆因
+  `GenerationCancelled not raised` 失敗。加入分批／層間檢查後通過。
+- V4.1 增加每層取消檢查；共用 `wait_for_futures` 在等待 expert 讀取時檢查取消，
+  取消尚未開始的工作並等待正在寫入的工作完成。未完成請求清除未使用的
+  整層預讀，再等待 GPU 工作完成；不因取消而提前重用仍在寫入的 slots。
+- 新增五項測試，涵蓋 V4 中途停止後恢復、V4.1 層間停止後恢復、讀取取消與收尾、
+  slots 回收及不暴露未完成的 batched weights。一般 server 的斷線測試改用真正的
+  V4 Prefill 迴圈搭配小型替身，確認只執行第一批、不產生第一個 token，下一筆成功。
+- `PYTHONPATH=runtime:runtime/tests .venv/bin/python -m unittest discover -s runtime/tests -q`：
+  **427 項通過**。包含 Qwen 既有取消、Prompt Cache、數值一致性、一般 HTTP request
+  與 Throughput 停止後卸載的測試。修改檔案的 `git diff --check` 通過。
+- 僅執行小型模型／buffer 與測試 server，未載入完整 checkpoint，未量測完整模型
+  取消延遲，未重新打包或發布。50 ms 是讀取等待的旗標檢查間隔，並非停止時間保證。
+
+## 2026-09-14：Qwen3.8 Slots 預設 3072
+
+- 共用模型描述的 Slots 預設由 2048 改為 **3072**，Advanced Settings 三語建議值
+  讀取相同預設；已儲存的自訂值保留，DeepSeek V4／V4.1 維持 1152。
+- Swift 兩項設定測試通過，涵蓋預設、三語文案、設定保存與舊設定遷移；
+  Python 模型支援七項測試、三語 strings 格式與修改空白檢查均通過。
+- logs：`scratch/qwen-slots-3072-2026-09-14/`。本次尚未重新打包或發布，
+  下方 local build 紀錄與現有 `dist` 成品的 Qwen 預設仍為 2048。
+
+## 2026-09-14：最新修正 build local
+
+- 來源為 `develop` 的 `6821af3` 加當前未提交修改；包含 V4／Qwen 長輸入前釋放舊 Slots、
+  Throughput 結束後卸載、V4.1 Prompt Cache、Qwen Slots 2048 與三語建議值。
+- Swift **89 項通過**，排除既有互動式 Keychain round-trip 案例。
+  Python **422 項通過**；首次執行漏設 `PYTHONPATH=runtime`，兩個模組無法載入，
+  補正環境後完整重跑通過，兩次 logs 均保留。
+- 執行 `make package APP_VERSION=1.1.7 BUILD_VERSION=1.1.7d2 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=`，
+  建立 `dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip`。版本沿用現有值，
+  使用 ad hoc 簽章，未建立 tag、公證或上傳；此成品與公開 Alpha 內容不同。
+- App 與 ZIP 解壓副本均通過 `codesign --verify --deep --strict`。
+  en／zh-Hans／zh-Hant 各自禁止專案 `.build` 與 Swift module bundle 存取時，
+  仍從 `Contents/Resources` 完成 L10n 初始化並存活；六次啟動均確認 local 功能旗標為 1。
+- 包內 Python 在禁止專案 `.build`、`.venv`、`runtime`、`Sources` 的沙盒下，
+  **26 項測試通過**：Slots 釋放 6、V4.1 Prompt Cache 4、Throughput 9、模型支援 7。
+  包內五個修改後的 runtime 檔案與原始碼逐位元一致；模型描述確認 Qwen Slots 2048、
+  所有模型 Max tokens 8192、V4.1 Prompt Cache 選項已包含。
+- ZIP：186331188 bytes；SHA-256：
+  `5e2ff10e99edb5816ed9d0cf02c56145dc2fabf77275de0c83df4e9b5e1bd63b`。
+  logs、驗證腳本與 runtime hashes：`scratch/local-build-2026-09-14/`。
+- 未另外執行完整模型重現或新增效能測量；下方較早紀錄中的「尚未打包」指當時狀態。
+
+## 2026-09-14：長輸入前釋放 Slots 與三模型審查
+
+- 使用者採用方案 1 後，原始碼在 V4 batched layer-major、Qwen layer-major 入口
+  先釋放舊 expert Slots，再建立輸入暫存。正式 server、CLI、Throughput 共用此修正。
+- 共用清理等待 GPU 與中斷請求殘留的 expert 預讀；保留 direct／staged／Qwen grouped／
+  bounded 儲存類型、模型、Prompt Cache、設定、檔案描述符及累計指標。
+  拒絕清除使用中或 speculative prefetch 保護中的 buffers。
+- V4.1 使用既有 Slots 做分批計算，程式未建立同類整層 expert 預載，沒有加入無效清理。
+- 六項新增回歸測試檢查實際 buffers 釋放、原 pool 釋放、重填與命中、所有儲存類型、
+  使用中保護、殘留預讀等待、embedding 前清理、非 batched／空輸入保留與 Qwen 入口。
+  修改前針對性案例失敗，修改後通過；完整 Python **422 項通過**。
+- 依使用者要求，未另外執行完整模型重現。上輪 V4 原型的 32.56 → 21.20 GiB 是
+  採用前的獨立方案評估，詳見 [原型數據](benchmarks/2026-09-14-throughput-memory-options/README.md)。
+  不是本次 Qwen／V4.1 或最終程式的完整模型效能驗收。
+- logs：`scratch/prefill-slot-release-2026-09-14/`。本次未改 Swift；沿用上一輪 89 項檢查。
+  尚未打包或發布。
+
+## 2026-09-14：DeepSeek V4 Throughput 記憶體排查
+
+- M5 Pro 64 GiB、1024 slots、Code、每筆實際生成 128 tokens、Prompt Cache 關閉。
+  五筆完整模型推論重現 Peak MLX 差異：依序 1K／4K／8K 為
+  **21.1753／32.5608／32.9677 GiB**；另一個新程序反向 4K／1K 為
+  **21.2026／31.1977 GiB**。同長度交換順序前後的輸出 token hash 相同。
+- 確認主因是 expert slots 按需配置並跨請求保留，1024 slots 共 12.75 GiB。
+  第一筆 prefill 在 slots 尚空時執行；後續 prefill 同時持有已填滿 slots 與計算暫存。
+  每筆結束 active 均約 21.15 GiB；不是 1K 增至 4K 自然需要額外約 11 GiB 的結論。
+- 這是記憶體診斷；第二組有逐層觀測、未清 OS page cache，不作速度比較。
+  完整條件、重現腳本、原始數值與 source／output hashes 見
+  [紀錄](benchmarks/2026-09-14-throughput-memory/README.md)。未更動推論或每筆快取策略。
+
+## 2026-09-14：Throughput 結束後卸載
+
+- 整輪完成、取消或請求失敗後呼叫本次模型的卸載 API；使用 canonical model ID，
+  等待取消的生成離開鎖後才關閉模型。各 context 長度之間不卸載。
+- 清理不繼承取消狀態，清理期間禁止再次取消或 Run；卸載錯誤可見，已完成結果保留。
+  server 啟動失敗、尚未發出請求與 Dry run 不卸載。
+- Swift **89 項通過**，排除既有互動式 Keychain 案例。其中 Throughput **9 項**，
+  覆蓋完成、取消、錯誤、清理失敗、清理期間重跑及 Dry run。
+- Python Throughput **9 項通過**；HTTP 測試確認斷線取消後立即要求卸載，
+  runtime 確實關閉、loaded model 清空、設定還原且生成狀態結束。
+- logs：`scratch/throughput-unload-2026-09-14/`。
+  尚未打包或發布，未以完整模型驗證 App 端取消與卸載。
+
+## 2026-09-14：DeepSeek V4.1 Prompt Cache
+
+- 原始碼開放 V4.1 的 Off／Memory／Disk，新的 Advanced Settings 預設 Memory，
+  已保存的模式保留；CLI／Server 沿用既有快取參數。尚未打包或發布。
+- V4.1 套件新增完整狀態保存與還原，包含 window KV、compressed KV、index keys、
+  compressor partial group、offset、capacity 與 Engram token history；還原檢查格式、
+  位置、形狀及型別，分支互相獨立，記憶體計量包含 CPU Engram 歷史。
+- 四項新增測試使用非零隨機權重的四層小型 V4.1 真實運算，涵蓋共享注意力、
+  ratio 1／2、partial group、ring wrap、擴容、磁碟保存與重開、取消後重試及無效狀態。
+  clone／磁碟還原後的後續 logits 完全一致；runtime 開關快取生成的 token 完全一致，
+  Memory／Disk 第二次請求皆確認實際重用了前文，Memory 不建立磁碟目錄。
+  刻意清掉 Engram history 或 compressor partial state 會改變輸出，證明案例有測到這些狀態。
+- Python 完整 **416 項通過**；Swift **85 項通過**，排除互動式 Keychain round-trip 案例。
+  Swift 覆蓋 V4.1 模式保存、舊資料遷移與 server catalog 傳遞。
+  完整測試後另補強 Memory 不落盤檢查，四項針對性測試再次通過。
+- logs：`scratch/v41-prompt-cache-2026-09-14/`。未驗證完整 V4.1 checkpoint 的生成、
+  長 context、效能或記憶體用量；上述是小型模型的功能驗證。
+
+## 2026-09-14：Qwen3.8 Slots 預設 2048
+
+- 共用模型描述的 Qwen Slots 預設改為 **2048**，Advanced Settings 的三語建議值
+  讀取相同預設；已儲存的自訂 Slots 保留。DeepSeek 預設維持 1152。
+- 兩項 Swift 設定測試通過，涵蓋預設、三語建議、設定保存及舊設定遷移；
+  Python model-support 七項測試、三語 strings 格式及 diff 空白檢查通過。
+  文案測試按數字核對，接受系統加入千分位分隔符號。
+- 本次僅修改原始碼與文件，尚未打包或發布；既有 Alpha 成品預設仍為 4096。
+
 ## 2026-09-14：Whallm 1.1.7-dev.2 Alpha 發布
 
 - [GitHub Release](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2)：

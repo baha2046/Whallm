@@ -1,0 +1,45 @@
+{
+  "evidence_kind": "single_full_model_screening_of_unadopted_options",
+  "formal_performance_result": false,
+  "scope": "DeepSeek V4 only; 4K Code / 128 output; prompt cache and DSpark off",
+  "rows": [
+    {
+      "mode": "baseline",
+      "peak_gib": 32.56079979799688,
+      "ttft_seconds": 22.032355750001443,
+      "total_seconds": 47.972278082997946,
+      "decode_tps": 4.896506674992137,
+      "logical_expert_read_gib": 349.267822265625,
+      "same_output_tokens_as_baseline": true,
+      "active_after_gib": 21.15008490718901
+    },
+    {
+      "mode": "release-slots",
+      "peak_gib": 21.202554743736982,
+      "ttft_seconds": 21.97765962500125,
+      "total_seconds": 49.64136433300155,
+      "decode_tps": 4.591432029989634,
+      "logical_expert_read_gib": 350.936279296875,
+      "same_output_tokens_as_baseline": true,
+      "active_after_gib": 21.15008490718901
+    },
+    {
+      "mode": "individual-256",
+      "peak_gib": 21.900704046711326,
+      "ttft_seconds": 43.618200541997794,
+      "total_seconds": 70.37389770899608,
+      "decode_tps": 4.747223139173914,
+      "logical_expert_read_gib": 338.9208984375,
+      "same_output_tokens_as_baseline": false,
+      "active_after_gib": 21.150085812434554
+    }
+  ],
+  "limits": [
+    "One measured request per mode, each preceded by the identical priming request in a new process.",
+    "OS page cache and desktop activity not controlled; fixed mode order; small timing differences are not conclusive.",
+    "Option 2 changes both batched_expert_prefill and moe_prefill_step_size; it is one concrete policy, not all possible low-memory implementations.",
+    "Option 2 output hashes differ, so decode time and total request I/O are not equivalent-workload comparisons.",
+    "Expert read bytes are logical requested bytes, not physical SSD traffic.",
+    "No production runtime or App settings changed; options are not adopted."
+  ]
+}

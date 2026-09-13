@@ -16,7 +16,8 @@ Throughput 頁面的測試流程、數據定義與限制見 [Throughput](THROUGH
 
 | 功能 | 命令列 | UI | 預設／行為 |
 | --- | --- | --- | --- |
-| 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
+| 長輸入前釋放舊 expert Slots | CLI／Server／Throughput 共用 runtime | 自動；無新開關 | V4 batched layer-major 與 Qwen layer-major 在建立輸入暫存前釋放；保留模型和 Prompt Cache；V4.1 無相同重疊配置。原始碼已修正，尚未發布 |
+| 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型，整輪結束後 App 自動卸載（原始碼已實作，尚未發布）；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
 | 關閉跨請求快取 | CLI／Server：`--prompt-cache off` | Model → Advanced Settings → Prompt cache → 不使用 | 每次重新處理輸入；單次生成仍需 KV state |
 | 記憶體快取 | CLI／Server：`--prompt-cache memory` | 同上 → 記憶體 | **新預設**；不建立、讀取或寫入磁碟快取 |
 | 磁碟快取 | CLI／Server：`--prompt-cache disk` | 同上 → 磁碟 | 記憶體重用加磁碟保存，可跨重啟恢復 |
@@ -24,7 +25,7 @@ Throughput 頁面的測試流程、數據定義與限制見 [Throughput](THROUGH
 | Log Level | Server：`--log-level debug\|info\|error` | **Log 頁面** | Info；下次啟動 server 生效 |
 | Qwen 一次確認最多四個 token | CLI／Server：`--qwen-short-block`／`--no-qwen-short-block` | Qwen → Advanced Settings | **新預設關閉**；已明確儲存的選擇保留 |
 
-記憶體／磁碟模式僅限支援 prompt cache 的模型。DeepSeek V4.1 不提供此選項；
+DeepSeek V4／V4.1 與 Qwen 均提供記憶體／磁碟 Prompt Cache 選項。
 Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由實驗旗標控制。
 這裡的 prompt cache 與「專家資料快取」是不同設定。
 
@@ -77,7 +78,7 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 
 | 功能／欄位 | CLI | Server 命令列 | UI |
 | --- | --- | --- | --- |
-| 專家快取容量 `slots` | `--slots` | `--slots` | Slots；App 預設 V4 1152、V4.1 1152、Qwen 4096 |
+| 專家快取容量 `slots` | `--slots` | `--slots` | Slots；App 預設 V4 1152、V4.1 1152、Qwen 3072 |
 | 讀取工作數 `read_workers` | `--read-workers` | 同左 | Read workers |
 | 預讀工作數 `prefetch_read_workers` | `--prefetch-read-workers` | 同左 | Prefetch read workers；預設 2，至少 1 |
 | MLX 記憶體限額 | `--memory-limit-gib` | 同左 | Memory limit GiB；0 為自動 |

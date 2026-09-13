@@ -87,8 +87,37 @@ Existing saved slot settings are preserved.
 
 This integration is text-only. It excludes the checkpoint's vision tower and
 aligner. It also disables MTP/DSpark, staged or adaptive expert prefill,
-layer-major prefill, persistent prompt cache, and prompt-cache reuse. Each
-generation starts with a fresh V4.1 cache.
+and layer-major prefill. Prompt-cache reuse and persistence are now implemented
+and included in the 2026-09-14 local build, after the published `v1.1.7-dev.2` Alpha.
+
+## Prompt cache
+
+Advanced Settings offers Off / Memory / Disk. New settings default to Memory;
+explicitly saved choices are preserved. Memory reuses a matching prefix until
+unload; Disk also restores it after restarting the runtime. Off starts fresh.
+The CLI and server use the same existing `--prompt-cache` controls.
+
+The model support package captures the global position, buffer capacity,
+per-layer window KV, compressed KV, index keys, unfinished compressor KV/scores,
+and Engram compressed-token history. Restored branches own independent state.
+Shared attention references are rebuilt by each forward call. A cache cannot
+be trimmed backward; the runtime reuses only complete matching saved prefixes.
+The existing disk contract binds the cache to the model revision and configuration;
+the V4.1 state additionally validates its schema version, positions, shapes, and dtypes.
+Cache memory accounting includes the CPU Engram history.
+
+Four tests run a small four-layer V4.1 model with nonzero Engram weights, shared
+compressed attention, and compression ratios 1 and 2. They cover a partial group,
+window wrap, capacity growth, independent branches, invalid-state rejection,
+Off / Memory / Disk runtime behavior, disk reload, and interrupted generation.
+Continuation logits after cloning and serialization match exactly; cached runtime
+output tokens match cold generation. Negative controls that erase Engram history
+or partial compressor state change the outputs, confirming that the tests exercise
+those states. These are functional checks, not full-checkpoint performance results.
+
+```sh
+PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests -p test_v41_prompt_cache.py
+```
 
 The manifest contract, native FP8-to-MLX path, strict quantized loading, SSD
 Engram lookup, cache ceiling, tool parser, a synthetic adapter load and real

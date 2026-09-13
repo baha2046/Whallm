@@ -12,10 +12,6 @@
   <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
 </p>
 
-> [!NOTE]
-> Whallm was previously named DeepSeekV4SSD. Releases published before the
-> rename, including version 1.0.4, use the old app and archive names.
-
 Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
 Whallm lets an M-series Mac run all 284B parameters of the pinned
 `DeepSeek-V4-Flash-0731` checkpoint by streaming routed experts from SSD. It
@@ -24,11 +20,11 @@ also supports the pinned `DeepSeek-V4.1-Flash` and
 
 ## Memory guidance
 
-| Model | Recorded peak memory |
-| --- | ---: |
-| `DeepSeek-V4-Flash-0731` | 32.84–35.70 GiB |
-| `DeepSeek-V4.1-Flash` | Not yet measured |
-| `Qwen3.8-Flash-Next-FP8` | 20.92–22.75 GiB |
+| Model | Recorded peak memory | expert cache slots | chipset
+| --- | ---: | ---: | --:
+| `DeepSeek-V4-Flash-0731` |  23 GiB | 1152 | M5 Pro
+| `Qwen3.8-Flash-Next-FP8` | 18 GiB | 3072 | M5 Pro
+| `DeepSeek-V4.1-Flash` | 33 GiB | 1152 | M2 Max
 
 These v1.1.4 results cover chat prompts with 1,024 to 16,384 input tokens. They
 are measurements, not minimum memory requirements or performance guarantees.
@@ -36,48 +32,26 @@ Prompt length, tools, cache state, and runtime settings can change peak memory.
 See the [benchmark](BENCHMARK.md) and
 [validation record](docs/VALIDATION.md) for the measured workloads.
 
-## Benchmark
+## Benchmark 
+### M5 Pro (v1.1.7)
+| Model | Context | Slots | Output limit | Input / Output | TTFT (ms) | TPOT (ms) | PP tok/s | TG tok/s | Total (s) | Throughput | Peak MLX |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| qwen3.8-flash-next-fp8 | Code | 3072 | 128 | 1024 / 128 | 15229.3 | 102.5 | 67.2 | 9.8 | 28.3 | 40.8 | 16.88 GB |
+|                        |      |      |     | 4096 / 128 | 34024.5 | 119.0 | 120.4 | 8.4 | 49.1 | 86.0 | 16.97 GB |
+|                        |      |      |     | 8192 / 128 | 59609.8 | 112.2 | 137.4 | 8.9 | 73.9 | 112.6 | 17.10 GB |
+|                        |      |      |     | 16384 / 128 | 113580.3 | 123.1 | 144.3 | 8.1 | 129.2 | 127.8 | 17.36 GB |
+| deepseek-v4-flash-0731 | Code | 1152 | 128 | 1024 / 128 | 17402.8 | 130.1 | 58.8 | 7.7 | 33.9 | 33.9 | 22.77 GB |
+|                        |      |      |     | 4096 / 128 | 23613.8 | 167.0 | 173.5 | 6.0 | 44.8 | 94.2 | 22.80 GB |
+|                        |      |      |     | 8192 / 128 | 48800.2 | 162.5 | 167.9 | 6.2 | 69.4 | 119.8 | 22.83 GB |
+|                        |      |      |     | 16384 / 128 | 89513.5 | 213.7 | 183.0 | 4.7 | 116.7 | 141.5 | 22.90 GB |
 
-These v1.1.4 results were measured on a MacBook Pro with an Apple M5 Pro,
-64 GB of unified memory, and 1 TB of storage. The benchmark used mixed
-SPEED-Bench prompts, three runs per input size, and a 64-token output limit.
-With three runs, nearest-rank P95 equals the maximum. TTFT means time to first
-token.
+### M2 Max (v1.1.7)
 
-### DeepSeek V4 Flash 0731
-
-| Input tokens | P95 total time | P95 TTFT | P95 prefill | P95 decode | Peak memory |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 27.10 s | 17.75 s | 59.9 tok/s | 7.8 tok/s | 32.84 GiB |
-| 2,048 | 27.35 s | 17.60 s | 117.3 tok/s | 7.3 tok/s | 33.26 GiB |
-| 8,192 | 50.12 s | 40.47 s | 206.3 tok/s | 7.4 tok/s | 34.50 GiB |
-| 16,384 | 88.27 s | 78.61 s | 209.0 tok/s | 7.2 tok/s | 35.70 GiB |
-
-### Qwen3.8 Next Flash FP8
-
-| Input tokens | P95 total time | P95 TTFT | P95 prefill | P95 decode | Peak memory |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 22.60 s | 15.65 s | 69.2 tok/s | 10.4 tok/s | 20.92 GiB |
-| 2,048 | 31.42 s | 24.90 s | 87.5 tok/s | 9.8 tok/s | 21.26 GiB |
-| 8,192 | 84.88 s | 77.74 s | 111.9 tok/s | 10.4 tok/s | 21.90 GiB |
-| 16,384 | 157.89 s | 150.33 s | 113.3 tok/s | 9.7 tok/s | 22.75 GiB |
-
-Performance changes with the prompt, SSD speed, and cache state. See the
-[full benchmark](BENCHMARK.md) and [validation record](docs/VALIDATION.md) for
-more details.
 
 ## How to use it
 
 **Download the app → Open the app → Select and download a model → Start the
 server → Chat in the app or connect Codex**
-
-> [!IMPORTANT]
-> Version 1.0.3 cannot install version 1.0.4 through automatic update because
-> the previous Sparkle signing key is no longer available. Quit the app,
-> download `DeepSeekV4SSD-macOS-arm64.zip` from the
-> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4),
-> and replace the existing app manually. Automatic updates work again after
-> you install version 1.0.4.
 
 1. Download the latest `Whallm-macOS-arm64.zip` from
    [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest).

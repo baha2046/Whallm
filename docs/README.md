@@ -1,7 +1,35 @@
 # Whallm 文件
 
+原始碼已補齊 Prefill 中途取消，適用一般 server request 與 Throughput：
+V4 增加分批／層間檢查、V4.1 增加層間檢查，三模型共用 expert 讀取取消與安全收尾。
+詳見 [Prefill 取消](MODEL_PACKAGES.md#prefill-取消)。此修改尚未打包或發布，
+下方 local build 紀錄不包含此修正。
+
+2026-09-14 已完成最新 local build：`dist/Whallm.app` 與 ZIP 包含記憶體與卸載等修正，
+版本保留 `1.1.7`／`1.1.7d2`，使用 ad hoc 簽章、啟用 Dry run，未公證或發布。
+Swift 89 項、Python 422 項與包內隔離測試 26 項通過；App 與 ZIP 解壓副本
+均通過簽章及三語系隔離啟動。詳見 [本機封裝驗證](VALIDATION.md#2026-09-14最新修正-build-local)。
+
+原始碼已採用長輸入前釋放舊 expert Slots：程式審查發現 DeepSeek V4 與 Qwen
+都有整層 expert 暫存重疊，兩者已修正；V4.1 沒有同類預載路徑，保留快取。
+模型與 Prompt Cache 保留，Python **422 項通過**，已納入上述 local build，未新增完整模型重現。
+詳見 [模型記憶體生命週期](MODEL_PACKAGES.md#長輸入的-expert-記憶體生命週期)。
+
+Throughput 原始碼已修正整輪完成、取消或失敗後自動卸載模型；清理期間禁止重跑，
+已完成結果保留。Swift 89 項與 Python Throughput 9 項測試通過，已納入 local build，尚未發布。
+修正前已實測確認 DeepSeek V4 的 1K／4K Peak MLX 跳升主要受前次保留的 expert slots 影響；
+交換順序可讓 4K 降至 21.20 GiB、1K 升至 31.20 GiB。見
+[記憶體排查](benchmarks/2026-09-14-throughput-memory/README.md)，不是新的速度效能結論。
+
+目前原始碼已將 Qwen3.8 的 Slots 預設與建議值改為 **3072**，保留已儲存的自訂值。
+本次數值修改尚未重新打包；目前 local build 仍為 2048，已發布 Alpha 仍為 4096。
+
+原始碼另已加入 DeepSeek V4.1 的 Memory／Disk Prompt Cache 與 Advanced Settings 選項，
+新設定預設 Memory，已保存的選擇保留。小型模型測試通過，尚未驗證完整 checkpoint，
+已納入 local build，尚未發布。詳見 [V4.1 支援範圍](DEEPSEEK_V41.md#prompt-cache)。
+
 已發布 [Whallm 1.1.7-dev.2 Alpha](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2)，
-對應 commit `f4eb369`，內部 build `1.1.7d2`。`dist` 為本次 Developer ID 簽章與公證成品；
+對應 commit `f4eb369`，內部 build `1.1.7d2`。此公開成品使用 Developer ID 簽章與公證；
 GitHub 下載 ZIP 的簽章、公證、三語隔離啟動及 local 功能關閉驗證皆通過。
 新增 [Throughput 頁面](THROUGHPUT.md)：內建 Code／Novel 素材、不重複補長、模型自動載入、
 多種輸入長度與 128／1024／4096 生成上限。所有模型的 Advanced Settings → Max tokens

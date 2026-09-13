@@ -36,5 +36,7 @@ M4 adds chunked prefill, FP8 KV cache, validated longer contexts, and a measured
 
 Each checkpoint revision is fixed. Code must reject incompatible model shapes and tensor layouts.
 DeepSeek V4.1 support is text-only and uses the exact `deepseek_v41` MLX architecture.
-Its vision tower, MTP/DSpark, reusable prompt cache, and layer-major prefill are outside
+Its vision tower, MTP/DSpark, and layer-major prefill are outside
 the current support boundary.
+Its prompt cache supports memory reuse and disk persistence through its model support package,
+including compressed attention state and Engram token history.

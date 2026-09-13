@@ -5,6 +5,10 @@
 
 ## 目前結構
 
+Qwen3.8 的 Slots 預設值與 Advanced Settings 建議值均為 **3072**；
+V4／V4.1 仍為 1152。介面建議直接讀取共用描述中的 `defaults.slots`。
+已儲存的自訂 Slots 保留；新設定與重設為預設值時採用目前預設。
+
 ```text
 App / CLI / HTTP
        |
@@ -30,13 +34,63 @@ Python [model_support](../runtime/deepseek_v4_ssd/model_support/) 集中每個�
 manifest contract、載入、Prefill、對話解析、抽樣與 reasoning 規則。
 共同 generation 透過套件建立、複製、保存、還原和評估 cache，
 不再依 `_is_qwen`／`_is_deepseek_v41` 選擇這些行為。
-V4.1 明確不提供對話快取重用和持久化，預設請求使用 exact 模式。
+V4.1 提供記憶體 Prompt Cache 重用與磁碟保存，預設請求仍使用 exact 模式。
+其套件保存滑動視窗、壓縮 KV、索引、未完成的壓縮群組、位置與 Engram token 歷史；
+還原時檢查格式、容量、陣列形狀與型別，記憶體計量包含 Engram 歷史。
+新設定預設 Memory；已保存的 Off／Memory／Disk 選擇保留。
 顯式要求不支援的近似模式時，API 在生成前拒絕。
 
 [expert_layout.py](../runtime/deepseek_v4_ssd/expert_layout.py) 提供兩個實際使用的格式：
 V4／V4.1 共用分離 `w1/w2/w3` 到 fused slot 的映射；Qwen 使用 `gate_up/down`。
 套件選擇格式，`ExpertCache` 共用檔案讀取、slot、eviction 和 buffer 生命週期。
 模型運算與量化算式維持既有實作，沒有新增運算圖解譯器。
+
+## 長輸入的 expert 記憶體生命週期
+
+2026-09-14 原始碼採用「整層 prefill 前釋放舊 Slots」，適用正式 server、CLI 與 Throughput。
+已納入當日 local build，尚未發布；保留模型載入狀態、Slots 容量與 Prompt Cache。
+
+| 模型 | 程式審查結果與處理 |
+| --- | --- |
+| DeepSeek V4 | batched layer-major prefill 有額外整層 expert buffers；進入前釋放舊 Slots。停用 batched experts 時保留 Slots。 |
+| Qwen3.8 | layer-major prefill 同樣另建整層 expert buffers；進入前釋放舊 Slots，保留一般／grouped／bounded pool 類型。 |
+| DeepSeek V4.1 | chunked prefill 使用既有 Slots，沒有整層 expert 預載的相同重疊配置；保留現有快取。 |
+
+釋放發生在建立整段輸入 embedding 之前；等待舊 GPU 工作與殘留預讀完成，
+清除實際 slot／arena buffers 和索引，保留模型、檔案描述符、設定及累計指標。
+正在使用或 speculative prefetch 保護中的 experts 不允許釋放。
+正常請求先扣除已重用的 Prompt Cache tokens，剩餘輸入未達 layer-major 門檻時不進入此流程。
+後續生成按需填回 Slots。此修正減少 expert buffers 重疊，並非整體記憶體硬上限。
+
+三模型結論來自程式審查，未新增完整模型重現；小型 buffer 回歸測試與完整 Python suite
+通過。採用前的 V4 單輪原型數值見 [方案比較](benchmarks/2026-09-14-throughput-memory-options/README.md)，
+不能視為 Qwen 或目前成品的實測。
+
+## Prefill 取消
+
+2026-09-14 原始碼補齊共用請求取消；此修改尚未打包或發布。
+一般 Chat／Responses／Completions API 與 Throughput 使用同一個
+`cancellation_scope`。連線中斷後，運算端在下一個 `check_cancelled()` 退出。
+
+- V4 逐層 Prefill 在每層、attention 分批、MoE 分批與 adaptive tile 處檢查；
+  不再等整段逐層 Prefill 做完才處理取消。
+- Qwen 保留每層與每批檢查；V4.1 增加模型內每層檢查，一般 Prefill 的
+  分批進度回呼也使用相同取消旗標。
+- 共用 ExpertCache 在新的 slot 讀取／整層預讀前檢查取消。
+  `wait_for_futures` 等待一般 slot 與 batched layer 讀取時，每 50 ms 檢查；
+  取消或讀取失敗會取消尚未開始的工作，等待正在寫入的工作完成後才釋放 buffer。
+- 未完成請求會清除未使用的整層預讀，並等待已提交 GPU 工作完成，
+  然後才把模型交給下一筆請求或卸載。
+
+取消一般 request 會保留模型；Throughput 仍在請求停止後卸載。
+這不是 GPU／檔案讀取的強制中止，50 ms 也不是停止時間保證；正在執行的運算或
+讀取仍須安全收尾。CLI／研究程式未設置取消 scope 時維持正常執行。
+新模型應重用共用取消旗標與 expert 讀取等待，並在自己長時間的分批／逐層迴圈
+加入取消檢查，不能只依賴外層 token 迴圈。
+
+小型回歸測試涵蓋 V4 分批停止、V4.1 層間停止、Qwen 既有取消、slot 回收、
+讀取收尾、server 斷線後再次請求及 Throughput 卸載；未執行完整 checkpoint，
+不宣稱完整模型的取消延遲。詳見 [驗證紀錄](VALIDATION.md)。
 
 ## 共用描述資料
 

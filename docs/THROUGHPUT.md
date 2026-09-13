@@ -1,10 +1,15 @@
 # Throughput
 
 Throughput 頁面提供單次請求的吞吐量測試。已隨 `v1.1.7-dev.2` Alpha 發布，
-本機 `dist` App 與 ZIP 為對應的簽章、公證成品。
-封裝與隔離檢查見 [驗證紀錄](VALIDATION.md#2026-09-14local-only-dry-run-與-max-tokens-8192)。
+本機 `dist` App 與 ZIP 已更新為包含後續修正的 local build，使用 ad hoc 簽章並啟用 Dry run。
+封裝與隔離檢查見 [驗證紀錄](VALIDATION.md#2026-09-14最新修正-build-local)。
 
 ## 操作
+
+2026-09-14 原始碼另補齊 Prefill 中途取消：V4 在分批／層間停止，
+V4.1 增加層間檢查，並共用 expert 讀取取消與安全收尾。
+此項尚未納入上述 local build。`Unloading model…` 仍可能包含等待當前運算／讀取
+收尾的時間；詳見 [共用取消流程](MODEL_PACKAGES.md#prefill-取消)。
 
 - Model 列出可用的 installed model，選單沿用模型 Alias。Run Benchmark 會在需要時
   啟動 App server，並自動載入所選模型。模型設定沿用 server catalog。
@@ -31,6 +36,10 @@ Throughput 頁面提供單次請求的吞吐量測試。已隨 `v1.1.7-dev.2` Al
   benchmark warm-up。模型原有的載入設定仍生效。
 - 執行中可取消，已完成的列保留；切換頁面保留本輪狀態。關閉視窗會取消。
   新一輪 Run 會清除上一輪結果；目前不跨 App 重啟保存。
+- 目前原始碼會在整輪完成、取消或請求失敗後，自動卸載本次模型；各輸入長度之間
+  保持載入。取消後會先等待生成停止，再卸載，清理完成前不能重新 Run。
+  卸載失敗會顯示錯誤並保留結果；尚未發出模型請求或 Dry run 不執行卸載。
+  此修改已納入 local build，尚未發布；既有公開 `v1.1.7-dev.2` 成品不含此行為。
 - 結果底下的 Result output 可切換 **純文字／JSON／Markdown table**，文字可選取複製。
   已完成的每筆結果即時加入輸出；取消或失敗後仍可複製已完成部分。
   純文字使用等寬空格對齊欄位，Markdown 是可直接貼上的表格原文；兩者包括模型、素材、
@@ -66,9 +75,17 @@ Generation length 與 Run／Cancel 共用同一條右邊界，操作按鈕位於
 
 每筆測試持有既有模型請求鎖，與聊天、載入／卸載和設定變更依序執行。
 測試期間停用一般與 DSpark 的跨請求 prompt cache 重用及寫入，完成、失敗或
-取消後恢復原設定；不刪除已有的對話快取。expert cache 與作業系統檔案快取仍
-保留，因此不同順序、前次使用情況會影響結果。取消透過關閉請求連線傳到 runtime，
+取消後恢復原設定；不刪除已有的對話快取。作業系統檔案快取仍保留；目前原始碼在
+V4 batched／Qwen layer-major prefill 前釋放舊 expert Slots，生成時再填回，其他路徑仍保留。
+不同順序、前次使用情況仍可能影響結果。取消透過關閉請求連線傳到 runtime，
 正在執行的 GPU 工作仍須完成安全收尾。
+
+**修正前的 Peak MLX 差異。** DeepSeek V4 的 slots 按需配置，第一筆可從空 slots 開始，
+下一筆則同時持有已填滿的 slots 與 prefill 暫存。2026-09-14 本機交換順序確認：
+4K 首筆為 21.20 GiB，放在 1K 後為 32.56 GiB；1K 首筆為 21.18 GiB，放在 4K 後為
+31.20 GiB。因此不能把第一列與後續列的全部差額歸因於輸入長度。
+本次設定、輸出一致性及限制見 [記憶體排查](benchmarks/2026-09-14-throughput-memory/README.md)。
+目前 local build 已移除上述兩條路徑的舊 Slots 重疊，尚未發布；既有公開 Alpha 仍有此行為。
 
 ## 結果欄位
 
