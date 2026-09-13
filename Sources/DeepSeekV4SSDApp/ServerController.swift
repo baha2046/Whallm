@@ -1084,6 +1084,15 @@ final class ServerController: ObservableObject {
     await changeLoadedModel(.unload(modelID), path: "api/models/unload")
   }
 
+  func unloadModelAfterBenchmark(_ modelID: String) async throws {
+    // A stopped server has already released its model. The endpoint waits for
+    // any cancelled generation to drain before releasing the selected model.
+    guard case .running = state else { return }
+    try await sendModelRequest(
+      path: "api/models/unload", body: ["model": modelID], timeoutInterval: 1_800)
+    await refreshPerformance()
+  }
+
   private func changeLoadedModel(
     _ action: ModelAction,
     path: String,

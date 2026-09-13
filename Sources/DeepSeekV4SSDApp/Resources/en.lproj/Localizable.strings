@@ -94,7 +94,7 @@
 "No Test Messages" = "No Test Messages";
 "Number of linear conversations to keep. The recommended value is 2." = "Number of linear conversations to keep. The recommended value is 2.";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Number of routed experts in the Active Parameters Cache. The recommended value is 1152.";
-"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Number of routed experts in the Active Parameters Cache. The recommended value is 4096.";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 3072." = "Number of routed experts in the Active Parameters Cache. The recommended value is 3072.";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "Number of workers that read expert blobs at the same time. The recommended value is 4.";
 "Optional for local use" = "Optional for local use";
 "Optional UTF-8 prompt file path" = "Optional UTF-8 prompt file path";
@@ -427,3 +427,5 @@
 "Simulated results for UI debugging. No model is loaded." = "Simulated results for UI debugging. No model is loaded.";
 "Generate results" = "Generate results";
 "Select at least one context length." = "Select at least one context length.";
+"Unloading model…" = "Unloading model…";
+"Could not unload the benchmark model: %@" = "Could not unload the benchmark model: %@";

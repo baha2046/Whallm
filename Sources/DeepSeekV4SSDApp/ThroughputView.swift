@@ -201,6 +201,7 @@ final class ThroughputSession: ObservableObject {
   @Published var benchmarkContext: BenchmarkContext = .code
   @Published private(set) var results: [ThroughputResult] = []
   @Published private(set) var isRunning = false
+  @Published private(set) var isUnloading = false
   @Published private(set) var phase = ""
   @Published private(set) var currentContext = 0
   @Published private(set) var generated = 0
@@ -241,11 +242,40 @@ final class ThroughputSession: ObservableObject {
     guard !isRunning, !model.isEmpty, !contextLengths.isEmpty else { return }
     if model == Self.dryRunModel { runDryRun(); return }
     let model = model
-    let lengths = contextLengths.sorted()
     let generation = generationLength
-    let benchmarkContext = benchmarkContext
+    let context = benchmarkContext
+    let modelID = catalog.models.first { $0.id == model || $0.alias == model }?.id ?? model
+    start(prepare: {
+      if !server.isActive { server.start(configuration, catalog: catalog) }
+      let deadline = ContinuousClock.now.advanced(by: .seconds(60))
+      while server.state == .starting, ContinuousClock.now < deadline {
+        try await Task.sleep(for: .milliseconds(100))
+      }
+      try Task.checkCancellation()
+      guard server.state == .running else {
+        if case .failed(let message) = server.state { throw ThroughputError(message: message) }
+        throw ThroughputError(message: L10n.string("The server is not ready. Check Logs and try again."))
+      }
+    }, run: { length, receive in
+      try await ThroughputClient.run(
+        configuration: configuration, model: model, context: length, generation: generation,
+        benchmarkContext: context, receive: receive)
+    }, unload: {
+      try await server.unloadModelAfterBenchmark(modelID)
+    })
+  }
+
+  // The lifecycle is shared by the real client and tests; cleanup outlives cancellation.
+  func start(
+    prepare: @MainActor @escaping () async throws -> Void,
+    run: @MainActor @escaping (Int, @MainActor @escaping (ThroughputEvent) -> Void) async throws -> ThroughputResult,
+    unload: @MainActor @escaping () async throws -> Void
+  ) {
+    guard !isRunning, !model.isEmpty, !contextLengths.isEmpty else { return }
+    if model == Self.dryRunModel { runDryRun(); return }
+    let lengths = contextLengths.sorted()
     results = []
-    resultModel = catalog.models.first { $0.id == model }?.id ?? model
+    resultModel = model
     error = nil
     isRunning = true
     phase = "Starting server…"
@@ -253,28 +283,17 @@ final class ThroughputSession: ObservableObject {
     currentContext = lengths[0]
     task = Task {
       defer { isRunning = false; task = nil }
+      var requestedModel = false
+      var finalPhase = "Benchmark complete"
       do {
-        if !server.isActive { server.start(configuration, catalog: catalog) }
-        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
-        while server.state == .starting, ContinuousClock.now < deadline {
-          try await Task.sleep(for: .milliseconds(100))
-        }
-        try Task.checkCancellation()
-        guard server.state == .running else {
-          if case .failed(let message) = server.state {
-            throw ThroughputError(message: message)
-          }
-          throw ThroughputError(message: L10n.string("The server is not ready. Check Logs and try again."))
-        }
+        try await prepare()
         for length in lengths {
           try Task.checkCancellation()
           currentContext = length
           generated = 0
           phase = "Loading model…"
-          let result = try await ThroughputClient.run(
-            configuration: configuration, model: model, context: length, generation: generation,
-            benchmarkContext: benchmarkContext
-          ) { [weak self] event in
+          requestedModel = true
+          let result = try await run(length) { [weak self] event in
             guard let self else { return }
             if event.phase == "loading" { phase = "Loading model…" }
             if event.phase == "running" { phase = "Running benchmark…" }
@@ -283,19 +302,36 @@ final class ThroughputSession: ObservableObject {
           try Task.checkCancellation()
           results.append(result)
         }
-        phase = "Benchmark complete"
       } catch {
         if Task.isCancelled {
-          phase = "Benchmark cancelled"
+          finalPhase = "Benchmark cancelled"
         } else {
           self.error = error.localizedDescription
-          phase = "Benchmark failed"
+          finalPhase = "Benchmark failed"
         }
       }
+      if requestedModel {
+        isUnloading = true
+        phase = "Unloading model…"
+        // An unstructured task does not inherit the cancelled benchmark's cancellation.
+        let cleanup = Task { @MainActor in try await unload() }
+        do {
+          try await cleanup.value
+        } catch {
+          let message = L10n.string("Could not unload the benchmark model: %@", error.localizedDescription)
+          self.error = [self.error, message].compactMap { $0 }.joined(separator: "\n")
+          finalPhase = "Benchmark failed"
+        }
+        isUnloading = false
+      }
+      phase = finalPhase
     }
   }
 
-  func cancel() { task?.cancel() }
+  func cancel() {
+    guard !isUnloading else { return }
+    task?.cancel()
+  }
 
   func reportFailure(_ error: Error) {
     self.error = error.localizedDescription
@@ -393,6 +429,7 @@ struct ThroughputView: View {
               Spacer(minLength: 8)
               if session.isRunning {
                 Button(label("Cancel"), role: .cancel) { session.cancel() }
+                  .disabled(session.isUnloading)
                   .keyboardShortcut(".", modifiers: .command)
               } else {
                 Button { run() } label: {

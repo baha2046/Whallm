@@ -94,7 +94,7 @@
 "No Test Messages" = "暂无测试消息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的线性对话数量。建议值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 数量。建议值是 1152。";
-"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Active Parameters Cache 的 routed expert 数量。建议值是 4096。";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 3072." = "Active Parameters Cache 的 routed expert 数量。建议值是 3072。";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "同时读取 expert blob 的工作数量。建议值是 8。";
 "Optional for local use" = "本机使用时可留空";
 "Optional UTF-8 prompt file path" = "可选的 UTF-8 prompt 文件路径";
@@ -427,3 +427,5 @@
 "Simulated results for UI debugging. No model is loaded." = "用于 UI 调试的模拟结果，不会加载模型。";
 "Generate results" = "生成结果";
 "Select at least one context length." = "请至少选择一个输入长度。";
+"Unloading model…" = "正在卸载模型…";
+"Could not unload the benchmark model: %@" = "无法卸载测试模型：%@";

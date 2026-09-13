@@ -5,6 +5,117 @@ import XCTest
 
 final class ThroughputTests: XCTestCase {
   @MainActor
+  func testCompletionUnloadsOnceAfterAllTrialsAndKeepsResults() async throws {
+    let session = ThroughputSession()
+    session.model = "test-model"
+    session.contextLengths = [1024, 4096]
+    var events: [String] = []
+    let finished = expectation(description: "unloaded")
+    session.start(prepare: {}, run: { length, _ in
+      events.append("run \(length)")
+      return try Self.result(length)
+    }, unload: {
+      XCTAssertTrue(session.isRunning)
+      XCTAssertTrue(session.isUnloading)
+      events.append("unload")
+      finished.fulfill()
+    })
+    await fulfillment(of: [finished], timeout: 2)
+    await Self.waitForFinish(session)
+    XCTAssertEqual(events, ["run 1024", "run 4096", "unload"])
+    XCTAssertEqual(session.results.map(\.contextTokens), [1024, 4096])
+    XCTAssertEqual(session.phase, "Benchmark complete")
+  }
+
+  @MainActor
+  func testCancellationUnloadsWithoutCancellingCleanupOrStartingAnotherRun() async throws {
+    let session = ThroughputSession()
+    session.model = "test-model"
+    session.contextLengths = [1024, 4096]
+    let entered = expectation(description: "second trial")
+    let unloaded = expectation(description: "unloaded")
+    var cleanupCount = 0
+    session.start(prepare: {}, run: { length, _ in
+      if length == 4096 {
+        entered.fulfill()
+        try await Task.sleep(for: .seconds(60))
+      }
+      return try Self.result(length)
+    }, unload: {
+      cleanupCount += 1
+      XCTAssertFalse(Task.isCancelled)
+      XCTAssertTrue(session.isRunning)
+      session.cancel()
+      session.start(prepare: { XCTFail("Must wait for unload") },
+                    run: { length, _ in try Self.result(length) }, unload: {})
+      try await Task.sleep(for: .milliseconds(10))
+      XCTAssertFalse(Task.isCancelled)
+      unloaded.fulfill()
+    })
+    await fulfillment(of: [entered], timeout: 2)
+    session.cancel()
+    await fulfillment(of: [unloaded], timeout: 2)
+    await Self.waitForFinish(session)
+    XCTAssertEqual(cleanupCount, 1)
+    XCTAssertEqual(session.results.map(\.contextTokens), [1024])
+    XCTAssertEqual(session.phase, "Benchmark cancelled")
+    XCTAssertNil(session.error)
+  }
+
+  @MainActor
+  func testTrialFailureUnloadsAndReportsCleanupFailure() async {
+    let session = ThroughputSession()
+    session.model = "test-model"
+    session.contextLengths = [1024]
+    let finished = expectation(description: "cleanup attempted")
+    session.start(prepare: {}, run: { _, _ in throw TestFailure(message: "trial failed") }, unload: {
+      finished.fulfill()
+      throw TestFailure(message: "unload failed")
+    })
+    await fulfillment(of: [finished], timeout: 2)
+    await Self.waitForFinish(session)
+    XCTAssertTrue(session.error?.contains("trial failed") == true)
+    XCTAssertTrue(session.error?.contains("unload failed") == true)
+    XCTAssertEqual(session.phase, "Benchmark failed")
+  }
+
+  @MainActor
+  func testPreparationFailureAndDryRunDoNotUnloadExistingModel() async {
+    let session = ThroughputSession()
+    session.model = "test-model"
+    let entered = expectation(description: "prepare failed")
+    session.start(prepare: {
+      entered.fulfill()
+      throw TestFailure(message: "server failed")
+    }, run: { _, _ in XCTFail("Must not run"); return try Self.result(1024) },
+       unload: { XCTFail("No benchmark model was requested") })
+    await fulfillment(of: [entered], timeout: 2)
+    await Self.waitForFinish(session)
+    session.model = ThroughputSession.dryRunModel
+    session.start(prepare: { XCTFail("Dry run must not start the server") },
+                  run: { _, _ in XCTFail("Dry run must not request a model"); return try Self.result(1024) },
+                  unload: { XCTFail("Dry run must not unload a model") })
+    XCTAssertFalse(session.isRunning)
+  }
+
+  private struct TestFailure: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+  }
+
+  @MainActor
+  private static func waitForFinish(_ session: ThroughputSession) async {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while session.isRunning && ContinuousClock.now < deadline { await Task.yield() }
+    XCTAssertFalse(session.isRunning)
+  }
+
+  private static func result(_ length: Int) throws -> ThroughputResult {
+    let data = "data: {\"result\":{\"model\":\"test-model\",\"context_tokens\":\(length),\"generation_tokens\":128,\"generation_limit\":128,\"ttft_ms\":500,\"tpot_ms\":10,\"prefill_tps\":100,\"decode_tps\":100,\"elapsed_seconds\":2,\"throughput_tps\":100,\"peak_memory_bytes\":1024,\"output_token_sha256\":\"test\",\"prompt_cache_reused_tokens\":0,\"benchmark_context\":\"code\",\"corpus_sha256\":\"test\"}}"
+    return try XCTUnwrap(ThroughputEvent.decode(data)?.result)
+  }
+
+  @MainActor
   func testDryRunUsesSelectedOptionsWithoutStartingServer() throws {
     let session = ThroughputSession()
     let server = ServerController()

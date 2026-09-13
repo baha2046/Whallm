@@ -23,7 +23,7 @@ final class ServerConfigurationTests: XCTestCase {
   func testSSDSettingsDefaultsMigrateAndPreserveExplicitChoices() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
-    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+    for kind in [ModelKind.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(settings.recentExpertCache, true)
       XCTAssertEqual(settings.qwenShortBlock, false)
@@ -65,7 +65,7 @@ final class ServerConfigurationTests: XCTestCase {
   func testPromptCacheModesMigrateSaveAndReachRuntime() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
-    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+    for kind in [ModelKind.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(settings.promptCacheMode, .memory)
       var old = try XCTUnwrap(
@@ -88,7 +88,7 @@ final class ServerConfigurationTests: XCTestCase {
         XCTAssertEqual(runtime.persistentPromptCache, mode == .disk)
       }
     }
-    XCTAssertEqual(ModelAdvancedSettings.defaults(for: .deepSeekV41).promptCacheMode, .off)
+    XCTAssertEqual(ModelAdvancedSettings.defaults(for: .deepSeekV41).promptCacheMode, .memory)
     for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
       for key in ["Prompt cache", "Off", "Memory", "Disk"] {
         XCTAssertNotEqual(L10n.string(key, language: language), key)
@@ -100,7 +100,7 @@ final class ServerConfigurationTests: XCTestCase {
   func testNewAdvancedControlsMigratePersistAndReachCatalog() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
-    for kind in [ModelKind.deepSeekV4, .qwen3_8FlashNext] {
+    for kind in [ModelKind.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       var old = try XCTUnwrap(
         JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
@@ -358,7 +358,13 @@ final class ServerConfigurationTests: XCTestCase {
     deepSeek.save(for: .deepSeekV4, defaults: isolated.defaults)
 
     var qwen = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
-    XCTAssertEqual(qwen.slots, 4_096)
+    XCTAssertEqual(qwen.slots, 3_072)
+    for language in [AppLanguage.english, .simplifiedChinese, .traditionalChinese] {
+      let hint = L10n.string(
+        "Number of routed experts in the Active Parameters Cache. The recommended value is %lld.",
+        language: language, Int64(ModelKind.qwen3_8FlashNext.descriptor.defaults.slots))
+      XCTAssertEqual(hint.filter(\.isNumber), "3072", hint)
+    }
     XCTAssertFalse(qwen.mtpEnabled ?? true)
     XCTAssertEqual(qwen.mtpSlots, 32)
     XCTAssertEqual(qwen.anePrefillRatio, 0.25)
@@ -483,7 +489,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(deepSeek.slots, 640)
     XCTAssertEqual(deepSeek.defaultTemperature, 0.7)
     XCTAssertEqual(deepSeek.layerMajorPrefillThreshold, 1_024)
-    XCTAssertEqual(qwen.slots, 4_096)
+    XCTAssertEqual(qwen.slots, 3_072)
     XCTAssertEqual(qwen.defaultTemperature, 0.7)
   }
 
@@ -592,7 +598,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
     XCTAssertFalse(catalog.models[1].runtime.layerMajorPrefill)
     XCTAssertFalse(catalog.models[1].runtime.fp8KVCache)
-    XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 0)
+    XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 1)
     XCTAssertFalse(catalog.models[1].runtime.persistentPromptCache)
     XCTAssertFalse(catalog.models[1].runtime.dsparkEnabled)
     XCTAssertFalse(catalog.models[1].runtime.mtpEnabled)
@@ -639,7 +645,7 @@ final class ServerConfigurationTests: XCTestCase {
     let v41Runtime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
     XCTAssertEqual(v41Runtime["layer_major_prefill"] as? Bool, false)
     XCTAssertEqual(v41Runtime["fp8_kv_cache"] as? Bool, false)
-    XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 0)
+    XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 1)
     XCTAssertEqual(v41Runtime["persistent_prompt_cache"] as? Bool, false)
     XCTAssertEqual(models[1]["model_kind"] as? String, "deepseek-v4.1")
     let qwenRuntime = try XCTUnwrap(models[2]["runtime"] as? [String: Any])

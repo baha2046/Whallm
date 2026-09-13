@@ -94,7 +94,7 @@
 "No Test Messages" = "尚無測試訊息";
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的線性對話數量。推薦值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 數量。建議值是 1152。";
-"Number of routed experts in the Active Parameters Cache. The recommended value is 4096." = "Active Parameters Cache 的 routed expert 數量。建議值是 4096。";
+"Number of routed experts in the Active Parameters Cache. The recommended value is 3072." = "Active Parameters Cache 的 routed expert 數量。建議值是 3072。";
 "Number of workers that read expert blobs at the same time. The recommended value is 4." = "同時讀取 expert blob 的工作數量。建議值是 8。";
 "Optional for local use" = "本機使用時可留空";
 "Optional UTF-8 prompt file path" = "可選的 UTF-8 prompt 檔案路徑";
@@ -427,3 +427,5 @@
 "Simulated results for UI debugging. No model is loaded." = "用於 UI 除錯的模擬結果，不會載入模型。";
 "Generate results" = "產生結果";
 "Select at least one context length." = "請至少選擇一個輸入長度。";
+"Unloading model…" = "正在卸載模型…";
+"Could not unload the benchmark model: %@" = "無法卸載測試模型：%@";
