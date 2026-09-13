@@ -71,8 +71,12 @@ GitHub Pages 部署完成後才會對外提供新清單。
 
 ## 驗證範圍
 
+目前已發布 `v1.1.7-dev.2` Alpha（build `1.1.7d2`），GitHub 下載 ZIP 的簽章、公證、
+三語隔離啟動及 local-only 功能關閉檢查通過；更新清單 dev 為 `1.1.7d2`、stable 為 `1.1.6`。
+完整成品 hash 與測試範圍見 [發布驗證](VALIDATION.md#2026-09-14whallm-117-dev2-alpha-發布)。
+
 Swift 測試覆蓋來源保存、stable／dev 篩選、自動檢查與 Sparkle 同步、dev 版本排序及三語文案。
-已發布 `v1.1.7-dev`（build `1.1.7d1`）。GitHub 下載 ZIP 的簽章、公證、三語系與
+以下是前一版 `v1.1.7-dev`（build `1.1.7d1`）的驗證：GitHub 下載 ZIP 的簽章、公證、三語系與
 隔離啟動均通過；公開 Pages 清單與 Release 附件一致，英文 release notes 內容也一致。
 獨立 App 副本實測 stable 不提供 dev，dev 找到本次版本並顯示英文說明。
 此次沒有透過 Sparkle 執行原地安裝替換。

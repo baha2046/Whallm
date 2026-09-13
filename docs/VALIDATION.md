@@ -1,5 +1,30 @@
 # 驗證紀錄
 
+## 2026-09-14：Whallm 1.1.7-dev.2 Alpha 發布
+
+- [GitHub Release](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2)：
+  `Whallm 1.1.7-dev.2 (Alpha)`，pre-release，非 latest。
+  tag 指向 `f4eb369f6ea612d01a1cb01263f0ad87da70443d`；App 版本 `1.1.7`／`1.1.7d2`。
+- `make release VERSION=1.1.7 CHANNEL=dev DEV_BUILD=2` 完成；使用 Developer ID
+  `Yanun Yang (Y366CJ66L6)` 與 `deepseek_ssd` 公證 profile。
+  Apple submission `94717c72-0ecd-4cee-9119-35e5a3509c78` 為 Accepted。
+- 發布前的 App／ZIP 解壓副本與發布後從 GitHub 下載的 ZIP 均通過 strict code signature、
+  stapled notarization、Gatekeeper，以及 en／zh-Hans／zh-Hant 的隔離啟動。
+  拒絕 `.build` 與 Swift module bundle 存取時仍完成 L10n 初始化並存活；
+  每次啟動皆確認 `WHALLM_LOCAL_BUILD:0`，發布包排除 Dry run。
+- 包內 Python 在禁止專案 `.build`、`.venv`、`runtime`、`Sources` 的沙盒下，
+  **9 項 Throughput 測試通過**。完整開發測試結果見下方發布前檢查。
+- Release 含 ZIP 與 `appcast.xml`；英文說明與原稿一致，Sparkle feed 簽章通過。
+  feed 內 dev 為 `1.1.7d2`，stable 保留 `1.1.6`；`gh-pages` 提交 `0be6544`。
+  公開 Pages 清單與 Release 附件 SHA-256 一致；GitHub latest 仍為 `v1.1.6`。
+  已開啟最終 Alpha App，實際檢查 Throughput 的 Model 選單沒有 Dry run。
+- GitHub 下載 ZIP SHA-256：
+  `4942481fd460213748ed7279ee5b3b7b53d30178eee86242ae146d1ce51312a0`。
+  GitHub 下載 appcast SHA-256：
+  `dda5b35fbe03d6a06f82ce87e852f441e1c9a1692f132cc369910a510361f59e`。
+- 原始 logs：`scratch/release-1.1.7-dev.2/`。本輪未執行 Sparkle 原地安裝，
+  未重新測量真實模型吞吐量，200K 素材覆蓋不代表已完成 200K 模型生成測試。
+
 ## 2026-09-14：1.1.7-dev.2 Alpha 發布前檢查
 
 - 版本為 `1.1.7`／`1.1.7d2`，tag `v1.1.7-dev.2`，GitHub pre-release，更新來源 dev。

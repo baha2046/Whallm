@@ -1,18 +1,21 @@
 # Whallm 文件
 
-本機開發新增 [Throughput 頁面](THROUGHPUT.md)：內建 Code／Novel 素材、不重複補長、模型自動載入、
-多種輸入長度與 128／1024／4096 生成上限。已完成本機封裝，`dist` 為包含此功能的
-1.1.7／1.1.7d1 ad hoc 簽章版本；App 與 ZIP 的三語隔離啟動皆通過，尚未公開發布。
-最新封裝將所有模型的 Advanced Settings → Max tokens 預設改為 8192。
+已發布 [Whallm 1.1.7-dev.2 Alpha](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2)，
+對應 commit `f4eb369`，內部 build `1.1.7d2`。`dist` 為本次 Developer ID 簽章與公證成品；
+GitHub 下載 ZIP 的簽章、公證、三語隔離啟動及 local 功能關閉驗證皆通過。
+新增 [Throughput 頁面](THROUGHPUT.md)：內建 Code／Novel 素材、不重複補長、模型自動載入、
+多種輸入長度與 128／1024／4096 生成上限。所有模型的 Advanced Settings → Max tokens
+預設改為 8192，明確儲存的自訂值仍保留。Alpha 使用 dev 更新來源，stable 保持 1.1.6。
 Model → Dry run 僅供 local build，可立即產生模擬結果供 UI 除錯；stable／dev 發布排除。保留
 滿寬結果表格、當次 slots，以及可複製的純文字／JSON／Markdown 表格；
-Code／Novel 素材在三種 tokenizer 下均覆蓋 200K。詳見
-[local-only Dry run 與預設值驗證](VALIDATION.md#2026-09-14local-only-dry-run-與-max-tokens-8192)。
+Code／Novel 素材在三種 tokenizer 下均覆蓋 200K；這不是完整模型的效能測量。
+詳見 [Alpha 發布驗證](VALIDATION.md#2026-09-14whallm-117-dev2-alpha-發布) 與
+[release notes](../Packaging/ReleaseNotes/1.1.7-dev.2.md)。
 
 已發布 [Whallm 1.1.7-dev](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev)，
 對應 commit `32de5c8`，包含下列變更。GitHub 下載成品的簽章、公證與三語隔離啟動
 均通過；stable 保持 1.1.6，dev 可找到本次更新。此為公開發布紀錄，
-目前 `dist` 的本機封裝狀態見上方說明。
+目前 `dist` 的新版成品狀態見上方說明。
 詳見 [發布驗證](VALIDATION.md#2026-09-13whallm-117-dev-預發布)。
 英文變更說明見 [1.1.7-dev release notes](../Packaging/ReleaseNotes/1.1.7.md)。
 App 更新來源與自動檢查設定見 [App 更新](UPDATES.md)。
@@ -20,7 +23,7 @@ App 更新來源與自動檢查設定見 [App 更新](UPDATES.md)。
 本目錄只放目前有效的文件。
 Whallm 的舊名稱是 DeepSeekV4SSD。
 
-最後核對日期是 2026-09-13。
+最後核對日期是 2026-09-14。
 
 模型進階設定新增 DeepSeek 近似模式（預設關閉）、Qwen 自動取樣（預設開啟，
 關閉後可使用手動 T／P／K）、預讀工作數、MoE 輸入分批大小及 LRU／LFU 選單。

@@ -1,6 +1,7 @@
 # Throughput
 
-Throughput 頁面提供單次請求的吞吐量測試。已加入本機 `dist` App 與 ZIP，尚未公開發布。
+Throughput 頁面提供單次請求的吞吐量測試。已隨 `v1.1.7-dev.2` Alpha 發布，
+本機 `dist` App 與 ZIP 為對應的簽章、公證成品。
 封裝與隔離檢查見 [驗證紀錄](VALIDATION.md#2026-09-14local-only-dry-run-與-max-tokens-8192)。
 
 ## 操作
