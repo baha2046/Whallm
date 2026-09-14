@@ -1,5 +1,30 @@
 # 驗證紀錄
 
+## 2026-09-14：Whallm 1.1.7 正式發布
+
+- 已發布 [v1.1.7 正式版](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7)，非 pre-release；GitHub latest 為 `v1.1.7`。
+- Tag 固定於使用者指定的最新 commit `062624ee974febb0b0ee07e228552998f260389d`。
+  Release notes 透過 `RELEASE_NOTES_FILE` 指定，發布後另行保存此文件與 notes，未移動 tag。
+- Apple M5 Pro；Python **424 項**、Swift **91 項**通過。Swift 排除互動式 Keychain 測試。
+- 先完成 `make package APP_VERSION=1.1.7 BUILD_VERSION=1.1.7 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=`；
+  App 與 ZIP 解壓副本通過 strict 簽章、模型描述與三語隔離啟動，local 旗標為 1。
+  local 與 distribution 的包內新增功能各 12 項測試通過；44 個 Python runtime 原始檔與發布來源相同。
+- `make release VERSION=1.1.7 CHANNEL=stable` 完成；使用 Developer ID 與
+  `deepseek_ssd` Keychain profile 公證。正式版本與 build 均為 `1.1.7`。
+- 上傳前與 GitHub 下載後均確認 strict code signature、stapled 公證與 Gatekeeper，
+  App／ZIP 解壓副本的 en、zh-Hans、zh-Hant 隔離啟動全部通過。
+  禁止讀取專案 `.build` 與 Swift module bundle 時仍完成 L10n 初始化並保持存活；
+  local 功能旗標為 0。Resources 的語系檔案優先於 `Bundle.module`。
+- GitHub Release 包含 ZIP 與已簽章 `appcast.xml`；下載驗證後才更新 `gh-pages`。
+  公開 Pages 清單與 Release 附件一致，stable 為 1.1.7，dev 也接受此正式版。
+- 本輪未執行 Sparkle 原地安裝、完整模型生成或新的速度／品質測量。
+  V4.1 與新加速功能的限制仍見 [三模型加速功能](MODEL_ACCELERATION.md)。
+- ZIP：186877549 bytes；SHA-256：
+  `9c313aafecff5587df3bbf540159a0ec64195ae96a3ef31e14bbd6cb65c14427`。
+- appcast.xml：9274 bytes；SHA-256：
+  `f8e01836d719d8a0a16bef1a9edee9d6a4acb948d157af0cc5ddbda63b9d5d5c`。
+- 原始測試、封裝、公證、下載與檢查紀錄：`scratch/release-1.1.7/`。
+
 ## 2026-09-14：三模型加速 local build
 
 - 基準 `5d3df76` 加當前工作樹，Apple M5 Pro；包含三模型加速設定、近似模式預設關閉、兩項生成路徑移除、Prefill 取消及 Qwen Slots 3072。
@@ -322,7 +347,7 @@ Tag 對應 `32de5c8c33d76b36f4c2a0be7d2e9120e576a63d`；App 版本 `1.1.7`、
 - Release commit、乾淨工作目錄、本機 tag 與遠端 tag 在打包前和上傳前核對一致；
   GitHub Release 使用 `--verify-tag --prerelease --latest=false` 建立。
 - GitHub Release body、Sparkle 內嵌 Markdown 與
-  `Packaging/ReleaseNotes/1.1.7.md` 英文內容相同。
+  `Packaging/ReleaseNotes/1.1.7-dev.md` 保存的當時英文內容相同。
 - `gh-pages` commit `d34e08a` 已部署，公開 appcast 與 Release 附件逐位元相同且
   Sparkle 簽章有效；保留 stable 1.1.6 與 dev 1.1.7d1。
 - 使用獨立 bundle ID、版本設為 1.1.6 的 App 副本實測：stable 顯示已是最新版，

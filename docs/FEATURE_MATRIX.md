@@ -1,8 +1,7 @@
 # 命令列與 UI 功能對照
 
 核對日期：2026-09-14。新增加速功能完整對照見 [三模型加速功能](MODEL_ACCELERATION.md)。
-基準為目前未提交原始碼，
-不是已發布的 v1.1.6 成品。表格依目前程式入口逐項核對，不代表所有模型都已完成實機驗證。
+基準為已發布的 `v1.1.7`（commit `062624e`）。表格依目前程式入口逐項核對，不代表所有模型都已完成實機驗證。
 
 - **CLI**：`python -m deepseek_v4_ssd.cli`，直接生成一次。
 - **Server**：`python -m deepseek_v4_ssd.server`，啟動 HTTP 服務。
@@ -17,8 +16,8 @@ Throughput 頁面的測試流程、數據定義與限制見 [Throughput](THROUGH
 
 | 功能 | 命令列 | UI | 預設／行為 |
 | --- | --- | --- | --- |
-| 長輸入前釋放舊 expert Slots | CLI／Server／Throughput 共用 runtime | 自動；無新開關 | V4 batched layer-major 與 Qwen layer-major 在建立輸入暫存前釋放；保留模型和 Prompt Cache；V4.1 選用按層合批時也會釋放。原始碼已修正，尚未發布 |
-| 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型，整輪結束後 App 自動卸載（原始碼已實作，尚未發布）；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
+| 長輸入前釋放舊 expert Slots | CLI／Server／Throughput 共用 runtime | 自動；無新開關 | V4 batched layer-major 與 Qwen layer-major 在建立輸入暫存前釋放；保留模型和 Prompt Cache；V4.1 選用按層合批時也會釋放。已隨 v1.1.7 發布 |
+| 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型，整輪結束後 App 自動卸載（已隨 v1.1.7 發布）；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
 | 關閉跨請求快取 | CLI／Server：`--prompt-cache off` | Model → Advanced Settings → Prompt cache → 不使用 | 每次重新處理輸入；單次生成仍需 KV state |
 | 記憶體快取 | CLI／Server：`--prompt-cache memory` | 同上 → 記憶體 | **新預設**；不建立、讀取或寫入磁碟快取 |
 | 磁碟快取 | CLI／Server：`--prompt-cache disk` | 同上 → 磁碟 | 記憶體重用加磁碟保存，可跨重啟恢復 |

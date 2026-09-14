@@ -1,14 +1,14 @@
 # Throughput
 
-Throughput 頁面提供單次請求的吞吐量測試。已隨 `v1.1.7-dev.2` Alpha 發布，
-本機 `dist` App 與 ZIP 已更新為包含後續修正的 local build，使用 ad hoc 簽章並啟用 Dry run。
-封裝與隔離檢查見 [驗證紀錄](VALIDATION.md#2026-09-14最新修正-build-local)。
+Throughput 頁面提供單次請求的吞吐量測試。`v1.1.7` 正式版包含下列取消、卸載與記憶體修正。
+本機 `dist` App 與 ZIP 為已簽章、公證的正式成品，排除 Dry run。
+封裝與隔離檢查見 [發布驗證](VALIDATION.md#2026-09-14whallm-117-正式發布)。
 
 ## 操作
 
 2026-09-14 原始碼另補齊 Prefill 中途取消：V4 在分批／層間停止，
 V4.1 增加層間檢查，並共用 expert 讀取取消與安全收尾。
-此項尚未納入上述 local build。`Unloading model…` 仍可能包含等待當前運算／讀取
+此項已納入 `v1.1.7`。`Unloading model…` 仍可能包含等待當前運算／讀取
 收尾的時間；詳見 [共用取消流程](MODEL_PACKAGES.md#prefill-取消)。
 
 - Model 列出可用的 installed model，選單沿用模型 Alias。Run Benchmark 會在需要時
@@ -39,7 +39,7 @@ V4.1 增加層間檢查，並共用 expert 讀取取消與安全收尾。
 - 目前原始碼會在整輪完成、取消或請求失敗後，自動卸載本次模型；各輸入長度之間
   保持載入。取消後會先等待生成停止，再卸載，清理完成前不能重新 Run。
   卸載失敗會顯示錯誤並保留結果；尚未發出模型請求或 Dry run 不執行卸載。
-  此修改已納入 local build，尚未發布；既有公開 `v1.1.7-dev.2` 成品不含此行為。
+  此修改已隨 `v1.1.7` 發布；較早的 `v1.1.7-dev.2` 成品不含此行為。
 - 結果底下的 Result output 可切換 **純文字／JSON／Markdown table**，文字可選取複製。
   已完成的每筆結果即時加入輸出；取消或失敗後仍可複製已完成部分。
   純文字使用等寬空格對齊欄位，Markdown 是可直接貼上的表格原文；兩者包括模型、素材、
@@ -85,7 +85,7 @@ V4 batched／Qwen layer-major prefill 前釋放舊 expert Slots，生成時再�
 4K 首筆為 21.20 GiB，放在 1K 後為 32.56 GiB；1K 首筆為 21.18 GiB，放在 4K 後為
 31.20 GiB。因此不能把第一列與後續列的全部差額歸因於輸入長度。
 本次設定、輸出一致性及限制見 [記憶體排查](benchmarks/2026-09-14-throughput-memory/README.md)。
-目前 local build 已移除上述兩條路徑的舊 Slots 重疊，尚未發布；既有公開 Alpha 仍有此行為。
+`v1.1.7` 已移除上述兩條路徑的舊 Slots 重疊；較早的 Alpha 仍有此行為。
 
 ## 結果欄位
 

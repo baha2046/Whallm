@@ -48,7 +48,7 @@ V4／V4.1 共用分離 `w1/w2/w3` 到 fused slot 的映射；Qwen 使用 `gate_u
 ## 長輸入的 expert 記憶體生命週期
 
 2026-09-14 原始碼採用「整層 prefill 前釋放舊 Slots」，適用正式 server、CLI 與 Throughput。
-已納入當日 local build，尚未發布；保留模型載入狀態、Slots 容量與 Prompt Cache。
+已隨 `v1.1.7` 正式發布；保留模型載入狀態、Slots 容量與 Prompt Cache。
 
 | 模型 | 程式審查結果與處理 |
 | --- | --- |

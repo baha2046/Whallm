@@ -71,9 +71,10 @@ GitHub Pages 部署完成後才會對外提供新清單。
 
 ## 驗證範圍
 
-目前已發布 `v1.1.7-dev.2` Alpha（build `1.1.7d2`），GitHub 下載 ZIP 的簽章、公證、
-三語隔離啟動及 local-only 功能關閉檢查通過；更新清單 dev 為 `1.1.7d2`、stable 為 `1.1.6`。
-完整成品 hash 與測試範圍見 [發布驗證](VALIDATION.md#2026-09-14whallm-117-dev2-alpha-發布)。
+目前已發布 `v1.1.7` 正式版（build `1.1.7`），GitHub 下載 ZIP 的簽章、公證、
+三語隔離啟動及 local-only 功能關閉檢查通過；stable 與 dev 使用者均可更新到 `1.1.7`。
+完整成品 hash 與測試範圍見 [發布驗證](VALIDATION.md#2026-09-14whallm-117-正式發布)。
+較早的 `v1.1.7-dev.2` Alpha 驗證另見 [Alpha 發布紀錄](VALIDATION.md#2026-09-14whallm-117-dev2-alpha-發布)。
 
 Swift 測試覆蓋來源保存、stable／dev 篩選、自動檢查與 Sparkle 同步、dev 版本排序及三語文案。
 以下是前一版 `v1.1.7-dev`（build `1.1.7d1`）的驗證：GitHub 下載 ZIP 的簽章、公證、三語系與

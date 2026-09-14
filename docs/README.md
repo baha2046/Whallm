@@ -1,5 +1,18 @@
 # Whallm 文件
 
+目前已發布 [v1.1.7 正式版](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7)，程式碼固定為 `062624ee974febb0b0ee07e228552998f260389d`。
+版本與內部 build 均為 `1.1.7`；本機 `dist` 為已簽章、公證的正式成品，排除 Dry run。
+包含下方記錄的 Throughput、Prefill 取消、Slots 記憶體修正、Qwen Slots 3072、
+V4.1 Prompt Cache 與三模型加速選項。完整 V4.1 checkpoint／DSpark 與速度、品質仍未驗證。
+Python 424 項、Swift 91 項通過；GitHub 下載成品通過簽章、公證及三語隔離啟動。
+更新清單已提供 stable 1.1.7，dev 使用者也能更新。
+詳見 [正式發布驗證](VALIDATION.md#2026-09-14whallm-117-正式發布) 與
+[從 v1.1.6 起的 release notes](../Packaging/ReleaseNotes/1.1.7.md)。
+
+## 發布前與歷史紀錄
+
+以下保留各輪檢查當時的狀態；「尚未發布」及舊版 stable 指當時情況。
+
 2026-09-14 三模型加速功能已補齊原始碼與進階設定；近似模式預設關閉，
 文字候選四 token 驗證與常駐專家 Decode 合批已移除。
 新增功能、格式、相依條件與驗證限制見 [三模型加速功能](MODEL_ACCELERATION.md)。
@@ -51,7 +64,7 @@ Code／Novel 素材在三種 tokenizer 下均覆蓋 200K；這不是完整模型
 均通過；stable 保持 1.1.6，dev 可找到本次更新。此為公開發布紀錄，
 目前 `dist` 的新版成品狀態見上方說明。
 詳見 [發布驗證](VALIDATION.md#2026-09-13whallm-117-dev-預發布)。
-英文變更說明見 [1.1.7-dev release notes](../Packaging/ReleaseNotes/1.1.7.md)。
+英文變更說明見 [1.1.7-dev release notes](../Packaging/ReleaseNotes/1.1.7-dev.md)。
 App 更新來源與自動檢查設定見 [App 更新](UPDATES.md)。
 
 本目錄只放目前有效的文件。
