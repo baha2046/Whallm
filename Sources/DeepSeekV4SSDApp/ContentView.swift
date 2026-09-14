@@ -1750,10 +1750,10 @@ private struct ModelAdvancedView: View {
             Divider()
             toggleField(
               "Use approximate mode",
-              hint: "Off uses Exact mode. Approximate mode is not used with DSpark.",
+              hint: "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP.",
               value: approximationEnabled
             )
-            .disabled(settings.dsparkEnabled)
+            .disabled(settings.dsparkEnabled || mtpEnabled.wrappedValue)
           }
         }
         .appCard()
@@ -1814,12 +1814,12 @@ private struct ModelAdvancedView: View {
             hint: "Number of input tokens processed together by MoE. 0 selects automatically.",
             value: moePrefillStepSize
           )
-          if modelKind.descriptor.supports("anePrefill") {
+          if modelKind.descriptor.supports("anePrefill") || modelKind.descriptor.supports("deepseekANEPrefill") {
             Divider()
             doubleField(
               "ANE Prefill share",
               hint:
-                "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.",
+                "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.",
               value: anePrefillRatio
             )
           }
@@ -1830,14 +1830,63 @@ private struct ModelAdvancedView: View {
               hint: "Loads routed experts by layer during prefill.",
               value: $settings.layerMajorPrefill
             )
+            .disabled(modelKind == .deepSeekV41 && settings.dsparkEnabled)
           }
-          if modelKind.descriptor.supports("shortBlock") {
+          if modelKind.descriptor.supports("readyExpertDecode") {
             Divider()
-            toggleField(
-              "Verify up to four tokens together",
-              hint: "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.",
-              value: qwenShortBlock
-            )
+            toggleField("Compute experts as they load",
+              hint: "Starts available expert calculations while other experts are still loading.",
+              value: optionalToggle(\.readyExpertDecode, defaultValue: true))
+
+          }
+          if modelKind.descriptor.supports("batchedExpertPrefill") {
+            Divider()
+            toggleField("Batch expert calculations",
+              hint: "Processes the experts for an input batch together.",
+              value: optionalToggle(\.batchedExpertPrefill, defaultValue: true))
+            .disabled(!settings.layerMajorPrefill)
+          }
+          if modelKind.descriptor.supports("nextLayerPrefetch") {
+            Divider()
+            toggleField("Read the next expert layer ahead",
+              hint: "Reads the next layer while the current layer runs. Uses extra memory.",
+              value: optionalToggle(\.nextLayerPrefetch, defaultValue: false))
+            .disabled(!settings.layerMajorPrefill || settings.batchedExpertPrefill == false || (modelKind == .deepSeekV41 && settings.dsparkEnabled))
+          }
+          if modelKind.descriptor.supports("packedKVCache") {
+            Divider()
+            toggleField("Compress attention cache",
+              hint: "Reduces attention cache memory. Qwen uses 8-bit storage and may produce different output.",
+              value: optionalToggle(\.packedKVCache, defaultValue: false))
+
+          }
+          if modelKind.descriptor.supports("packedIndexCache") {
+            Divider()
+            toggleField("Compress attention index",
+              hint: "Uses 4-bit index storage. Qwen may select different attention positions.",
+              value: optionalToggle(\.packedIndexCache, defaultValue: false))
+
+          }
+          if modelKind.descriptor.supports("candidateIndex") {
+            Divider()
+            toggleField("Search candidate positions only",
+              hint: "Limits later attention searches to the candidates selected by the first indexer.",
+              value: optionalToggle(\.candidateIndex, defaultValue: false))
+
+          }
+          if modelKind.descriptor.supports("cedPrefill") {
+            Divider()
+            toggleField("Reduce decoder prefill work",
+              hint: "Processes the decoder tail needed to rebuild its attention windows.",
+              value: optionalToggle(\.cedPrefill, defaultValue: false))
+            .disabled(!settings.layerMajorPrefill || settings.dsparkEnabled)
+          }
+          if modelKind.descriptor.supports("deepseekANEPrefill") {
+            Divider()
+            toggleField("Use ANE for prefill",
+              hint: "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding.",
+              value: optionalToggle(\.deepSeekANEPrefill, defaultValue: false))
+
           }
           if modelKind.descriptor.supports("groupedExperts") {
             Divider()
@@ -1990,6 +2039,12 @@ private struct ModelAdvancedView: View {
     Binding(get: { settings.moePrefillStepSize ?? 0 }, set: { settings.moePrefillStepSize = $0 })
   }
 
+  private func optionalToggle(_ keyPath: WritableKeyPath<ModelAdvancedSettings, Bool?>,
+                              defaultValue: Bool) -> Binding<Bool> {
+    Binding(get: { settings[keyPath: keyPath] ?? defaultValue },
+            set: { settings[keyPath: keyPath] = $0 })
+  }
+
   private var approximationEnabled: Binding<Bool> {
     Binding(get: { settings.approximationEnabled ?? false }, set: { settings.approximationEnabled = $0 })
   }
@@ -2010,12 +2065,6 @@ private struct ModelAdvancedView: View {
     )
   }
 
-  private var qwenShortBlock: Binding<Bool> {
-    Binding(
-      get: { settings.qwenShortBlock ?? false },
-      set: { settings.qwenShortBlock = $0 }
-    )
-  }
 
   private var qwenGroupedExperts: Binding<Bool> {
     Binding(

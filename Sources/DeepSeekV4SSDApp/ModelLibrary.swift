@@ -366,11 +366,10 @@ final class ModelLibrary: ObservableObject {
           persistentPromptCacheEntries: 8,
           promptCacheDirectory: nil,
           moePrefillStepSize: settings.moePrefillStepSize ?? 0,
-          batchedExpertPrefill: true,
-          qwenNextLayerPrefetch: false,
+          batchedExpertPrefill: settings.batchedExpertPrefill ?? true,
+          qwenNextLayerPrefetch: modelKind == .qwen3_8FlashNext && settings.nextLayerPrefetch == true && settings.layerMajorPrefill,
           qwenGroupedExperts: settings.qwenGroupedExperts == true,
           expertEvictionPolicy: settings.recentExpertCache == true ? "lru" : "lfu",
-          qwenShortBlock: settings.qwenShortBlock == true,
           anePrefill: modelKind.descriptor.supports("anePrefill"),
           anePrefillRatio: settings.anePrefillRatio ?? 0.25,
           fp4IndexCache: true,
@@ -388,17 +387,26 @@ final class ModelLibrary: ObservableObject {
           expertRouteTrace: nil,
           expertPageCacheProbe: false,
           expertFileCachePolicy: "cached",
-          readyExpertDecode: true,
+          readyExpertDecode: settings.readyExpertDecode ?? true,
           stagedExpertStreaming: false,
           adaptiveExpertPrefillThreshold: nil,
-          powerSavingLimitGBps: powerSavingLimitGBps
+          powerSavingLimitGBps: powerSavingLimitGBps,
+          qwenQuantizedKV: modelKind == .qwen3_8FlashNext && settings.packedKVCache == true,
+          qwenQuantizedIndex: modelKind == .qwen3_8FlashNext && settings.packedIndexCache == true,
+          v41PackedKV: modelKind == .deepSeekV41 && settings.packedKVCache == true,
+          v41PackedIndex: modelKind == .deepSeekV41 && settings.packedIndexCache == true,
+          v41CandidateIndex: modelKind == .deepSeekV41 && settings.candidateIndex == true,
+          v41CEDPrefill: modelKind == .deepSeekV41 && settings.cedPrefill == true && settings.layerMajorPrefill && !settings.dsparkEnabled,
+          v41NextLayerPrefetch: modelKind == .deepSeekV41 && settings.nextLayerPrefetch == true && settings.layerMajorPrefill && settings.batchedExpertPrefill != false && !settings.dsparkEnabled,
+          deepseekANEPrefill: modelKind != .qwen3_8FlashNext && settings.deepSeekANEPrefill == true,
+          v41LayerMajorPrefill: modelKind == .deepSeekV41 && settings.layerMajorPrefill && !settings.dsparkEnabled
         ),
         defaults: ModelCatalog.Entry.Defaults(
           maxTokens: settings.defaultMaxTokens,
           temperature: settings.defaultTemperature,
           topP: settings.defaultTopP,
           topK: settings.defaultTopK,
-          approximationMode: settings.approximationEnabled == true && !settings.dsparkEnabled
+          approximationMode: settings.approximationEnabled == true && !settings.dsparkEnabled && settings.mtpEnabled != true
             ? "learned-route-drop-lowest-1" : "exact",
           qwenAdaptiveSampling: settings.qwenAdaptiveSampling ?? true
         ),
@@ -873,10 +881,14 @@ final class ModelLibrary: ObservableObject {
 
   private func performDSparkInstallation(_ url: URL) async {
     do {
-      _ = try await DeepSeekV4Checkpoint().installDSpark(at: url) { [weak self] progress in
-        Task { @MainActor in
-          self?.updateRepackProgress(progress, phase: .installingDSpark)
-        }
+      let progress: @Sendable (RepackProgress) -> Void = { [weak self] progress in
+        Task { @MainActor in self?.updateRepackProgress(progress, phase: .installingDSpark) }
+      }
+      let manifest = try InstalledModel.loadManifest(at: url)
+      if manifest.modelKind == .deepSeekV41 {
+        _ = try await DeepSeekV41Checkpoint().installDSpark(at: url, progress: progress)
+      } else {
+        _ = try await DeepSeekV4Checkpoint().installDSpark(at: url, progress: progress)
       }
       try Task.checkCancellation()
       let verification = try await audit(url)

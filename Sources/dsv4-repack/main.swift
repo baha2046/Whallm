@@ -57,9 +57,14 @@ struct CLI {
     case "install-dspark":
       let model = try value(after: "--model", in: arguments)
       let printer = ProgressPrinter()
-      let manifest = try await DeepSeekV4Checkpoint().installDSpark(
-        at: URL(fileURLWithPath: model)
-      ) { printer.update($0) }
+      let url = URL(fileURLWithPath: model)
+      let installed = try InstalledModel.loadManifest(at: url)
+      let manifest: InstalledManifest
+      if installed.modelKind == .deepSeekV41 {
+        manifest = try await DeepSeekV41Checkpoint().installDSpark(at: url) { printer.update($0) }
+      } else {
+        manifest = try await DeepSeekV4Checkpoint().installDSpark(at: url) { printer.update($0) }
+      }
       print("DSpark installed: \(model)")
       print("files: \(manifest.files.count)")
     case "install-mtp":

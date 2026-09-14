@@ -333,9 +333,7 @@
 
 "Keeps recently used expert data in the same cache capacity. Changes apply on next load." = "Keeps recently used expert data in the same cache capacity. Changes apply on next load.";
 
-"Verify up to four tokens together" = "Verify up to four tokens together";
 
-"Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load.";
 
 "Number of routed experts in the Active Parameters Cache. The recommended value is %lld." = "Number of routed experts in the Active Parameters Cache. The recommended value is %lld.";
 
@@ -429,3 +427,21 @@
 "Select at least one context length." = "Select at least one context length.";
 "Unloading model…" = "Unloading model…";
 "Could not unload the benchmark model: %@" = "Could not unload the benchmark model: %@";
+"Compute experts as they load" = "Compute experts as they load";
+"Starts available expert calculations while other experts are still loading." = "Starts available expert calculations while other experts are still loading.";
+"Batch expert calculations" = "Batch expert calculations";
+"Processes the experts for an input batch together." = "Processes the experts for an input batch together.";
+"Read the next expert layer ahead" = "Read the next expert layer ahead";
+"Reads the next layer while the current layer runs. Uses extra memory." = "Reads the next layer while the current layer runs. Uses extra memory.";
+"Compress attention cache" = "Compress attention cache";
+"Reduces attention cache memory. Qwen uses 8-bit storage and may produce different output." = "Reduces attention cache memory. Qwen uses 8-bit storage and may produce different output.";
+"Compress attention index" = "Compress attention index";
+"Uses 4-bit index storage. Qwen may select different attention positions." = "Uses 4-bit index storage. Qwen may select different attention positions.";
+"Search candidate positions only" = "Search candidate positions only";
+"Limits later attention searches to the candidates selected by the first indexer." = "Limits later attention searches to the candidates selected by the first indexer.";
+"Reduce decoder prefill work" = "Reduce decoder prefill work";
+"Processes the decoder tail needed to rebuild its attention windows." = "Processes the decoder tail needed to rebuild its attention windows.";
+"Use ANE for prefill" = "Use ANE for prefill";
+"Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding.";
+"Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP.";
+"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.";

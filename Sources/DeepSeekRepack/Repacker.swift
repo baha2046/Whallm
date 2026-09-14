@@ -212,9 +212,12 @@ struct Repacker {
         }
         return InstalledFile(path: file.path, size: size, sha256: try sha256(url))
       }
-      let companions = requestedCompanions ?? {
+      var companions = requestedCompanions ?? {
         ModelPackages.companions(for: plan.modelKind ?? .deepSeekV4)
       }()
+      if plan.modelKind == .deepSeekV41 && plan.dspark != nil {
+        companions.append(CompanionFile(source: "inference/config.json", destination: "inference/config.json"))
+      }
       for companion in companions {
         let data = try await read(path: companion.source)
         let url = try safeFileURL(root: partial, path: companion.destination)

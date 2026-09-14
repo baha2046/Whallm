@@ -26,36 +26,30 @@ final class ServerConfigurationTests: XCTestCase {
     for kind in [ModelKind.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(settings.recentExpertCache, true)
-      XCTAssertEqual(settings.qwenShortBlock, false)
       settings.slots = 900
       var old = try XCTUnwrap(
         JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
       old.removeValue(forKey: "recentExpertCache")
-      old.removeValue(forKey: "qwenShortBlock")
       let decoded = try JSONDecoder().decode(
         ModelAdvancedSettings.self, from: JSONSerialization.data(withJSONObject: old))
       decoded.save(for: kind, defaults: isolated.defaults)
       settings = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
       XCTAssertEqual(settings.slots, 900)
       XCTAssertEqual(settings.recentExpertCache, true)
-      XCTAssertEqual(settings.qwenShortBlock, false)
       for enabled in [false, true] {
         settings.recentExpertCache = enabled
-        settings.qwenShortBlock = enabled
         settings.save(for: kind, defaults: isolated.defaults)
         let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
         XCTAssertEqual(restored.recentExpertCache, enabled)
-        XCTAssertEqual(restored.qwenShortBlock, enabled && kind == .qwen3_8FlashNext)
         let catalog = try ModelLibrary.makeServerCatalog(
           models: [installedModel(kind)], aliases: [:], settings: [kind: restored],
           powerSavingLimitGBps: nil)
         let runtime = try XCTUnwrap(catalog.models.first).runtime
         XCTAssertEqual(runtime.expertEvictionPolicy, enabled ? "lru" : "lfu")
-        XCTAssertEqual(runtime.qwenShortBlock, enabled && kind == .qwen3_8FlashNext)
       }
     }
     for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
-      for label in ["Keep recently used experts", "Verify up to four tokens together"] {
+      for label in ["Keep recently used experts"] {
         XCTAssertNotEqual(L10n.string(label, language: language), label)
       }
     }
@@ -139,7 +133,7 @@ final class ServerConfigurationTests: XCTestCase {
         XCTAssertEqual(entry.runtime.expertEvictionPolicy, "lfu")
         XCTAssertEqual(entry.defaults.qwenAdaptiveSampling, adaptive)
         XCTAssertEqual(entry.defaults.approximationMode,
-          kind == .deepSeekV4 ? "learned-route-drop-lowest-1" : "exact")
+          "learned-route-drop-lowest-1")
       }
       settings.prefetchReadWorkers = 0
       XCTAssertThrowsError(try settings.validate(for: kind))
@@ -630,16 +624,18 @@ final class ServerConfigurationTests: XCTestCase {
         "dspark_fallback_enabled", "dspark_sequential_verification",
         "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
         "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
-        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch", "qwen_grouped_decode",
-        "qwen_grouped_experts", "expert_eviction_policy", "qwen_short_block",
+        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch",
+        "qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
+        "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "deepseek_ane_prefill", "v41_layer_major_prefill",
+        "qwen_grouped_experts", "expert_eviction_policy",
         "power_saving_limit_gbps",
       ]
     )
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
-    XCTAssertEqual(runtime["qwen_grouped_decode"] as? Bool, false)
+    XCTAssertNil(runtime["qwen_grouped_decode"])
     XCTAssertEqual(runtime["expert_eviction_policy"] as? String, "lru")
-    XCTAssertEqual(runtime["qwen_short_block"] as? Bool, false)
+    XCTAssertNil(runtime["qwen_short_block"])
     XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
     let v41Runtime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
@@ -649,13 +645,51 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(v41Runtime["persistent_prompt_cache"] as? Bool, false)
     XCTAssertEqual(models[1]["model_kind"] as? String, "deepseek-v4.1")
     let qwenRuntime = try XCTUnwrap(models[2]["runtime"] as? [String: Any])
-    XCTAssertEqual(qwenRuntime["qwen_grouped_decode"] as? Bool, false)
+    XCTAssertNil(qwenRuntime["qwen_grouped_decode"])
     XCTAssertEqual(qwenRuntime["ane_prefill"] as? Bool, true)
-    XCTAssertEqual(qwenRuntime["qwen_short_block"] as? Bool, false)
+    XCTAssertNil(qwenRuntime["qwen_short_block"])
     XCTAssertEqual(qwenRuntime["qwen_grouped_experts"] as? Bool, true)
     XCTAssertEqual(qwenRuntime["ane_prefill_ratio"] as? Double, 0.5)
     XCTAssertEqual(models[0]["model_kind"] as? String, "deepseek-v4")
     XCTAssertTrue(models[0]["warmup_prompt_path"] is NSNull)
+  }
+
+  @MainActor
+  func testNewPerformanceSettingsReachOnlyTheirModelAndDisableConflictingPrefill() throws {
+    var settings = ModelAdvancedSettings.defaults(for: .deepSeekV41)
+    XCTAssertFalse(settings.approximationEnabled == true)
+    XCTAssertFalse(settings.packedKVCache == true)
+    XCTAssertFalse(settings.cedPrefill == true)
+    settings.layerMajorPrefill = true
+    settings.packedKVCache = true
+    settings.packedIndexCache = true
+    settings.candidateIndex = true
+    settings.cedPrefill = true
+    settings.nextLayerPrefetch = true
+    settings.deepSeekANEPrefill = true
+    settings.readyExpertDecode = false
+    settings.approximationEnabled = true
+    func catalog(_ value: ModelAdvancedSettings) throws -> ModelCatalog {
+      try ModelLibrary.makeServerCatalog(models: [installedModel(.deepSeekV41, hasDSpark: true)],
+        aliases: [:], settings: [.deepSeekV41: value], powerSavingLimitGBps: nil)
+    }
+    let enabled = try XCTUnwrap(catalog(settings).models.first)
+    XCTAssertTrue(enabled.runtime.v41LayerMajorPrefill)
+    XCTAssertTrue(enabled.runtime.v41PackedKV)
+    XCTAssertTrue(enabled.runtime.v41PackedIndex)
+    XCTAssertTrue(enabled.runtime.v41CandidateIndex)
+    XCTAssertTrue(enabled.runtime.v41CEDPrefill)
+    XCTAssertTrue(enabled.runtime.v41NextLayerPrefetch)
+    XCTAssertTrue(enabled.runtime.deepseekANEPrefill)
+    XCTAssertFalse(enabled.runtime.readyExpertDecode)
+    XCTAssertFalse(enabled.runtime.qwenQuantizedKV)
+    settings.dsparkEnabled = true
+    let speculative = try XCTUnwrap(catalog(settings).models.first)
+    XCTAssertTrue(speculative.runtime.dsparkEnabled)
+    XCTAssertFalse(speculative.runtime.v41LayerMajorPrefill)
+    XCTAssertFalse(speculative.runtime.v41CEDPrefill)
+    XCTAssertFalse(speculative.runtime.v41NextLayerPrefetch)
+    XCTAssertEqual(speculative.defaults.approximationMode, "exact")
   }
 
   @MainActor

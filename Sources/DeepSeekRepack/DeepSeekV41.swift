@@ -101,12 +101,13 @@ enum DeepSeekV41Contract {
       plan.expertRegions == expertRegions,
       plan.maximumContext == maximumContext,
       plan.engram == engram,
-      plan.dspark == nil,
+
       plan.ngram == nil,
       plan.expertQuantization == nil
     else {
       throw RepackError.incompatibleModel("repack plan does not match the pinned V4.1 model contract")
     }
+    try validateDSpark(plan.dspark, files: plan.files.map { InstalledFile(path: $0.path, size: $0.size, sha256: "") })
   }
 
   static func validate(_ manifest: InstalledManifest) throws -> InstalledManifest {
@@ -121,7 +122,7 @@ enum DeepSeekV41Contract {
       manifest.expertRegions == expertRegions,
       manifest.maximumContext == maximumContext,
       manifest.engram == engram,
-      manifest.dspark == nil,
+
       manifest.mtp == nil,
       manifest.ngram == nil,
       manifest.expertQuantization == nil
@@ -130,10 +131,12 @@ enum DeepSeekV41Contract {
         "installed manifest does not match the pinned V4.1 model contract")
     }
 
+    try validateDSpark(manifest.dspark, files: manifest.files)
     let required = Set(
       ["common.bin"] + companionPaths
         + (0..<layerCount).map(expertLayerPath)
-        + engram.tables.flatMap { [$0.weightFile, $0.scaleFile] })
+        + engram.tables.flatMap { [$0.weightFile, $0.scaleFile] }
+        + (manifest.dspark == nil ? [] : ["dspark/common.bin", "inference/config.json"] + (0..<3).map { String(format: "dspark/experts/layer_%02d.bin", $0) }))
     let paths = manifest.files.map(\.path)
     guard Set(paths) == required, Set(paths).count == paths.count else {
       throw RepackError.invalidPlan("installed V4.1 files do not match the pinned layout")
@@ -164,6 +167,21 @@ enum DeepSeekV41Contract {
       }
     }
     return manifest
+  }
+
+  static func validateDSpark(_ descriptor: DSparkDescriptor?, files: [InstalledFile]) throws {
+    guard let value = descriptor else { return }
+    guard Set(files.map(\.path)).count == files.count else {
+      throw RepackError.invalidPlan("duplicate V4.1 DSpark file path")
+    }
+    let sizes = Dictionary(uniqueKeysWithValues: files.map { ($0.path, $0.size) })
+    guard value.layerCount == 3, value.blockSize == 5, value.noiseTokenID == 128799,
+      value.targetLayerIDs == [37, 38, 39], value.markovRank == 256,
+      value.commonTensors.count == 97, let size = sizes["dspark/common.bin"],
+      Set(value.commonTensors.map(\.name)).count == 97,
+      value.commonTensors.allSatisfy({ $0.name.hasPrefix("mtp.") && !$0.name.contains(".experts.") && $0.offset <= size && $0.length <= size - $0.offset }),
+      (0..<3).allSatisfy({ sizes[String(format: "dspark/experts/layer_%02d.bin", $0)] == UInt64(128) * expertBlobSize })
+    else { throw RepackError.invalidPlan("invalid V4.1 DSpark contract") }
   }
 
   static func expertLayerPath(_ layer: Int) -> String {
@@ -262,7 +280,7 @@ struct DeepSeekV41Config: Decodable, Sendable {
 }
 
 enum DeepSeekV41Planner {
-  static func makePlan(index: CheckpointIndex, tensors: [String: SafeTensor]) throws
+  static func makePlan(index: CheckpointIndex, tensors: [String: SafeTensor], includeDSpark: Bool = false) throws
     -> RepackPlan
   {
     guard Set(index.weightMap.keys) == Set(tensors.keys) else {
@@ -364,6 +382,50 @@ enum DeepSeekV41Planner {
         PlannedFile(path: DeepSeekV41Contract.expertLayerPath($0), size: expertLayerSize)
       })
 
+    var dspark: DSparkDescriptor?
+    if includeDSpark {
+      let expectedNames = Set((0..<3).flatMap { layer in
+        (0..<128).flatMap { expert in
+          DeepSeekV41Contract.expertRegions.map { "mtp.\(layer).ffn.experts.\(expert).\($0.name)" }
+        }
+      })
+      guard Set(tensors.keys.filter { $0.hasPrefix("mtp.") && $0.contains(".experts.") }) == expectedNames else {
+        throw RepackError.invalidPlan("V4.1 DSpark expert set is incomplete")
+      }
+      for layer in 0..<3 {
+        let path = String(format: "dspark/experts/layer_%02d.bin", layer)
+        plannedFiles.append(PlannedFile(path: path, size: UInt64(128) * DeepSeekV41Contract.expertBlobSize))
+        for expert in 0..<128 {
+          for region in DeepSeekV41Contract.expertRegions {
+            let name = "mtp.\(layer).ffn.experts.\(expert).\(region.name)"
+            guard let tensor = tensors[name], tensor.shape == region.shape,
+              tensor.dtype == region.dtype, tensor.length == region.length else {
+              throw RepackError.invalidPlan("invalid V4.1 DSpark tensor \(name)")
+            }
+            copies.append(TensorCopy(tensor: name, sourceFile: tensor.sourceFile,
+              sourceOffset: tensor.sourceOffset, length: tensor.length, destinationFile: path,
+              destinationOffset: UInt64(expert) * DeepSeekV41Contract.expertBlobSize + region.offset))
+          }
+        }
+      }
+      var common: [InstalledTensor] = []
+      var offset: UInt64 = 0
+      for tensor in tensors.values.sorted(by: { $0.name < $1.name })
+      where tensor.name.hasPrefix("mtp.") && !tensor.name.contains(".experts.") {
+        offset = aligned(offset, to: DeepSeekV41Contract.commonAlignment)
+        common.append(InstalledTensor(name: tensor.name, dtype: tensor.dtype, shape: tensor.shape,
+          offset: offset, length: tensor.length))
+        copies.append(TensorCopy(tensor: tensor.name, sourceFile: tensor.sourceFile,
+          sourceOffset: tensor.sourceOffset, length: tensor.length,
+          destinationFile: "dspark/common.bin", destinationOffset: offset))
+        offset += tensor.length
+      }
+      guard common.count == 97 else { throw RepackError.invalidPlan("incomplete V4.1 DSpark common tensors") }
+      plannedFiles.append(PlannedFile(path: "dspark/common.bin", size: offset))
+      dspark = DSparkDescriptor(layerCount: 3, blockSize: 5, noiseTokenID: 128799,
+        targetLayerIDs: [37, 38, 39], markovRank: 256, commonTensors: common)
+    }
+
     return RepackPlan(
       formatVersion: 3,
       modelID: DeepSeekV41Contract.modelID,
@@ -376,6 +438,7 @@ enum DeepSeekV41Planner {
       files: plannedFiles,
       commonTensors: commonTensors,
       expertRegions: DeepSeekV41Contract.expertRegions,
+      dspark: dspark,
       copies: copies,
       modelKind: .deepSeekV41,
       maximumContext: DeepSeekV41Contract.maximumContext,
@@ -422,7 +485,7 @@ public struct DeepSeekV41Checkpoint: Sendable {
     self.source = source
   }
 
-  public func makeRepackPlan() async throws -> RepackPlan {
+  public func makeRepackPlan(includeDSpark: Bool = false) async throws -> RepackPlan {
     let configData = try await source.data(path: "config.json")
     let config: DeepSeekV41Config
     do {
@@ -433,7 +496,7 @@ public struct DeepSeekV41Checkpoint: Sendable {
     try DeepSeekV41Contract.validate(config)
     let indexData = try await source.data(path: "model.safetensors.index.json")
     let index = try CheckpointIndex.decode(indexData)
-    return try DeepSeekV41Planner.makePlan(index: index, tensors: try await readTensors(index: index))
+    return try DeepSeekV41Planner.makePlan(index: index, tensors: try await readTensors(index: index), includeDSpark: includeDSpark)
   }
 
   public func repack(
@@ -458,9 +521,19 @@ public struct DeepSeekV41Checkpoint: Sendable {
     invalidFiles: Set<String>,
     progress: (@Sendable (RepackProgress) -> Void)? = nil
   ) async throws -> InstalledManifest {
-    let plan = try await makeRepackPlan()
+    let installed = try InstalledModel.loadManifest(at: output)
+    let plan = try await makeRepackPlan(includeDSpark: installed.dspark != nil)
     return try await Repacker(source: source).repair(
       plan: plan, output: output, invalidFiles: invalidFiles, progress: progress)
+  }
+
+  public func installDSpark(at output: URL,
+    progress: (@Sendable (RepackProgress) -> Void)? = nil) async throws -> InstalledManifest {
+    let manifest = try DeepSeekV41Contract.validate(InstalledModel.loadManifest(at: output))
+    if manifest.dspark != nil { return try InstalledModel.verify(at: output) }
+    let plan = try await makeRepackPlan(includeDSpark: true)
+    return try await Repacker(source: source).repair(plan: plan, output: output,
+      invalidFiles: Set(plan.files.map(\.path).filter { $0.hasPrefix("dspark/") } + ["inference/config.json"]), progress: progress)
   }
 
   private func readTensors(index: CheckpointIndex) async throws -> [String: SafeTensor] {

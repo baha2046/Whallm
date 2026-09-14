@@ -12,10 +12,37 @@
       "checkpointRevision": "7872f01b1d1fe23eabc4c98b48bffcef5a386062",
       "manifestVersion": 1,
       "directoryName": "deepseek-v4-flash-0731.dsv4",
-      "requiredPaths": ["common.bin", "config.json", "encoding/encoding_dsv4.py", "tokenizer/tokenizer.json"],
-      "features": ["layerMajorPrefill", "promptCache", "dspark", "stagedExpertStreaming", "adaptiveExpertPrefill", "approximation"],
-      "editableSettings": ["sampling", "kvCachePrecision", "prefillThreshold"],
-      "defaults": {"slots": 1152, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 8192, "temperature": 0.2, "topP": 0.98, "topK": 0},
+      "requiredPaths": [
+        "common.bin",
+        "config.json",
+        "encoding/encoding_dsv4.py",
+        "tokenizer/tokenizer.json"
+      ],
+      "features": [
+        "layerMajorPrefill",
+        "promptCache",
+        "dspark",
+        "stagedExpertStreaming",
+        "adaptiveExpertPrefill",
+        "approximation",
+        "readyExpertDecode",
+        "batchedExpertPrefill",
+        "deepseekANEPrefill"
+      ],
+      "editableSettings": [
+        "sampling",
+        "kvCachePrecision",
+        "prefillThreshold"
+      ],
+      "defaults": {
+        "slots": 1152,
+        "promptCacheEntries": 2,
+        "bf16KVCache": false,
+        "maxTokens": 8192,
+        "temperature": 0.2,
+        "topP": 0.98,
+        "topK": 0
+      },
       "automaticMemoryGiB": 0,
       "prefillThreshold": null
     },
@@ -30,10 +57,40 @@
       "checkpointRevision": "dba1be0a40aa45a94ad051997016db3960a90277",
       "manifestVersion": 3,
       "directoryName": "deepseek-v4.1-flash.dsv4",
-      "requiredPaths": ["common.bin", "config.json", "encoding/encoding.py", "tokenizer/tokenizer.json", "engram/layer_01.weight.bin", "engram/layer_14.weight.bin"],
-      "features": ["promptCache"],
-      "editableSettings": [],
-      "defaults": {"slots": 1152, "promptCacheEntries": 1, "bf16KVCache": true, "maxTokens": 8192, "temperature": 0.2, "topP": 0.98, "topK": 0},
+      "requiredPaths": [
+        "common.bin",
+        "config.json",
+        "encoding/encoding.py",
+        "tokenizer/tokenizer.json",
+        "engram/layer_01.weight.bin",
+        "engram/layer_14.weight.bin"
+      ],
+      "features": [
+        "promptCache",
+        "approximation",
+        "layerMajorPrefill",
+        "readyExpertDecode",
+        "batchedExpertPrefill",
+        "deepseekANEPrefill",
+        "packedKVCache",
+        "packedIndexCache",
+        "candidateIndex",
+        "cedPrefill",
+        "nextLayerPrefetch",
+        "dspark"
+      ],
+      "editableSettings": [
+        "prefillThreshold"
+      ],
+      "defaults": {
+        "slots": 1152,
+        "promptCacheEntries": 1,
+        "bf16KVCache": true,
+        "maxTokens": 8192,
+        "temperature": 0.2,
+        "topP": 0.98,
+        "topK": 0
+      },
       "automaticMemoryGiB": 0,
       "prefillThreshold": null
     },
@@ -48,10 +105,38 @@
       "checkpointRevision": "bcd9f01ddc9cff2316eb84281bebcd5b058bddce",
       "manifestVersion": 2,
       "directoryName": "qwen3.8-flash-next.dsv4",
-      "requiredPaths": ["common.bin", "ngram.bin", "config.json", "tokenizer/tokenizer.json"],
-      "features": ["layerMajorPrefill", "promptCache", "mtp", "anePrefill", "groupedExperts", "groupedDecode", "shortBlock", "adaptiveSampling"],
-      "editableSettings": ["sampling"],
-      "defaults": {"slots": 3072, "promptCacheEntries": 2, "bf16KVCache": false, "maxTokens": 8192, "temperature": 0.7, "topP": 0.8, "topK": 20},
+      "requiredPaths": [
+        "common.bin",
+        "ngram.bin",
+        "config.json",
+        "tokenizer/tokenizer.json"
+      ],
+      "features": [
+        "layerMajorPrefill",
+        "promptCache",
+        "mtp",
+        "anePrefill",
+        "groupedExperts",
+        "adaptiveSampling",
+        "approximation",
+        "readyExpertDecode",
+        "batchedExpertPrefill",
+        "packedKVCache",
+        "packedIndexCache",
+        "nextLayerPrefetch"
+      ],
+      "editableSettings": [
+        "sampling"
+      ],
+      "defaults": {
+        "slots": 3072,
+        "promptCacheEntries": 2,
+        "bf16KVCache": false,
+        "maxTokens": 8192,
+        "temperature": 0.7,
+        "topP": 0.8,
+        "topK": 20
+      },
       "automaticMemoryGiB": 48,
       "prefillThreshold": 128
     }

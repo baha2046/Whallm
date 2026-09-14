@@ -333,9 +333,7 @@
 
 "Keeps recently used expert data in the same cache capacity. Changes apply on next load." = "在相同快取容量內，優先保留最近用過的專家資料。下次載入模型時生效。";
 
-"Verify up to four tokens together" = "一次確認最多四個字詞";
 
-"Reuses expert data when text repeats. Each token is checked by the model. Uses ordinary decoding with MTP, unsupported layouts, or a large state cache. Changes apply on next load." = "文字重複時重用專家資料，每個字詞仍由模型確認。啟用 MTP、格式不支援或狀態快取過大時，使用原本的生成方式。下次載入模型時生效。";
 
 "Number of routed experts in the Active Parameters Cache. The recommended value is %lld." = "Active Parameters Cache 的 routed expert 數量。建議值是 %lld。";
 
@@ -429,3 +427,21 @@
 "Select at least one context length." = "請至少選擇一個輸入長度。";
 "Unloading model…" = "正在卸載模型…";
 "Could not unload the benchmark model: %@" = "無法卸載測試模型：%@";
+"Compute experts as they load" = "專家載入後立即計算";
+"Starts available expert calculations while other experts are still loading." = "先計算已載入的專家，同時繼續載入其餘專家。";
+"Batch expert calculations" = "批次計算專家";
+"Processes the experts for an input batch together." = "將同一批輸入的專家一起計算。";
+"Read the next expert layer ahead" = "預先讀取下一層專家";
+"Reads the next layer while the current layer runs. Uses extra memory." = "計算目前這層時讀取下一層，會多用一些記憶體。";
+"Compress attention cache" = "壓縮注意力快取";
+"Reduces attention cache memory. Qwen uses 8-bit storage and may produce different output." = "減少注意力快取的記憶體。Qwen 使用 8 位元儲存，輸出可能改變。";
+"Compress attention index" = "壓縮注意力索引";
+"Uses 4-bit index storage. Qwen may select different attention positions." = "使用 4 位元索引儲存。Qwen 可能選到不同的注意力位置。";
+"Search candidate positions only" = "只搜尋候選位置";
+"Limits later attention searches to the candidates selected by the first indexer." = "後續的注意力搜尋只計算第一個索引器選出的候選位置。";
+"Reduce decoder prefill work" = "減少解碼器的輸入計算";
+"Processes the decoder tail needed to rebuild its attention windows." = "只處理解碼器重建注意力視窗所需的尾端輸入。";
+"Use ANE for prefill" = "使用 ANE 處理輸入";
+"Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "由 ANE 分擔查詢投影計算；無法使用時改用 GPU。可能改變數值捨入結果。";
+"Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "關閉時使用全部選定專家。開啟後少算一個專家，可能降低品質。不能與 DSpark 或 MTP 同時使用。";
+"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "由 ANE 計算的查詢投影輸出比例。0 只使用 GPU，1 只使用 ANE，預設為 0.25。";

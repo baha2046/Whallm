@@ -222,6 +222,14 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var readWorkers = 4
   var prefetchReadWorkers: Int? = 2
   var moePrefillStepSize: Int? = 0
+  var readyExpertDecode: Bool? = true
+  var batchedExpertPrefill: Bool? = true
+  var nextLayerPrefetch: Bool? = false
+  var packedKVCache: Bool? = false
+  var packedIndexCache: Bool? = false
+  var candidateIndex: Bool? = false
+  var cedPrefill: Bool? = false
+  var deepSeekANEPrefill: Bool? = false
   var approximationEnabled: Bool? = false
   var qwenAdaptiveSampling: Bool? = true
   var memoryLimitGiB = 0
@@ -236,7 +244,6 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var anePrefillRatio: Double? = 0.25
   var qwenGroupedExperts: Bool?
   var recentExpertCache: Bool?
-  var qwenShortBlock: Bool?
   var mtpEnabled: Bool? = false
   var mtpSlots: Int? = 32
   var dsparkEnabled = false
@@ -251,11 +258,10 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     var settings = ModelAdvancedSettings()
     let descriptor = modelKind.descriptor
     settings.recentExpertCache = true
-    settings.qwenShortBlock = false
     settings.promptCacheMode = descriptor.supports("promptCache") ? .memory : .off
     settings.qwenGroupedExperts = descriptor.supports("groupedExperts")
     settings.slots = descriptor.defaults.slots
-    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill")
+    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && modelKind != .deepSeekV41
     settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
     settings.bf16KVCache = descriptor.defaults.bf16KVCache
     settings.defaultMaxTokens = descriptor.defaults.maxTokens
@@ -278,8 +284,6 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
       && (settings.approximationEnabled ?? false)
     settings.qwenAdaptiveSampling = settings.qwenAdaptiveSampling ?? true
     settings.recentExpertCache = settings.recentExpertCache ?? true
-    settings.qwenShortBlock = descriptor.supports("shortBlock")
-      ? (settings.qwenShortBlock ?? false) : false
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
     settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
     settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && settings.layerMajorPrefill
@@ -625,10 +629,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let moePrefillStepSize: Int
       let batchedExpertPrefill: Bool
       let qwenNextLayerPrefetch: Bool
-      let qwenGroupedDecode: Bool = false
       let qwenGroupedExperts: Bool
       let expertEvictionPolicy: String
-      let qwenShortBlock: Bool
       let anePrefill: Bool
       let anePrefillRatio: Double
       let fp4IndexCache: Bool
@@ -650,6 +652,15 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let stagedExpertStreaming: Bool
       let adaptiveExpertPrefillThreshold: Double?
       let powerSavingLimitGBps: Double?
+      let qwenQuantizedKV: Bool
+      let qwenQuantizedIndex: Bool
+      let v41PackedKV: Bool
+      let v41PackedIndex: Bool
+      let v41CandidateIndex: Bool
+      let v41CEDPrefill: Bool
+      let v41NextLayerPrefetch: Bool
+      let deepseekANEPrefill: Bool
+      let v41LayerMajorPrefill: Bool
 
       enum CodingKeys: String, CodingKey {
         case slots
@@ -668,10 +679,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case moePrefillStepSize = "moe_prefill_step_size"
         case batchedExpertPrefill = "batched_expert_prefill"
         case qwenNextLayerPrefetch = "qwen_next_layer_prefetch"
-        case qwenGroupedDecode = "qwen_grouped_decode"
         case qwenGroupedExperts = "qwen_grouped_experts"
         case expertEvictionPolicy = "expert_eviction_policy"
-        case qwenShortBlock = "qwen_short_block"
         case anePrefill = "ane_prefill"
         case anePrefillRatio = "ane_prefill_ratio"
         case fp4IndexCache = "fp4_index_cache"
@@ -693,11 +702,29 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case stagedExpertStreaming = "staged_expert_streaming"
         case adaptiveExpertPrefillThreshold = "adaptive_expert_prefill_threshold"
         case powerSavingLimitGBps = "power_saving_limit_gbps"
+        case qwenQuantizedKV = "qwen_quantized_kv"
+        case qwenQuantizedIndex = "qwen_quantized_index"
+        case v41PackedKV = "v41_packed_kv"
+        case v41PackedIndex = "v41_packed_index"
+        case v41CandidateIndex = "v41_candidate_index"
+        case v41CEDPrefill = "v41_ced_prefill"
+        case v41NextLayerPrefetch = "v41_next_layer_prefetch"
+        case deepseekANEPrefill = "deepseek_ane_prefill"
+        case v41LayerMajorPrefill = "v41_layer_major_prefill"
       }
 
       func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(slots, forKey: .slots)
+        try values.encode(qwenQuantizedKV, forKey: .qwenQuantizedKV)
+        try values.encode(qwenQuantizedIndex, forKey: .qwenQuantizedIndex)
+        try values.encode(v41PackedKV, forKey: .v41PackedKV)
+        try values.encode(v41PackedIndex, forKey: .v41PackedIndex)
+        try values.encode(v41CandidateIndex, forKey: .v41CandidateIndex)
+        try values.encode(v41CEDPrefill, forKey: .v41CEDPrefill)
+        try values.encode(v41NextLayerPrefetch, forKey: .v41NextLayerPrefetch)
+        try values.encode(deepseekANEPrefill, forKey: .deepseekANEPrefill)
+        try values.encode(v41LayerMajorPrefill, forKey: .v41LayerMajorPrefill)
         try values.encode(readWorkers, forKey: .readWorkers)
         try values.encode(prefetchReadWorkers, forKey: .prefetchReadWorkers)
         try values.encode(prefillStepSize, forKey: .prefillStepSize)
@@ -720,10 +747,8 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(moePrefillStepSize, forKey: .moePrefillStepSize)
         try values.encode(batchedExpertPrefill, forKey: .batchedExpertPrefill)
         try values.encode(qwenNextLayerPrefetch, forKey: .qwenNextLayerPrefetch)
-        try values.encode(qwenGroupedDecode, forKey: .qwenGroupedDecode)
         try values.encode(qwenGroupedExperts, forKey: .qwenGroupedExperts)
         try values.encode(expertEvictionPolicy, forKey: .expertEvictionPolicy)
-        try values.encode(qwenShortBlock, forKey: .qwenShortBlock)
         try values.encode(anePrefill, forKey: .anePrefill)
         try values.encode(anePrefillRatio, forKey: .anePrefillRatio)
         try values.encode(fp4IndexCache, forKey: .fp4IndexCache)
