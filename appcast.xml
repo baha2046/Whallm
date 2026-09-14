@@ -7,6 +7,64 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>Whallm</title>
         <item>
             <title>1.1.7</title>
+            <pubDate>Mon, 14 Sep 2026 10:57:39 +0800</pubDate>
+            <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.7</link>
+            <sparkle:version>1.1.7</sparkle:version>
+            <sparkle:shortVersionString>1.1.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[## What's new since 1.1.6
+
+Whallm 1.1.7 brings DeepSeek V4.1 Flash support, a built-in Throughput benchmark, and more control over model loading, caching, and updates. This stable release includes the changes from 1.1.7-dev and 1.1.7-dev.2, plus the fixes and model options added since those previews.
+
+### Throughput benchmark
+
+- Run benchmarks from the new **Throughput** page. Select an installed model and Whallm loads it automatically.
+- Choose bundled, offline **Code** or **Novel** input, context lengths from **1K to 200K**, and output limits of **128, 1024, or 4096** tokens.
+- View first-token latency, input/output speed, time per output token, total time, throughput, peak MLX memory, and the slots used for each run.
+- Copy results as plain text, JSON, or a Markdown table.
+- Cancel during input processing or generation. Completed results remain available, and the model unloads when the run finishes, fails, or is cancelled.
+- Benchmarks run sequentially with prompt reuse disabled. Model loading and input tokenization are excluded from timing; no extra warm-up is performed. Dry run remains exclusive to local builds and is excluded from this release.
+
+### DeepSeek V4.1 Flash
+
+- Added text-only installation, repacking, model discovery, API access, SSD expert and Engram loading, and model-specific tool-call parsing for the pinned DeepSeek V4.1 Flash checkpoint.
+- Added **Off / Memory / Disk** prompt-cache choices, with **Memory** as the default for new settings.
+- Added optional DSpark installation and generation, layer-major input processing, batched expert input processing, next-layer expert prefetch, packed KV/index caches, candidate-only index scoring, and CED input processing.
+- Added optional ANE input projection for DeepSeek V4 and V4.1, and an optional approximation mode for all three model families. Approximation and DSpark/MTP cannot be enabled together.
+- V4.1 defaults to **1152 slots**. Its displayed **501.38 GB** weight size comes from the verified installation plan; metadata and network traffic are not included in that figure.
+
+### Model settings and runtime fixes
+
+- **Max tokens defaults to 8192 for every model**. Qwen3.8 defaults to **3072 slots**. Explicitly saved custom values remain unchanged.
+- Added or exposed controls for prompt caching, prefetch workers, input batch size, LRU/LFU expert-cache eviction, and processing experts as their reads finish. Qwen also gains optional quantized QSA KV/index caches.
+- Unloaded models can be configured while the server is running; updated settings take effect when the model next loads. Fixed command-line settings being ignored with a model catalog.
+- Reduced overlapping expert memory during long-input processing in DeepSeek V4 and Qwen by releasing old expert slots and avoiding overlapping layer buffers, while retaining the loaded model and prompt cache.
+- Added cancellation checks during input processing and shared expert reads, with cleanup before another run starts.
+- Removed Qwen's text-derived four-token verification and resident-expert grouped Decode options. Prefill batching and trained DSpark/MTP remain available. Old catalogs that explicitly enable either removed option must be updated; false values remain accepted.
+- Unified installation and runtime model descriptions, and moved **Log Level** to the Logs page.
+
+### App updates
+
+- Added **stable / dev** update sources and an **Automatically check for updates** setting under **Settings → Updates**.
+- Stable receives official releases; dev also receives development builds. Both can update to this stable 1.1.7 release, including from 1.1.7-dev.2.
+- Added English, Simplified Chinese, and Traditional Chinese text for the new controls.
+
+### Validation and limitations
+
+- Release checks passed **424 Python tests** and **91 Swift tests**. The interactive Keychain test was excluded.
+- DeepSeek V4.1 remains experimental and text-only. A complete checkpoint installation, full-model generation, and full V4.1 DSpark weights have not been validated.
+- New packed-cache, candidate-index, CED, DeepSeek ANE, and approximation options default to off. Some combinations are incompatible and are disabled or rejected by the app/runtime.
+- Qwen quantized caches are lossy, and ANE uses FP16; these options may change generated output. No new full-model speed, peak-memory, or quality improvement is claimed for the optional acceleration features.
+- Bundled inputs cover 200K tokens with all three tokenizers; this is an offline coverage check, not a verified 200K generation result. Generation may end before the selected output limit.
+- This release retains MLX/MLX Metal 0.32.2.
+
+**Full changelog:** https://github.com/yanun0323/Whallm/compare/v1.1.6...v1.1.7
+]]></description>
+            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.7/Whallm-macOS-arm64.zip" length="186877549" type="application/octet-stream" sparkle:edSignature="k4wkKtYwrCTB4P0p+cKsZXgorIjD814Fo2GPNjEW6QeWgrXdmQC4VbLEAZl22rgdLmoe+C8PEvbZXOv/BINsBA=="/>
+        </item>
+        <item>
+            <title>1.1.7</title>
             <pubDate>Mon, 14 Sep 2026 02:30:41 +0800</pubDate>
             <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.7-dev.2</link>
             <sparkle:channel>dev</sparkle:channel>
@@ -41,41 +99,9 @@ This alpha adds a Throughput benchmark page and updates model defaults. Select *
 ]]></description>
             <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.7-dev.2/Whallm-macOS-arm64.zip" length="186839652" type="application/octet-stream" sparkle:edSignature="xPkXpqJbcjpGvxrQ/FVtv07svxNgvUDAmSMaZm1ObCloOoBRkSDVyX0RPK3nUTyY8ZjdSjIfzCW4FI+eTCPGAQ=="/>
         </item>
-        <item>
-            <title>1.1.6</title>
-            <pubDate>Tue, 08 Sep 2026 09:50:31 +0800</pubDate>
-            <link>https://github.com/yanun0323/Whallm/releases/tag/v1.1.6</link>
-            <sparkle:version>1.1.6</sparkle:version>
-            <sparkle:shortVersionString>1.1.6</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[## What's new in 1.1.6
-
-### Fix for crashes after a response finishes
-
-- Updated MLX and MLX Metal to **0.32.2** to address the compiled-function cleanup crash investigated in [issue #7](https://github.com/yanun0323/Whallm/issues/7). The upstream fix acquires the Python GIL when releasing compiled-function data during worker-thread teardown.
-- Retains the sampling fix introduced in 1.1.5. This update does not add per-request `mx.clear_streams()` cleanup, which caused later requests to fail in our tests.
-- Existing installed models can be reused; no download or repacking is required for this dependency update.
-
-### Model Advanced Settings
-
-- Added **Recent Expert Cache**, enabled by default in the app, to retain recently used experts within the existing cache capacity.
-- Added a default-on Qwen short-block generation option that proposes continuations from previously seen text and verifies them with the main model, allowing up to four tokens to be handled together when eligible.
-- Saved settings migrate to the new defaults while explicitly disabled values remain disabled. Changes take effect when the model is next loaded.
-- Unsupported configurations, insufficient state-copy budget, and unhelpful proposals fall back to ordinary generation. Qwen short-block generation is not used with MTP or DSpark.
-
-### Validation and limits
-
-- MLX 0.32.2 passed 375 development Python tests and 371 packaged-runtime tests. Four research-grader tests were excluded from the packaged run because their sandbox denies the bundled Python path; they passed in the development environment. The initial failed packaged attempt is retained in the validation records.
-- Local packaged checks covered 100 worker-thread lifecycles, six consecutive DeepSeek requests with matching output, actual prefix-cache reuse, disconnect recovery, and four Qwen sampling requests.
-- These are bounded tests on an M2 Max. Confirmation on the issue reporter's M1 Ultra and broader workload coverage remain open. No universal speedup or memory reduction is claimed.
-- Earlier short-block output/state parity and memory measurements used MLX 0.32.1; the complete real-model short-block/MTP and long-context matrix has not been rerun on 0.32.2.
-]]></description>
-            <enclosure url="https://github.com/yanun0323/Whallm/releases/download/v1.1.6/Whallm-macOS-arm64.zip" length="185797200" type="application/octet-stream" sparkle:edSignature="EB3tIrMpoe7u7ocBmwvIn3ZUjWlR24+M+Zatcp/RIEQLVDYnmwtbU+yyBvwcuBoXIU6lFcWmlluaUjkPPxuDBA=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 1Wsbse+++p10UKj2moCsgxzelHrkPTEul0uoatzegs5iCmygVKEGTHw/mBOtm8gVhK4VkL6WSuxTfZo67oXsAw==
-length: 6620
+edSignature: GJjvfOn7gM6Asq8E1Pq5JGxzjhSor/eW9sulFT6aCOIkSJSfd53t93gtBDX/wD9ORc1nlNiRvGv7o+uD6+wXDg==
+length: 9130
 -->
