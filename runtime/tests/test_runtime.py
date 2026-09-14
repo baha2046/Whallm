@@ -117,31 +117,26 @@ class ModelRuntimeTests(unittest.TestCase):
 
         self.assertEqual([layer.ffn.gate.top_k for layer in layers], [6] * 43)
 
-    def test_approximation_mode_rejects_qwen_and_dspark(self):
-        qwen = SimpleNamespace(_is_qwen=True, model=object())
-        with self.assertRaisesRegex(ValueError, "Qwen"):
-            with _approximation_mode(qwen, "learned-route-drop-lowest-1"):
-                pass
+    def test_approximation_scopes_all_learned_routers_and_restores_after_failure(self):
+        for kind, count, field in (("qwen3.8-flash-next", 10, "top_k"), ("deepseek-v4.1", 6, "topk")):
+            from deepseek_v4_ssd.model_support import get_support
+            router = SimpleNamespace(**{field: count})
+            layer = (SimpleNamespace(mlp=router) if field == "top_k"
+                     else SimpleNamespace(ffn=SimpleNamespace(gate=router)))
+            model = SimpleNamespace(model=SimpleNamespace(layers=[layer]))
+            support = get_support(kind)
+            with self.assertRaisesRegex(RuntimeError, "stop"):
+                with support.approximation(model, "learned-route-drop-lowest-1"):
+                    self.assertEqual(getattr(router, field), count - 1)
+                    raise RuntimeError("stop")
+            self.assertEqual(getattr(router, field), count)
+            for sidecar in ("mtp", "dspark"):
+                setattr(model, sidecar, object())
+                with self.assertRaisesRegex(ValueError, "speculative"):
+                    with support.approximation(model, "learned-route-drop-lowest-1"):
+                        pass
+                delattr(model, sidecar)
 
-        dspark = SimpleNamespace(
-            _is_qwen=False,
-            model=SimpleNamespace(dspark=object()),
-        )
-        with self.assertRaisesRegex(ValueError, "DSpark"):
-            with _approximation_mode(dspark, "learned-route-drop-lowest-1"):
-                pass
-
-        deepseek_v41 = SimpleNamespace(
-            _is_qwen=False,
-            _is_deepseek_v41=True,
-            model=object(),
-        )
-        with self.assertRaisesRegex(ValueError, "DeepSeek V4.1"):
-            with _approximation_mode(
-                deepseek_v41,
-                "learned-route-drop-lowest-1",
-            ):
-                pass
 
     def test_v41_warm_prompt_uses_plain_chunked_prefill(self):
         runtime = ModelRuntime.__new__(ModelRuntime)

@@ -43,6 +43,7 @@ class SharedState:
         self.kv_src_cache = None       # LayerCache of the most recent kv source
         self.index_src_cache = None    # LayerCache of the most recent index-key owner
         self.topk_idxs = None          # [b, n, k] from the most recent index source
+        self.candidate_indices = None
         self.candidates = None         # [b, n, nb] bool from the candidate source
 
 
@@ -117,11 +118,11 @@ class Model(nn.Module):
         self.engram_hasher = EngramHasher(self.args, token_map)
 
     def make_cache(self, bsz: int = 1, max_seq_len: int | None = None,
-                   dtype=mx.float32) -> ModelCache:
-        return ModelCache(self.args, bsz, max_seq_len, dtype)
+                   dtype=mx.float32, packed_kv=False, packed_index=False) -> ModelCache:
+        return ModelCache(self.args, bsz, max_seq_len, dtype, packed_kv, packed_index)
 
     def __call__(self, input_ids: mx.array, cache: ModelCache,
-                 last_logit_only: bool = False) -> mx.array:
+                 last_logit_only: bool = False, target_layers=()) -> mx.array:
         """input_ids [b, n] continue the sequence at cache.offset. Advances the cache."""
         start_pos = cache.offset
         b, n = input_ids.shape
@@ -142,10 +143,13 @@ class Model(nn.Module):
 
         pre_mix = make_identity_pre_mix(b, n, self.hc_mult)
         shared = SharedState()
+        captured = {}
         for layer in self.layers:
             check_cancelled()
             if layer.engram is not None:
                 h = layer.engram(h, hashes[:, :, layer.engram.layer_hash_index])
+            if target_layers and layer.layer_id in target_layers:
+                captured[layer.layer_id] = h.mean(axis=2)
             if self._break_sharing and not layer.attn.is_kv_source and layer.attn.ratio:
                 shared_use = SharedState()           # sever the link: consumers see nothing
                 shared_use.kv_src_cache = shared.kv_src_cache
@@ -163,4 +167,6 @@ class Model(nn.Module):
             h = h[:, -1:]
         logits = self.head(h.astype(mx.float32))   # fp32 logits, as the reference
         cache.offset = start_pos + n
+        if target_layers:
+            return logits, mx.concatenate([captured[i] for i in target_layers], axis=-1)
         return logits

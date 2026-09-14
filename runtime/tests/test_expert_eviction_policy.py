@@ -25,7 +25,7 @@ class EvictionPolicyTests(unittest.TestCase):
     def test_legacy_catalog_defaults_and_explicit_policy_validation(self):
         from deepseek_v4_ssd.model_manager import _parse_runtime, ModelCatalogError
         legacy=asdict(RuntimeConfig())
-        for key in ('expert_eviction_policy','qwen_grouped_decode','qwen_grouped_experts'):
+        for key in ('expert_eviction_policy','qwen_grouped_experts'):
             legacy.pop(key)
         self.assertEqual(_parse_runtime(legacy,'runtime','qwen3.8-flash-next').expert_eviction_policy,'lfu')
         self.assertEqual(_parse_runtime({**legacy,'expert_eviction_policy':'lru'},'runtime','qwen3.8-flash-next').expert_eviction_policy,'lru')

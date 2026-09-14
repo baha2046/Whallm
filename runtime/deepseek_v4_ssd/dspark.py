@@ -1257,6 +1257,11 @@ def generate_tokens(
 
 
 def _target_sequence(main_model, tokens, cache, target_layers):
+    if hasattr(main_model, "forward_with_hidden"):
+        from .model_support import get_support
+        branch = get_support("deepseek-v4.1").clone_cache(cache)
+        logits, hidden = main_model.forward_with_hidden(mx.array([tokens], mx.int32), branch, target_layers)
+        return logits, hidden, branch, VerificationMetrics()
     from .model import verification_forward_with_hidden
 
     return verification_forward_with_hidden(

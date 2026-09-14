@@ -198,8 +198,14 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
 
 
 def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
+    if isinstance(value, dict):
+        value = dict(value)
+        for removed in ("qwen_grouped_decode", "qwen_short_block"):
+            if removed in value:
+                if value.pop(removed) is not False:
+                    raise ModelCatalogError(f"{prefix}.{removed} has been removed; remove this setting")
     names = {field.name for field in fields(RuntimeConfig)}
-    required = names - {"qwen_grouped_experts", "qwen_grouped_decode", "expert_eviction_policy", "qwen_short_block"}
+    required = names - {'qwen_quantized_kv', 'qwen_quantized_index', 'v41_ced_prefill', 'v41_packed_kv', 'v41_packed_index', 'deepseek_ane_prefill', 'qwen_grouped_experts', 'expert_eviction_policy', 'v41_layer_major_prefill', 'v41_candidate_index', 'v41_next_layer_prefetch'}
     if not isinstance(value, dict) or not required <= set(value) <= names:
         raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
@@ -242,8 +248,8 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "persistent_prompt_cache",
         "batched_expert_prefill",
         "qwen_grouped_experts",
-        "qwen_short_block",
         "ane_prefill",
+        "deepseek_ane_prefill",
         "fp4_index_cache",
         "dspark_enabled",
         "mtp_enabled",
@@ -255,7 +261,15 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "dspark_hybrid_verification",
         "expert_page_cache_probe",
         "ready_expert_decode",
-        "qwen_grouped_decode",
+        "v41_next_layer_prefetch",
+        "v41_candidate_index",
+        "v41_ced_prefill",
+        "v41_layer_major_prefill",
+        "v41_packed_kv",
+        "qwen_quantized_kv",
+        "qwen_quantized_index",
+        "v41_packed_index",
+        "qwen_next_layer_prefetch",
         "staged_expert_streaming",
     }
     for name in boolean_names:
@@ -588,9 +602,6 @@ class ModelManager:
                     "expert_page_cache_probe": config.expert_page_cache_probe,
                     "expert_file_cache_policy": config.expert_file_cache_policy,
                     "expert_eviction_policy": config.expert_eviction_policy,
-                    "qwen_short_block": getattr(config, "qwen_short_block", False),
-                    "qwen_short_block_ready": getattr(cache, "qwen_short_block_active", False),
-                    "qwen_short_block_reason": getattr(cache, "qwen_short_block_reason", "unsupported model or mode"),
                     "expert_file_direct_io_alignment_bytes": getattr(
                         cache, "direct_io_alignment", 0
                     ),

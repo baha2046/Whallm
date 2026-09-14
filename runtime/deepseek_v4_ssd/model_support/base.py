@@ -17,10 +17,19 @@ class ModelSupport:
 
     def validate_config(self, config) -> None:
         features = self.descriptor.features
-        if getattr(config, "qwen_grouped_decode", False) and (
-            "groupedDecode" not in features or getattr(config, "mtp_enabled", False)
-        ):
-            raise ValueError("grouped Decode requires Qwen with MTP disabled")
+        if self.descriptor.kind == "deepseek-v4.1" and getattr(config, "dspark_enabled", False):
+            for name in ("v41_layer_major_prefill", "v41_ced_prefill", "v41_next_layer_prefetch", "dspark_prompt_cache", "dspark_hash_prefetch", "dspark_adaptive_block", "dspark_sequential_verification", "dspark_hybrid_verification"):
+                if getattr(config, name, False):
+                    raise ValueError(f"{name} is not supported by V4.1 DSpark")
+        for name in ("qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
+                     "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "v41_layer_major_prefill"):
+            expected = "qwen3.8-flash-next" if name.startswith("qwen_") else "deepseek-v4.1"
+            if getattr(config, name, False) and self.descriptor.kind != expected:
+                raise ValueError(f"{name} is supported only by {expected}")
+        if getattr(config, "deepseek_ane_prefill", False) and self.descriptor.kind not in ("deepseek-v4", "deepseek-v4.1"):
+            raise ValueError("DeepSeek ANE prefill requires a DeepSeek model")
+        if getattr(config, "v41_ced_prefill", False) and not (config.layer_major_prefill and config.v41_layer_major_prefill):
+            raise ValueError("CED prefill requires layer-major prefill")
         for option, feature, label in (
             ("dspark_enabled", "dspark", "DSpark"),
             ("staged_expert_streaming", "stagedExpertStreaming", "staged expert streaming"),
@@ -36,6 +45,8 @@ class ModelSupport:
         return self.descriptor.display_name
 
     def uses_layer_major_prefill(self, config, token_count: int) -> bool:
+        if self.descriptor.kind == "deepseek-v4.1" and not getattr(config, "v41_layer_major_prefill", False):
+            return False
         threshold = self.descriptor.prefill_threshold
         if threshold is None:
             threshold = getattr(config, "layer_major_prefill_threshold", 1_024)
@@ -111,9 +122,27 @@ class ModelSupport:
 
     @contextmanager
     def approximation(self, model, mode):
-        if mode != "exact":
+        if mode == "exact":
+            yield
+            return
+        if mode != "learned-route-drop-lowest-1" or not self.descriptor.supports("approximation"):
             raise ValueError(f"approximation mode is not supported for {self.option_error_name}")
-        yield
+        if getattr(model, "dspark", None) is not None or getattr(model, "mtp", None) is not None:
+            raise ValueError("approximation mode cannot be combined with speculative decoding")
+        changed = []
+        try:
+            for layer in model.model.layers:
+                router, attribute = ((layer.mlp, "top_k") if hasattr(layer, "mlp")
+                                     else (layer.ffn.gate, "topk"))
+                count = getattr(router, attribute)
+                if count <= 1:
+                    raise ValueError("approximation requires at least two routed experts")
+                changed.append((router, attribute, count))
+                setattr(router, attribute, count - 1)
+            yield
+        finally:
+            for router, attribute, count in changed:
+                setattr(router, attribute, count)
 
     def close(self, model, expert_cache):
         resources = []

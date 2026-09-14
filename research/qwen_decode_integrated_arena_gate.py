@@ -7,7 +7,7 @@ from pathlib import Path
 import mlx.core as mx
 import numpy as np
 from deepseek_v4_ssd.manifest import InstalledModel
-from deepseek_v4_ssd.expert_cache import _QwenArenaSlotPool as ArenaSlotPool
+from research.qwen_resident_block import _QwenArenaSlotPool as ArenaSlotPool
 from qwen_decode_candidates import grouped_resident
 from qwen_a_replay import benchmark
 

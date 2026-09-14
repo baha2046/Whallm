@@ -33,6 +33,7 @@ from .compressor import Compressor
 from .config import ModelArgs
 from .fakequant import fake_quant_fp4_e4m3, fake_quant_fp8_ue8m0
 from .indexer import Indexer
+from .packed_cache import PackedRows
 from .layers import RMSNorm, precompute_freqs_cis, rope_tail
 from .sparse_attention import sparse_attn
 
@@ -122,6 +123,7 @@ class Attention(nn.Module):
         # --- window KV: rope tail, FP8 fake-quant over the whole vector ---
         kv = self.kv_norm(self.wkv(x))
         kv = rope_tail(kv, rd, c_q, s_q)
+        raw_kv = kv
         kv = fake_quant_fp8_ue8m0(kv, 32)
 
         lc = cache.layers[self.layer_id]
@@ -130,7 +132,7 @@ class Attention(nn.Module):
         kv_all = mx.concatenate([prev.astype(kv.dtype), kv], axis=1) if wp else kv
         idxs = mx.broadcast_to(window_idx_matrix(wp, n, self.window_size)[None],
                                (bsz, n, min(self.window_size, wp + n)))
-        lc.write_window(start_pos, kv)
+        lc.write_window(start_pos, raw_kv if lc.packed_kv else kv)
         offset = wp + n                                          # compressed entries follow
 
         if self.ratio:
@@ -162,8 +164,11 @@ class Attention(nn.Module):
                 g = latents.shape[1]
                 pos = (g0 + mx.arange(g)) * self.ratio           # group j at position j*ratio
                 latents = rope_tail(latents, rd, cos[pos], sin[pos])
-                latents = fake_quant_fp4_e4m3(latents, 16)
-                lc.comp_kv[:bsz, g0:g0 + g] = latents.astype(lc.dtype)
+                if isinstance(lc.comp_kv, PackedRows):
+                    lc.comp_kv.write((slice(None, bsz), slice(g0, g0 + g)), latents)
+                else:
+                    latents = fake_quant_fp4_e4m3(latents, 16)
+                    lc.comp_kv[:bsz, g0:g0 + g] = latents.astype(lc.dtype)
 
             if compress_len:
                 comp = src.comp_kv[:bsz, :compress_len].astype(kv.dtype)
@@ -176,6 +181,10 @@ class Attention(nn.Module):
         # --- inverse rope, grouped block-diagonal output LoRA ---
         if not self._break_rope_inverse:
             o = rope_tail(o, rd, c_q, s_q, inverse=True)
+        return self.project_output(o, x.dtype)
+
+    def project_output(self, o, dtype):
+        bsz, n = o.shape[:2]
         o = o.reshape(bsz, n, self.n_groups, -1)
         if hasattr(self.wo_a, "scales"):
             weight = self.wo_a.weight.reshape(self.n_groups, self.o_lora_rank, -1)
@@ -196,4 +205,4 @@ class Attention(nn.Module):
         else:
             wo_a = self.wo_a.weight.reshape(self.n_groups, self.o_lora_rank, -1)
             o = mx.einsum("bsgd,grd->bsgr", o.astype(mx.float32), wo_a.astype(mx.float32))
-        return self.wo_b(o.reshape(bsz, n, -1).astype(x.dtype))
+        return self.wo_b(o.reshape(bsz, n, -1).astype(dtype))

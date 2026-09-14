@@ -46,10 +46,17 @@ class RuntimeConfig:
     prompt_cache_directory: str | None = None
     moe_prefill_step_size: int = 0
     batched_expert_prefill: bool = True
+    qwen_quantized_kv: bool = False
+    qwen_quantized_index: bool = False
+    v41_packed_kv: bool = False
+    v41_packed_index: bool = False
+    v41_layer_major_prefill: bool = False
+    v41_ced_prefill: bool = False
+    v41_candidate_index: bool = False
+    v41_next_layer_prefetch: bool = False
     qwen_next_layer_prefetch: bool = False
-    qwen_grouped_decode: bool = False
     qwen_grouped_experts: bool = True
-    qwen_short_block: bool = False
+    deepseek_ane_prefill: bool = False
     ane_prefill: bool = True
     ane_prefill_ratio: float = 0.25
     fp4_index_cache: bool = True
@@ -887,6 +894,8 @@ def forward_with_hidden(
     target_layers: tuple[int, ...],
 ) -> tuple[mx.array, mx.array]:
     """Run the main model and return DSpark target-layer hidden states."""
+    if hasattr(model, "forward_with_hidden"):
+        return model.forward_with_hidden(inputs, cache, target_layers)
     core = model.model
     hidden = core.embed_tokens(inputs)
     hidden = mx.broadcast_to(
@@ -1254,8 +1263,11 @@ def _cache_arrays(cache) -> list[mx.array]:
             for name in ("_chunks", "_index_chunks"):
                 for pair in getattr(item, name, ()):
                     values.extend(pair)
-            for value in values:
-                if isinstance(value, mx.array) and id(value) not in seen:
+            while values:
+                value = values.pop()
+                if isinstance(value, (list, tuple)):
+                    values.extend(value)
+                elif isinstance(value, mx.array) and id(value) not in seen:
                     seen.add(id(value))
                     arrays.append(value)
     return arrays

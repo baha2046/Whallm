@@ -11,6 +11,7 @@ from mlx.utils import tree_flatten
 from .deepseek_v41 import engram as v41_engram
 from .deepseek_v41 import moe as v41_moe
 from .deepseek_v41.config import ModelArgs
+from .deepseek_v41.packed_cache import PackedRows
 from .deepseek_v41.dequant import dequant_fp8_rows
 from .deepseek_v41.model import Model
 from .expert_cache import ExpertCache
@@ -98,14 +99,14 @@ class DeepSeekV41PromptCache:
         layers = []
         for layer in cache.layers:
             layers.append({
-                "win_kv": layer.win_kv,
-                "comp_kv": layer.comp_kv,
-                "index_k": layer.index_k,
+                "win_kv": layer.win_kv.state() if isinstance(layer.win_kv, PackedRows) else layer.win_kv,
+                "comp_kv": layer.comp_kv.state() if isinstance(layer.comp_kv, PackedRows) else layer.comp_kv,
+                "index_k": layer.index_k.state() if isinstance(layer.index_k, PackedRows) else layer.index_k,
                 "kv_state": layer.comp_state.kv_state if layer.comp_state else None,
                 "score_state": layer.comp_state.score_state if layer.comp_state else None,
             })
         return {
-            "kind": "deepseek_v41", "version": 1,
+            "kind": "deepseek_v41", "version": 2 if cache.packed_kv or cache.packed_index else 1,
             "offset": cache.offset, "capacity": cache.max_seq_len,
             "layers": layers,
             # Engram history is mutable NumPy data; capture it before decoding resumes.
@@ -115,7 +116,7 @@ class DeepSeekV41PromptCache:
     def restore_persistence_state(self, state):
         from .deepseek_v41.cache import ModelCache
 
-        if not isinstance(state, dict) or state.get("kind") != "deepseek_v41" or state.get("version") != 1:
+        if not isinstance(state, dict) or state.get("kind") != "deepseek_v41" or state.get("version") != (2 if self.cache.packed_kv or self.cache.packed_index else 1):
             raise ValueError("Invalid DeepSeek V4.1 prompt cache schema")
         offset, capacity = state.get("offset"), state.get("capacity")
         if (type(offset) is not int or type(capacity) is not int
@@ -125,9 +126,11 @@ class DeepSeekV41PromptCache:
         if not isinstance(saved_layers, list) or len(saved_layers) != len(self.cache.layers):
             raise ValueError("DeepSeek V4.1 prompt cache layer count does not match")
         first = self.cache.layers[0]
-        restored = ModelCache(self.cache.args, first.win_kv.shape[0], capacity, first.dtype)
+        restored = ModelCache(self.cache.args, first.win_kv.shape[0], capacity, first.dtype, self.cache.packed_kv, self.cache.packed_index)
 
         def restore_array(saved, expected):
+            if isinstance(expected, PackedRows):
+                return expected.restore(saved)
             if expected is None:
                 if saved is not None:
                     raise ValueError("Unexpected DeepSeek V4.1 prompt cache array")
@@ -180,13 +183,18 @@ class DeepSeekV41ForCausalLM(nn.Module):
         self.dspark = None
         self.mtp = None
         self.mtp_expert_cache = None
+        self.packed_kv = False
+        self.packed_index = False
 
     def make_cache(self):
         return [
             DeepSeekV41PromptCache(
-                self.model.make_cache(dtype=mx.bfloat16)
+                self.model.make_cache(dtype=mx.bfloat16, packed_kv=self.packed_kv, packed_index=self.packed_index)
             )
         ]
+
+    def forward_with_hidden(self, inputs, cache, target_layers):
+        return self.model(inputs, cache[0].cache, target_layers=target_layers)
 
     def __call__(self, inputs: mx.array, cache=None):
         if cache is None:
@@ -284,8 +292,6 @@ def load(
     common_weights: dict[str, mx.array],
     read_limiter,
 ):
-    if config.dspark_enabled:
-        raise ValueError("DeepSeek V4.1 does not yet support DSpark")
     if config.mtp_enabled:
         raise ValueError("DeepSeek V4.1 does not yet support MTP")
     if config.staged_expert_streaming:
@@ -325,9 +331,12 @@ def load(
         eviction_policy=config.expert_eviction_policy,
         staged_expert_streaming=False,
     )
+    wrapped = None
     try:
         tables = {table.layer: table for table in installed_model.engram.tables}
         for layer_index, layer in enumerate(core.layers):
+            if layer.attn.is_index_source:
+                layer.attn.indexer.candidate_only = config.v41_candidate_index
             activation = layer.ffn.experts.activation
             layer.ffn.experts = _StreamingSwitchGLU(layer_index, cache, activation)
             if layer.engram is not None:
@@ -354,7 +363,17 @@ def load(
         core.load_weights(list(weights.items()), strict=False)
         core.eval()
         mx.eval(core.parameters())
-        return DeepSeekV41ForCausalLM(core), cache
+        from .ane_prefill import install_deepseek_ane_prefill
+        wrapped = DeepSeekV41ForCausalLM(core)
+        wrapped.packed_kv = config.v41_packed_kv
+        wrapped.packed_index = config.v41_packed_index
+        wrapped.ane_prefill = install_deepseek_ane_prefill(wrapped, config.deepseek_ane_prefill, config.ane_prefill_ratio)
+        if config.dspark_enabled:
+            from .deepseek_v41.dspark import load_dspark
+            wrapped.dspark = load_dspark(installed_model, args, config, read_limiter)
+        return wrapped, cache
     except Exception:
+        if wrapped is not None:
+            wrapped.ane_prefill.close()
         cache.close()
         raise

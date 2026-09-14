@@ -236,6 +236,8 @@ def _load(installed_model, config, raw_config, common_weights, read_limiter):
                 installed_model, model, args, config, read_limiter
             )
         mx.eval(model.parameters())
+        from ..ane_prefill import install_deepseek_ane_prefill
+        model.ane_prefill = install_deepseek_ane_prefill(model, config.deepseek_ane_prefill, config.ane_prefill_ratio)
         return model, cache
     except Exception:
         cache.close()

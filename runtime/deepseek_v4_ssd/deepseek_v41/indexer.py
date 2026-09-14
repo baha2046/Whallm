@@ -29,13 +29,14 @@ import mlx.nn as nn
 
 from .config import ModelArgs
 from .fakequant import fake_quant_fp4_ue8m0
+from .packed_cache import PackedRows
 from .layers import RMSNorm, rope_tail
 
 NEG_INF = float("-inf")
 POS_INF = float("inf")
 
 
-def select_candidate_blocks(scores: mx.array, lens: mx.array, topk_blocks: int,
+def _candidate_blocks(scores: mx.array, lens: mx.array, topk_blocks: int,
                             block_size: int) -> mx.array:
     """Level one of the two-level top-k. scores [b, n, nb] with unreachable
     positions already at -inf; lens [n, 1] (positions visible per query).
@@ -61,13 +62,21 @@ def select_candidate_blocks(scores: mx.array, lens: mx.array, topk_blocks: int,
     top_val = mx.take_along_axis(blocks, top_idx, axis=-1)
     keep = mx.zeros(blocks.shape, dtype=mx.bool_)
     keep = mx.put_along_axis(keep, top_idx, top_val > NEG_INF, axis=-1)
-    return mx.repeat(keep, block_size, axis=-1)[..., :width]
+    positions = (top_idx[..., None] * block_size + mx.arange(block_size)).reshape(*scores.shape[:-1], -1)
+    valid = mx.repeat(top_val > NEG_INF, block_size, axis=-1) & (positions < width)
+    positions = mx.where(valid, positions, width)
+    return mx.repeat(keep, block_size, axis=-1)[..., :width], mx.sort(positions, axis=-1)
+
+
+def select_candidate_blocks(scores, lens, topk_blocks, block_size):
+    return _candidate_blocks(scores, lens, topk_blocks, block_size)[0]
 
 
 class Indexer(nn.Module):
     def __init__(self, args: ModelArgs, layer_id: int):
         super().__init__()
         self.layer_id = layer_id
+        self.candidate_only = False
         self.owns_k = layer_id in args.kv_source_layers
         self.ratio = args.compress_ratio(layer_id)
         self.is_candidate_source = layer_id == args.candidate_source_layer
@@ -100,8 +109,11 @@ class Indexer(nn.Module):
         pos = (g0 + mx.arange(g)) * self.ratio
         k = self.k_norm(self.wk(latents))
         k = rope_tail(k, rd, cos[pos], sin[pos])
-        k = fake_quant_fp4_ue8m0(k, 32)
-        cache.index_k[:k.shape[0], g0:g0 + g] = k
+        if isinstance(cache.index_k, PackedRows):
+            cache.index_k.write((slice(None, k.shape[0]), slice(g0, g0 + g)), k)
+        else:
+            k = fake_quant_fp4_ue8m0(k, 32)
+            cache.index_k[:k.shape[0], g0:g0 + g] = k
 
     def __call__(self, x: mx.array, qr: mx.array, start_pos: int, offset: int,
                  cos, sin, index_k: mx.array, shared) -> mx.array:
@@ -121,6 +133,21 @@ class Indexer(nn.Module):
         q = fake_quant_fp4_ue8m0(q, 32)
 
         w = self.weights_proj(x) * (self.softmax_scale * self.n_heads ** -0.5)
+        positions = getattr(shared, "candidate_indices", None)
+        if (self.candidate_only and self.uses_candidates and positions is not None
+                and positions.shape[-1] < nb and positions.shape[-1] >= self.index_topk):
+            # The source already selected blocks. Later layers read and score only these keys.
+            safe = mx.minimum(positions, nb - 1)
+            batch = mx.arange(bsz)[:, None, None]
+            keys = index_k[batch, safe]
+            scores = mx.einsum("bshd,bstd->bsht", q.astype(mx.float32), keys.astype(mx.float32))
+            scores = mx.sum(mx.maximum(scores, 0.0) * w[..., None].astype(mx.float32), axis=2)
+            lens = ((start_pos + mx.arange(n) + 1) // ratio)[None, :, None]
+            scores = mx.where((positions < nb) & (positions < lens), scores, NEG_INF)
+            selected = mx.argpartition(-scores, self.index_topk - 1, axis=-1)[..., :self.index_topk]
+            idx = mx.take_along_axis(positions, selected, axis=-1).astype(mx.int32)
+            idx = mx.sort(idx, axis=-1)
+            return mx.where((idx < nb) & (idx < lens), idx + offset, mx.array(-1, mx.int32))
         scores = mx.einsum("bshd,btd->bsht", q.astype(mx.float32),
                            index_k.astype(mx.float32))
         scores = mx.maximum(scores, 0.0) * w[..., None].astype(mx.float32)
@@ -132,7 +159,7 @@ class Indexer(nn.Module):
         scores = mx.where(vis[None], scores, NEG_INF)
 
         if self.is_candidate_source:
-            shared.candidates = select_candidate_blocks(
+            shared.candidates, shared.candidate_indices = _candidate_blocks(
                 scores, lens, self.candidate_topk_blocks, self.candidate_block_size)
         elif self.uses_candidates and shared.candidates is not None:
             scores = mx.where(shared.candidates, scores, NEG_INF)

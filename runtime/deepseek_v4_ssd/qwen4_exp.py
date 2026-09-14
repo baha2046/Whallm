@@ -612,29 +612,6 @@ class StreamingExperts(nn.Module):
 
     def __call__(self, value: mx.array, indices: mx.array) -> mx.array:
         batched = self.cache.current_batched(self.layer)
-        if (
-            batched is None
-            and getattr(self.cache, "qwen_decode_active", False)
-            and value.size // value.shape[-1] == 1
-        ):
-            selected = np.asarray(indices, dtype=np.int32)
-            pages = self.cache.qwen_grouped_weights(
-                self.layer, selected.reshape(-1).tolist()
-            )
-            if len(pages) == 1:
-                batched, physical, _ = pages[0]
-                indices = mx.array(physical, dtype=mx.uint32).reshape(indices.shape)
-            else:
-                outputs, positions = [], []
-                for weights, physical, order in pages:
-                    mapped = mx.array(physical, dtype=mx.uint32).reshape(*indices.shape[:-1], -1)
-                    outputs.append(self._grouped(value, mapped, weights))
-                    positions.extend(order)
-                self.cache.record_gather_qmm(2 * len(pages))
-                return mx.take(
-                    mx.concatenate(outputs, axis=-2),
-                    mx.array(np.argsort(positions)), axis=-2,
-                )
         if isinstance(batched, QwenBatchedExperts):
             source = mx.expand_dims(value, (-2, -3))
             grouped = self.grouped_prefill and indices.size >= 64
@@ -671,6 +648,13 @@ class StreamingExperts(nn.Module):
             return output.squeeze(-2)
 
         selected = np.asarray(indices, dtype=np.int32)
+        if value.size // value.shape[-1] == 1 and getattr(self.cache, "ready_expert_decode", False):
+            outputs = {}
+            for expert, weights in self.cache.iter_ready(self.layer, selected.reshape(-1).tolist()):
+                output = self._one(value, weights)
+                mx.async_eval(output)
+                outputs[expert] = output
+            return mx.stack([outputs[int(expert)] for expert in selected.reshape(-1)], axis=-2)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
         flat = selected.reshape(-1)
         order = np.argsort(flat, kind="stable")
@@ -690,31 +674,6 @@ class StreamingExperts(nn.Module):
         restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
         return restored.reshape(*selected.shape, -1)
 
-    @staticmethod
-    def _grouped(value, indices, batched):
-        source = mx.expand_dims(value, (-2, -3))
-        projected = mx.gather_qmm(
-            source,
-            batched.gate_up,
-            batched.gate_up_scales,
-            rhs_indices=indices,
-            transpose=True,
-            group_size=32,
-            bits=4,
-            mode="mxfp4",
-        )
-        gate, up = mx.split(projected, 2, axis=-1)
-        output = mx.gather_qmm(
-            nn.silu(gate) * up,
-            batched.down,
-            batched.down_scales,
-            rhs_indices=indices,
-            transpose=True,
-            group_size=32,
-            bits=4,
-            mode="mxfp4",
-        )
-        return output.squeeze(-2)
 
 
 class SparseMoE(nn.Module):
@@ -822,12 +781,11 @@ class Model(nn.Module):
         self.model_type = args.model_type
         self.model = TextModel(args, cache, ngram_store)
         self._expert_cache = cache
+        self.quantize_kv = False
+        self.quantize_index = False
         self.lm_head = nn.Linear(args.hidden_size, args.vocab_size, bias=False)
 
     def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
-        if self._expert_cache.qwen_grouped_decode:
-            with self._expert_cache.qwen_decode_step(input_ids.size):
-                return self.lm_head(self.model(input_ids, cache))
         return self.lm_head(self.model(input_ids, cache))
 
     def forward_with_hidden(
@@ -842,10 +800,12 @@ class Model(nn.Module):
         return self.model.layers
 
     def make_cache(self):
+        from .qwen_quantized_cache import QSAQuantizedCache
         return [
             ArraysCache(size=4)
             if layer.layer_type == "linear_attention"
-            else CacheList(KVCache(), KVCache())
+            else CacheList(QSAQuantizedCache(8, self.args.head_dim) if self.quantize_kv else KVCache(),
+                           QSAQuantizedCache(4, self.args.indexer_head_dim) if self.quantize_index else KVCache())
             for layer in self.layers
         ]
 
@@ -1226,8 +1186,6 @@ def load(
         page_cache_probe=getattr(config, "expert_page_cache_probe", False),
         file_cache_policy=getattr(config, "expert_file_cache_policy", "cached"),
         eviction_policy=getattr(config, "expert_eviction_policy", "lfu"),
-        qwen_grouped_decode=getattr(config, "qwen_grouped_decode", False),
-        qwen_short_block=getattr(config, "qwen_short_block", False) and not config.mtp_enabled,
     )
     try:
         scale_name = (
@@ -1243,6 +1201,8 @@ def load(
             weight_scale,
         )
         model = Model(args, cache, ngram_store)
+        model.quantize_kv = config.qwen_quantized_kv
+        model.quantize_index = config.qwen_quantized_index
         grouped_prefill = bool(
             getattr(config, "qwen_grouped_experts", True)
             and not getattr(config, "mtp_enabled", False)

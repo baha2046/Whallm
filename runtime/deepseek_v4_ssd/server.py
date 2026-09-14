@@ -1935,9 +1935,10 @@ def _options(
 def _validate_approximation_runtime(options: GenerationOptions, runtime: Any) -> None:
     if options.approximation_mode != LEARNED_ROUTE_DROP_LOWEST_1:
         return
-    if bool(getattr(getattr(runtime, "config", None), "dspark_enabled", False)):
+    if any(bool(getattr(getattr(runtime, "config", None), name, False))
+           for name in ("dspark_enabled", "mtp_enabled")):
         raise APIError(
-            "approximation.mode is not supported with DSpark.",
+            "approximation.mode is not supported with DSpark or MTP.",
             param="approximation.mode",
         )
     if not support_for_runtime(runtime).descriptor.supports("approximation"):
@@ -2319,12 +2320,12 @@ def _parser() -> argparse.ArgumentParser:
             "F_NOCACHE with read-ahead disabled"
         ),
     )
-    parser.add_argument("--qwen-short-block", action=argparse.BooleanOptionalAction, default=False,
-                        help="Reuse resident Qwen experts across up to four verified tokens")
     parser.add_argument(
         "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
         help="expert eviction ranking (default LFU)",
     )
+    for name in ('qwen_quantized_kv', 'qwen_quantized_index', 'v41_packed_kv', 'v41_packed_index', 'v41_candidate_index', 'v41_ced_prefill', 'v41_next_layer_prefetch', 'deepseek_ane_prefill', 'v41_layer_major_prefill'):
+        parser.add_argument("--" + name.replace("_", "-"), action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
         "--dspark-prompt-cache",
@@ -2414,6 +2415,15 @@ def main() -> None:
     if not 1 <= arguments.port <= 65535:
         parser.error("--port must be between 1 and 65535")
     config = RuntimeConfig(
+        qwen_quantized_kv=arguments.qwen_quantized_kv,
+        qwen_quantized_index=arguments.qwen_quantized_index,
+        v41_packed_kv=arguments.v41_packed_kv,
+        v41_packed_index=arguments.v41_packed_index,
+        v41_candidate_index=arguments.v41_candidate_index,
+        v41_ced_prefill=arguments.v41_ced_prefill,
+        v41_next_layer_prefetch=arguments.v41_next_layer_prefetch,
+        deepseek_ane_prefill=arguments.deepseek_ane_prefill,
+        v41_layer_major_prefill=arguments.v41_layer_major_prefill,
         slots=arguments.slots,
         read_workers=arguments.read_workers,
         prefetch_read_workers=arguments.prefetch_read_workers,
@@ -2435,7 +2445,6 @@ def main() -> None:
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
         expert_eviction_policy=arguments.expert_eviction_policy,
-        qwen_short_block=arguments.qwen_short_block,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         mtp_enabled=arguments.mtp,
         mtp_slots=arguments.mtp_slots,

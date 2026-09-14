@@ -79,7 +79,7 @@ class PrefillSlotReleaseTests(unittest.TestCase):
                         cache.release_prefill_slots()
                 self.assertEqual(cache.resident_count, 1)
 
-    def test_qwen_direct_grouped_and_bounded_pools_release_and_refill(self):
+    def test_qwen_pool_releases_and_refills(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'experts').mkdir()
@@ -89,7 +89,7 @@ class PrefillSlotReleaseTests(unittest.TestCase):
                 expert_blob_size=2_611_200, common_tensors=(),
                 expert_regions=tuple(Tensor(*region) for region in QWEN_EXPERT_REGIONS),
                 model_kind='qwen3.8-flash-next')
-            for options in ({}, {'qwen_grouped_decode': True}, {'qwen_short_block': True}):
+            for options in ({},):
                 with self.subTest(options=options), ExpertCache(model, slots=4, **options) as cache:
                     cache.get_many(0, [0, 1])
                     old_pool = weakref.ref(cache._pool)

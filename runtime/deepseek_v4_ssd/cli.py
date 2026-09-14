@@ -102,10 +102,6 @@ def main() -> None:
         help="research only: prefetch the next Qwen expert layer during compute",
     )
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
-    parser.add_argument(
-        "--qwen-grouped-decode", action="store_true",
-        help="experimental Qwen Decode with resident grouped QMM (MTP disabled)",
-    )
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
     cache_mode = parser.add_mutually_exclusive_group()
     cache_mode.add_argument("--prompt-cache", choices=("off", "memory", "disk"),
@@ -121,6 +117,8 @@ def main() -> None:
         help="enable experimental Qwen MTP speculative decoding",
     )
     parser.add_argument("--mtp-slots", type=int, default=32)
+    for name in ('qwen_quantized_kv', 'qwen_quantized_index', 'v41_packed_kv', 'v41_packed_index', 'v41_candidate_index', 'v41_ced_prefill', 'v41_next_layer_prefetch', 'deepseek_ane_prefill', 'v41_layer_major_prefill'):
+        parser.add_argument("--" + name.replace("_", "-"), action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
         "--dspark-prompt-cache",
@@ -176,8 +174,6 @@ def main() -> None:
             "F_NOCACHE with read-ahead disabled"
         ),
     )
-    parser.add_argument("--qwen-short-block", action=argparse.BooleanOptionalAction, default=False,
-                        help="Reuse resident Qwen experts across up to four verified tokens")
     parser.add_argument(
         "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
         help="expert cache eviction ranking; LRU is opt-in and keeps per-layer reserves",
@@ -283,6 +279,15 @@ def main() -> None:
     if not 0 <= arguments.ane_prefill_ratio <= 1:
         parser.error("--ane-prefill-ratio must be between 0 and 1")
     config = RuntimeConfig(
+        qwen_quantized_kv=arguments.qwen_quantized_kv,
+        qwen_quantized_index=arguments.qwen_quantized_index,
+        v41_packed_kv=arguments.v41_packed_kv,
+        v41_packed_index=arguments.v41_packed_index,
+        v41_candidate_index=arguments.v41_candidate_index,
+        v41_ced_prefill=arguments.v41_ced_prefill,
+        v41_next_layer_prefetch=arguments.v41_next_layer_prefetch,
+        deepseek_ane_prefill=arguments.deepseek_ane_prefill,
+        v41_layer_major_prefill=arguments.v41_layer_major_prefill,
         slots=arguments.slots,
         read_workers=arguments.read_workers,
         prefetch_read_workers=arguments.prefetch_read_workers,
@@ -296,7 +301,6 @@ def main() -> None:
         ane_prefill=not arguments.no_ane_prefill,
         ane_prefill_ratio=arguments.ane_prefill_ratio,
         qwen_next_layer_prefetch=arguments.qwen_next_layer_prefetch,
-        qwen_grouped_decode=arguments.qwen_grouped_decode,
         qwen_grouped_experts=(
             support.descriptor.supports("groupedExperts") if arguments.qwen_grouped_experts is None
             else arguments.qwen_grouped_experts
@@ -323,7 +327,6 @@ def main() -> None:
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
         expert_eviction_policy=arguments.expert_eviction_policy,
-        qwen_short_block=arguments.qwen_short_block,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,
     )
@@ -446,7 +449,6 @@ def main() -> None:
             "ane_prefill": config.ane_prefill,
             "ane_prefill_ratio": config.ane_prefill_ratio,
             "qwen_next_layer_prefetch": config.qwen_next_layer_prefetch,
-            "qwen_grouped_decode": config.qwen_grouped_decode,
             "fp4_index_cache": config.fp4_index_cache,
             "ready_expert_decode": config.ready_expert_decode,
             "expert_page_cache_probe": config.expert_page_cache_probe,

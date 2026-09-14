@@ -103,7 +103,8 @@ class ModelSupportTests(unittest.TestCase):
                                      (support.restore_cache, ([], []))):
             with self.assertRaises(ValueError):
                 operation(*arguments)
-        for config in (RuntimeConfig(dspark_enabled=True), RuntimeConfig(mtp_enabled=True),
+        support.validate_config(RuntimeConfig(dspark_enabled=True))
+        for config in (RuntimeConfig(dspark_enabled=True, dspark_hash_prefetch=True), RuntimeConfig(mtp_enabled=True),
                        RuntimeConfig(staged_expert_streaming=True)):
             with self.assertRaises(ValueError):
                 support.validate_config(config)

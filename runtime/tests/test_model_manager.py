@@ -97,10 +97,10 @@ class ModelCatalogTests(unittest.TestCase):
         for kind in ("deepseek-v4", "deepseek-v4.1", "qwen3.8-flash-next"):
             with self.subTest(kind=kind):
                 model = raw_model(kind)
-                model["runtime"].pop("qwen_grouped_decode")
+                model["runtime"]["qwen_grouped_decode"] = False
                 model["runtime"].pop("qwen_grouped_experts")
                 parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
-                self.assertFalse(parsed.runtime.qwen_grouped_decode)
+                self.assertFalse(hasattr(parsed.runtime, "qwen_grouped_decode"))
                 self.assertEqual(
                     parsed.runtime.qwen_grouped_experts,
                     kind == "qwen3.8-flash-next",
@@ -124,7 +124,6 @@ class ModelCatalogTests(unittest.TestCase):
         self.assertEqual(parsed.owner, "deepseek-ai")
 
         for field, value in (
-            ("dspark_enabled", True),
             ("mtp_enabled", True),
             ("staged_expert_streaming", True),
             ("adaptive_expert_prefill_threshold", 0.5),
@@ -222,20 +221,18 @@ class ModelCatalogTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ModelCatalogError):
                 parse_model_catalog({"version": 1, "models": [model]})
 
-    def test_grouped_decode_accepts_qwen_and_rejects_mtp(self):
-        model = raw_model("qwen3.8-flash-next")
-        model["runtime"]["qwen_grouped_decode"] = True
-        parsed = parse_model_catalog({"version": 1, "models": [model]})
-        self.assertTrue(parsed[0].runtime.qwen_grouped_decode)
-        model["runtime"]["mtp_enabled"] = True
-        with self.assertRaises(ModelCatalogError):
-            parse_model_catalog({"version": 1, "models": [model]})
-
-    def test_catalog_without_new_grouped_decode_field_preserves_legacy_default(self):
-        model = raw_model("qwen3.8-flash-next")
-        del model["runtime"]["qwen_grouped_decode"]
-        parsed = parse_model_catalog({"version": 1, "models": [model]})
-        self.assertFalse(parsed[0].runtime.qwen_grouped_decode)
+    def test_removed_decode_features_accept_only_disabled_legacy_values(self):
+        for kind in ("deepseek-v4", "deepseek-v4.1", "qwen3.8-flash-next"):
+            for field in ("qwen_grouped_decode", "qwen_short_block"):
+                model = raw_model(kind)
+                model["runtime"][field] = False
+                parsed = parse_model_catalog({"version": 1, "models": [model]})[0]
+                self.assertFalse(hasattr(parsed.runtime, field))
+                for invalid in (True, 0, "false", None):
+                    model["runtime"][field] = invalid
+                    with self.subTest(kind=kind, field=field, value=invalid):
+                        with self.assertRaisesRegex(ModelCatalogError, "removed"):
+                            parse_model_catalog({"version": 1, "models": [model]})
 
     def test_layer_major_prefill_threshold_must_be_positive(self):
         model = raw_model("deepseek-v4")

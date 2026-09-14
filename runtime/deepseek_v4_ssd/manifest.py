@@ -216,7 +216,8 @@ class InstalledModel:
             )
             for layer in range(3):
                 path = f"dspark/experts/layer_{layer:02d}.bin"
-                if files[path] != expected_layer_size:
+                dspark_layer_size = 128 * contract["expert_blob_size"] if contract["model_kind"] == "deepseek-v4.1" else expected_layer_size
+                if files[path] != dspark_layer_size:
                     raise ValueError(f"installed DSpark expert layer has an invalid size: {path}")
 
         mtp_raw = raw.get("mtp")

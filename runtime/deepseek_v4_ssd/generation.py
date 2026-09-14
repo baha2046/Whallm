@@ -95,18 +95,6 @@ def _route_phase(expert_cache, phase: str):
     return trace_routes(phase) if callable(trace_routes) else nullcontext()
 
 
-@contextmanager
-def _qwen_decode_request(runtime):
-    if not getattr(runtime.config, "qwen_grouped_decode", False):
-        yield
-        return
-    with runtime.expert_cache.qwen_decode_request():
-        try:
-            yield
-        finally:
-            # Drain mlx-lm's lookahead before cancellation or a new request can
-            # overwrite physical slots on this runtime's generation stream.
-            mx.synchronize(runtime._generation_stream)
 
 
 @contextmanager
@@ -231,8 +219,12 @@ def _prompt_cache_contract(installed: InstalledModel, config: RuntimeConfig) -> 
         "format": _PROMPT_CACHE_CONTRACT_FORMAT,
         "revision": str(getattr(installed, "revision", "")),
         "modelID": str(getattr(installed, "model_id", "")),
+        **({"v41PackedCache": [getattr(config, "v41_packed_kv", False), getattr(config, "v41_packed_index", False)]}
+           if getattr(config, "v41_packed_kv", False) or getattr(config, "v41_packed_index", False) else {}),
+        **({"qwenQuantizedCache": [getattr(config, "qwen_quantized_kv", False), getattr(config, "qwen_quantized_index", False)]}
+           if getattr(config, "qwen_quantized_kv", False) or getattr(config, "qwen_quantized_index", False) else {}),
+        **({"deepseekANE": config.ane_prefill_ratio} if getattr(config, "deepseek_ane_prefill", False) else {}),
         # Keep legacy cache contracts unchanged when the experiment is off.
-        **({"qwenGroupedDecode": True} if getattr(config, "qwen_grouped_decode", False) else {}),
         "modelConfigSHA256": _sha256_json(raw_config),
         "rope": {key: raw_config.get(key) for key in rope_keys},
         "kvFormat": {
@@ -1087,7 +1079,6 @@ class RuntimeMetrics:
                 "prompt_cache_write_seconds": self._prompt_cache_write_seconds,
                 "prompt_cache_write_errors": self._prompt_cache_write_errors,
                 "prompt_cache_write_error": self._prompt_cache_write_error,
-                "qwen_short_block": dict(getattr(self, "qwen_short_block", {})),
                 "request_prefill_step_size": self._prefill_step_size,
                 "layer_major_prefill": self._layer_major_prefill,
                 "request_expert_cache_hit_rate": self._expert_request.hit_rate,
@@ -1805,7 +1796,7 @@ class ModelRuntime:
         )
         with self._generation_lock, _approximation_mode(
             self, options.approximation_mode
-        ), _qwen_decode_request(self):
+        ):
             with mx.stream(self._generation_stream):
                 prompt_tokens = list(prompt) if isinstance(prompt, list) else self._encode_prompt(prompt)
                 available_tokens = getattr(
@@ -1877,18 +1868,6 @@ class ModelRuntime:
                     dspark_cache=(dspark.expert_cache if dspark is not None else None),
                     dspark_prompt_cache_source=dspark_prompt_cache_source,
                     approximation_mode=options.approximation_mode,
-                )
-                block_enabled = bool(getattr(self.config, "qwen_short_block", False))
-                use_short_block = bool(
-                    block_enabled and self.support.descriptor.supports("shortBlock")
-                    and dspark is None and mtp is None
-                    and getattr(self.expert_cache, "qwen_short_block_active", False)
-                    and options.approximation_mode == EXACT_APPROXIMATION_MODE
-                )
-                self.metrics.qwen_short_block = dict(
-                    enabled=block_enabled, active=use_short_block, rounds=0,
-                    proposed_tokens=0, accepted_tokens=0, memory_fallbacks=0,
-                    reason="ready" if use_short_block else "disabled or incompatible mode/layout",
                 )
                 completed = False
                 prefill_persist_entry = None
@@ -1980,16 +1959,8 @@ class ModelRuntime:
                             )
                         generation_prompt = generation_prompt[-1:]
                     with _use_mlx_lm_generation_stream(self._generation_stream):
-                        if getattr(self.config, "qwen_grouped_decode", False):
-                            self.expert_cache.set_qwen_decode_prefill(len(generation_prompt))
-                        generate = stream_generate
-                        extra = {}
-                        if use_short_block:
-                            from .qwen_block_generation import stream_block_generate
-                            generate = stream_block_generate
-                            extra = dict(history=prompt_tokens, stats=self.metrics.qwen_short_block)
                         responses = iter(
-                            generate(
+                            stream_generate(
                                 self.model,
                                 self.tokenizer,
                                 generation_prompt,
@@ -1999,7 +1970,6 @@ class ModelRuntime:
                                 prompt_cache=prompt_cache,
                                 prefill_step_size=step_size,
                                 prompt_progress_callback=record_prefill_checkpoint,
-                                **extra,
                             )
                         )
                         with closing(responses):

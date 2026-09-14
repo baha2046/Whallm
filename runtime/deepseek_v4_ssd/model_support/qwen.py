@@ -35,6 +35,7 @@ class QwenSupport(ModelSupport):
         return _qwen_layer_major_prefill(
             model, tokens, cache, step_size, expert_cache,
             getattr(config, "qwen_next_layer_prefetch", False),
+            getattr(config, "batched_expert_prefill", True),
         )
 
     def open_codec(self, root, tokenizer):
@@ -164,6 +165,7 @@ def _qwen_layer_major_prefill(
     step_size: int,
     expert_cache: Any,
     next_layer_prefetch: bool = False,
+    batched_expert_prefill: bool = True,
 ) -> mx.array | None:
     """Populate Qwen caches while reading each complete expert layer once."""
     if not token_ids:
@@ -172,7 +174,7 @@ def _qwen_layer_major_prefill(
     if len(prompt_cache) != len(core.layers):
         raise ValueError("prompt cache does not match the Qwen model layers")
     release_slots = getattr(expert_cache, "release_prefill_slots", None)
-    if callable(release_slots):
+    if batched_expert_prefill and callable(release_slots):
         release_slots()
     record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
     inputs = mx.array(token_ids)[None]
@@ -180,7 +182,8 @@ def _qwen_layer_major_prefill(
     for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
         check_cancelled()
         outputs = []
-        with expert_cache.batched_layer(layer_index):
+        from contextlib import nullcontext
+        with expert_cache.batched_layer(layer_index) if batched_expert_prefill else nullcontext():
             for start in range(0, len(token_ids), step_size):
                 check_cancelled()
                 end = min(start + step_size, len(token_ids))
@@ -196,7 +199,7 @@ def _qwen_layer_major_prefill(
                 )
                 output = layer(chunk, chunk_ids, mask, layer_cache)
                 if (
-                    next_layer_prefetch
+                    batched_expert_prefill and next_layer_prefetch
                     and start == 0
                     and layer_index + 1 < len(core.layers)
                 ):

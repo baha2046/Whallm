@@ -147,6 +147,7 @@ def _ane_output_channels(ratio: float) -> int:
 
 class ANEPrefillController:
     def __init__(self, requested: bool, ratio: float = 0.25):
+        self.output_channels = _QWEN_OUTPUT_CHANNELS
         self.requested = requested
         self.requested_ratio = ratio
         self.ane_channels = _ane_output_channels(ratio) if requested else 0
@@ -181,9 +182,9 @@ class ANEPrefillController:
         return {
             "requested": self.requested,
             "requested_ratio": self.requested_ratio,
-            "active_ratio": active_ane_channels / _QWEN_OUTPUT_CHANNELS,
+            "active_ratio": active_ane_channels / self.output_channels,
             "ane_channels": active_ane_channels,
-            "gpu_channels": _QWEN_OUTPUT_CHANNELS - active_ane_channels,
+            "gpu_channels": self.output_channels - active_ane_channels,
             "active": self.active,
             "error": self.error,
             "evaluations": self.evaluations,
@@ -279,3 +280,78 @@ def install_qwen_ane_prefill(
     except Exception as error:
         controller.disable(error)
         return controller
+
+
+class ANEQuantizedPrefillLinear(nn.Module):
+    """Retain the original quantized GPU projection for Decode and all fallbacks."""
+    def __init__(self, linear, projection, controller):
+        super().__init__()
+        import copy
+        self._linear = linear
+        self._projection = projection
+        self._controller = controller
+        self._gpu_channels = linear.weight.shape[0] - projection.output_channels
+        self._gpu = copy.copy(linear)
+        for key in ('weight', 'scales', 'biases', 'bias'):
+            value = getattr(linear, key, None)
+            if value is not None:
+                self._gpu[key] = value[:self._gpu_channels]
+
+    def __call__(self, value):
+        if (not self._controller.active or value.ndim != 3 or value.shape[:2] != (1, self._projection.spatial)
+                or value.shape[-1] != self._projection.input_channels):
+            return self._linear(value)
+        try:
+            cpu = np.ascontiguousarray(np.asarray(value.astype(mx.float16))[0])
+            gpu = self._gpu(value) if self._gpu_channels else None
+            if gpu is not None:
+                mx.async_eval(gpu)
+            ane = mx.array(self._projection.evaluate(cpu)[None]).astype(value.dtype)
+            bias = getattr(self._linear, 'bias', None)
+            if bias is not None:
+                ane = ane + bias[-self._projection.output_channels:]
+            self._controller.evaluations += 1
+            return mx.concatenate([gpu, ane], axis=-1) if gpu is not None else ane
+        except Exception as error:
+            self._controller.disable(error, fallback=True)
+            return self._linear(value)
+
+
+def install_deepseek_ane_prefill(model, requested, ratio=0.25):
+    """Compile only the selected query-projection rows; leave quantized weights resident."""
+    core = getattr(model, 'model', model)
+    layers = core.layers
+    outputs = layers[0].attn.wq_b.weight.shape[0]
+    controller = ANEPrefillController(False, ratio)
+    controller.requested = requested
+    controller.output_channels = outputs
+    if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 <= ratio <= 1:
+        raise ValueError('ANE Prefill ratio must be between zero and one')
+    controller.ane_channels = min(outputs, int(ratio * outputs / 256 + 0.5) * 256) if requested else 0
+    if not controller.ane_channels:
+        return controller
+    replacements = []
+    try:
+        library = _ANELibrary.open()
+        for layer in layers:
+            linear = layer.attn.wq_b
+            rows = controller.ane_channels
+            if linear.weight.shape[0] != outputs:
+                raise ValueError('DeepSeek query projection widths must match')
+            if hasattr(linear, 'scales'):
+                weight = mx.dequantize(linear.weight[-rows:], linear.scales[-rows:],
+                    biases=(linear.biases[-rows:] if getattr(linear, 'biases', None) is not None else None),
+                    group_size=linear.group_size, bits=linear.bits, mode=linear.mode)
+            else:
+                weight = linear.weight[-rows:]
+            projection = library.create(np.asarray(weight.astype(mx.float16)), _ANE_SPATIAL)
+            controller.add(projection)
+            projection.evaluate(np.zeros((_ANE_SPATIAL, weight.shape[1]), np.float16))
+            replacements.append((layer.attn, ANEQuantizedPrefillLinear(linear, projection, controller)))
+        # Publish only once every layer compiled successfully.
+        for attention, linear in replacements:
+            attention.wq_b = linear
+        controller.active = True
+    except Exception as error:
+        controller.disable(error)
+    return controller

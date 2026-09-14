@@ -6,6 +6,7 @@ import mlx.core as mx
 from mlx_lm.models.cache import CacheList, make_prompt_cache
 from ..model import _cache_arrays
 from ..fp8_cache import MXFP8PoolingCache
+from ..qwen_quantized_cache import QSAQuantizedCache
 
 class _RawEvalCacheList(CacheList):
     @property
@@ -100,6 +101,8 @@ def _decode_cache_state(value: Any, arrays: dict[str, mx.array]) -> Any:
 
 
 def _persistence_item(item: Any) -> dict[str, Any]:
+    if isinstance(item, QSAQuantizedCache):
+        return {"kind": "qsa_quantized", "value": item.persistence_state()}
     if isinstance(item, MXFP8PoolingCache):
         return {
             "kind": "mxfp8_pooling",
@@ -129,6 +132,13 @@ def _persistence_cache_state(cache: Any) -> list[dict[str, Any]]:
 
 def _restore_persistence_item(target: Any, saved: dict[str, Any]) -> None:
     kind = saved.get("kind")
+    if kind == "qsa_quantized":
+        if not isinstance(target, QSAQuantizedCache):
+            raise ValueError("QSA prompt cache format does not match")
+        target.restore_persistence_state(saved["value"])
+        return
+    if isinstance(target, QSAQuantizedCache):
+        raise ValueError("QSA prompt cache format does not match")
     if kind == "mxfp8_pooling":
         if not isinstance(target, MXFP8PoolingCache):
             raise ValueError("prompt cache type does not match the saved cache")

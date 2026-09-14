@@ -43,7 +43,7 @@ class CLITests(unittest.TestCase):
             ),
             "exact",
         )
-        for is_qwen, dspark_enabled in ((True, False), (False, True)):
+        for is_qwen, dspark_enabled in ((True, True), (False, True)):
             with self.subTest(is_qwen=is_qwen, dspark_enabled=dspark_enabled):
                 self.assertEqual(
                     _select_approximation_mode(

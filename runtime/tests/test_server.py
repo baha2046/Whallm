@@ -385,7 +385,7 @@ class QwenSamplingServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         self.assertEqual(json.loads(body)["error"]["param"], "presence_penalty")
 
-    def test_qwen_request_rejects_approximation(self):
+    def test_qwen_request_accepts_explicit_approximation(self):
         status, body = self.request(
             "/v1/chat/completions",
             {
@@ -394,8 +394,8 @@ class QwenSamplingServerTests(unittest.TestCase):
                 "approximation": {"mode": "learned-route-drop-lowest-1"},
             },
         )
-        self.assertEqual(status, 400)
-        self.assertEqual(json.loads(body)["error"]["param"], "approximation.mode")
+        self.assertEqual(status, 200)
+        self.assertEqual(self.runtime.last_options.approximation_mode, "learned-route-drop-lowest-1")
 
     def test_qwen_codex_first_turn_requires_tool_and_retries_once(self):
         runtime = self.runtime
@@ -747,7 +747,7 @@ class ServerTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.param, "approximation.mode")
 
-    def test_approximation_rejects_deepseek_v41_runtime(self):
+    def test_approximation_accepts_deepseek_v41_runtime(self):
         options = GenerationOptions(
             approximation_mode="learned-route-drop-lowest-1"
         )
@@ -756,10 +756,7 @@ class ServerTests(unittest.TestCase):
             config=SimpleNamespace(dspark_enabled=False),
         )
 
-        with self.assertRaises(APIError) as raised:
-            _validate_approximation_runtime(options, runtime)
-
-        self.assertEqual(raised.exception.param, "approximation.mode")
+        _validate_approximation_runtime(options, runtime)
 
     def test_generation_token_limit_is_272000(self):
         self.assertEqual(_options({"max_tokens": 272_000}, ServerDefaults()).max_tokens, 272_000)

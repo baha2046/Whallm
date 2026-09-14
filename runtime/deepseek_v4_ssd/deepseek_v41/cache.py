@@ -22,28 +22,33 @@ import mlx.core as mx
 
 from .compressor import CompressorState
 from .config import ModelArgs
+from .packed_cache import PackedRows
 
 
 class LayerCache:
     def __init__(self, bsz: int, args: ModelArgs, layer_id: int, max_seq_len: int,
-                 dtype=mx.float32):
+                 dtype=mx.float32, packed_kv=False, packed_index=False):
         self.window = args.window_size
         self.ratio = args.compress_ratio(layer_id)
         self.is_kv_source = layer_id in args.kv_source_layers
         self.dtype = dtype
 
-        self.win_kv = mx.zeros((bsz, self.window, args.head_dim), dtype=dtype)
+        self.packed_kv, self.packed_index = packed_kv, packed_index
+        self.win_kv = (PackedRows((bsz, self.window, args.head_dim), 'fp8_ue8m0', dtype)
+                       if packed_kv else mx.zeros((bsz, self.window, args.head_dim), dtype=dtype))
 
         self.comp_kv = None
         self.comp_state = None
         self.index_k = None
         if self.is_kv_source:
             n_comp = max_seq_len // self.ratio
-            self.comp_kv = mx.zeros((bsz, n_comp, args.head_dim), dtype=dtype)
+            self.comp_kv = (PackedRows((bsz, n_comp, args.head_dim), 'fp4_e4m3', dtype)
+                            if packed_kv else mx.zeros((bsz, n_comp, args.head_dim), dtype=dtype))
             if self.ratio > 1:
                 self.comp_state = CompressorState(bsz, self.ratio, args.head_dim)
             if layer_id in args.index_source_layers:
-                self.index_k = mx.zeros((bsz, n_comp, args.index_head_dim), dtype=dtype)
+                self.index_k = (PackedRows((bsz, n_comp, args.index_head_dim), 'fp4_ue8m0', dtype)
+                                if packed_index else mx.zeros((bsz, n_comp, args.index_head_dim), dtype=dtype))
 
     # ---- window ring ----
 
@@ -64,16 +69,20 @@ class LayerCache:
         keep = min(n, self.window)
         tail = kv[:, n - keep:]
         slots = (pos + n - keep + mx.arange(keep)) % self.window
-        self.win_kv[:, slots] = tail.astype(self.dtype)
+        if isinstance(self.win_kv, PackedRows):
+            self.win_kv.write((slice(None), slots), tail)
+        else:
+            self.win_kv[:, slots] = tail.astype(self.dtype)
 
 
 class ModelCache:
     def __init__(self, args: ModelArgs, bsz: int = 1, max_seq_len: int | None = None,
-                 dtype=mx.float32):
+                 dtype=mx.float32, packed_kv=False, packed_index=False):
         self.args = args
+        self.packed_kv, self.packed_index = packed_kv, packed_index
         self.max_seq_len = max_seq_len or min(args.max_seq_len, 4096)
         self.offset = 0
-        self.layers = [LayerCache(bsz, args, i, self.max_seq_len, dtype)
+        self.layers = [LayerCache(bsz, args, i, self.max_seq_len, dtype, packed_kv, packed_index)
                        for i in range(args.n_layers)]
         self.engram_ids = (np.zeros((bsz, self.max_seq_len), dtype=np.int64)
                            if args.engram_layer_ids else None)
@@ -88,22 +97,17 @@ class ModelCache:
                 raise ValueError("DeepSeek V4.1 cache exceeds the configured context")
             capacity = next_capacity
         for layer in self.layers:
-            if layer.comp_kv is not None:
+            for name in ('comp_kv', 'index_k'):
+                old = getattr(layer, name)
+                if old is None:
+                    continue
                 rows = capacity // layer.ratio
-                expanded = mx.zeros(
-                    (layer.comp_kv.shape[0], rows, layer.comp_kv.shape[-1]),
-                    dtype=layer.comp_kv.dtype,
-                )
-                expanded[:, : layer.comp_kv.shape[1]] = layer.comp_kv
-                layer.comp_kv = expanded
-            if layer.index_k is not None:
-                rows = capacity // layer.ratio
-                expanded = mx.zeros(
-                    (layer.index_k.shape[0], rows, layer.index_k.shape[-1]),
-                    dtype=layer.index_k.dtype,
-                )
-                expanded[:, : layer.index_k.shape[1]] = layer.index_k
-                layer.index_k = expanded
+                if isinstance(old, PackedRows):
+                    expanded = old.grow(rows)
+                else:
+                    expanded = mx.zeros((old.shape[0], rows, old.shape[-1]), dtype=old.dtype)
+                    expanded[:, :old.shape[1]] = old
+                setattr(layer, name, expanded)
         if self.engram_ids is not None:
             expanded_ids = np.zeros((self.engram_ids.shape[0], capacity), dtype=np.int64)
             expanded_ids[:, : self.engram_ids.shape[1]] = self.engram_ids
