@@ -53,8 +53,8 @@ V4／V4.1 共用分離 `w1/w2/w3` 到 fused slot 的映射；Qwen 使用 `gate_u
 | 模型 | 程式審查結果與處理 |
 | --- | --- |
 | DeepSeek V4 | batched layer-major prefill 有額外整層 expert buffers；進入前釋放舊 Slots。停用 batched experts 時保留 Slots。 |
-| Qwen3.8 | layer-major prefill 同樣另建整層 expert buffers；進入前釋放舊 Slots，保留一般／grouped／bounded pool 類型。 |
-| DeepSeek V4.1 | chunked prefill 使用既有 Slots，沒有整層 expert 預載的相同重疊配置；保留現有快取。 |
+| Qwen3.8 | layer-major prefill 同樣另建整層 expert buffers；進入前釋放舊 Slots，使用一般 expert slot pool；生成階段的 grouped／bounded pool 已移除。 |
+| DeepSeek V4.1 | 預設 chunked prefill 使用既有 Slots；選用 layer-major batched prefill 時先釋放旧 Slots。 |
 
 釋放發生在建立整段輸入 embedding 之前；等待舊 GPU 工作與殘留預讀完成，
 清除實際 slot／arena buffers 和索引，保留模型、檔案描述符、設定及累計指標。
@@ -166,3 +166,6 @@ swift test --skip ServerConfigurationTests.testAPIKeyRoundTripsThroughIsolatedKe
 本次保留既有模型運算來源與 V4/V4.1 的底層建構方式；消除其 module globals
 替換、搬移完整架構到 fork、進一步共用 row store，均需另行驗證。
 本次沒有新的完整模型記憶體或效能結論；驗證結果見 [VALIDATION](VALIDATION.md)。
+
+2026-09-14 新增的 V4.1 DSpark 安裝與 runtime、三模型加速設定及快取格式，
+見 [三模型加速功能](MODEL_ACCELERATION.md)。

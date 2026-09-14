@@ -14,17 +14,10 @@ Python `ModelSupport` 分別處理安裝及 runtime 差異，`ModelPackages.json
 模型身分、App 顯示與設定資料。`ExpertCache` 由套件選擇 expert layout，
 共用讀取和 slot 管理；詳細責任、相容範圍及新增模型步驟見該文件。
 
-Model Advanced Settings 的「保留最近使用的專家資料」預設開啟；Qwen
-「一次確認最多四個字詞」自 2026-09-12 起預設關閉。舊設定缺少欄位時採用目前預設，
-已明確儲存的開關值保留；catalog 將設定傳入 runtime，載入中的模型維持既有設定鎖定規則。
-LRU 不增加 slots；Qwen 合批使用 production `qwen_block_generation.py`、
-`qwen_short_block.py`、`qwen_resident_block.py` 與包內 Metal header，沒有 research
-import 或全域 monkeypatch。它從已知文字提出最多三個候選，主模型以 T=1 dense/state
-數學及一次 expert union 取得各位置 logits，再逐位置抽樣。猜錯或提前結束時，丟棄
-私有 state 並重播已消耗前綴；取消或讀取失敗不儲存未完成對話快取。
-每頁 32 slots 的未使用 payload 上限為 80,947,200 bytes；state fork 計帳上限 300 MB。
-超過 16 個 arena 的 kernel 參數會按 token 分組，仍共用同一次 expert acquisition。
-狀態位元複製修正始終生效，不提供會重新引入錯誤的關閉選項。
+Model Advanced Settings 的專家資料保留設定沿用既有預設。
+三模型新增或補上 UI 的加速路徑見 [三模型加速功能](MODEL_ACCELERATION.md)。
+文字候選四 token 驗證與常駐專家 Decode 合批已移除；Prefill 合批與 DSpark／MTP 保留。
+狀態位元複製修正繼續生效。
 
 ## 元件
 
@@ -443,7 +436,8 @@ Qwen 和啟用 DSpark 的 DeepSeek 預設使用 `exact`。
 Runtime 持有 generation lock 時，會暫時把 40 個 learned router 從 top-6 改為 top-5。
 三個 hash router 保持 top-6。
 Runtime 使用 `finally` 還原 learned router，因此正常完成、錯誤和中止都會回到 top-6。
-Qwen 和 DSpark 會拒絕這個 mode。
+V4.1 與 Qwen 也可明確啟用 top-k 減一；預設皆為 Exact。
+DSpark 和 MTP 會拒絕這個 mode。
 App request 沿用模型設定；DSpark 開啟時固定使用 Exact。
 
 ## DSpark
@@ -452,7 +446,8 @@ DSpark 是可選功能。
 App 下載的 DeepSeek installed model 固定包含 DSpark weights。
 runtime 預設不啟用 DSpark。
 
-目前 DSpark 合約如下。
+以下為 V4 的 DSpark 合約。V4.1 的 128 專家、top-3 合約見
+[三模型加速功能](MODEL_ACCELERATION.md#v41-dspark-安裝)。
 
 | 欄位 | 值 |
 | --- | ---: |

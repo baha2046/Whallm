@@ -1,5 +1,17 @@
 # 驗證紀錄
 
+## 2026-09-14：三模型加速 local build
+
+- 基準 `5d3df76` 加當前工作樹，Apple M5 Pro；包含三模型加速設定、近似模式預設關閉、兩項生成路徑移除、Prefill 取消及 Qwen Slots 3072。
+- Python **424 項**、Swift **91 項**通過；Swift 排除既有互動式 Keychain 測試。
+- `make package APP_VERSION=1.1.7 BUILD_VERSION=1.1.7d2 CODE_SIGN_IDENTITY=- NOTARY_PROFILE=` 完成，產生 `dist/Whallm.app` 與 `dist/Whallm-macOS-arm64.zip`。
+- App 與暫存目錄內的 ZIP 解壓副本均通過 `codesign --verify --deep --strict`。
+- 兩份 App 的 en／zh-Hans／zh-Hant 六次啟動，均禁止讀取專案 `.build` 與 Swift module bundle，仍完成 L10n 初始化並存活；local build 旗標皆為 1。`L10n` 先從 `Bundle.main` 的 `Contents/Resources` 讀取，再考慮 `.module`。
+- 包內 Python 禁止讀取專案 `.build`、`.venv`、`runtime`、`Sources`，新增功能 **12 項測試通過**。44 個 runtime Python 原始檔與工作樹逐位元相符；已移除的四個 runtime／kernel 檔案未出現在成品。
+- 使用 ad hoc 簽章；沒有建立 tag、公證或上傳。完整模型的速度與品質仍未另行實測。
+- ZIP：186355021 bytes；SHA-256：`aa52789e960d9ffeceda46322a759f85993835c6237109d1002413256344a5d3`。
+- logs、來源 hashes、包內測試與成品紀錄：`scratch/local-build-2026-09-14-acceleration/`。
+
 ## 2026-09-14：共用 Prefill 中途取消
 
 - 來源為 `6821af3` 加目前工作樹修改。原先 V4 逐層 Prefill 未檢查取消旗標；
@@ -3596,3 +3608,19 @@ ownership release。新候選因速度 gate 失敗，未宣稱完成完整 runti
 本輪 runtime unittest **360 項通過**，研究 component **3 項通過**；source hashes
 與開始時一致，未改 production。詳見
 [原始資料與 source archive](benchmarks/2026-09-07-ssd-three-directions/summary.json)。
+
+
+## 2026-09-14 三模型加速原始碼驗證
+
+基準 `5d3df76` 加本次未提交修改，Apple M5 Pro。
+本節晚於上方 local build；沒有重新封裝或發布。
+
+- `PYTHONPATH=runtime .venv/bin/python -m unittest discover -s runtime/tests`：424 項通過。
+- `swift test -Xswiftc -DWHALLM_LOCAL_BUILD --skip Keychain`：91 項通過；未執行會存取 Keychain 的隔離測試。
+- 新增 UI 的八個開關均有英文、簡體中文、繁體中文文案；設定編碼、模型分流與互斥條件測試通過。未執行 GUI 點擊驗證。
+- V4.1 官方固定 revision 的 DSpark 97 個 common tensor headers 與本機模型名稱、形狀相符；未下載完整權重。
+- 本機原生 ANE 完成 1×1024×32 輸入、512 輸出通道、50% 分工的單投影；active=true、evaluations=1，對 GPU 最大絕對差 0.002398。這不是速度測試。
+- `git diff --check` 通過。
+
+覆蓋項目與限制詳見 [三模型加速功能](MODEL_ACCELERATION.md)。
+完整模型載入、速度與品質比較仍待驗證，不把小模型或假 ANE 後端測試當成完整模型效能結果。

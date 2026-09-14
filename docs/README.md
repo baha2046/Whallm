@@ -1,11 +1,17 @@
 # Whallm 文件
 
+2026-09-14 三模型加速功能已補齊原始碼與進階設定；近似模式預設關閉，
+文字候選四 token 驗證與常駐專家 Decode 合批已移除。
+新增功能、格式、相依條件與驗證限制見 [三模型加速功能](MODEL_ACCELERATION.md)。
+這些變更已完成 local build：版本 `1.1.7 / 1.1.7d2`，Swift 91 項、Python 424 項、包內隔離測試 12 項通過。
+App 與 ZIP 解壓副本均通過簽章與三語系隔離啟動；未公證或發布。
+詳見 [本次打包紀錄](VALIDATION.md#2026-09-14三模型加速-local-build)。下方較早紀錄保留當時狀態。
+
 原始碼已補齊 Prefill 中途取消，適用一般 server request 與 Throughput：
 V4 增加分批／層間檢查、V4.1 增加層間檢查，三模型共用 expert 讀取取消與安全收尾。
-詳見 [Prefill 取消](MODEL_PACKAGES.md#prefill-取消)。此修改尚未打包或發布，
-下方 local build 紀錄不包含此修正。
+詳見 [Prefill 取消](MODEL_PACKAGES.md#prefill-取消)。已包含於本次 local build，尚未發布。
 
-2026-09-14 已完成最新 local build：`dist/Whallm.app` 與 ZIP 包含記憶體與卸載等修正，
+2026-09-14 較早的 local build：`dist/Whallm.app` 與 ZIP 包含記憶體與卸載等修正，
 版本保留 `1.1.7`／`1.1.7d2`，使用 ad hoc 簽章、啟用 Dry run，未公證或發布。
 Swift 89 項、Python 422 項與包內隔離測試 26 項通過；App 與 ZIP 解壓副本
 均通過簽章及三語系隔離啟動。詳見 [本機封裝驗證](VALIDATION.md#2026-09-14最新修正-build-local)。
@@ -22,7 +28,7 @@ Throughput 原始碼已修正整輪完成、取消或失敗後自動卸載模型
 [記憶體排查](benchmarks/2026-09-14-throughput-memory/README.md)，不是新的速度效能結論。
 
 目前原始碼已將 Qwen3.8 的 Slots 預設與建議值改為 **3072**，保留已儲存的自訂值。
-本次數值修改尚未重新打包；目前 local build 仍為 2048，已發布 Alpha 仍為 4096。
+本次 local build 已包含 3072；較早 local build 為 2048，已發布 Alpha 仍為 4096。
 
 原始碼另已加入 DeepSeek V4.1 的 Memory／Disk Prompt Cache 與 Advanced Settings 選項，
 新設定預設 Memory，已保存的選擇保留。小型模型測試通過，尚未驗證完整 checkpoint，

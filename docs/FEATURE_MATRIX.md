@@ -1,6 +1,7 @@
 # 命令列與 UI 功能對照
 
-核對日期：2026-09-13。基準為 `develop`（`0204409`）加目前未提交修改，
+核對日期：2026-09-14。新增加速功能完整對照見 [三模型加速功能](MODEL_ACCELERATION.md)。
+基準為目前未提交原始碼，
 不是已發布的 v1.1.6 成品。表格依目前程式入口逐項核對，不代表所有模型都已完成實機驗證。
 
 - **CLI**：`python -m deepseek_v4_ssd.cli`，直接生成一次。
@@ -16,14 +17,13 @@ Throughput 頁面的測試流程、數據定義與限制見 [Throughput](THROUGH
 
 | 功能 | 命令列 | UI | 預設／行為 |
 | --- | --- | --- | --- |
-| 長輸入前釋放舊 expert Slots | CLI／Server／Throughput 共用 runtime | 自動；無新開關 | V4 batched layer-major 與 Qwen layer-major 在建立輸入暫存前釋放；保留模型和 Prompt Cache；V4.1 無相同重疊配置。原始碼已修正，尚未發布 |
+| 長輸入前釋放舊 expert Slots | CLI／Server／Throughput 共用 runtime | 自動；無新開關 | V4 batched layer-major 與 Qwen layer-major 在建立輸入暫存前釋放；保留模型和 Prompt Cache；V4.1 選用按層合批時也會釋放。原始碼已修正，尚未發布 |
 | 吞吐量測試 | API：`POST /api/benchmark/throughput` | Throughput | Code／Novel 下拉選單；不重複補長的內建素材（gzip 合計約 698 KB），三種 tokenizer 均覆蓋 200K；自動載入模型，整輪結束後 App 自動卸載（原始碼已實作，尚未發布）；1K–200K 輸入多選；128／1024／4096 輸出上限；逐筆結果與取消；結果保留當次 slots；可複製純文字／JSON／Markdown 表格 |
 | 關閉跨請求快取 | CLI／Server：`--prompt-cache off` | Model → Advanced Settings → Prompt cache → 不使用 | 每次重新處理輸入；單次生成仍需 KV state |
 | 記憶體快取 | CLI／Server：`--prompt-cache memory` | 同上 → 記憶體 | **新預設**；不建立、讀取或寫入磁碟快取 |
 | 磁碟快取 | CLI／Server：`--prompt-cache disk` | 同上 → 磁碟 | 記憶體重用加磁碟保存，可跨重啟恢復 |
 | catalog 與 CLI 同時設定 | Server：明確 CLI 參數優先 | App 產生各模型的 JSON | CLI 沒給的欄位保留 JSON；覆寫後重新驗證 |
 | Log Level | Server：`--log-level debug\|info\|error` | **Log 頁面** | Info；下次啟動 server 生效 |
-| Qwen 一次確認最多四個 token | CLI／Server：`--qwen-short-block`／`--no-qwen-short-block` | Qwen → Advanced Settings | **新預設關閉**；已明確儲存的選擇保留 |
 
 DeepSeek V4／V4.1 與 Qwen 均提供記憶體／磁碟 Prompt Cache 選項。
 Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由實驗旗標控制。
@@ -42,7 +42,7 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 | 取消安裝 | 結束安裝程序 | Stop Current Operation | 保留可續傳資料 |
 | 校驗模型 | `dsv4-repack verify --model` | Verify and repair | UI 另會下載缺少或損壞的資料 |
 | 修復安裝 | 重跑 `repack`，沿用安裝計畫與續傳 | Verify and repair | CLI 的 `verify` 本身只校驗 |
-| 安裝 DSpark | `dsv4-repack install-dspark` | DeepSeek 新安裝包含 DSpark | 安裝不等於啟用 |
+| 安裝 DSpark | `dsv4-repack install-dspark` | V4 新安裝包含；V4.1 可另行安裝 | 安裝不等於啟用 |
 | 安裝 Qwen MTP | `dsv4-repack install-mtp` | Qwen 的 MTP 下載按鈕 | 保留主模型 |
 | 選擇模型目錄 | CLI／Server：`--model PATH`；catalog 的 `path` | Select Model Folder | UI 顯示空間、可用性與修復狀態 |
 | 模型 Alias | Server：`--public-model` 或 JSON `alias` | Model → Advanced Settings → Alias | `--public-model` 僅限單模型啟動 |
@@ -86,15 +86,14 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 | MoE 輸入分批大小 | `--moe-prefill-step-size` | 同左 | MoE prefill step size；預設 0（自動），不可為負 |
 | 按層處理輸入 | `--no-layer-major-prefill` | 同左 | 支援模型的 Use layer-major prefill |
 | 按層處理門檻 | `--layer-major-prefill-threshold` | 同左 | DeepSeek V4 可調；Qwen 使用模型門檻 |
-| Expert 合批輸入 | `--no-batched-expert-prefill` | 同左 | 固定開啟，沒有獨立控制項 |
+| Expert 合批輸入 | `--no-batched-expert-prefill` | 同左 | 支援模型的合批處理輸入開關 |
 | Qwen Prefill acceleration | `--qwen-grouped-experts`／`--no-qwen-grouped-experts` | 同左 | Qwen 開關；預設開啟，MTP 開啟時停用 |
 | ANE Prefill | `--no-ane-prefill` | 同左 | 沒有獨立開關；Qwen 提供 ANE Prefill share |
 | ANE 分工比例 | `--ane-prefill-ratio` | 同左 | Qwen ANE Prefill share；0 表示 GPU only |
 | FP8／BF16 KV cache | `--bf16-kv-cache` | 同左 | DeepSeek V4 可選 BF16；其他模型固定 |
 | FP4 index cache | `--no-fp4-index-cache` | 同左 | 固定開啟，沒有控制項 |
-| Ready expert decode | `--no-ready-expert-decode` | 同左 | 固定開啟，沒有控制項 |
+| Ready expert decode | `--no-ready-expert-decode` | 同左 | 三模型皆有開關 |
 | LRU／LFU 專家資料淘汰方式 | `--expert-eviction-policy` | 同左 | Expert cache eviction 選單：LRU／LFU；App 預設 LRU，CLI 預設 LFU |
-| Qwen 四 token 合批 | `--qwen-short-block`／`--no-qwen-short-block` | 同左 | Qwen 開關；新預設關閉 |
 | Prompt cache 模式 | `--prompt-cache off\|memory\|disk` | 同左 | 不使用／記憶體／磁碟；新預設記憶體 |
 | Prompt cache 筆數 | `--prompt-cache-entries` | 同左 | Prompt cache entries；不使用時隱藏 |
 | Prompt cache 記憶體限額 | `--prompt-cache-memory-gib` | 同左 | Prompt cache GiB；不使用時隱藏 |
@@ -118,8 +117,7 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 
 | 功能／欄位 | CLI | Server 命令列／JSON | UI |
 | --- | --- | --- | --- |
-| Qwen 下一層預讀 | `--qwen-next-layer-prefetch` | JSON `qwen_next_layer_prefetch` | 固定關閉 |
-| Qwen grouped Decode | `--qwen-grouped-decode` | JSON `qwen_grouped_decode` | 固定關閉 |
+| Qwen 下一層預讀 | `--qwen-next-layer-prefetch` | JSON `qwen_next_layer_prefetch` | 進階設定；預設關閉 |
 | DSpark prompt cache | `--dspark-prompt-cache` | 同左 | 固定關閉 |
 | DSpark hash 預讀 | `--dspark-hash-prefetch` | 同左 | 固定關閉 |
 | DSpark adaptive block | `--dspark-adaptive-block` | 同左 | 固定關閉 |

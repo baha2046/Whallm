@@ -86,8 +86,10 @@ Existing saved slot settings are preserved.
 ## Current boundary
 
 This integration is text-only. It excludes the checkpoint's vision tower and
-aligner. It also disables MTP/DSpark, staged or adaptive expert prefill,
-and layer-major prefill. Prompt-cache reuse and persistence are now implemented
+aligner. Staged and adaptive expert prefill remain unavailable.
+Optional layer-major/batched Prefill, CED, packed caches, candidate-only index scoring,
+ANE projection, approximation and DSpark are now implemented in source.
+See [current acceleration settings and validation](MODEL_ACCELERATION.md). Prompt-cache reuse and persistence are now implemented
 and included in the 2026-09-14 local build, after the published `v1.1.7-dev.2` Alpha.
 
 ## Prompt cache

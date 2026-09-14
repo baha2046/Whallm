@@ -501,7 +501,11 @@ tokenizer 後實際為 4,577 tokens，不能以檔名判定 token 數。
 品質、官方 reference parity 或候選配對效能驗證。
 MXFP4 routed expert 輸出不保證等同官方 FP8。
 
-## Grouped Decode 實驗
+## Grouped Decode 歷史實驗
+
+以下記錄僅供追溯：2026-09-14 已移除其 runtime、CLI 與 UI，不能再啟用。
+目前 Qwen 新增 ready-expert Decode、QSA 低位元快取與近似模式，見
+[三模型加速功能](MODEL_ACCELERATION.md)。
 
 CLI `--qwen-grouped-decode` 或 model catalog `runtime.qwen_grouped_decode=true`
 使用 resident expert 的分區 arena 與 grouped QMM。預設仍為 `false`，APP 也固定

@@ -1,7 +1,7 @@
 # Whallm
 
 <p align="center">
-  <img src="Packaging/AppIcon.png" alt="Whallm APP Icon" width="160">
+  <a href="."><img height="160" src="Packaging/AppIcon.png" alt="Whallm"></a>
 </p>
 
 <p align="center">
@@ -12,99 +12,116 @@
   <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
 </p>
 
-> [!NOTE]
-> Whallm 的舊名稱是 DeepSeekV4SSD。改名前發布的 release 仍使用舊 APP 與 ZIP 名稱。
+Whallm 讓 Apple Silicon Mac 從 SSD 讀取需要的專家權重，在本機執行大型語言模型。支援 DeepSeek V4、DeepSeek V4.1 與 Qwen3.8，提供內建聊天和 OpenAI 相容 API。
 
-Whallm 讓 M 系列 Mac 執行 `DeepSeek-V4-Flash-0731` 的全部 284B 參數。
-Whallm 從 SSD 串流 routed expert。
-Whallm 也支援 `Qwen3.8-Flash-Next-FP8` text checkpoint。
-本專案的設計啟發自 [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare)。
+## 效能摘要
 
-## 峰值記憶體參考
+| 模型 | 晶片 | Prefill | Decode | 峰值記憶體 | 專家快取 Slots |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `DeepSeek-V4-Flash-0731` | M5 Pro | 53.6–201.0 tok/s | 5.9–7.7 tok/s | 23 GiB | 1152 |
+| `Qwen3.8-Flash-Next-FP8` | M5 Pro | 99.1–153.7 tok/s | 8.5–10.6 tok/s | 18 GiB | 3072 |
+| `DeepSeek-V4.1-Flash` | M2 Max | 13.9–65.9 tok/s | 1.8–2.2 tok/s | 33 GiB | 1152 |
 
-| 模型 | 量測到的峰值記憶體 |
-| --- | ---: |
-| `DeepSeek-V4-Flash-0731` | 32.84–35.70 GiB |
-| `Qwen3.8-Flash-Next-FP8` | 20.92–22.75 GiB |
+> 使用 v1.1.7 內建 Throughput 效能測試，輸入長度為 1,024 至 16,384 tokens。
+>
+> 詳細資料見[完整效能測試](#效能測試)。
 
-v1.1.4 測試使用 1,024 到 16,384 個 input token 的對話 prompt。
-這些結果是量測值。這些結果不是最低記憶體需求，也不是效能保證。
-prompt 長度、tool、cache 狀態和 runtime 設定會改變峰值記憶體。
-請參閱[完整 Benchmark](BENCHMARK.md)和[完整驗證紀錄](docs/VALIDATION.md)。
+## 快速開始
 
-## Benchmark
+1. 從 [GitHub Releases](https://github.com/yanun0323/Whallm/releases) 下載 `Whallm-macOS-arm64.zip`，解壓縮後開啟 `Whallm.app`。
+2. 開啟 **Model**，選擇模型並按 **Download Model**。App 會檢查儲存空間，中斷的下載可以繼續。
+3. 開啟 **Server**，按 **Start Server**。
+4. 到 **Chat** 選擇模型開始對話，或依下方範例連接 API 用戶端。
 
-v1.1.4 測試在配備 Apple M5 Pro、64 GB 統一記憶體和 1 TB 儲存空間的
-MacBook Pro 執行。測試使用 SPEED-Bench mixed prompts、每個 input size 跑三次，
-output 上限是 64 tokens。三次測試使用 nearest-rank P95 時，P95 等於最大值。
-TTFT 表示第一個 token 的等待時間。
+預設位址為 `http://127.0.0.1:11434`。模型在首次使用時載入；伺服器一次保留一個模型，依序處理生成請求。若聊天選單沒有剛安裝的模型，請重新啟動伺服器。
 
-### DeepSeek V4 Flash 0731
-
-| Input token | P95 總時間 | P95 TTFT | P95 Prefill | P95 Decode | 峰值記憶體 |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 27.10 s | 17.75 s | 59.9 tok/s | 7.8 tok/s | 32.84 GiB |
-| 2,048 | 27.35 s | 17.60 s | 117.3 tok/s | 7.3 tok/s | 33.26 GiB |
-| 8,192 | 50.12 s | 40.47 s | 206.3 tok/s | 7.4 tok/s | 34.50 GiB |
-| 16,384 | 88.27 s | 78.61 s | 209.0 tok/s | 7.2 tok/s | 35.70 GiB |
-
-### Qwen3.8 Next Flash FP8
-
-| Input token | P95 總時間 | P95 TTFT | P95 Prefill | P95 Decode | 峰值記憶體 |
-| ---: | ---: | ---: | ---: | ---: | ---: |
-| 1,024 | 22.60 s | 15.65 s | 69.2 tok/s | 10.4 tok/s | 20.92 GiB |
-| 2,048 | 31.42 s | 24.90 s | 87.5 tok/s | 9.8 tok/s | 21.26 GiB |
-| 8,192 | 84.88 s | 77.74 s | 111.9 tok/s | 10.4 tok/s | 21.90 GiB |
-| 16,384 | 157.89 s | 150.33 s | 113.3 tok/s | 9.7 tok/s | 22.75 GiB |
-
-prompt、SSD 速度和 cache 狀態會改變效能。請參閱
-[完整 Benchmark](BENCHMARK.md)和[完整驗證紀錄](docs/VALIDATION.md)。
-
-## 如何使用
-
-**下載 APP → 開啟 APP → 選擇並下載模型 → 啟動 server →
-在 APP 對話或連接 Codex**
-
-> [!IMPORTANT]
-> 1.0.3 版無法透過自動更新安裝 1.0.4 版，因為舊的 Sparkle signing key
-> 已無法使用。請結束 APP，從
-> [1.0.4 release](https://github.com/yanun0323/Whallm/releases/tag/v1.0.4)
-> 下載 `DeepSeekV4SSD-macOS-arm64.zip`，然後手動取代現有 APP。
-> 安裝 1.0.4 版後，自動更新會恢復正常。
-
-1. 從 [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest)
-   下載最新的 `Whallm-macOS-arm64.zip`。
-2. 解壓縮 ZIP。開啟 `Whallm.app`。
-3. 開啟「模型」頁面。選擇 DeepSeek 或 Qwen，然後選擇「下載模型」。APP 會檢查
-   所需儲存空間。Qwen 會下載已發布的 MXFP4 installed model。使用者可以停止下載，
-   之後再繼續下載。
-4. 開啟「Server」頁面，然後選擇「啟動 server」。server 可以在沒有 installed model
-   時啟動。generation request 必須使用 installed model。
-5. 開啟對話頁面並選擇模型。使用者也可以使用下方設定連接 Codex。
-
-預設本機 server 位址是 `http://127.0.0.1:11434`。
-
-![Whallm APP 畫面](docs/assets/deepseekv4ssd-app.png)
+公開下載版的功能可能少於本文件所述原始碼。各次打包涵蓋的內容見[打包與驗證紀錄](docs/VALIDATION.md)。
 
 ## 使用需求
 
 | 項目 | 需求 |
 | --- | --- |
-| Mac | Apple Silicon M 系列 Mac |
-| macOS | macOS 15 或更新版本 |
-| 統一記憶體 | 64 GiB 或更多 |
-| 可用儲存空間 | APP 會檢查所選模型和現有的部分下載 |
-| 模型儲存裝置 | 高速內接、Thunderbolt 或 USB4 SSD |
-| 網路 | 下載模型和 APP 更新時需要網路 |
+| Mac | Apple Silicon，macOS 15 或更新版本 |
+| 統一記憶體 | 建議 64 GiB；實際用量依模型與設定而定 |
+| 儲存裝置 | 高速內接、Thunderbolt 或 USB4 SSD |
+| 可用空間 | App 會依模型及現有的部分下載計算需求 |
+| 網路 | 下載模型與 App 更新時需要 |
 
-> [!IMPORTANT]
-> Whallm 是實驗性軟體。APP 不包含模型權重。除非其他裝置必須
-> 連線，否則請保留預設本機 server 位址。
+App 不包含模型權重。DeepSeek V4.1 的專家與 Engram 檔案就需要約 **458 GiB**，另需常駐權重與中繼資料的空間。
 
-## Codex `config.toml` 配置
+## 模型與預設值
 
-先在 Whallm 啟動 server。然後把下列設定加入
-`~/.codex/config.toml`：
+| 模型 | API model ID | 專家快取 Slots | 選用候選模型 |
+| --- | --- | ---: | --- |
+| DeepSeek-V4-Flash-0731 | `deepseek-v4-flash-0731` | 1152 | DSpark |
+| DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 1152 | DSpark |
+| Qwen3.8-Flash-Next-FP8 | `qwen3.8-flash-next-fp8` | 3072 | MTP |
+
+一個 Slot 可保存一個專家的權重。增加 Slots 會多用記憶體，也可能減少 SSD 讀取。已儲存的自訂設定會保留。
+
+在 **Model → Advanced Settings** 中：
+
+- 三個模型的 **Max tokens** 均預設為 **8192**。
+- **Prompt cache** 預設為 **Memory**。**Disk** 可在重新啟動後恢復快取；**Off** 每次重新處理輸入。
+- **Use approximate mode** 預設**關閉**。開啟後少用一個選中的專家，可能降低輸出品質。
+- **DSpark / MTP** 預設**關閉**，需要額外權重。它們先提出候選 token，再由主模型確認，不能與近似模式同時使用。
+- **Alias** 可設定 API 請求使用的別名。其他設定在下次載入模型時生效；模型載入期間不能編輯。
+
+新下載的 DeepSeek V4 包含 DSpark 權重。V4.1 DSpark 與 Qwen MTP 可另行安裝。Qwen 下載的是已轉換好的 MXFP4 模型，不會在安裝時於你的 Mac 上量化。App 使用 DSpark／MTP 生成時，不重用跨請求的 Prompt cache。
+
+## 功能
+
+Whallm 將共用權重留在記憶體，從 SSD 讀取選中的專家。DeepSeek V4.1 的 Engram 與 Qwen 的 N-gram 資料也按需讀取。
+
+| 模型 | 加速選項 |
+| --- | --- |
+| DeepSeek V4 | 按層處理輸入、專家合批計算、FP8 KV 快取、選用 ANE 投影運算與 DSpark |
+| DeepSeek V4.1 | 按層處理輸入、專家合批、壓縮 KV／索引快取、只計算候選索引、CED 輸入處理、ANE 投影運算與 DSpark |
+| Qwen3.8 | 輸入階段的專家分組、專家讀取完成後立即計算、QSA 快取壓縮、下一層預讀、ANE 投影運算與 MTP |
+
+V4.1 按層處理輸入、V4.1／Qwen 快取壓縮、候選索引、CED、下一層預讀與 DeepSeek ANE 均**預設關閉**。「專家載入完成就開始計算」與「合批處理輸入的專家運算」則預設開啟。CED 會略過後續層不再需要的舊 token。Qwen 快取壓縮與 ANE 可能改變運算結果。UI 會停用不相容的組合；這些選項不保證一定加速。
+
+詳見[加速設定與限制](docs/MODEL_ACCELERATION.md)。
+
+## 效能測試
+
+以下 v1.1.7 紀錄使用 **Code** 素材，輸出上限為 **128 tokens**。表格未附各次程式版本與快取狀態，因此僅供參考，不能當成新增加速選項的控制變因比較。
+
+TTFT 是等待第一個 token 的時間。Prefill 為輸入處理速度，Decode 為輸出生成速度，單位均為 tokens／秒。Peak MLX 是以 **GiB** 表示的 MLX 配置量，不是整台 Mac 的記憶體用量。App 匯出雖標為 GB，實際以 bytes 除以 1024³ 計算。
+
+### M5 Pro
+
+| 模型 | Slots | 輸入 tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| DeepSeek V4 | 1152 | 1024 | 19112.3 | 53.6 | 7.7 | 22.77 |
+| DeepSeek V4 | 1152 | 4096 | 24498.6 | 167.2 | 5.9 | 22.80 |
+| DeepSeek V4 | 1152 | 8192 | 42137.5 | 194.4 | 6.8 | 22.83 |
+| DeepSeek V4 | 1152 | 16384 | 81517.9 | 201.0 | 6.3 | 22.90 |
+| Qwen3.8 | 3072 | 1024 | 10336.3 | 99.1 | 10.6 | 16.86 |
+| Qwen3.8 | 3072 | 4096 | 28831.0 | 142.1 | 9.2 | 16.92 |
+| Qwen3.8 | 3072 | 8192 | 53303.2 | 153.7 | 10.1 | 17.01 |
+| Qwen3.8 | 3072 | 16384 | 112353.1 | 145.8 | 8.5 | 17.18 |
+
+### M2 Max
+
+| 模型 | Slots | 輸入 tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen3.8 | 3072 | 1024 | 14016.3 | 73.1 | 9.0 | 16.86 |
+| Qwen3.8 | 3072 | 4096 | 40902.4 | 100.1 | 7.6 | 16.92 |
+| Qwen3.8 | 3072 | 8192 | 79125.0 | 103.5 | 8.3 | 17.01 |
+| Qwen3.8 | 3072 | 16384 | 158838.7 | 103.1 | 7.1 | 17.18 |
+| DeepSeek V4.1 | 1152 | 1024 | 73426.4 | 13.9 | 2.2 | 32.05 |
+| DeepSeek V4.1 | 1152 | 4096 | 106742.4 | 38.4 | 1.8 | 32.11 |
+| DeepSeek V4.1 | 1152 | 8192 | 144011.4 | 56.9 | 2.1 | 32.19 |
+| DeepSeek V4.1 | 1152 | 16384 | 248481.9 | 65.9 | 1.9 | 32.75 |
+
+要測試自己的 Mac，開啟 **Throughput**，選擇已安裝模型、**Code** 或 **Novel** 素材、**1K–200K** 輸入長度，以及 **128、1024 或 4096** 的輸出上限。結果可複製為純文字、JSON 或 Markdown。整輪完成或取消後，App 會卸載測試模型。本機打包版另有 **Dry run**，只產生模擬結果。
+
+SSD 速度、輸入長度、快取狀態與設定都會影響結果。指標定義與測試條件見 [Throughput](docs/THROUGHPUT.md)。
+
+## 連接 Codex
+
+先啟動 Whallm 伺服器，再將以下內容加入使用者層級的 `~/.codex/config.toml`：
 
 ```toml
 model = "deepseek-v4-flash-0731"
@@ -118,90 +135,35 @@ wire_api = "responses"
 requires_openai_auth = false
 ```
 
-儲存檔案後，請重新啟動 Codex。本機位址不需要 API key。provider 設定
-必須放在使用者層級的設定檔。[Codex 官方配置參考](https://developers.openai.com/codex/config-reference/)
-包含其他設定。
+將 `model` 設為上表的 API model ID 或 Alias，儲存後重新啟動 Codex。此範例使用預設本機位址，且未設定 API key。若在 Whallm 設定了金鑰，用戶端也要設定相同金鑰。詳見 [Codex 設定參考](https://developers.openai.com/codex/config-reference/)。
 
-## 其他技術細節
+## API 與隱私
 
-### 運作方式
+API 支援文字串流與工具呼叫，提供以下端點：
 
-- main model 具有 284B 總參數。每個 token 約會啟用 13B 參數。
-- runtime 會把 common tensor 保留在統一記憶體中。
-- routed expert 使用 checkpoint 原生 FP4 權重。runtime 會在需要時從
-  SSD 讀取 routed expert。
-- runtime 使用 FP8 KV cache 和有容量上限的 expert cache 控制記憶體用量。
-- installed model 必須通過固定 checkpoint revision 的驗證。
-- server 啟動時只讀取 installed model 清單。server 啟動時不載入模型權重。
-- 第一個 generation request 會載入指定模型。
-- server 一次只保留一個已載入模型。request 指定另一個模型時，server 會先關閉
-  舊 runtime，然後載入新 runtime。
-- 使用者可以在「模型」頁面載入或卸載模型。已載入的模型會移到「已載入」區段。
-- 使用者可以調整 DeepSeek layer-major Prefill 門檻。預設值是 1,024 個未快取的
-  prompt token。
-
-### 模型儲存空間與 DSpark
-
-- main model 約使用 145 GiB。
-- DSpark 會增加約 10.12 GiB。每次新的 DeepSeek 下載都會安裝 DSpark。
-- 安裝 DSpark 不會啟用 DSpark。使用者可以在 runtime 設定中啟用
-  「使用 DSpark」來測試 speculative decoding。
-- 使用者可以移除 DSpark。移除 DSpark 不需要重新安裝 main model。
-- Qwen installed weight 檔案使用 125,268,506,112 bytes。Qwen 不支援 DSpark。
-- Qwen 會下載已驗證的 MXFP4 installed model。模型安裝程序不會在使用者的 Mac
-  上量化 Qwen checkpoint。
-
-### OpenAI 相容 server
-
-server 支援下列 endpoint：
-
-- `GET /healthz`
-- `GET /v1/models`
+- `GET /healthz` 與 `GET /v1/models`
 - `POST /v1/responses`
-- `POST /v1/chat/completions`
-- `POST /v1/completions`
-- `POST /api/models/load`
-- `POST /api/models/unload`
+- `POST /v1/chat/completions` 與 `POST /v1/completions`
+- `POST /api/models/load` 與 `POST /api/models/unload`
 
-固定 API model ID 是 `deepseek-v4-flash-0731` 和
-`qwen3.8-flash-next-fp8`。每個模型的「進階設定」頁面可以設定選用的 Alias。
-有效的變更會自動儲存。generation request 接受 API model ID 或 Alias。
-對話模型選單只顯示 server 啟動時可用的 installed model。如果下載在 server
-執行期間完成，使用者必須重新啟動 server。
+工具由用戶端執行，再回傳結果。不支援圖片、音訊、`logprobs`、`response_format` 與 `stop`。請求本文上限為 **1 MiB**。支援欄位與驗證方式見 [API 指南](docs/API.md)。
 
-Responses API 支援 Codex tool 和 OpenAI function tool。API client 必須執行
-tool，然後把結果傳回 server。[API 指南](docs/API.md)包含 request 欄位、
-範例和目前限制。
+推論在你的 Mac 上執行。下載、更新與 API 連線會使用網路。連接的用戶端可能將資料傳往其他服務；**Debug** 記錄可能包含完整輸入與工具結果。
 
-### 指標與隱私
+## 驗證與限制
 
-APP 會顯示 prefill 速度、decode 速度、token 數量、記憶體用量、SSD 讀取速度、
-cache hit rate、第一個 token 等待時間和完成時間。載入的模型切換時，APP 會清除
-指標歷史。
+v1.1.7 本機打包版通過 **424 項 Python 測試**、**91 項 Swift 測試**與 **12 項包內執行測試**。App 與 ZIP 解壓副本均通過簽章，以及英文、簡體中文、繁體中文的隔離啟動檢查。
 
-runtime 會在 Mac 上執行推論。prompt 和生成文字會保留在本機 runtime。
-連接的 API client 仍可能把資料傳送到其他位置。APP 會使用網路下載模型、
-檢查更新和接收已設定的 API request。
+目前只支援這三個固定版本的文字模型。新增加速路徑已通過小模型與元件測試；完整模型的速度與品質比較仍待驗證。很長的輸入需要更多快取記憶體。各項檢查範圍見[驗證紀錄](docs/VALIDATION.md)。
 
-### 目前限制
+## 文件
 
-- runtime 只支援目前文件中的兩個固定 checkpoint revision。
-- Qwen 只支援文字。Qwen 不支援 vision、video、MTP 和 DSpark。
-- Qwen 已在記錄的 M5 Pro 環境通過完整模型 SHA-256、文字、thinking、tool call、
-  greedy 4K、prompt cache 和 packaged APP 驗證。請參閱
-  [Qwen 支援狀態](docs/QWEN.md)。
-- server 一次只保留一個已載入模型。server 一次只處理一個 generation request。
-  其他 generation request 會等待目前 request stream 完整結束。
-- API 不支援圖片、音訊、logprobs、`response_format` 和 `stop`。
-- server 將 request body 限制為 1 MiB。
-- 很長的 input 和 output 需要更多 KV cache 記憶體。
-- 效能取決於 SSD 速度、input 長度和 cache 狀態。
-
-[目前文件](docs/README.md)包含模型合約、runtime 設計、驗證、效能和研究結論。
-
-Whallm 與 DeepSeek 沒有從屬關係。下載和使用模型前，請先閱讀模型條款。
+- [文件索引](docs/README.md)
+- [CLI 與 UI 功能對照](docs/FEATURE_MATRIX.md)
+- [加速設定](docs/MODEL_ACCELERATION.md)
+- [DeepSeek V4.1](docs/DEEPSEEK_V41.md) 與 [Qwen](docs/QWEN.md)
+- [API](docs/API.md)、[Throughput](docs/THROUGHPUT.md) 與 [App 更新](docs/UPDATES.md)
 
 ## 授權
 
-Whallm 原始碼依照 [MIT License](LICENSE)開放。專案不包含模型權重。
-模型權重適用個別條款。
+Whallm 採用 [MIT License](LICENSE)。模型權重另有使用條款。Whallm 與 DeepSeek、Qwen 無隸屬關係。

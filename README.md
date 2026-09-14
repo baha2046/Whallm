@@ -1,7 +1,7 @@
 # Whallm
 
 <p align="center">
-  <img src="Packaging/AppIcon.png" alt="Whallm App Icon" width="160">
+  <a href="."><img height="160" src="Packaging/AppIcon.png" alt="Whallm"></a>
 </p>
 
 <p align="center">
@@ -12,82 +12,116 @@
   <a href="README-ko.md"><img src="https://img.shields.io/badge/한국어-클릭-yellow" alt="한국어"></a>
 </p>
 
-Inspired by [Turbo Fieldfare](https://github.com/drumih/turbo-fieldfare),
-Whallm lets an M-series Mac run all 284B parameters of the pinned
-`DeepSeek-V4-Flash-0731` checkpoint by streaming routed experts from SSD. It
-also supports the pinned `DeepSeek-V4.1-Flash` and
-`Qwen3.8-Flash-Next-FP8` text checkpoints.
+Whallm runs large language models on Apple Silicon Macs by reading the experts it needs from SSD. It supports DeepSeek V4, DeepSeek V4.1, and Qwen3.8, with built-in chat and an OpenAI-compatible API.
 
-## Memory guidance
+## Benchmark summary
 
-| Model | Recorded peak memory | expert cache slots | chipset
-| --- | ---: | ---: | --:
-| `DeepSeek-V4-Flash-0731` |  23 GiB | 1152 | M5 Pro
-| `Qwen3.8-Flash-Next-FP8` | 18 GiB | 3072 | M5 Pro
-| `DeepSeek-V4.1-Flash` | 33 GiB | 1152 | M2 Max
+| Model | Chipset | Prefill | Decode | Peak memory | Expert cache slots |
+| --- | --- | ---: | ---: | ---: | ---: |
+| `DeepSeek-V4-Flash-0731` | M5 Pro | 53.6–201.0 tok/s | 5.9–7.7 tok/s | 23 GiB | 1152 |
+| `Qwen3.8-Flash-Next-FP8` | M5 Pro | 99.1–153.7 tok/s | 8.5–10.6 tok/s | 18 GiB | 3072 |
+| `DeepSeek-V4.1-Flash` | M2 Max | 13.9–65.9 tok/s | 1.8–2.2 tok/s | 33 GiB | 1152 |
 
-These v1.1.4 results cover chat prompts with 1,024 to 16,384 input tokens. They
-are measurements, not minimum memory requirements or performance guarantees.
-Prompt length, tools, cache state, and runtime settings can change peak memory.
-See the [benchmark](BENCHMARK.md) and
-[validation record](docs/VALIDATION.md) for the measured workloads.
+> Tested in v1.1.7 using the built-in Throughput benchmark with 1,024 to 16,384 input tokens.
+>
+> See the [full benchmark](#benchmarks) for details.
 
-## Benchmark 
-### M5 Pro (v1.1.7)
-| Model | Context | Slots | Output limit | Input / Output | TTFT (ms) | TPOT (ms) | PP tok/s | TG tok/s | Total (s) | Throughput | Peak MLX |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| qwen3.8-flash-next-fp8 | Code | 3072 | 128 | 1024 / 128 | 15229.3 | 102.5 | 67.2 | 9.8 | 28.3 | 40.8 | 16.88 GB |
-|                        |      |      |     | 4096 / 128 | 34024.5 | 119.0 | 120.4 | 8.4 | 49.1 | 86.0 | 16.97 GB |
-|                        |      |      |     | 8192 / 128 | 59609.8 | 112.2 | 137.4 | 8.9 | 73.9 | 112.6 | 17.10 GB |
-|                        |      |      |     | 16384 / 128 | 113580.3 | 123.1 | 144.3 | 8.1 | 129.2 | 127.8 | 17.36 GB |
-| deepseek-v4-flash-0731 | Code | 1152 | 128 | 1024 / 128 | 17402.8 | 130.1 | 58.8 | 7.7 | 33.9 | 33.9 | 22.77 GB |
-|                        |      |      |     | 4096 / 128 | 23613.8 | 167.0 | 173.5 | 6.0 | 44.8 | 94.2 | 22.80 GB |
-|                        |      |      |     | 8192 / 128 | 48800.2 | 162.5 | 167.9 | 6.2 | 69.4 | 119.8 | 22.83 GB |
-|                        |      |      |     | 16384 / 128 | 89513.5 | 213.7 | 183.0 | 4.7 | 116.7 | 141.5 | 22.90 GB |
+## Quick start
 
-### M2 Max (v1.1.7)
+1. Download `Whallm-macOS-arm64.zip` from [GitHub Releases](https://github.com/yanun0323/Whallm/releases), extract it, and open `Whallm.app`.
+2. Open **Model**, choose a model, and select **Download Model**. The app checks storage space; interrupted downloads can resume.
+3. Open **Server** and select **Start Server**.
+4. Open **Chat** and choose your model, or connect an API client using the example below.
 
+The default address is `http://127.0.0.1:11434`. Models load when first used. The server keeps one model loaded and handles one generation request at a time. Restart the server if a newly installed model is missing from the chat picker.
 
-## How to use it
-
-**Download the app → Open the app → Select and download a model → Start the
-server → Chat in the app or connect Codex**
-
-1. Download the latest `Whallm-macOS-arm64.zip` from
-   [GitHub Releases](https://github.com/yanun0323/Whallm/releases/latest).
-2. Extract the ZIP and open `Whallm.app`.
-3. Open the **Model** page. Select DeepSeek V4, DeepSeek V4.1, or Qwen, and then select
-   **Download Model**. The app checks the required storage. Qwen downloads the
-   published MXFP4 installed model. You can stop the download and resume it
-   later.
-4. Open the **Server** page and select **Start Server**. The server can start
-   with no installed model, but generation needs an installed model.
-5. Open the chat and select a model. You can also connect Codex with the
-   configuration below.
-
-The local server starts at `http://127.0.0.1:11434` by default.
-
-![Whallm app](docs/assets/deepseekv4ssd-app.png)
+Public downloads may contain fewer features than the source described here. See the [build and validation records](docs/VALIDATION.md) for the packaged version's coverage.
 
 ## Requirements
 
 | Item | Requirement |
 | --- | --- |
-| Mac | Apple Silicon M-series Mac |
-| macOS | macOS 15 or later |
-| Unified memory | 64 GiB or more |
-| Free storage | The app checks the selected model and existing partial data |
-| Model storage | A fast internal, Thunderbolt, or USB4 SSD |
-| Internet | Required to download the model and app updates |
+| Mac | Apple Silicon, macOS 15 or later |
+| Unified memory | 64 GiB recommended; usage depends on the model and settings |
+| Storage | A fast internal, Thunderbolt, or USB4 SSD |
+| Free space | The app calculates the requirement for each model, including partial downloads |
+| Network | Needed for model downloads and app updates |
 
-> [!IMPORTANT]
-> Whallm is experimental. Model weights are not included with the app.
-> Keep the default local server address unless another device must connect.
+Model weights are not included with the app. DeepSeek V4.1's expert and Engram files alone need about **458 GiB**, plus common weights and metadata.
 
-## Codex `config.toml`
+## Models and defaults
 
-Start the server in Whallm. Then add this configuration to
-`~/.codex/config.toml`:
+| Model | API model ID | Expert cache slots | Optional draft model |
+| --- | --- | ---: | --- |
+| DeepSeek-V4-Flash-0731 | `deepseek-v4-flash-0731` | 1152 | DSpark |
+| DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 1152 | DSpark |
+| Qwen3.8-Flash-Next-FP8 | `qwen3.8-flash-next-fp8` | 3072 | MTP |
+
+A slot holds one expert's weights. More slots keep more experts in memory and may reduce SSD reads. Saved custom settings are preserved.
+
+In **Model → Advanced Settings**:
+
+- **Max tokens** defaults to **8192** for all three models.
+- **Prompt cache** defaults to **Memory**. **Disk** also saves it across restarts; **Off** processes each prompt again.
+- **Use approximate mode** defaults to **off**. Enabling it uses one fewer selected expert and may reduce output quality.
+- **DSpark / MTP** default to **off** and require their extra weights. They propose tokens for the main model to verify and cannot run with approximate mode.
+- **Alias** sets an optional API request name. Other settings take effect on the next model load; loaded models are locked for editing.
+
+New DeepSeek V4 downloads include DSpark weights. V4.1 DSpark and Qwen MTP can be installed separately. Qwen downloads a prepared MXFP4 model; installation does not quantize it on your Mac. Prompt-cache reuse is disabled during DSpark/MTP generation in the app.
+
+## Features
+
+Whallm keeps common weights in memory and reads selected experts from SSD. DeepSeek V4.1 Engram rows and Qwen N-gram rows are also read as needed.
+
+| Model | Acceleration options |
+| --- | --- |
+| DeepSeek V4 | Layer-by-layer input processing, batched expert calculations, FP8 KV cache, optional ANE projection and DSpark |
+| DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
+| Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
+
+V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. Expert calculations as reads finish and batched expert input processing default to on. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
+
+See [acceleration settings and limits](docs/MODEL_ACCELERATION.md).
+
+## Benchmarks
+
+These recorded v1.1.7 runs use **Code** context and an output limit of **128 tokens**. The build revisions and cache state were not recorded alongside these rows, so they are reference results, not a controlled comparison of the new acceleration options.
+
+TTFT is the wait for the first token. Prefill measures input processing; Decode measures output generation, both in tokens per second. Peak MLX is MLX allocation in **GiB**, not total Mac memory. The app export labels this value GB but divides bytes by 1024³.
+
+### M5 Pro
+
+| Model | Slots | Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| DeepSeek V4 | 1152 | 1024 | 19112.3 | 53.6 | 7.7 | 22.77 |
+| DeepSeek V4 | 1152 | 4096 | 24498.6 | 167.2 | 5.9 | 22.80 |
+| DeepSeek V4 | 1152 | 8192 | 42137.5 | 194.4 | 6.8 | 22.83 |
+| DeepSeek V4 | 1152 | 16384 | 81517.9 | 201.0 | 6.3 | 22.90 |
+| Qwen3.8 | 3072 | 1024 | 10336.3 | 99.1 | 10.6 | 16.86 |
+| Qwen3.8 | 3072 | 4096 | 28831.0 | 142.1 | 9.2 | 16.92 |
+| Qwen3.8 | 3072 | 8192 | 53303.2 | 153.7 | 10.1 | 17.01 |
+| Qwen3.8 | 3072 | 16384 | 112353.1 | 145.8 | 8.5 | 17.18 |
+
+### M2 Max
+
+| Model | Slots | Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Qwen3.8 | 3072 | 1024 | 14016.3 | 73.1 | 9.0 | 16.86 |
+| Qwen3.8 | 3072 | 4096 | 40902.4 | 100.1 | 7.6 | 16.92 |
+| Qwen3.8 | 3072 | 8192 | 79125.0 | 103.5 | 8.3 | 17.01 |
+| Qwen3.8 | 3072 | 16384 | 158838.7 | 103.1 | 7.1 | 17.18 |
+| DeepSeek V4.1 | 1152 | 1024 | 73426.4 | 13.9 | 2.2 | 32.05 |
+| DeepSeek V4.1 | 1152 | 4096 | 106742.4 | 38.4 | 1.8 | 32.11 |
+| DeepSeek V4.1 | 1152 | 8192 | 144011.4 | 56.9 | 2.1 | 32.19 |
+| DeepSeek V4.1 | 1152 | 16384 | 248481.9 | 65.9 | 1.9 | 32.75 |
+
+To test your Mac, open **Throughput**, choose an installed model, select **Code** or **Novel**, input lengths from **1K to 200K**, and an output limit of **128, 1024, or 4096**. Results can be copied as plain text, JSON, or Markdown. The app unloads the test model when the run finishes or is cancelled. Local builds also offer **Dry run**, which produces simulated results.
+
+SSD speed, prompt length, cache state, and settings affect results. See [Throughput](docs/THROUGHPUT.md) for metric definitions and test conditions.
+
+## Connect Codex
+
+Start Whallm's server, then add this to your user-level `~/.codex/config.toml`:
 
 ```toml
 model = "deepseek-v4-flash-0731"
@@ -101,116 +135,35 @@ wire_api = "responses"
 requires_openai_auth = false
 ```
 
-Restart Codex after you save the file. The local address does not need an API
-key. The provider settings must be in the user-level config file. See the
-[official Codex configuration reference](https://developers.openai.com/codex/config-reference/)
-for more options.
+Set `model` to an API model ID or Alias from the table above, then restart Codex. This example assumes the default local address and no API key. If you configure a key in Whallm, configure the same key in your client. See the [Codex configuration reference](https://developers.openai.com/codex/config-reference/).
 
-## Other technical details
+## API and privacy
 
-### How it works
+The API supports text streaming and tool calls through:
 
-- DeepSeek V4 Flash 0731 has 284B total parameters and about 13B active
-  parameters per token.
-- Common tensors stay in unified memory.
-- Routed experts use checkpoint-native FP4 weights and stream from SSD when
-  needed.
-- DeepSeek V4.1 engram embedding rows are also fetched from SSD on demand.
-- The runtime uses an FP8 KV cache and a bounded expert cache to control memory
-  use.
-- The installed model is verified against the pinned checkpoint revision.
-- Server startup reads the installed model list but does not load model
-  weights. The first generation request loads its selected model.
-- The server keeps one model loaded. A request for another model closes the old
-  runtime before it loads the new runtime.
-- The Model page can load or unload a model. A loaded model moves to the
-  **Loaded** section.
-- The DeepSeek V4 Flash 0731 layer-major prefill threshold is configurable. Its default is
-  1,024 uncached prompt tokens.
-
-### Model storage and DSpark
-
-- The main model uses about 145 GiB.
-- DSpark adds about 10.12 GiB. Every new DeepSeek download includes it.
-- Installing DSpark does not enable it. Enable **Use DSpark** in the runtime
-  settings when you want to test speculative decoding.
-- You can remove DSpark without reinstalling the main model.
-- Qwen installed weight files use 125,268,506,112 bytes. Qwen does not support
-  DSpark.
-- Qwen downloads a verified MXFP4 installed model. Model installation does not
-  quantize the Qwen checkpoint on the user's Mac.
-- DeepSeek V4.1 installs the exact pinned Hugging Face text checkpoint. Its
-  expert and engram files alone require at least 491,535,862,800 bytes
-  (457.78 GiB), before common tensors and metadata. The app calculates the
-  complete requirement from the repack plan.
-- DeepSeek V4.1 does not install or enable vision, MTP/DSpark, or reusable
-  prompt-cache state.
-
-### OpenAI-compatible server
-
-The server supports these endpoints:
-
-- `GET /healthz`
-- `GET /v1/models`
+- `GET /healthz` and `GET /v1/models`
 - `POST /v1/responses`
-- `POST /v1/chat/completions`
-- `POST /v1/completions`
-- `POST /api/models/load`
-- `POST /api/models/unload`
+- `POST /v1/chat/completions` and `POST /v1/completions`
+- `POST /api/models/load` and `POST /api/models/unload`
 
-The fixed API model IDs are `deepseek-v4-flash-0731`,
-`deepseek-v4.1-flash`, and `qwen3.8-flash-next-fp8`. The CLI also accepts
-`deepseek-flash` as a DeepSeek V4.1 alias. Each model's **Advanced Settings** view lets you set an
-optional Alias. Valid changes are saved automatically. Generation requests
-accept the API model ID or its Alias. The chat model picker shows only the
-installed models that were available when the server started. Restart the
-server after a download finishes while it is running.
+The client executes tools and sends their results back. Images, audio, `logprobs`, `response_format`, and `stop` are not supported. Request bodies are limited to **1 MiB**. See the [API guide](docs/API.md) for supported fields and authentication.
 
-The Responses API supports Codex tools and OpenAI function tools. The client
-must run each tool and send the result back to the server. Read the
-[API guide](docs/API.md) for fields, examples, and current limits.
+Inference runs on your Mac. Network access is used for downloads, updates, and API connections. Connected clients may send data elsewhere; **Debug** logs can contain complete prompts and tool results.
 
-### Metrics and privacy
+## Validation and limits
 
-The app shows prefill speed, decode speed, token counts, memory use, SSD read
-speed, cache hit rate, first-token wait time, and completion time. The app
-clears metric history when the loaded model changes.
+The v1.1.7 local build passed **424 Python tests**, **91 Swift tests**, and **12 packaged-runtime tests**. Both the app and extracted ZIP passed signature and isolated startup checks in English, Simplified Chinese, and Traditional Chinese.
 
-Inference runs on your Mac. Prompts and generated text stay in the local
-runtime unless the connected client sends them elsewhere. The app uses the
-network to download the model, check for updates, and accept configured API
-requests.
+Only the three pinned text checkpoints are supported. New acceleration paths have small-model and component tests; full-model speed and quality comparisons are still pending. Very long prompts need more cache memory. See the [validation records](docs/VALIDATION.md) for the scope of each check.
 
-### Current limits
+## Documentation
 
-- The runtime supports only the three pinned checkpoint revisions in the current
-  documentation.
-- DeepSeek V4.1 support is text-only. Vision, MTP/DSpark, layer-major prefill,
-  persistent prompt cache, and prompt-cache reuse are disabled for this model.
-- DeepSeek V4.1 contract, native FP8/MLX loading, SSD Engram lookup, cache,
-  parser, full Python runtime suite, and core build validation pass in this
-  worktree. A complete checkpoint install and full-model generation have not
-  yet been run, so no memory or performance claim is made for V4.1.
-- Qwen supports text only. Qwen vision, video, MTP, and DSpark are not supported.
-- Qwen full-model SHA-256, text, thinking, tool call, greedy 4K, prompt cache,
-  and packaged App validation passed on the recorded M5 Pro environment. See
-  the [Qwen support status](docs/QWEN.md).
-- The server keeps one model loaded and processes one generation request at a
-  time. Other generation requests wait until the full request stream ends.
-- Images, audio, logprobs, `response_format`, and `stop` are not supported.
-- Request bodies are limited to 1 MiB.
-- Very long input and output need more KV cache memory.
-- Performance depends on SSD speed, input length, and cache state.
-
-Read the [current documentation](docs/README.md) for the model contract,
-runtime design, validation, performance, and research conclusions.
-See [DeepSeek V4.1 support](docs/DEEPSEEK_V41.md) for its exact contract and
-current validation boundary.
-
-Whallm is not affiliated with DeepSeek. Review the model terms before
-you download and use the model.
+- [Documentation index](docs/README.md)
+- [CLI and UI feature matrix](docs/FEATURE_MATRIX.md)
+- [Acceleration settings](docs/MODEL_ACCELERATION.md)
+- [DeepSeek V4.1](docs/DEEPSEEK_V41.md) and [Qwen](docs/QWEN.md)
+- [API](docs/API.md), [Throughput](docs/THROUGHPUT.md), and [app updates](docs/UPDATES.md)
 
 ## License
 
-The Whallm source code is available under the [MIT License](LICENSE).
-Model weights are not included and remain subject to their own terms.
+Whallm is released under the [MIT License](LICENSE). Model weights have their own terms. Whallm is not affiliated with DeepSeek or Qwen.
