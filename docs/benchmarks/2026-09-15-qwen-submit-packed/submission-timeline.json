@@ -1,0 +1,1675 @@
+{
+  "evidence_kind": "instrumented_fixed_layer_timeline",
+  "target_pid": 68578,
+  "aligned_events": 637,
+  "target_gpu_intervals": 179,
+  "clock_offset_spread_ns": 22167,
+  "clock_offset_median_ns": -55378098324041,
+  "medians_ms": {
+    "10": {
+      "layer_ns": 1.055854,
+      "gpu_active_union_ns": 0.5127915,
+      "no_target_gpu_activity_ns": 0.550813,
+      "ready_not_submitted_overlap_ns": 0.469646,
+      "interior_ready_gap_upper_ns": 0.162229
+    },
+    "4": {
+      "layer_ns": 1.627625,
+      "gpu_active_union_ns": 0.7410835,
+      "no_target_gpu_activity_ns": 0.9298315,
+      "ready_not_submitted_overlap_ns": 0.733812,
+      "interior_ready_gap_upper_ns": 0.4240415
+    },
+    "0": {
+      "layer_ns": 2.055625,
+      "gpu_active_union_ns": 0.829292,
+      "no_target_gpu_activity_ns": 1.230896,
+      "ready_not_submitted_overlap_ns": 0.291667,
+      "interior_ready_gap_upper_ns": 0.291667
+    }
+  },
+  "rows": [
+    {
+      "tag": "w0-r10",
+      "resident": 10,
+      "layer_ns": 2719584,
+      "gpu_active_union_ns": 504667,
+      "no_target_gpu_activity_ns": 2214917,
+      "ready_not_submitted_overlap_ns": 998083,
+      "interior_ready_gap_upper_ns": 324458,
+      "post_yield_ready_to_submit_overlap_ns": 78917,
+      "gpu_intervals": 11,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2019827541,
+          "yield_ns": 2020808333,
+          "submit_ns": 2020819333,
+          "submitted_ns": 2020870541
+        },
+        {
+          "expert": 3,
+          "available_ns": 2019827541,
+          "yield_ns": 2019893750,
+          "submit_ns": 2019928500,
+          "submitted_ns": 2020066333
+        },
+        {
+          "expert": 409,
+          "available_ns": 2019827541,
+          "yield_ns": 2020937083,
+          "submit_ns": 2020941125,
+          "submitted_ns": 2021019958
+        },
+        {
+          "expert": 44,
+          "available_ns": 2019827541,
+          "yield_ns": 2020281708,
+          "submit_ns": 2020286833,
+          "submitted_ns": 2020450958
+        },
+        {
+          "expert": 17,
+          "available_ns": 2019827541,
+          "yield_ns": 2020081125,
+          "submit_ns": 2020089583,
+          "submitted_ns": 2020266083
+        },
+        {
+          "expert": 500,
+          "available_ns": 2019827541,
+          "yield_ns": 2021026791,
+          "submit_ns": 2021030166,
+          "submitted_ns": 2021166750
+        },
+        {
+          "expert": 91,
+          "available_ns": 2019827541,
+          "yield_ns": 2020459458,
+          "submit_ns": 2020463541,
+          "submitted_ns": 2020602416
+        },
+        {
+          "expert": 341,
+          "available_ns": 2019827541,
+          "yield_ns": 2020879291,
+          "submit_ns": 2020883041,
+          "submitted_ns": 2020928833
+        },
+        {
+          "expert": 128,
+          "available_ns": 2019827541,
+          "yield_ns": 2020610291,
+          "submit_ns": 2020615708,
+          "submitted_ns": 2020730583
+        },
+        {
+          "expert": 203,
+          "available_ns": 2019827541,
+          "yield_ns": 2020740166,
+          "submit_ns": 2020744500,
+          "submitted_ns": 2020799208
+        }
+      ],
+      "gpu_spans": [
+        [
+          2020501166,
+          2020705708
+        ],
+        [
+          2021365958,
+          2021632958
+        ],
+        [
+          2022384000,
+          2022417125
+        ]
+      ],
+      "gaps": [
+        [
+          2019827541,
+          2020501166
+        ],
+        [
+          2020705708,
+          2021365958
+        ],
+        [
+          2021632958,
+          2022384000
+        ],
+        [
+          2022417125,
+          2022547125
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2019827541,
+          2020501166
+        ],
+        [
+          2020705708,
+          2021030166
+        ]
+      ]
+    },
+    {
+      "tag": "w0-r4",
+      "resident": 4,
+      "layer_ns": 1969875,
+      "gpu_active_union_ns": 734292,
+      "no_target_gpu_activity_ns": 1235583,
+      "ready_not_submitted_overlap_ns": 905375,
+      "interior_ready_gap_upper_ns": 492292,
+      "post_yield_ready_to_submit_overlap_ns": 31707,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2026162000,
+          "yield_ns": 2026273125,
+          "submit_ns": 2026277041,
+          "submitted_ns": 2026323625
+        },
+        {
+          "expert": 3,
+          "available_ns": 2025140875,
+          "yield_ns": 2025910833,
+          "submit_ns": 2025931208,
+          "submitted_ns": 2026014458
+        },
+        {
+          "expert": 409,
+          "available_ns": 2026380500,
+          "yield_ns": 2026546291,
+          "submit_ns": 2026549583,
+          "submitted_ns": 2026594791
+        },
+        {
+          "expert": 44,
+          "available_ns": 2025140875,
+          "yield_ns": 2026105625,
+          "submit_ns": 2026109791,
+          "submitted_ns": 2026178333
+        },
+        {
+          "expert": 17,
+          "available_ns": 2025140875,
+          "yield_ns": 2026034750,
+          "submit_ns": 2026041916,
+          "submitted_ns": 2026097250
+        },
+        {
+          "expert": 500,
+          "available_ns": 2026433458,
+          "yield_ns": 2026608083,
+          "submit_ns": 2026613333,
+          "submitted_ns": 2026659625
+        },
+        {
+          "expert": 91,
+          "available_ns": 2025140875,
+          "yield_ns": 2026185958,
+          "submit_ns": 2026190250,
+          "submitted_ns": 2026237541
+        },
+        {
+          "expert": 341,
+          "available_ns": 2026309041,
+          "yield_ns": 2026487625,
+          "submit_ns": 2026491958,
+          "submitted_ns": 2026538208
+        },
+        {
+          "expert": 128,
+          "available_ns": 2026283916,
+          "yield_ns": 2026417666,
+          "submit_ns": 2026426416,
+          "submitted_ns": 2026477791
+        },
+        {
+          "expert": 203,
+          "available_ns": 2026228208,
+          "yield_ns": 2026335708,
+          "submit_ns": 2026340041,
+          "submitted_ns": 2026391958
+        }
+      ],
+      "gpu_spans": [
+        [
+          2025553958,
+          2025708208
+        ],
+        [
+          2026183208,
+          2026436666
+        ],
+        [
+          2026453958,
+          2026641000
+        ],
+        [
+          2026644750,
+          2026757583
+        ],
+        [
+          2027006666,
+          2027033375
+        ]
+      ],
+      "gaps": [
+        [
+          2025140875,
+          2025553958
+        ],
+        [
+          2025708208,
+          2026183208
+        ],
+        [
+          2026436666,
+          2026453958
+        ],
+        [
+          2026641000,
+          2026644750
+        ],
+        [
+          2026757583,
+          2027006666
+        ],
+        [
+          2027033375,
+          2027110750
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2025140875,
+          2025553958
+        ],
+        [
+          2025708208,
+          2026183208
+        ],
+        [
+          2026436666,
+          2026453958
+        ]
+      ]
+    },
+    {
+      "tag": "w0-r0",
+      "resident": 0,
+      "layer_ns": 2243500,
+      "gpu_active_union_ns": 858083,
+      "no_target_gpu_activity_ns": 1385417,
+      "ready_not_submitted_overlap_ns": 343918,
+      "interior_ready_gap_upper_ns": 343918,
+      "post_yield_ready_to_submit_overlap_ns": 41999,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2030114250,
+          "yield_ns": 2030345958,
+          "submit_ns": 2030350541,
+          "submitted_ns": 2030396000
+        },
+        {
+          "expert": 3,
+          "available_ns": 2029761833,
+          "yield_ns": 2029818375,
+          "submit_ns": 2029836208,
+          "submitted_ns": 2029948291
+        },
+        {
+          "expert": 409,
+          "available_ns": 2030201000,
+          "yield_ns": 2030476916,
+          "submit_ns": 2030481375,
+          "submitted_ns": 2030523291
+        },
+        {
+          "expert": 44,
+          "available_ns": 2029893958,
+          "yield_ns": 2030079375,
+          "submit_ns": 2030091333,
+          "submitted_ns": 2030139500
+        },
+        {
+          "expert": 17,
+          "available_ns": 2029857166,
+          "yield_ns": 2029982125,
+          "submit_ns": 2029994333,
+          "submitted_ns": 2030053625
+        },
+        {
+          "expert": 500,
+          "available_ns": 2030302208,
+          "yield_ns": 2030531750,
+          "submit_ns": 2030542875,
+          "submitted_ns": 2030586500
+        },
+        {
+          "expert": 91,
+          "available_ns": 2029926041,
+          "yield_ns": 2030158416,
+          "submit_ns": 2030163416,
+          "submitted_ns": 2030209500
+        },
+        {
+          "expert": 341,
+          "available_ns": 2030132250,
+          "yield_ns": 2030412666,
+          "submit_ns": 2030418041,
+          "submitted_ns": 2030465208
+        },
+        {
+          "expert": 128,
+          "available_ns": 2030003375,
+          "yield_ns": 2030230083,
+          "submit_ns": 2030234000,
+          "submitted_ns": 2030277875
+        },
+        {
+          "expert": 203,
+          "available_ns": 2030100666,
+          "yield_ns": 2030286875,
+          "submit_ns": 2030291250,
+          "submitted_ns": 2030334541
+        }
+      ],
+      "gpu_spans": [
+        [
+          2028924416,
+          2029182708
+        ],
+        [
+          2030124875,
+          2030308916
+        ],
+        [
+          2030310750,
+          2030624708
+        ],
+        [
+          2030634833,
+          2030710500
+        ],
+        [
+          2030738041,
+          2030764166
+        ]
+      ],
+      "gaps": [
+        [
+          2028583666,
+          2028924416
+        ],
+        [
+          2029182708,
+          2030124875
+        ],
+        [
+          2030308916,
+          2030310750
+        ],
+        [
+          2030624708,
+          2030634833
+        ],
+        [
+          2030710500,
+          2030738041
+        ],
+        [
+          2030764166,
+          2030827166
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2029761833,
+          2029836208
+        ],
+        [
+          2029857166,
+          2030124875
+        ],
+        [
+          2030308916,
+          2030310750
+        ]
+      ]
+    },
+    {
+      "tag": "w1-r0",
+      "resident": 0,
+      "layer_ns": 2173125,
+      "gpu_active_union_ns": 762918,
+      "no_target_gpu_activity_ns": 1410207,
+      "ready_not_submitted_overlap_ns": 552958,
+      "interior_ready_gap_upper_ns": 552958,
+      "post_yield_ready_to_submit_overlap_ns": 37707,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2033954916,
+          "yield_ns": 2034344750,
+          "submit_ns": 2034348333,
+          "submitted_ns": 2034390916
+        },
+        {
+          "expert": 3,
+          "available_ns": 2033773166,
+          "yield_ns": 2033899875,
+          "submit_ns": 2033904416,
+          "submitted_ns": 2034057041
+        },
+        {
+          "expert": 409,
+          "available_ns": 2034116416,
+          "yield_ns": 2034512875,
+          "submit_ns": 2034517000,
+          "submitted_ns": 2034565333
+        },
+        {
+          "expert": 44,
+          "available_ns": 2033727833,
+          "yield_ns": 2033827708,
+          "submit_ns": 2033834458,
+          "submitted_ns": 2033890250
+        },
+        {
+          "expert": 17,
+          "available_ns": 2033665750,
+          "yield_ns": 2033705458,
+          "submit_ns": 2033718750,
+          "submitted_ns": 2033813125
+        },
+        {
+          "expert": 500,
+          "available_ns": 2034110250,
+          "yield_ns": 2034457208,
+          "submit_ns": 2034460625,
+          "submitted_ns": 2034503375
+        },
+        {
+          "expert": 91,
+          "available_ns": 2033799625,
+          "yield_ns": 2034085541,
+          "submit_ns": 2034101333,
+          "submitted_ns": 2034200291
+        },
+        {
+          "expert": 341,
+          "available_ns": 2034127500,
+          "yield_ns": 2034401000,
+          "submit_ns": 2034404833,
+          "submitted_ns": 2034447458
+        },
+        {
+          "expert": 128,
+          "available_ns": 2033847833,
+          "yield_ns": 2034216750,
+          "submit_ns": 2034222291,
+          "submitted_ns": 2034273666
+        },
+        {
+          "expert": 203,
+          "available_ns": 2033916583,
+          "yield_ns": 2034285750,
+          "submit_ns": 2034289750,
+          "submitted_ns": 2034334166
+        }
+      ],
+      "gpu_spans": [
+        [
+          2032901291,
+          2033159541
+        ],
+        [
+          2033974166,
+          2034130458
+        ],
+        [
+          2034384083,
+          2034705625
+        ],
+        [
+          2034709416,
+          2034736250
+        ]
+      ],
+      "gaps": [
+        [
+          2032624583,
+          2032901291
+        ],
+        [
+          2033159541,
+          2033974166
+        ],
+        [
+          2034130458,
+          2034384083
+        ],
+        [
+          2034705625,
+          2034709416
+        ],
+        [
+          2034736250,
+          2034797708
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2033665750,
+          2033718750
+        ],
+        [
+          2033727833,
+          2033974166
+        ],
+        [
+          2034130458,
+          2034384083
+        ]
+      ]
+    },
+    {
+      "tag": "w1-r4",
+      "resident": 4,
+      "layer_ns": 1645125,
+      "gpu_active_union_ns": 645002,
+      "no_target_gpu_activity_ns": 1000123,
+      "ready_not_submitted_overlap_ns": 937040,
+      "interior_ready_gap_upper_ns": 683999,
+      "post_yield_ready_to_submit_overlap_ns": 52290,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2038030750,
+          "yield_ns": 2038059708,
+          "submit_ns": 2038075583,
+          "submitted_ns": 2038159083
+        },
+        {
+          "expert": 3,
+          "available_ns": 2037104750,
+          "yield_ns": 2037696250,
+          "submit_ns": 2037710166,
+          "submitted_ns": 2037779000
+        },
+        {
+          "expert": 409,
+          "available_ns": 2038219625,
+          "yield_ns": 2038371125,
+          "submit_ns": 2038374625,
+          "submitted_ns": 2038416416
+        },
+        {
+          "expert": 44,
+          "available_ns": 2037104750,
+          "yield_ns": 2037883375,
+          "submit_ns": 2037895125,
+          "submitted_ns": 2037943791
+        },
+        {
+          "expert": 17,
+          "available_ns": 2037104750,
+          "yield_ns": 2037806041,
+          "submit_ns": 2037812791,
+          "submitted_ns": 2037873666
+        },
+        {
+          "expert": 500,
+          "available_ns": 2038276833,
+          "yield_ns": 2038426333,
+          "submit_ns": 2038430250,
+          "submitted_ns": 2038471333
+        },
+        {
+          "expert": 91,
+          "available_ns": 2037104750,
+          "yield_ns": 2037952333,
+          "submit_ns": 2037956958,
+          "submitted_ns": 2038011083
+        },
+        {
+          "expert": 341,
+          "available_ns": 2038100916,
+          "yield_ns": 2038184666,
+          "submit_ns": 2038192083,
+          "submitted_ns": 2038238416
+        },
+        {
+          "expert": 128,
+          "available_ns": 2038135041,
+          "yield_ns": 2038314000,
+          "submit_ns": 2038318041,
+          "submitted_ns": 2038359666
+        },
+        {
+          "expert": 203,
+          "available_ns": 2038122500,
+          "yield_ns": 2038248875,
+          "submit_ns": 2038253791,
+          "submitted_ns": 2038295958
+        }
+      ],
+      "gpu_spans": [
+        [
+          2037357791,
+          2037522125
+        ],
+        [
+          2037934666,
+          2038128250
+        ],
+        [
+          2038399708,
+          2038660375
+        ],
+        [
+          2038661583,
+          2038688000
+        ]
+      ],
+      "gaps": [
+        [
+          2037104750,
+          2037357791
+        ],
+        [
+          2037522125,
+          2037934666
+        ],
+        [
+          2038128250,
+          2038399708
+        ],
+        [
+          2038660375,
+          2038661583
+        ],
+        [
+          2038688000,
+          2038749875
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2037104750,
+          2037357791
+        ],
+        [
+          2037522125,
+          2037934666
+        ],
+        [
+          2038128250,
+          2038399708
+        ]
+      ]
+    },
+    {
+      "tag": "w1-r10",
+      "resident": 10,
+      "layer_ns": 862500,
+      "gpu_active_union_ns": 544000,
+      "no_target_gpu_activity_ns": 318500,
+      "ready_not_submitted_overlap_ns": 253625,
+      "interior_ready_gap_upper_ns": 0,
+      "post_yield_ready_to_submit_overlap_ns": 20208,
+      "gpu_intervals": 11,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2041548625,
+          "yield_ns": 2041933083,
+          "submit_ns": 2041937291,
+          "submitted_ns": 2041998958
+        },
+        {
+          "expert": 3,
+          "available_ns": 2041548625,
+          "yield_ns": 2041588000,
+          "submit_ns": 2041597416,
+          "submitted_ns": 2041655375
+        },
+        {
+          "expert": 409,
+          "available_ns": 2041548625,
+          "yield_ns": 2042083291,
+          "submit_ns": 2042088416,
+          "submitted_ns": 2042146083
+        },
+        {
+          "expert": 44,
+          "available_ns": 2041548625,
+          "yield_ns": 2041721541,
+          "submit_ns": 2041725083,
+          "submitted_ns": 2041766958
+        },
+        {
+          "expert": 17,
+          "available_ns": 2041548625,
+          "yield_ns": 2041665166,
+          "submit_ns": 2041669041,
+          "submitted_ns": 2041712916
+        },
+        {
+          "expert": 500,
+          "available_ns": 2041548625,
+          "yield_ns": 2042154500,
+          "submit_ns": 2042158583,
+          "submitted_ns": 2042206541
+        },
+        {
+          "expert": 91,
+          "available_ns": 2041548625,
+          "yield_ns": 2041774000,
+          "submit_ns": 2041777375,
+          "submitted_ns": 2041818000
+        },
+        {
+          "expert": 341,
+          "available_ns": 2041548625,
+          "yield_ns": 2042010375,
+          "submit_ns": 2042021458,
+          "submitted_ns": 2042070250
+        },
+        {
+          "expert": 128,
+          "available_ns": 2041548625,
+          "yield_ns": 2041826083,
+          "submit_ns": 2041830375,
+          "submitted_ns": 2041871625
+        },
+        {
+          "expert": 203,
+          "available_ns": 2041548625,
+          "yield_ns": 2041879666,
+          "submit_ns": 2041883583,
+          "submitted_ns": 2041925041
+        }
+      ],
+      "gpu_spans": [
+        [
+          2041802250,
+          2042244500
+        ],
+        [
+          2042246833,
+          2042321541
+        ],
+        [
+          2042331166,
+          2042358208
+        ]
+      ],
+      "gaps": [
+        [
+          2041548625,
+          2041802250
+        ],
+        [
+          2042244500,
+          2042246833
+        ],
+        [
+          2042321541,
+          2042331166
+        ],
+        [
+          2042358208,
+          2042411125
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2041548625,
+          2041802250
+        ]
+      ]
+    },
+    {
+      "tag": "w2-r10",
+      "resident": 10,
+      "layer_ns": 860625,
+      "gpu_active_union_ns": 487291,
+      "no_target_gpu_activity_ns": 373334,
+      "ready_not_submitted_overlap_ns": 303000,
+      "interior_ready_gap_upper_ns": 0,
+      "post_yield_ready_to_submit_overlap_ns": 27458,
+      "gpu_intervals": 11,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2045008208,
+          "yield_ns": 2045384541,
+          "submit_ns": 2045388750,
+          "submitted_ns": 2045486291
+        },
+        {
+          "expert": 3,
+          "available_ns": 2045008208,
+          "yield_ns": 2045045416,
+          "submit_ns": 2045053208,
+          "submitted_ns": 2045107750
+        },
+        {
+          "expert": 409,
+          "available_ns": 2045008208,
+          "yield_ns": 2045547958,
+          "submit_ns": 2045552333,
+          "submitted_ns": 2045596416
+        },
+        {
+          "expert": 44,
+          "available_ns": 2045008208,
+          "yield_ns": 2045167125,
+          "submit_ns": 2045170458,
+          "submitted_ns": 2045210416
+        },
+        {
+          "expert": 17,
+          "available_ns": 2045008208,
+          "yield_ns": 2045116666,
+          "submit_ns": 2045120291,
+          "submitted_ns": 2045159500
+        },
+        {
+          "expert": 500,
+          "available_ns": 2045008208,
+          "yield_ns": 2045604458,
+          "submit_ns": 2045608041,
+          "submitted_ns": 2045654291
+        },
+        {
+          "expert": 91,
+          "available_ns": 2045008208,
+          "yield_ns": 2045218458,
+          "submit_ns": 2045222416,
+          "submitted_ns": 2045262166
+        },
+        {
+          "expert": 341,
+          "available_ns": 2045008208,
+          "yield_ns": 2045492958,
+          "submit_ns": 2045496416,
+          "submitted_ns": 2045539291
+        },
+        {
+          "expert": 128,
+          "available_ns": 2045008208,
+          "yield_ns": 2045275208,
+          "submit_ns": 2045283958,
+          "submitted_ns": 2045324250
+        },
+        {
+          "expert": 203,
+          "available_ns": 2045008208,
+          "yield_ns": 2045331916,
+          "submit_ns": 2045335416,
+          "submitted_ns": 2045376583
+        }
+      ],
+      "gpu_spans": [
+        [
+          2045311208,
+          2045772416
+        ],
+        [
+          2045780000,
+          2045806083
+        ]
+      ],
+      "gaps": [
+        [
+          2045008208,
+          2045311208
+        ],
+        [
+          2045772416,
+          2045780000
+        ],
+        [
+          2045806083,
+          2045868833
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2045008208,
+          2045311208
+        ]
+      ]
+    },
+    {
+      "tag": "w2-r4",
+      "resident": 4,
+      "layer_ns": 1610125,
+      "gpu_active_union_ns": 750585,
+      "no_target_gpu_activity_ns": 859540,
+      "ready_not_submitted_overlap_ns": 562249,
+      "interior_ready_gap_upper_ns": 355791,
+      "post_yield_ready_to_submit_overlap_ns": 18375,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2049136625,
+          "yield_ns": 2049323791,
+          "submit_ns": 2049327250,
+          "submitted_ns": 2049366000
+        },
+        {
+          "expert": 3,
+          "available_ns": 2048401208,
+          "yield_ns": 2048915166,
+          "submit_ns": 2048926083,
+          "submitted_ns": 2048989208
+        },
+        {
+          "expert": 409,
+          "available_ns": 2049331458,
+          "yield_ns": 2049489250,
+          "submit_ns": 2049493208,
+          "submitted_ns": 2049535041
+        },
+        {
+          "expert": 44,
+          "available_ns": 2048401208,
+          "yield_ns": 2049112041,
+          "submit_ns": 2049124625,
+          "submitted_ns": 2049171708
+        },
+        {
+          "expert": 17,
+          "available_ns": 2048401208,
+          "yield_ns": 2049008000,
+          "submit_ns": 2049015458,
+          "submitted_ns": 2049101291
+        },
+        {
+          "expert": 500,
+          "available_ns": 2049390583,
+          "yield_ns": 2049544375,
+          "submit_ns": 2049548125,
+          "submitted_ns": 2049587583
+        },
+        {
+          "expert": 91,
+          "available_ns": 2048401208,
+          "yield_ns": 2049181708,
+          "submit_ns": 2049185416,
+          "submitted_ns": 2049231250
+        },
+        {
+          "expert": 341,
+          "available_ns": 2049196875,
+          "yield_ns": 2049376041,
+          "submit_ns": 2049382333,
+          "submitted_ns": 2049429250
+        },
+        {
+          "expert": 128,
+          "available_ns": 2049208625,
+          "yield_ns": 2049257375,
+          "submit_ns": 2049262166,
+          "submitted_ns": 2049311875
+        },
+        {
+          "expert": 203,
+          "available_ns": 2049268125,
+          "yield_ns": 2049438416,
+          "submit_ns": 2049441666,
+          "submitted_ns": 2049481500
+        }
+      ],
+      "gpu_spans": [
+        [
+          2048607666,
+          2048763083
+        ],
+        [
+          2049104416,
+          2049222666
+        ],
+        [
+          2049232166,
+          2049336375
+        ],
+        [
+          2049337250,
+          2049473958
+        ],
+        [
+          2049478041,
+          2049687458
+        ],
+        [
+          2049915166,
+          2049941750
+        ]
+      ],
+      "gaps": [
+        [
+          2048401208,
+          2048607666
+        ],
+        [
+          2048763083,
+          2049104416
+        ],
+        [
+          2049222666,
+          2049232166
+        ],
+        [
+          2049336375,
+          2049337250
+        ],
+        [
+          2049473958,
+          2049478041
+        ],
+        [
+          2049687458,
+          2049915166
+        ],
+        [
+          2049941750,
+          2050011333
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2048401208,
+          2048607666
+        ],
+        [
+          2048763083,
+          2049104416
+        ],
+        [
+          2049222666,
+          2049232166
+        ],
+        [
+          2049336375,
+          2049337250
+        ],
+        [
+          2049473958,
+          2049478041
+        ]
+      ]
+    },
+    {
+      "tag": "w2-r0",
+      "resident": 0,
+      "layer_ns": 1757042,
+      "gpu_active_union_ns": 800501,
+      "no_target_gpu_activity_ns": 956541,
+      "ready_not_submitted_overlap_ns": 239416,
+      "interior_ready_gap_upper_ns": 239416,
+      "post_yield_ready_to_submit_overlap_ns": 30376,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2052557625,
+          "yield_ns": 2052708791,
+          "submit_ns": 2052712750,
+          "submitted_ns": 2052762708
+        },
+        {
+          "expert": 3,
+          "available_ns": 2052259125,
+          "yield_ns": 2052296833,
+          "submit_ns": 2052315625,
+          "submitted_ns": 2052371041
+        },
+        {
+          "expert": 409,
+          "available_ns": 2052734833,
+          "yield_ns": 2052831833,
+          "submit_ns": 2052837375,
+          "submitted_ns": 2052881250
+        },
+        {
+          "expert": 44,
+          "available_ns": 2052358458,
+          "yield_ns": 2052443291,
+          "submit_ns": 2052447000,
+          "submitted_ns": 2052490750
+        },
+        {
+          "expert": 17,
+          "available_ns": 2052331833,
+          "yield_ns": 2052382333,
+          "submit_ns": 2052386375,
+          "submitted_ns": 2052434500
+        },
+        {
+          "expert": 500,
+          "available_ns": 2052784541,
+          "yield_ns": 2052896291,
+          "submit_ns": 2052899666,
+          "submitted_ns": 2052948875
+        },
+        {
+          "expert": 91,
+          "available_ns": 2052409041,
+          "yield_ns": 2052507375,
+          "submit_ns": 2052511208,
+          "submitted_ns": 2052572875
+        },
+        {
+          "expert": 341,
+          "available_ns": 2052623833,
+          "yield_ns": 2052774541,
+          "submit_ns": 2052779208,
+          "submitted_ns": 2052822166
+        },
+        {
+          "expert": 128,
+          "available_ns": 2052525000,
+          "yield_ns": 2052646000,
+          "submit_ns": 2052649458,
+          "submitted_ns": 2052697125
+        },
+        {
+          "expert": 203,
+          "available_ns": 2052528416,
+          "yield_ns": 2052584750,
+          "submit_ns": 2052588333,
+          "submitted_ns": 2052636208
+        }
+      ],
+      "gpu_spans": [
+        [
+          2051629500,
+          2051884458
+        ],
+        [
+          2052528541,
+          2053048500
+        ],
+        [
+          2053090541,
+          2053116125
+        ]
+      ],
+      "gaps": [
+        [
+          2051417916,
+          2051629500
+        ],
+        [
+          2051884458,
+          2052528541
+        ],
+        [
+          2053048500,
+          2053090541
+        ],
+        [
+          2053116125,
+          2053174958
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2052259125,
+          2052315625
+        ],
+        [
+          2052331833,
+          2052511208
+        ],
+        [
+          2052525000,
+          2052528541
+        ]
+      ]
+    },
+    {
+      "tag": "w3-r0",
+      "resident": 0,
+      "layer_ns": 1938125,
+      "gpu_active_union_ns": 861750,
+      "no_target_gpu_activity_ns": 1076375,
+      "ready_not_submitted_overlap_ns": 208001,
+      "interior_ready_gap_upper_ns": 208001,
+      "post_yield_ready_to_submit_overlap_ns": 21043,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2055939875,
+          "yield_ns": 2056134916,
+          "submit_ns": 2056139458,
+          "submitted_ns": 2056188541
+        },
+        {
+          "expert": 3,
+          "available_ns": 2055763166,
+          "yield_ns": 2055908375,
+          "submit_ns": 2055912041,
+          "submitted_ns": 2055953166
+        },
+        {
+          "expert": 409,
+          "available_ns": 2056003791,
+          "yield_ns": 2056256500,
+          "submit_ns": 2056261000,
+          "submitted_ns": 2056304375
+        },
+        {
+          "expert": 44,
+          "available_ns": 2055735958,
+          "yield_ns": 2055854083,
+          "submit_ns": 2055858125,
+          "submitted_ns": 2055900083
+        },
+        {
+          "expert": 17,
+          "available_ns": 2055617666,
+          "yield_ns": 2055650583,
+          "submit_ns": 2055657125,
+          "submitted_ns": 2055707375
+        },
+        {
+          "expert": 500,
+          "available_ns": 2056111208,
+          "yield_ns": 2056314000,
+          "submit_ns": 2056318333,
+          "submitted_ns": 2056364791
+        },
+        {
+          "expert": 91,
+          "available_ns": 2055715666,
+          "yield_ns": 2055791333,
+          "submit_ns": 2055797250,
+          "submitted_ns": 2055844166
+        },
+        {
+          "expert": 341,
+          "available_ns": 2055980875,
+          "yield_ns": 2056200750,
+          "submit_ns": 2056205125,
+          "submitted_ns": 2056246541
+        },
+        {
+          "expert": 128,
+          "available_ns": 2055802916,
+          "yield_ns": 2055962291,
+          "submit_ns": 2055965916,
+          "submitted_ns": 2056022875
+        },
+        {
+          "expert": 203,
+          "available_ns": 2055918541,
+          "yield_ns": 2056044625,
+          "submit_ns": 2056053541,
+          "submitted_ns": 2056121666
+        }
+      ],
+      "gpu_spans": [
+        [
+          2054842416,
+          2055085708
+        ],
+        [
+          2055862166,
+          2056118458
+        ],
+        [
+          2056140250,
+          2056213416
+        ],
+        [
+          2056213666,
+          2056476958
+        ],
+        [
+          2056485500,
+          2056511208
+        ]
+      ],
+      "gaps": [
+        [
+          2054626000,
+          2054842416
+        ],
+        [
+          2055085708,
+          2055862166
+        ],
+        [
+          2056118458,
+          2056140250
+        ],
+        [
+          2056213416,
+          2056213666
+        ],
+        [
+          2056476958,
+          2056485500
+        ],
+        [
+          2056511208,
+          2056564125
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2055617666,
+          2055657125
+        ],
+        [
+          2055715666,
+          2055862166
+        ],
+        [
+          2056118458,
+          2056140250
+        ],
+        [
+          2056213416,
+          2056213666
+        ]
+      ]
+    },
+    {
+      "tag": "w3-r4",
+      "resident": 4,
+      "layer_ns": 1381083,
+      "gpu_active_union_ns": 747875,
+      "no_target_gpu_activity_ns": 633208,
+      "ready_not_submitted_overlap_ns": 552500,
+      "interior_ready_gap_upper_ns": 347125,
+      "post_yield_ready_to_submit_overlap_ns": 23457,
+      "gpu_intervals": 12,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2059483541,
+          "yield_ns": 2059562291,
+          "submit_ns": 2059571791,
+          "submitted_ns": 2059632208
+        },
+        {
+          "expert": 3,
+          "available_ns": 2058764875,
+          "yield_ns": 2059257375,
+          "submit_ns": 2059267708,
+          "submitted_ns": 2059329541
+        },
+        {
+          "expert": 409,
+          "available_ns": 2059673041,
+          "yield_ns": 2059822458,
+          "submit_ns": 2059826500,
+          "submitted_ns": 2059873083
+        },
+        {
+          "expert": 44,
+          "available_ns": 2058764875,
+          "yield_ns": 2059397166,
+          "submit_ns": 2059400833,
+          "submitted_ns": 2059447916
+        },
+        {
+          "expert": 17,
+          "available_ns": 2058764875,
+          "yield_ns": 2059341625,
+          "submit_ns": 2059347166,
+          "submitted_ns": 2059389916
+        },
+        {
+          "expert": 500,
+          "available_ns": 2059772291,
+          "yield_ns": 2059882208,
+          "submit_ns": 2059886125,
+          "submitted_ns": 2059930000
+        },
+        {
+          "expert": 91,
+          "available_ns": 2058764875,
+          "yield_ns": 2059454875,
+          "submit_ns": 2059462250,
+          "submitted_ns": 2059534750
+        },
+        {
+          "expert": 341,
+          "available_ns": 2059586708,
+          "yield_ns": 2059643750,
+          "submit_ns": 2059647666,
+          "submitted_ns": 2059701500
+        },
+        {
+          "expert": 128,
+          "available_ns": 2059619416,
+          "yield_ns": 2059761791,
+          "submit_ns": 2059767083,
+          "submitted_ns": 2059811291
+        },
+        {
+          "expert": 203,
+          "available_ns": 2059604000,
+          "yield_ns": 2059710250,
+          "submit_ns": 2059713625,
+          "submitted_ns": 2059751666
+        }
+      ],
+      "gpu_spans": [
+        [
+          2058970250,
+          2059121750
+        ],
+        [
+          2059445666,
+          2059633666
+        ],
+        [
+          2059656875,
+          2060038916
+        ],
+        [
+          2060063541,
+          2060089875
+        ]
+      ],
+      "gaps": [
+        [
+          2058764875,
+          2058970250
+        ],
+        [
+          2059121750,
+          2059445666
+        ],
+        [
+          2059633666,
+          2059656875
+        ],
+        [
+          2060038916,
+          2060063541
+        ],
+        [
+          2060089875,
+          2060145958
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2058764875,
+          2058970250
+        ],
+        [
+          2059121750,
+          2059445666
+        ],
+        [
+          2059633666,
+          2059656875
+        ]
+      ]
+    },
+    {
+      "tag": "w3-r10",
+      "resident": 10,
+      "layer_ns": 1249208,
+      "gpu_active_union_ns": 520916,
+      "no_target_gpu_activity_ns": 728292,
+      "ready_not_submitted_overlap_ns": 636292,
+      "interior_ready_gap_upper_ns": 360959,
+      "post_yield_ready_to_submit_overlap_ns": 87959,
+      "gpu_intervals": 11,
+      "experts": [
+        {
+          "expert": 277,
+          "available_ns": 2062861708,
+          "yield_ns": 2063600041,
+          "submit_ns": 2063603875,
+          "submitted_ns": 2063643625
+        },
+        {
+          "expert": 3,
+          "available_ns": 2062861708,
+          "yield_ns": 2062896958,
+          "submit_ns": 2062905875,
+          "submitted_ns": 2062969708
+        },
+        {
+          "expert": 409,
+          "available_ns": 2062861708,
+          "yield_ns": 2063701416,
+          "submit_ns": 2063704708,
+          "submitted_ns": 2063742541
+        },
+        {
+          "expert": 44,
+          "available_ns": 2062861708,
+          "yield_ns": 2063042041,
+          "submit_ns": 2063045708,
+          "submitted_ns": 2063089791
+        },
+        {
+          "expert": 17,
+          "available_ns": 2062861708,
+          "yield_ns": 2062979375,
+          "submit_ns": 2062983125,
+          "submitted_ns": 2063035166
+        },
+        {
+          "expert": 500,
+          "available_ns": 2062861708,
+          "yield_ns": 2063750333,
+          "submit_ns": 2063754000,
+          "submitted_ns": 2063796291
+        },
+        {
+          "expert": 91,
+          "available_ns": 2062861708,
+          "yield_ns": 2063097833,
+          "submit_ns": 2063101916,
+          "submitted_ns": 2063183791
+        },
+        {
+          "expert": 341,
+          "available_ns": 2062861708,
+          "yield_ns": 2063650708,
+          "submit_ns": 2063654166,
+          "submitted_ns": 2063693250
+        },
+        {
+          "expert": 128,
+          "available_ns": 2062861708,
+          "yield_ns": 2063190583,
+          "submit_ns": 2063194375,
+          "submitted_ns": 2063371000
+        },
+        {
+          "expert": 203,
+          "available_ns": 2062861708,
+          "yield_ns": 2063480875,
+          "submit_ns": 2063534166,
+          "submitted_ns": 2063585416
+        }
+      ],
+      "gpu_spans": [
+        [
+          2063137041,
+          2063319166
+        ],
+        [
+          2063339333,
+          2063413208
+        ],
+        [
+          2063801958,
+          2064040833
+        ],
+        [
+          2064042000,
+          2064068041
+        ]
+      ],
+      "gaps": [
+        [
+          2062861708,
+          2063137041
+        ],
+        [
+          2063319166,
+          2063339333
+        ],
+        [
+          2063413208,
+          2063801958
+        ],
+        [
+          2064040833,
+          2064042000
+        ],
+        [
+          2064068041,
+          2064110916
+        ]
+      ],
+      "ready_gap_spans": [
+        [
+          2062861708,
+          2063137041
+        ],
+        [
+          2063319166,
+          2063339333
+        ],
+        [
+          2063413208,
+          2063754000
+        ]
+      ]
+    }
+  ],
+  "limits": [
+    "No activity means this target process only, not whole-device idle.",
+    "Overlap is an optimistic ceiling including necessary CPU graph building, not proven removable latency.",
+    "Native intervals identify command buffers, not individual kernels or expert last-use.",
+    "Observer timings are not uninstrumented performance results."
+  ]
+}

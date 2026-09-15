@@ -1,0 +1,26 @@
+{
+  "all_output_exact": true,
+  "summary": {
+    "10": {
+      "control_ms": 0.617802,
+      "candidate_ms": 0.4895832499999999,
+      "reduction_percent": 20.7540198963422
+    },
+    "4": {
+      "control_ms": 0.96091675,
+      "candidate_ms": 0.9423435,
+      "reduction_percent": 1.9328677536321393
+    },
+    "0": {
+      "control_ms": 1.1501145,
+      "candidate_ms": 1.11953125,
+      "reduction_percent": 2.659148284801194
+    }
+  },
+  "raw_runs": [
+    "submit-abba-0/result.json",
+    "submit-abba-1/result.json",
+    "submit-abba-2/result.json",
+    "submit-abba-3/result.json"
+  ]
+}

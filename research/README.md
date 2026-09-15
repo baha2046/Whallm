@@ -10,6 +10,13 @@
 目前 runtime 行為以 [docs](../docs/README.md) 為準。
 本目錄保存研究問題、實驗與尚未採用的方向。
 
+## 2026-09-15：GPT 討論後的選項 2、3
+
+使用者指定先研究 [Decode 提交與 Qwen packed cache 先選列](DECODE_SUBMISSION_PACKED_SELECT_2026-09-15.md)。
+兩個方向已分開完成部件與 8 次完整請求測量：Qwen 16K packed 8-bit 先選列的
+Decode 兩對提高 15.12–15.49%；4K 常駐合併提交平均僅 3.60%，本輪停止整合。
+候選只存在獨立研究程序，尚未採用為 runtime 或 App 預設；完整條件與限制見報告。
+
 ## 2026-09-15：本機 SSD streaming 六項實驗
 
 使用者已選擇本機 V4＋Qwen。依 [執行表與比較規則](SSD_STREAMING_ABLATION_2026-09-15.md)
