@@ -23,14 +23,14 @@ try:
         _apply_candidate,
         _validate_manifest,
     )
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,
     )
 except ImportError:
     from benchmark_approximate_expert_drop import _apply_candidate, _validate_manifest
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,

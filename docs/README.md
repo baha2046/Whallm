@@ -1,5 +1,20 @@
 # Whallm 文件
 
+2026-09-15 最新工作目錄：[三模型分開 Prefill／Decode 讀取](PREFILL_IO.md) 預設啟用；
+第 4、5、6、7、9、10 項實驗已移除，第 8 項不實作。
+保留基本 DSpark／MTP、一般預讀及模型安裝。尚未重新打包發布。
+
+[SSD 串流十個方向比較](SSD_OPTIMIZATION_COMPARISON.md)：三模型實作狀態、完整程度與測試收益。
+
+2026-09-15 工作目錄新增 [路由感知快取](ROUTE_AWARE_CACHE.md)：
+保留跨淘汰的全專家歷史、分開長短期熱門度，並動態分配各層容量。
+App／CLI／Server 可選 `route`；既有預設不變，尚未重新封裝或發布。
+
+2026-09-15 本機 V4／Qwen 的 [SSD 串流六項實驗](benchmarks/2026-09-15-ssd-streaming-ablation/README.md)
+已完成本輪候選檢查，Python 432 項通過。V4 直接 Prefill 讀取的 4K 首次回覆時間縮短
+14.65%、整次請求縮短 6.35%；其他候選的退步、輸出差異、swapout 排除與 GPU 歸因限制
+均列於報告。這是研究測量，App 預設與發布成品不變。
+
 目前已發布 [v1.1.7 正式版](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7)，程式碼固定為 `062624ee974febb0b0ee07e228552998f260389d`。
 版本與內部 build 均為 `1.1.7`；本機 `dist` 為已簽章、公證的正式成品，排除 Dry run。
 包含下方記錄的 Throughput、Prefill 取消、Slots 記憶體修正、Qwen Slots 3072、

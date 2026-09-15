@@ -16,15 +16,14 @@ from research.qwen_resident_block import BoundedArenaPool,direct_project
 def demand_lease(cache,layer,selected):
     """Reserve/touch once, protect all source slots through the final GPU fence."""
     check_cancelled()
-    if cache._active_speculative_prefetch is not None:raise ValueError('speculative scratch composition unsupported')
     frequencies=Counter(selected);unique=sorted(frequencies)
     if not 0<=layer<cache.layer_count or len(unique)>cache.slots or any(not 0<=e<cache.model.expert_count for e in unique):raise ValueError('invalid expert demand')
     protected={(layer,e) for e in unique};assigned={};futures={};added=set();success=False
     missing=[];resident=[];started=None
     try:
         with cache._lock:
-            added=protected-cache._speculative_pinned_keys
-            cache._speculative_pinned_keys.update(added)
+            added=protected-cache._pinned_expert_keys
+            cache._pinned_expert_keys.update(added)
             for expert in unique:
                 entry=cache._entries.get((layer,expert))
                 if entry is None:cache.metrics.misses+=1;missing.append(expert)
@@ -51,7 +50,7 @@ def demand_lease(cache,layer,selected):
                 if finished and started is not None:cache.metrics.read_seconds+=max(finished)-started
                 if not success:cache._release_slots(layer,assigned)
                 else:cache._decay_if_needed()
-                cache._speculative_pinned_keys.difference_update(added)
+                cache._pinned_expert_keys.difference_update(added)
 
 
 def ready_experts(value,indices,cache,layer,shared,state):

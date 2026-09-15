@@ -1772,12 +1772,13 @@ private struct ModelAdvancedView: View {
           Divider()
           SettingRow(
             "Expert cache eviction",
-            hint: "LRU keeps recently used experts. LFU keeps frequently used experts.",
+            hint: "Route-aware cache remembers expert usage and adjusts memory across layers.",
             language: language
           ) {
             Picker(L10n.string("Expert cache eviction", language: language), selection: expertEvictionPolicy) {
               Text(L10n.string("LRU (recently used)", language: language)).tag("lru")
               Text(L10n.string("LFU (frequently used)", language: language)).tag("lfu")
+              Text(L10n.string("Route-aware", language: language)).tag("route")
             }
             .labelsHidden()
             .pickerStyle(.menu)
@@ -2054,8 +2055,12 @@ private struct ModelAdvancedView: View {
   }
 
   private var expertEvictionPolicy: Binding<String> {
-    Binding(get: { settings.recentExpertCache ?? true ? "lru" : "lfu" },
-            set: { settings.recentExpertCache = $0 == "lru" })
+    Binding(get: {
+      settings.routeAwareExpertCache == true ? "route" : (settings.recentExpertCache ?? true ? "lru" : "lfu")
+    }, set: { policy in
+      settings.routeAwareExpertCache = policy == "route"
+      if policy != "route" { settings.recentExpertCache = policy == "lru" }
+    })
   }
 
   private var promptCacheMode: Binding<PromptCacheMode> {

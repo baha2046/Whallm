@@ -296,8 +296,6 @@ def load(
         raise ValueError("DeepSeek V4.1 does not yet support MTP")
     if config.staged_expert_streaming:
         raise ValueError("DeepSeek V4.1 does not support staged expert streaming")
-    if config.adaptive_expert_prefill_threshold is not None:
-        raise ValueError("DeepSeek V4.1 does not support adaptive expert prefill")
     if installed_model.engram is None:
         raise ValueError("installed DeepSeek V4.1 model has no engram descriptor")
 
@@ -328,6 +326,7 @@ def load(
         read_limiter=read_limiter,
         page_cache_probe=config.expert_page_cache_probe,
         file_cache_policy=config.expert_file_cache_policy,
+        separate_prefill_io=getattr(config, "separate_prefill_io", True),
         eviction_policy=config.expert_eviction_policy,
         staged_expert_streaming=False,
     )

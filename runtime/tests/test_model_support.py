@@ -104,7 +104,7 @@ class ModelSupportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 operation(*arguments)
         support.validate_config(RuntimeConfig(dspark_enabled=True))
-        for config in (RuntimeConfig(dspark_enabled=True, dspark_hash_prefetch=True), RuntimeConfig(mtp_enabled=True),
+        for config in (RuntimeConfig(mtp_enabled=True),
                        RuntimeConfig(staged_expert_streaming=True)):
             with self.assertRaises(ValueError):
                 support.validate_config(config)

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 try:
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _load_prompts,
         _package_version,
@@ -22,7 +22,7 @@ try:
         _sysctl,
     )
 except ImportError:
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _load_prompts,
         _package_version,
@@ -200,8 +200,6 @@ def _run_configuration(
         dspark_fallback_enabled=fallback_enabled,
         layer_major_prefill_enabled=False,
         sequential_verification_enabled=False,
-        hybrid_verification_enabled=True,
-        hybrid_hash_prefetch_enabled=False,
         dspark_slots=slots,
     )
     row["mode"] = label
@@ -302,8 +300,6 @@ def main() -> None:
             dspark_fallback_enabled=arguments.fallback_enabled,
             layer_major_prefill_enabled=False,
             sequential_verification_enabled=False,
-            hybrid_verification_enabled=True,
-            hybrid_hash_prefetch_enabled=False,
         )
         reference["sequence"] = 0
         runs.append(reference)
@@ -415,9 +411,7 @@ def main() -> None:
             "fresh_process_per_run": True,
             "persistent_prompt_cache": False,
             "layer_major_prefill": False,
-            "target_verification": "hybrid v3 token-shaped target math",
-            "hash_prefetch": False,
-            "adaptive_block": False,
+            "target_verification": "standard target verifier",
             "fallback_enabled": arguments.fallback_enabled,
             "temperature": 0,
             "top_p": 1,

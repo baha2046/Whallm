@@ -1,0 +1,264 @@
+{
+  "evidence_kind": "bounded_full_model_ab_ba_screening",
+  "formal_performance_result": false,
+  "validation": {
+    "timed_runs": 16,
+    "source_hashes_verified": true,
+    "output_hashes_verified": true,
+    "swap_and_memory_gates_passed": true,
+    "lifecycle_models_passed": [
+      "v4",
+      "qwen"
+    ]
+  },
+  "results": {
+    "qwen-code": {
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": -9.867727451228554,
+          "time_to_first_token_seconds": -6.33853165623754,
+          "decode_tokens_per_second": 15.75830773974024,
+          "expert_bytes_read": 1.0453582971135633,
+          "peak_memory_bytes": 1.4133926473647307e-06
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -14.551693300055346,
+            -5.183761602401759
+          ],
+          "time_to_first_token_seconds": [
+            -11.615393472280322,
+            -1.0616698401947566
+          ],
+          "decode_tokens_per_second": [
+            10.048762070949957,
+            21.467853408530523
+          ],
+          "expert_bytes_read": [
+            1.0409004792154342,
+            1.0498161150116925
+          ],
+          "peak_memory_bytes": [
+            0.0,
+            2.8267852947294614e-06
+          ]
+        },
+        "screening_speed_signal": true
+      },
+      "median_metrics": {
+        "control": {
+          "request_seconds": 29.02352874999997,
+          "time_to_first_token_seconds": 14.618956083002558,
+          "decode_tokens_per_second": 8.838841217136071,
+          "expert_bytes_read": 117151488000.0,
+          "peak_memory_bytes": 18112447725.0,
+          "expert_cache_hit_rate": 0.6723352713178294,
+          "expert_eviction_seconds": 0.11564316060321289
+        },
+        "route": {
+          "request_seconds": 26.06533081250018,
+          "time_to_first_token_seconds": 13.619420812996395,
+          "decode_tokens_per_second": 10.209598931336664,
+          "expert_bytes_read": 118376140800.0,
+          "peak_memory_bytes": 18112447981.0,
+          "expert_cache_hit_rate": 0.6647609819121447,
+          "expert_eviction_seconds": 0.18708001761478954
+        }
+      },
+      "maximum_peak_extra_bytes": 512,
+      "maximum_rss_extra_bytes": 49152
+    },
+    "v4-code": {
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": -10.537472011788129,
+          "time_to_first_token_seconds": -5.012639896807563,
+          "decode_tokens_per_second": 17.56946902515356,
+          "expert_bytes_read": 0.5664346981712254,
+          "peak_memory_bytes": -0.00010751604062053666
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -14.741185836010517,
+            -6.333758187565741
+          ],
+          "time_to_first_token_seconds": [
+            -7.8320785441814085,
+            -2.1932012494337183
+          ],
+          "decode_tokens_per_second": [
+            10.558528576898695,
+            24.580409473408427
+          ],
+          "expert_bytes_read": [
+            0.5542968117818514,
+            0.5785725845605993
+          ],
+          "peak_memory_bytes": [
+            -0.00011236001519199235,
+            -0.00010267206604908097
+          ]
+        },
+        "screening_speed_signal": true
+      },
+      "median_metrics": {
+        "control": {
+          "request_seconds": 41.13581941699522,
+          "time_to_first_token_seconds": 17.601111812498857,
+          "decode_tokens_per_second": 5.4187962034352175,
+          "expert_bytes_read": 330436706304.0,
+          "peak_memory_bytes": 24442864642.0,
+          "expert_cache_hit_rate": 0.5804338681569617,
+          "expert_eviction_seconds": 0.06714053672112641
+        },
+        "route": {
+          "request_seconds": 36.71989593750186,
+          "time_to_first_token_seconds": 16.70577366699945,
+          "decode_tokens_per_second": 6.347134475521095,
+          "expert_bytes_read": 332308414464.0,
+          "peak_memory_bytes": 24442838362.0,
+          "expert_cache_hit_rate": 0.5762273901808785,
+          "expert_eviction_seconds": 0.11499650069890777
+        }
+      },
+      "maximum_peak_extra_bytes": -25096,
+      "maximum_rss_extra_bytes": 573440
+    },
+    "qwen-zh_technical": {
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": -0.2619560449859393,
+          "time_to_first_token_seconds": 0.5081394574950826,
+          "decode_tokens_per_second": 2.3364228090610393,
+          "expert_bytes_read": 0.6361384936628967,
+          "peak_memory_bytes": -1.1942281291643653e-05
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -0.9027196254516201,
+            0.37880753547974155
+          ],
+          "time_to_first_token_seconds": [
+            -0.19557859713208448,
+            1.2118575121222497
+          ],
+          "decode_tokens_per_second": [
+            -1.7542483696896594,
+            6.427093987811738
+          ],
+          "expert_bytes_read": [
+            0.3787694847763756,
+            0.8935075025494177
+          ],
+          "peak_memory_bytes": [
+            -1.683773830363222e-05,
+            -7.046824279655084e-06
+          ]
+        },
+        "screening_speed_signal": false
+      },
+      "median_metrics": {
+        "control": {
+          "request_seconds": 47.03379420850251,
+          "time_to_first_token_seconds": 33.35657922950122,
+          "decode_tokens_per_second": 9.291392946930358,
+          "expert_bytes_read": 107544883200.0,
+          "peak_memory_bytes": 18220974102.0,
+          "expert_cache_hit_rate": 0.7317506459948321,
+          "expert_eviction_seconds": 0.10663921359810047
+        },
+        "route": {
+          "request_seconds": 46.91448641699753,
+          "time_to_first_token_seconds": 33.5228379379987,
+          "decode_tokens_per_second": 9.512602259020099,
+          "expert_bytes_read": 108229017600.0,
+          "peak_memory_bytes": 18220971926.0,
+          "expert_cache_hit_rate": 0.7275193798449613,
+          "expert_eviction_seconds": 0.15145688821212389
+        }
+      },
+      "maximum_peak_extra_bytes": -1284,
+      "maximum_rss_extra_bytes": 491520
+    },
+    "v4-zh_technical": {
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": 0.18047857027904124,
+          "time_to_first_token_seconds": 4.69473141998108,
+          "decode_tokens_per_second": 6.685123729192716,
+          "expert_bytes_read": 2.2267845862286806,
+          "peak_memory_bytes": -0.00017709569632984312
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -7.5741728162531,
+            7.935129956811182
+          ],
+          "time_to_first_token_seconds": [
+            0.5721852499750435,
+            8.817277589987116
+          ],
+          "decode_tokens_per_second": [
+            -6.415556830759883,
+            19.785804289145315
+          ],
+          "expert_bytes_read": [
+            2.138796137532717,
+            2.3147730349246443
+          ],
+          "peak_memory_bytes": [
+            -0.00035847353478946076,
+            4.282142129774513e-06
+          ]
+        },
+        "screening_speed_signal": true
+      },
+      "median_metrics": {
+        "control": {
+          "request_seconds": 52.15921254150089,
+          "time_to_first_token_seconds": 27.957733833500242,
+          "decode_tokens_per_second": 5.270581570978488,
+          "expert_bytes_read": 296291401728.0,
+          "peak_memory_bytes": 24473752750.0,
+          "expert_cache_hit_rate": 0.6571720449492218,
+          "expert_eviction_seconds": 0.06881012629310135
+        },
+        "route": {
+          "request_seconds": 52.110964771,
+          "time_to_first_token_seconds": 29.257829270998627,
+          "decode_tokens_per_second": 5.57916269208963,
+          "expert_bytes_read": 302889172992.0,
+          "peak_memory_bytes": 24473709408.0,
+          "expert_cache_hit_rate": 0.6423442100835286,
+          "expert_eviction_seconds": 0.12000665456798743
+        }
+      },
+      "maximum_peak_extra_bytes": 1048,
+      "maximum_rss_extra_bytes": 6832128
+    }
+  },
+  "files": {
+    "README.md": "4d46b9b43a15a4068e203603132b01ace4f5ac796227ed19874a3b601b61944b",
+    "qwen-code-layers.csv": "0d62625162671e69e5dc8157810477145ea0db2bac8300b1bf334e5f8e0cac3d",
+    "qwen-code.json": "ce4e39303e40a006e748ba39d6707e63e5ce5522574f5baa738db66d886a32bf",
+    "qwen-lifecycle.json": "4b2ccf479cc88e1edb90b7f19342fc8a925675f5b4e7062fd62483e1d2fb7d0e",
+    "qwen-zh_technical-layers.csv": "bf988a0c75fca31c5c5aa30c62b465cc7af67f0c628a078e81b013a50624c278",
+    "qwen-zh_technical.json": "a631bac3d9f05d79cd82e829071abd0858e9132ba80b45abb50ebd4a52850b32",
+    "raw-evidence.tar.gz": "5a1a0d669e9507358cd6b8005b6af5ac316e1c3dd89f2cfaddb2ee73d23af3f8",
+    "runtime-tests.log": "232d6b65dde7c87d66cdc1f615b089c87732f41986590fb1c2c84acdf41b705d",
+    "swift-tests.log": "8edd5780fa2f276ee3e0aa04b15043bedea334ff16b2fe57cbcb7a80c29d7511",
+    "v4-code-layers.csv": "306c67464a148ff94cfdac98ca3cf7bb08ee6bbd5894adaf0cf01e7e67b364d4",
+    "v4-code.json": "5ef73ce882e1301a6f063a42634ec476c8a853e32dae7bfa9f9226ceaa0094c3",
+    "v4-lifecycle.json": "98a8b8a148414ca82962a0457e7a58181826a82347de0ca27f66a5be01979f53",
+    "v4-zh_technical-layers.csv": "37d7963919de489a7b306d2e3a37312369940566b8087d241e9223f12c863182",
+    "v4-zh_technical.json": "d59e549d1a6e8694ae2cef9cd1a18ec430c68b113e941787f776f2f1474ef815"
+  }
+}

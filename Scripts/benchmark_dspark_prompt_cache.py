@@ -91,9 +91,6 @@ def _config(cache_root: Path) -> RuntimeConfig:
         dspark_enabled=True,
         dspark_prompt_cache=True,
         dspark_fallback_enabled=False,
-        dspark_hybrid_verification=True,
-        dspark_hash_prefetch=False,
-        dspark_adaptive_block=False,
         expert_file_cache_policy="bypass",
     )
 
@@ -306,10 +303,7 @@ def main() -> None:
             "batch_size": 1,
             "dspark_prompt_cache": True,
             "persistent_prompt_cache": True,
-            "dspark_hybrid_verification": True,
             "dspark_fallback_enabled": False,
-            "dspark_hash_prefetch": False,
-            "dspark_adaptive_block": False,
             "layer_major_prefill": False,
             "expert_file_cache_policy": "bypass",
             "cache_directory": "new isolated temporary directory",
@@ -329,7 +323,7 @@ def main() -> None:
             "Request time and TTFT are descriptive because model reload, memory-cache state, and operating-system state are not balanced.",
             "Expert bytes are logical runtime reads; they are not physical SSD byte counters.",
             "The gate covers one checkpoint, one exact prompt prefix, batch size 1, one process lifetime, and one restart boundary.",
-            "Passing does not enable DSpark, hybrid verification, prompt-context reuse, or expert-file bypass by default.",
+            "Passing does not enable DSpark, prompt-context reuse, or expert-file bypass by default.",
         ],
     }
     output.parent.mkdir(parents=True, exist_ok=True)

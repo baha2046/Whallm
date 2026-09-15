@@ -1,5 +1,27 @@
 # 驗證紀錄
 
+## 2026-09-15：分開 Prefill／Decode 讀取與實驗移除
+
+- 第 3 項已接入三模型主模型與 DSpark／MTP，預設啟用；[功能說明](PREFILL_IO.md)。
+- 第 4、5、6、7、9、10 項依使用者要求移除／取消，第 8 項不實作；[明細與原始碼保存](../research/archive/SSD_DIRECTIONS_RETIRED_2026-09-15.md)。
+- Python **395 項**、Swift **93 項**通過；CLI／Server help 已核對，移除旗標不再出現。
+- [V4／Qwen 實機對照](benchmarks/2026-09-15-prefill-io/README.md)：各兩輪、4K 輸入及 128 輸出。八次計時加八次預熱，計時輸出一致、沒有新增 swapout。
+- V4 整次請求 −4.63%；Qwen −1.08%，Qwen 整體接近持平。完整 V4.1 checkpoint 未安裝，只完成正式權重格式讀取測試。
+- DSpark 拒絕草稿的原有快取收尾保留並補上測試；舊未啟用的 catalog 欄位可遷移，啟用已移除功能會報錯。
+- 尚未打包、簽章或發布。下方較早的旗標、原型與測試數為當時記錄。
+
+## 2026-09-15：路由感知快取
+
+- 工作目錄新增全專家使用統計、短／長期熱門度和逐層容量分配；
+  [功能契約與啟用方式](ROUTE_AWARE_CACHE.md)。App／CLI／Server 可選 `route`，舊預設保留。
+- Python 440 項通過，包括與逐一檢查所有專家的方式核對淘汰結果、分段讀取的權重 bytes、
+  pinning、讀取失敗重試、取消清理、歷史保留及兩段 Prefill 統計。
+- Swift `ServerConfigurationTests` 31 項通過，涵蓋三模型 catalog、偏好存取與新選項翻譯；
+  App 原始碼編譯成功。未重新封裝、簽章或發布。
+- [本機 V4／Qwen 對照及原始紀錄](benchmarks/2026-09-15-route-aware-cache/README.md)。
+  16 次計時生成輸出一致、無新增換頁；兩個模型的連續請求、換題、取消與釋放槽位後重試皆通過。
+  V4.1 完整 checkpoint 未安裝，完整 sidecar 的 route 效能未測。
+
 ## 2026-09-14：Whallm 1.1.7 正式發布
 
 - 已發布 [v1.1.7 正式版](https://github.com/yanun0323/Whallm/releases/tag/v1.1.7)，非 pre-release；GitHub latest 為 `v1.1.7`。

@@ -1,0 +1,171 @@
+{
+  "date": "2026-09-15",
+  "commit": "6cdbdce2fba0085c035c982be1d18bfc7387f3bf",
+  "dirty_worktree": true,
+  "models": {
+    "v4": {
+      "artifact": "v4.json",
+      "sha256": "25bc5e9011963d4a8f2b7d7cbb77488d22b17b17292f69568a884af1d61cd36f",
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": -4.627665404799719,
+          "time_to_first_token_seconds": -10.95457774362043,
+          "decode_tokens_per_second": -2.673999037163438,
+          "expert_bytes_read": 0.0,
+          "peak_memory_bytes": 0.00020443199666431155
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -5.153617797622778,
+            -4.10171301197666
+          ],
+          "time_to_first_token_seconds": [
+            -12.32968394196311,
+            -9.579471545277752
+          ],
+          "decode_tokens_per_second": [
+            -5.443972671814301,
+            0.09597459748742487
+          ],
+          "expert_bytes_read": [
+            0.0,
+            0.0
+          ],
+          "peak_memory_bytes": [
+            2.520250479420838e-05,
+            0.00038366148853441473
+          ]
+        },
+        "screening_speed_signal": true
+      },
+      "timing_runtime_ast_differences": [
+        "runtime/deepseek_v4_ssd/dspark.py"
+      ],
+      "disabled_speculation_verified": true,
+      "final_source_differences": [
+        "runtime/deepseek_v4_ssd/dspark.py",
+        "runtime/deepseek_v4_ssd/expert_cache.py",
+        "runtime/tests/test_prefill_cancellation.py",
+        "runtime/tests/test_runtime.py",
+        "runtime/tests/test_server.py",
+        "runtime/tests/test_ssd_streaming_ablation.py",
+        "runtime/tests/test_ssd_streaming_candidates.py"
+      ]
+    },
+    "qwen": {
+      "artifact": "qwen.json",
+      "sha256": "147e1a900482e3ba4c3e8687206548fcb6e55640372a8012799b8c5885a1c0a2",
+      "comparison": {
+        "pairs": 2,
+        "valid": true,
+        "median_change_percent": {
+          "request_seconds": -1.0823160690184852,
+          "time_to_first_token_seconds": 0.7273887182229877,
+          "decode_tokens_per_second": 6.151808610512621,
+          "expert_bytes_read": 0.0,
+          "peak_memory_bytes": -0.00010745837890624443
+        },
+        "pair_range_percent": {
+          "request_seconds": [
+            -2.26087088486,
+            0.09623874682302969
+          ],
+          "time_to_first_token_seconds": [
+            0.4135157693899938,
+            1.0412616670559816
+          ],
+          "decode_tokens_per_second": [
+            2.48936317675843,
+            9.814254044266812
+          ],
+          "expert_bytes_read": [
+            0.0,
+            0.0
+          ],
+          "peak_memory_bytes": [
+            -0.00020791383927853957,
+            -7.002918533949298e-06
+          ]
+        },
+        "screening_speed_signal": false
+      },
+      "timing_runtime_ast_differences": [
+        "runtime/deepseek_v4_ssd/dspark.py"
+      ],
+      "disabled_speculation_verified": true,
+      "final_source_differences": [
+        "runtime/deepseek_v4_ssd/dspark.py",
+        "runtime/deepseek_v4_ssd/expert_cache.py",
+        "runtime/tests/test_prefill_cancellation.py",
+        "runtime/tests/test_runtime.py",
+        "runtime/tests/test_server.py",
+        "runtime/tests/test_ssd_streaming_ablation.py",
+        "runtime/tests/test_ssd_streaming_candidates.py"
+      ]
+    }
+  },
+  "validation": {
+    "runtime-tests.log": "f0829bafd99252b2fe94b736c405c6fcfc67136adcade8161d93aa070019f325",
+    "swift-all-tests.log": "5ed2d55910518c9a8b6d30612305a813f1e99b53ac4cb1b39b68507403102a5e",
+    "prefill-tests.log": "0604ff95a5ac28df419c2b74dc2a641f1666fda3cde726fc59621b8882c17551",
+    "common-test.log": "c346f1228fe88f4ab3cb336ffa610dc3a34ec7c7bb7d05df7a1c222f2d928881"
+  },
+  "limits": [
+    "Two paired waves per model, one 4096-token Chinese technical prompt and 128 greedy output tokens.",
+    "Fresh process, empty application caches, identical control primer before every timed run; OS cache not purged.",
+    "V4.1 native layout bytes tested; no installed complete checkpoint or generation benchmark.",
+    "No DSpark/MTP or route-aware eviction enabled in the timing runs.",
+    "Timing source snapshots are preserved; final validation source hashes are recorded separately."
+  ],
+  "final_runtime_sha256": {
+    "runtime/deepseek_v4_ssd/__init__.py": "d152b9c150588dd0ac23465b75aa0a45475912dbf90708799d2f85437d4a0ac5",
+    "runtime/deepseek_v4_ssd/ane_prefill.py": "be4754be464af9ce615c0e211fd258e6f451705643870700b5bec882a2baaae2",
+    "runtime/deepseek_v4_ssd/cancellation.py": "04bc452bcc89ba4dbf5ab3fc9850c664200f6506182c8ac4570c59ddd72b2821",
+    "runtime/deepseek_v4_ssd/cli.py": "33905422e8c23efbd524f7f1bd46d6ed16d567514a70334a0a455b89674a259e",
+    "runtime/deepseek_v4_ssd/deepseek_v41/__init__.py": "2d27bf58f828cbce2dc841ee72b3804ff3828bfe843f0c4fa4adcfc1c58eb447",
+    "runtime/deepseek_v4_ssd/deepseek_v41/attention.py": "7c39222731157bdea03c9c0df460df7d9d39dde1ac3eb67aee018a9b2ee04675",
+    "runtime/deepseek_v4_ssd/deepseek_v41/cache.py": "48645c0a98f4af528c34f478d1db884c4ca5cf96e27d8f2346a4004810c34440",
+    "runtime/deepseek_v4_ssd/deepseek_v41/compressor.py": "e347bc5f649c6e88933be3ebff907e3effe51563499bc8fc920d5847771f0d1e",
+    "runtime/deepseek_v4_ssd/deepseek_v41/config.py": "c4a052159ea2eaa1cc7ac897f5a1e266e888b98958ec2dd549ff1d7979602969",
+    "runtime/deepseek_v4_ssd/deepseek_v41/dequant.py": "38283b16527e50401e7923e5d58d3cacc3055a43c0b58738df84e2284203bf7f",
+    "runtime/deepseek_v4_ssd/deepseek_v41/dspark.py": "e9b29844c897bb560a802fc2df8dc9716f4fb4410e85d34e27da025d3deb8aeb",
+    "runtime/deepseek_v4_ssd/deepseek_v41/engram.py": "e57111fc5d1c163714db156b4f7003b29ba0caeb7606a92aa46fd3ab7f228acf",
+    "runtime/deepseek_v4_ssd/deepseek_v41/fakequant.py": "209f7572ccb5531fef4e9874366daaa27967d828049da4e9ca00832a7465c6d6",
+    "runtime/deepseek_v4_ssd/deepseek_v41/hyper_connections.py": "578e40fe8ac502cdd6874c573ecf822e3ec614cdb00c0af0277045f1beab9348",
+    "runtime/deepseek_v4_ssd/deepseek_v41/indexer.py": "62d1a182fbc2c7d5a062d2b01145f92593a2d064c74915841ce495ed42ed62c7",
+    "runtime/deepseek_v4_ssd/deepseek_v41/layers.py": "7eac8011a19aa24e7d552f93127625bab3b9705f9cc123ef2628c4f6c936af36",
+    "runtime/deepseek_v4_ssd/deepseek_v41/model.py": "16a5f17afb948d67ae863542935d7d0bcd55943dce26c773e8da9b897338480d",
+    "runtime/deepseek_v4_ssd/deepseek_v41/moe.py": "29a4143d873d499a70c7296a89146ef857aae89ab77dc745664dbafaa81eacaf",
+    "runtime/deepseek_v4_ssd/deepseek_v41/packed_cache.py": "35f4d5459ea7e137f161f4231e42bc74bb8e0371f64f03739da74485bf7facc3",
+    "runtime/deepseek_v4_ssd/deepseek_v41/sparse_attention.py": "7e1e123e0bcb0f43e3cf319158454490b2aab6c0a9e417107416839d5e81f47e",
+    "runtime/deepseek_v4_ssd/deepseek_v41_ssd.py": "1d93395be494cb29bb0179681c01ca73ce70254bfb79b6c72f3c9f848c2a9d4b",
+    "runtime/deepseek_v4_ssd/dspark.py": "fac30faad52a2bce5ad4e355d88fdd374ae5b92c1a72765b482c8c13070d73d2",
+    "runtime/deepseek_v4_ssd/expert_cache.py": "93f70fd4184cc2db0989c80474179138784f5fe422243a08d891f06e1c3beeef",
+    "runtime/deepseek_v4_ssd/expert_layout.py": "ad910cfbdaf113f9611330b71c771b0a7fc0aafa4cb77a9cabf1b192aea45839",
+    "runtime/deepseek_v4_ssd/fp8_cache.py": "f30aa7b0b6800cee914415e16232869529145990f3ffbd9936d07c8c89fa1241",
+    "runtime/deepseek_v4_ssd/generation.py": "65e01b038bd0d9a337c6a890def86e9b3a6ef38b530a8eb03799cb5d3ef45487",
+    "runtime/deepseek_v4_ssd/io_metrics.py": "bcae42d74a9d93a8efe1b1ee663c4ccf23aabefc82aa6377333cf97327d7ac4c",
+    "runtime/deepseek_v4_ssd/manifest.py": "9115e87ba8be333d810683b45edfc35cca8e1243b5a46a3bfd90aa08f89e4e05",
+    "runtime/deepseek_v4_ssd/model.py": "02ec19afd6b1a9bf64d542fc07dc0438bc744919db5b48fc2853070c195fa6b1",
+    "runtime/deepseek_v4_ssd/model_manager.py": "bd7b9d8b25016a938c624b6d9bca63a7b794f9e2d84b1d05d354f14052c17320",
+    "runtime/deepseek_v4_ssd/model_support/__init__.py": "c432f3c28034b8d0d17c6eb26cae1f84bfa651af577865fa461b0e6b821852fe",
+    "runtime/deepseek_v4_ssd/model_support/__main__.py": "3fe107ea5f32a891c97d794dd9d95c65c0250f06d6e10ab1ad4364e5efcd9434",
+    "runtime/deepseek_v4_ssd/model_support/base.py": "285f529be1c70ecd8e18064b0a46c162398f1f74d94a4b755e5e0d4b6ca4fe58",
+    "runtime/deepseek_v4_ssd/model_support/catalog.py": "814c06e1eebd10180e53d4fe9252b6e4cf82df2ffe3d162dfb59ef913d98de3d",
+    "runtime/deepseek_v4_ssd/model_support/deepseek_v4.py": "741986cb330a5b300379bcf442d078d1434e95c57ee8b87bb973d18763a52eb1",
+    "runtime/deepseek_v4_ssd/model_support/deepseek_v41.py": "6bd82b3c204e0920e13192185b2539f61b0f8f7bedb0a89b1a143d73dcd1eac6",
+    "runtime/deepseek_v4_ssd/model_support/qwen.py": "1c3d43a828cce31dc2fd046435ce5aae8ec63d0ae0a890c4e47b5335680b6da6",
+    "runtime/deepseek_v4_ssd/model_support/state.py": "bf296f76f74319303cd6a093a3a3f49d84add939de12d45bb6a4ee1304307978",
+    "runtime/deepseek_v4_ssd/prefill_io.py": "ffb42cd8f503a7fa640622f932e137d05b8231eb0457e9e16c10e97111d1c2fb",
+    "runtime/deepseek_v4_ssd/qwen4_exp.py": "f50f7005867f3e50c11735aa77648193e5a81c36e5643662b39defea3532ff9c",
+    "runtime/deepseek_v4_ssd/qwen_quantized_cache.py": "5eb60982ab6f81cf3f3ba277295e099177bba1ff2e99aca93a28b8955617d4b0",
+    "runtime/deepseek_v4_ssd/route_cache.py": "552c8b1fe6d33618dd38da512256835b1bb8466f6ad67fcf73f5bf2d06bebc31",
+    "runtime/deepseek_v4_ssd/route_trace.py": "3b592d34040c5318c3f8c7cadcdac0e00d647140fb311c89793f38a792daac10",
+    "runtime/deepseek_v4_ssd/server.py": "cec9a6acb0ec725c6bfbda5bfe5fbeed66418ff27ad9a05408cff2f528c9fe4f",
+    "runtime/deepseek_v4_ssd/throughput.py": "6233bb263b41557a0c4a07936b59bb032e88dd7f2db4f9c22eb2e1b1da709b85",
+    "runtime/deepseek_v4_ssd/tool_codec.py": "030c9de4f2b91015248b69b298818ab7c3e4371748ca10bc6e6b7cd8d3397d09"
+  },
+  "raw_evidence_sha256": "090cdb0f5edb08b1c8e77c10cf76acc9932393b2d288f4c63fe337fab2b5209e"
+}

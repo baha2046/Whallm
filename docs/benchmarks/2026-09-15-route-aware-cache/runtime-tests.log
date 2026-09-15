@@ -1,0 +1,197 @@
+..................Server is not running. Starting test-model...
+Server ready in 0.0s.
+Stopping Server...
+.................ANE Prefill disabled; using original Prefill: unavailable
+.ANE Prefill disabled; using original Prefill: test device failure
+........................................................................................................ANE Prefill disabled; using original Prefill: interface changed
+.............................................................................response resp_5ac360b459074f5986734fa74ed4ca3c failed: injected generation failure
+........................................................................................................127.0.0.1 - "GET /v1/models HTTP/1.1" 200 -
+.127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.model load failed for deepseek-v4-flash-0731: load failed
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 500 -
+model load failed for deepseek-v4-flash-0731: load failed
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 500 -
+.127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 400 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+........usage: python -m unittest [-h] [--model MODEL | --model-catalog MODEL_CATALOG]
+                          [--host HOST] [--port PORT] [--api-key API_KEY]
+                          [--log-level {debug,info,error}]
+                          [--public-model PUBLIC_MODEL] [--slots SLOTS]
+                          [--read-workers READ_WORKERS]
+                          [--prefetch-read-workers PREFETCH_READ_WORKERS]
+                          [--power-saving-limit-gbps {0.5,1,2,3,5,10,25}]
+                          [--memory-limit-gib MEMORY_LIMIT_GIB]
+                          [--prefill-step-size PREFILL_STEP_SIZE]
+                          [--moe-prefill-step-size MOE_PREFILL_STEP_SIZE]
+                          [--no-layer-major-prefill]
+                          [--layer-major-prefill-threshold LAYER_MAJOR_PREFILL_THRESHOLD]
+                          [--no-batched-expert-prefill]
+                          [--qwen-grouped-experts | --no-qwen-grouped-experts]
+                          [--no-ane-prefill]
+                          [--ane-prefill-ratio ANE_PREFILL_RATIO]
+                          [--prompt-cache-entries PROMPT_CACHE_ENTRIES]
+                          [--prompt-cache-memory-gib PROMPT_CACHE_MEMORY_GIB]
+                          [--prompt-cache {off,memory,disk} |
+                          --persistent-prompt-cache | --no-persistent-prompt-cache]
+                          [--prompt-cache-directory PROMPT_CACHE_DIRECTORY]
+                          [--warmup-prompt-file WARMUP_PROMPT_FILE]
+                          [--bf16-kv-cache] [--no-fp4-index-cache]
+                          [--no-ready-expert-decode] [--mtp]
+                          [--mtp-slots MTP_SLOTS] [--expert-page-cache-probe]
+                          [--expert-file-cache-policy {cached,bypass}]
+                          [--expert-eviction-policy {lfu,lru,route}]
+                          [--qwen-quantized-kv | --no-qwen-quantized-kv]
+                          [--qwen-quantized-index | --no-qwen-quantized-index]
+                          [--v41-packed-kv | --no-v41-packed-kv]
+                          [--v41-packed-index | --no-v41-packed-index]
+                          [--v41-candidate-index | --no-v41-candidate-index]
+                          [--v41-ced-prefill | --no-v41-ced-prefill]
+                          [--v41-next-layer-prefetch | --no-v41-next-layer-prefetch]
+                          [--deepseek-ane-prefill | --no-deepseek-ane-prefill]
+                          [--v41-layer-major-prefill | --no-v41-layer-major-prefill]
+                          [--dspark] [--dspark-prompt-cache]
+                          [--dspark-hash-prefetch] [--dspark-adaptive-block]
+                          [--no-dspark-fallback]
+                          [--dspark-sequential-verification]
+                          [--dspark-hybrid-verification]
+                          [--dspark-slots DSPARK_SLOTS]
+                          [--dspark-confidence-threshold DSPARK_CONFIDENCE_THRESHOLD]
+                          [--default-max-tokens DEFAULT_MAX_TOKENS]
+                          [--default-temperature DEFAULT_TEMPERATURE]
+                          [--default-top-p DEFAULT_TOP_P]
+                          [--default-top-k DEFAULT_TOP_K]
+python -m unittest: error: argument --model-catalog: not allowed with argument --model
+.usage: python -m unittest [-h] [--model MODEL | --model-catalog MODEL_CATALOG]
+                          [--host HOST] [--port PORT] [--api-key API_KEY]
+                          [--log-level {debug,info,error}]
+                          [--public-model PUBLIC_MODEL] [--slots SLOTS]
+                          [--read-workers READ_WORKERS]
+                          [--prefetch-read-workers PREFETCH_READ_WORKERS]
+                          [--power-saving-limit-gbps {0.5,1,2,3,5,10,25}]
+                          [--memory-limit-gib MEMORY_LIMIT_GIB]
+                          [--prefill-step-size PREFILL_STEP_SIZE]
+                          [--moe-prefill-step-size MOE_PREFILL_STEP_SIZE]
+                          [--no-layer-major-prefill]
+                          [--layer-major-prefill-threshold LAYER_MAJOR_PREFILL_THRESHOLD]
+                          [--no-batched-expert-prefill]
+                          [--qwen-grouped-experts | --no-qwen-grouped-experts]
+                          [--no-ane-prefill]
+                          [--ane-prefill-ratio ANE_PREFILL_RATIO]
+                          [--prompt-cache-entries PROMPT_CACHE_ENTRIES]
+                          [--prompt-cache-memory-gib PROMPT_CACHE_MEMORY_GIB]
+                          [--prompt-cache {off,memory,disk} |
+                          --persistent-prompt-cache | --no-persistent-prompt-cache]
+                          [--prompt-cache-directory PROMPT_CACHE_DIRECTORY]
+                          [--warmup-prompt-file WARMUP_PROMPT_FILE]
+                          [--bf16-kv-cache] [--no-fp4-index-cache]
+                          [--no-ready-expert-decode] [--mtp]
+                          [--mtp-slots MTP_SLOTS] [--expert-page-cache-probe]
+                          [--expert-file-cache-policy {cached,bypass}]
+                          [--expert-eviction-policy {lfu,lru,route}]
+                          [--qwen-quantized-kv | --no-qwen-quantized-kv]
+                          [--qwen-quantized-index | --no-qwen-quantized-index]
+                          [--v41-packed-kv | --no-v41-packed-kv]
+                          [--v41-packed-index | --no-v41-packed-index]
+                          [--v41-candidate-index | --no-v41-candidate-index]
+                          [--v41-ced-prefill | --no-v41-ced-prefill]
+                          [--v41-next-layer-prefetch | --no-v41-next-layer-prefetch]
+                          [--deepseek-ane-prefill | --no-deepseek-ane-prefill]
+                          [--v41-layer-major-prefill | --no-v41-layer-major-prefill]
+                          [--dspark] [--dspark-prompt-cache]
+                          [--dspark-hash-prefetch] [--dspark-adaptive-block]
+                          [--no-dspark-fallback]
+                          [--dspark-sequential-verification]
+                          [--dspark-hybrid-verification]
+                          [--dspark-slots DSPARK_SLOTS]
+                          [--dspark-confidence-threshold DSPARK_CONFIDENCE_THRESHOLD]
+                          [--default-max-tokens DEFAULT_MAX_TOKENS]
+                          [--default-temperature DEFAULT_TEMPERATURE]
+                          [--default-top-p DEFAULT_TOP_P]
+                          [--default-top-k DEFAULT_TOP_K]
+python -m unittest: error: argument --power-saving-limit-gbps: invalid choice: '0.75' (choose from '0.5', '1', '2', '3', '5', '10', '25')
+.....127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 400 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+..127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+..127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+..127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 401 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 401 -
+127.0.0.1 - "POST /v1/completions HTTP/1.1" 401 -
+..127.0.0.1 - "POST /api/models/load HTTP/1.1" 401 -
+127.0.0.1 - "POST /api/models/configure HTTP/1.1" 401 -
+127.0.0.1 - "POST /api/models/configure HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/models/load HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/models/unload HTTP/1.1" 200 -
+.127.0.0.1 - "GET /v1/models HTTP/1.1" 401 -
+127.0.0.1 - "GET /v1/models?client_version=0.152.1 HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 400 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "GET / HTTP/1.1" 200 -
+.127.0.0.1 - "PUT /api/settings HTTP/1.1" 404 -
+127.0.0.1 - "GET /api/settings HTTP/1.1" 404 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 400 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 400 -
+..127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+..127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/responses HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/completions HTTP/1.1" 200 -
+.127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 400 -
+.............................127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+..127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+.127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+127.0.0.1 - "POST /api/models/unload HTTP/1.1" 200 -
+.127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+.127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+.127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 200 -
+.127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 400 -
+127.0.0.1 - "POST /api/benchmark/throughput HTTP/1.1" 401 -
+.....................
+----------------------------------------------------------------------
+Ran 440 tests in 18.701s
+
+OK

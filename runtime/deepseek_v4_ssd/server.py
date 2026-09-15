@@ -2312,6 +2312,10 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--separate-prefill-io", action=argparse.BooleanOptionalAction, default=True,
+        help="Use separate cache-bypassing Prefill reads (enabled by default).",
+    )
+    parser.add_argument(
         "--expert-file-cache-policy",
         choices=EXPERT_FILE_CACHE_POLICIES,
         default="cached",
@@ -2321,7 +2325,7 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--expert-eviction-policy", choices=("lfu", "lru"), default="lfu",
+        "--expert-eviction-policy", choices=("lfu", "lru", "route"), default="lfu",
         help="expert eviction ranking (default LFU)",
     )
     for name in ('qwen_quantized_kv', 'qwen_quantized_index', 'v41_packed_kv', 'v41_packed_index', 'v41_candidate_index', 'v41_ced_prefill', 'v41_next_layer_prefetch', 'deepseek_ane_prefill', 'v41_layer_major_prefill'):
@@ -2333,16 +2337,6 @@ def _parser() -> argparse.ArgumentParser:
         help="experimentally reuse an atomic target and DSpark prompt snapshot",
     )
     parser.add_argument(
-        "--dspark-hash-prefetch",
-        action="store_true",
-        help="experimentally prefetch exact target hash-layer experts",
-    )
-    parser.add_argument(
-        "--dspark-adaptive-block",
-        action="store_true",
-        help="experimentally select a storage-aware DSpark draft prefix",
-    )
-    parser.add_argument(
         "--no-dspark-fallback",
         action="store_true",
         help="research only: continue DSpark after its wall-time stop gate",
@@ -2351,14 +2345,6 @@ def _parser() -> argparse.ArgumentParser:
         "--dspark-sequential-verification",
         action="store_true",
         help="research oracle: verify each DSpark target position sequentially",
-    )
-    parser.add_argument(
-        "--dspark-hybrid-verification",
-        action="store_true",
-        help=(
-            "experimental verifier: token-shaped target math with one expert "
-            "union acquisition per layer"
-        ),
     )
     parser.add_argument("--dspark-slots", type=int, default=768)
     parser.add_argument("--dspark-confidence-threshold", type=float, default=0.6)
@@ -2444,19 +2430,20 @@ def main() -> None:
         fp4_index_cache=not arguments.no_fp4_index_cache,
         expert_page_cache_probe=arguments.expert_page_cache_probe,
         expert_file_cache_policy=arguments.expert_file_cache_policy,
+        separate_prefill_io=arguments.separate_prefill_io,
         expert_eviction_policy=arguments.expert_eviction_policy,
         ready_expert_decode=not arguments.no_ready_expert_decode,
         mtp_enabled=arguments.mtp,
         mtp_slots=arguments.mtp_slots,
         dspark_enabled=arguments.dspark,
         dspark_prompt_cache=arguments.dspark_prompt_cache,
-        dspark_hash_prefetch=arguments.dspark_hash_prefetch,
-        dspark_adaptive_block=arguments.dspark_adaptive_block,
+
+
         dspark_fallback_enabled=not arguments.no_dspark_fallback,
         dspark_sequential_verification=(
             arguments.dspark_sequential_verification
         ),
-        dspark_hybrid_verification=arguments.dspark_hybrid_verification,
+
         dspark_slots=arguments.dspark_slots,
         dspark_confidence_threshold=arguments.dspark_confidence_threshold,
         power_saving_limit_gbps=arguments.power_saving_limit_gbps,

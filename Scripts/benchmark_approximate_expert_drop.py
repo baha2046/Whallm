@@ -13,13 +13,13 @@ from deepseek_v4_ssd.generation import GenerationOptions, ModelRuntime
 from deepseek_v4_ssd.model import RuntimeConfig
 
 try:
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,
     )
 except ImportError:
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,

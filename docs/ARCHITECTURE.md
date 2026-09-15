@@ -222,7 +222,7 @@ Python runtime 載入 installed model 時不重新計算 155 GiB 的 SHA-256。
 | `fp4_index_cache` | `true` | indexer cache 使用 MXFP4 view。 |
 | `ready_expert_decode` | `true` | decode 依 expert ready 時間提交運算。 |
 | `staged_expert_streaming` | `false` | Internal research-only split `w13`／`w2` slot prototype；需要 ready-expert decode，拒絕 DSpark，且不提供 CLI／server／APP opt-in。 |
-| `adaptive_expert_prefill_threshold` | `null` | Internal stopped research prototype；只接受 0.7／0.8／0.9，需要 layer-major batched prefill，拒絕 DSpark／staged composition，且沒有 CLI／server／APP opt-in。 |
+| `separate_prefill_io` | `true` | 三模型及配套草稿模型的 Prefill 使用獨立 bypass 連線；未對齊時使用有界暫存區。 |
 | `expert_page_cache_probe` | `false` | Research-only `mincore` pre-read page-residency classification；不是 physical SSD counter。 |
 | `expert_file_cache_policy` | `cached` | Expert descriptor policy；research-only `bypass` 使用 Darwin `F_NOCACHE` 並停用 read-ahead。 |
 | `expert_eviction_policy` | `lfu` | 固定容量 expert cache 的淘汰排序，可選 `lru`；保留相同每層配額、pinning、in-flight 保護與 heap 清理。CLI／server／catalog 可 opt-in，舊 catalog 省略時仍用 LFU，App UI 預設不變。 |
@@ -277,6 +277,9 @@ adaptive candidates 都未達 request-time／throughput 門檻，因此預設沒
 | 4,096 或更多 | 1,024 |
 
 ## Prefill 資料路徑
+
+三模型主模型與 DSpark／MTP 都預設使用[分開 Prefill／Decode 讀取](PREFILL_IO.md)。
+Prefill 使用獨立 bypass 連線，未對齊資料經單專家暫存區搬入；Decode 保留既有快取策略。
 
 未快取 token 數少於 `layer_major_prefill_threshold` 時，DeepSeek runtime 使用 mlx-lm 的 chunk-major path。
 
@@ -540,77 +543,9 @@ shape-dependent 差異。Shared expert output 各有一個值不同，但在 MoE
 邊界被消除。資料位於
 [`layer 0 FFN component diagnostic`](benchmarks/2026-08-27-dspark-layer0-ffn-component-diagnostic-m2-max.json)。
 
-`--dspark-hybrid-verification` 是預設關閉的 verifier candidate。它保留每 round 一次
-cache fork；每層的 attention、FFN HyperConnection、router、shared expert、routed
-expert math 與 final expand 都依 autoregressive one-token shape 執行。Runtime 會先收集
-該層所有 token 的 selected expert IDs，以一次 `get_many` acquire expert union，再用
-同一批 resident weights 逐 token 計算 routed experts。因此它保留 union I/O 去重，
-但不保留原 block verifier 的 grouped multi-row QMM。Rejected committed prefix 也走
-相同 hybrid path。Hybrid 與 sequential oracle 互斥；hybrid 可與 hash exact prefetch
-及 adaptive selector 組合。
-
-候選分三步收斂。V1 只讓 attention token-shaped；單一 exact cache state 恢復 near-tie
-top token，但 `random_hex` 4K／32 多 round 在 index 15 再次分歧。V2 再讓 FFN
-HyperConnection token-shaped；五組 discovery workloads 中 3 組 exact，
-`storage_sentence` 與 `multilingual_choice` 仍分別在 index 16／6 分歧。V3 把 MoE math
-也改為 token-shaped、仍每層只 acquire 一次 union；五組 4K workloads 的 normal／fixed
-greedy tokens 全部 exact。V3 correctness artifact 位於
-[`hybrid v3 five-workload gate`](benchmarks/2026-08-27-dspark-hybrid-v3-discovery-4k32-m2-max.json)。
-這是 32-output-token decision survey（`balanced_choice` 在 5 tokens EOS），不是 sampling
-proof、長 decode proof 或 performance adoption evidence。
-
-Metrics 以 `dspark_verification_expert_union_calls` 累計 target verification／replay
-實際執行的 `get_many` 次數，並以 assignments、union experts、reuse、misses、bytes 與
-read time 分開描述 acquisition。128-token `repeated` 的四波 gate 在相同 accepted
-5-token block 上量到 sequential／grouped／hybrid calls 為 258／43／43。Hybrid 相對
-sequential target bytes -12.31%，但 verification time +17.34%；相對 grouped
-verification time +87.59%。這確認 one-per-layer acquisition，卻也顯示目前所有
-token-shaped target execution 的 aggregate cost 是 material。Grouped 與 hybrid 還會
-產生不同內部 union，因此 timing 不能單獨歸因於 QMM。Grouped 仍因既有 low-margin
-correctness failure 停止，hybrid 仍只是 default-off correctness implementation。
-
-`--dspark-hash-prefetch` 啟用實驗性 exact prefetch。前三個 main model
-router 直接以 checkpoint 的 `tid2eid[token_id]` 查表；draft block 完成後，runtime
-會依 block 內第一次使用的位置建立 per-layer expert union。主 LFU cache 已 resident
-的 expert 在 transaction 期間暫時 pin；其餘 expert 讀入獨立 verification scratch，
-不做 LFU admission。scratch 在目前固定 5-token DSpark block 下最多配置 108 個
-expert blob slots，並在 initial verification 與 rejected-prefix replay 之間重用。
-此功能預設關閉。2026-08-26 的單一 full-model greedy smoke 已通過 output token
-hash parity 與 logical-byte accounting，但不是正式速度結果。
-2026-08-27 與 hybrid v3 組合後，五組 4K normal／fixed outputs 仍全部 exact；每組
-`useful + wasted = hash_prefetch_bytes_read`，useful rate 範圍是 23.53% 至 56.23%。
-Artifact 位於
-[`hybrid v3 + hash`](benchmarks/2026-08-27-dspark-hybrid-v3-hash-discovery-4k32-m2-max.json)。
-
-`--dspark-adaptive-block` 會在 DSpark 產生完整草稿後，對 1、2、4 與 checkpoint
-最大 block size（目前為 5）建立候選 prefix。runtime 將 confidence 當成 conditional
-survival probability，計算預期 committed tokens；再以 checkpoint hash routes 與主 LFU
-cache 的即時 resident snapshot，計算每個候選的 missing hash experts。第一版 score 是：
-
-```text
-expected committed tokens / max(1, missing hash experts)
-```
-
-送入 selector 前，runtime 會先把 draft 限制為最多
-`remaining output tokens - 1`；保留的一個位置供 bonus 或 correction token 使用。
-這個 output-budget truncation 與 adaptive score truncation 分開計量。
-若完整候選的預期 committed tokens 除以 `draft tokens + 1` 至少為 0.90，校準後的
-護欄會直接保留完整 block；否則才使用上述 storage score。
-
-selector 只使用前三個可 exact lookup 的 hash layers，不估計其餘 40 個 learned-router
-layers。選擇 prefix 不會省下 DSpark 本身的完整 5-position forward，只改變 target
-verification、exact prefetch 與可能的 round 數。既有 confidence threshold 會先做
-hard prefix truncation，output budget 再限制可驗證長度，adaptive selector 最後從
-留下的長度建立候選。此功能同樣預設關閉。
-
-2026-08-27 的 hybrid v3 + hash + adaptive 五組 survey 共有 63 個 adaptive decisions：
-selected length 1／2／3／4／5 分別出現 56／4／1／1／1 次。Normal、fixed 與 adaptive
-的完整 output token 序列逐組 exact；adaptive hash-prefetch useful rate 是 65.22% 至
-91.31%，但每層 union assignment reuse rate 降到 15.59% 至 23.98%。這顯示縮短 block
-可減少 rejected-only prefetch，同時犧牲 block 內 expert reuse。Artifact 位於
-[`hybrid v3 + hash + adaptive`](benchmarks/2026-08-27-dspark-hybrid-v3-hash-adaptive-discovery-4k32-m2-max.json)。
-本 survey 沒有 warmup、沒有控制 OS page cache、每模式只有一 run；不得用 request
-time、process disk bytes 或 peak memory 宣稱採用。
+2026-09-15 已移除 DSpark hash 預讀、storage-aware adaptive block 與 hybrid 專家聯集驗證。
+基本草稿生成、target 驗證、被拒絕草稿的回退，以及逐 token 驗證仍保留。
+歷史測量與程式保存見[移除記錄](../research/archive/SSD_DIRECTIONS_RETIRED_2026-09-15.md)。
 
 DSpark path 不讀取一般 prompt cache；只有明確啟用 `--dspark-prompt-cache` 時才讀取獨立
 atomic DSpark namespace。預設仍每次執行完整 prompt prefill。
@@ -701,7 +636,7 @@ APP 啟動時會依目前 APP 位置重新取得 runtime 路徑。
 - server 一次只執行一個 generation request。
 - full-model sampling parity 尚未記錄在目前驗證 artifact。
 - 本專案沒有驗證 1M context。
-- MTLIO、custom Metal expert kernel 和 learned prefetch predictor 尚未整合；native
+- MTLIO、專用離線權重格式和 learned prefetch predictor 已取消；歷史 native
   MTLIO bytes/shared/private、shared-event 與 cancellation gate 已通過，但 installed
   MLX 0.32.0 沒有支援 external `MTLSharedEvent` dependency handoff，因此停止 runtime
   integration。Hash-layer exact prefetch 只有預設關閉的 prototype；4K／32 explicit

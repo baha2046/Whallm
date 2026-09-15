@@ -26,15 +26,12 @@ from deepseek_v4_ssd.expert_cache import (
     ExpertUnionProfile,
     ExpertWeights,
     ResidentExperts,
-    SpeculativePrefetchMetrics,
     _ReadLimiter,
 )
 from deepseek_v4_ssd.dspark import (
     DraftResult,
     VerificationMetrics,
     _confidence_prefix_length,
-    _hash_expert_prefetch_plan,
-    _select_adaptive_block,
     _should_fallback,
     _verify,
     generate_tokens,
@@ -67,20 +64,14 @@ from deepseek_v4_ssd.model import (
     RuntimeConfig,
     _ORIGINAL_SPARSE_POOLED_ATTENTION,
     _StreamingSwitchGLU,
-    _adaptive_prefill_read_set,
     _configure_memory_limits,
     _correct_compressor,
-    _finish_adaptive_prefill_tile,
-    _plan_adaptive_prefill_layer,
     _select_moe_step_size,
     _select_prefill_step_size,
     _sparse_pooled_attention,
     _stable_topk_indices,
-    _tokenwise_moe_with_expert_union,
-    _validate_adaptive_expert_prefill_config,
     eval_prompt_cache,
     forward_with_hidden,
-    hybrid_verification_forward_with_hidden,
     layer_major_prefill,
     sequential_verification_forward_with_hidden,
     verification_forward_with_hidden,
@@ -947,81 +938,14 @@ class PrefillTests(unittest.TestCase):
         self.assertFalse(RuntimeConfig().mtp_enabled)
         self.assertEqual(RuntimeConfig().mtp_slots, 32)
         self.assertFalse(RuntimeConfig().dspark_prompt_cache)
-        self.assertFalse(RuntimeConfig().dspark_hash_prefetch)
-        self.assertFalse(RuntimeConfig().dspark_adaptive_block)
         self.assertTrue(RuntimeConfig().dspark_fallback_enabled)
         self.assertFalse(RuntimeConfig().dspark_sequential_verification)
-        self.assertFalse(RuntimeConfig().dspark_hybrid_verification)
         self.assertTrue(RuntimeConfig().ready_expert_decode)
         self.assertFalse(RuntimeConfig().staged_expert_streaming)
-        self.assertIsNone(RuntimeConfig().adaptive_expert_prefill_threshold)
         self.assertFalse(RuntimeConfig().qwen_next_layer_prefetch)
         self.assertTrue(RuntimeConfig().ane_prefill)
         self.assertEqual(RuntimeConfig().ane_prefill_ratio, 0.25)
 
-    def test_adaptive_expert_prefill_requires_isolated_batched_layer_major_mode(self):
-        for config, message in (
-            (
-                RuntimeConfig(adaptive_expert_prefill_threshold=0.75),
-                "threshold",
-            ),
-            (
-                RuntimeConfig(
-                    adaptive_expert_prefill_threshold=0.8,
-                    layer_major_prefill=False,
-                ),
-                "layer-major",
-            ),
-            (
-                RuntimeConfig(
-                    adaptive_expert_prefill_threshold=0.8,
-                    batched_expert_prefill=False,
-                ),
-                "batched",
-            ),
-            (
-                RuntimeConfig(
-                    adaptive_expert_prefill_threshold=0.8,
-                    dspark_enabled=True,
-                ),
-                "DSpark",
-            ),
-            (
-                RuntimeConfig(
-                    adaptive_expert_prefill_threshold=0.8,
-                    staged_expert_streaming=True,
-                ),
-                "mutually exclusive",
-            ),
-        ):
-            with self.subTest(message=message), self.assertRaisesRegex(
-                ValueError,
-                message,
-            ):
-                _validate_adaptive_expert_prefill_config(config)
-
-        _validate_adaptive_expert_prefill_config(
-            RuntimeConfig(adaptive_expert_prefill_threshold=0.8)
-        )
-
-    def test_adaptive_expert_prefill_threshold_uses_full_only_above_boundary(self):
-        selected, full, read_count = _adaptive_prefill_read_set(
-            tuple(range(8)),
-            10,
-            0.8,
-        )
-        self.assertEqual(selected, tuple(range(8)))
-        self.assertFalse(full)
-        self.assertEqual(read_count, 8)
-
-        selected, full, read_count = _adaptive_prefill_read_set(
-            tuple(range(9)),
-            10,
-            0.8,
-        )
-        self.assertIsNone(selected)
-        self.assertTrue(full)
-        self.assertEqual(read_count, 10)
 
     def test_automatic_step_size_uses_larger_chunks_for_long_prompts(self):
         self.assertEqual(_select_prefill_step_size(0, 1_000), 128)
@@ -1122,163 +1046,7 @@ class PrefillTests(unittest.TestCase):
         self.assertLess(mx.max(mx.abs(actual - expected)).item(), 1e-5)
 
 class DSparkTests(unittest.TestCase):
-    def test_hash_prefetch_plan_uses_checkpoint_routes_and_first_use_order(self):
-        tables = (
-            mx.array(
-                [
-                    [0, 0],
-                    [4, 2],
-                    [2, 3],
-                    [4, 1],
-                ],
-                dtype=mx.int32,
-            ),
-            mx.array(
-                [
-                    [0, 0],
-                    [1, 3],
-                    [3, 2],
-                    [1, 4],
-                ],
-                dtype=mx.int32,
-            ),
-        )
-        layers = []
-        for layer_id, table in enumerate(tables):
-            layers.append(
-                SimpleNamespace(
-                    ffn=SimpleNamespace(
-                        gate=SimpleNamespace(hash=True, tid2eid=table),
-                        switch_mlp=SimpleNamespace(layer=layer_id),
-                    )
-                )
-            )
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=2),
-            model=SimpleNamespace(pipeline_layers=layers),
-        )
 
-        plan = _hash_expert_prefetch_plan(model, [1, 2, 3])
-
-        self.assertEqual(plan.layers[0].routes_by_position[0], (4, 2))
-        self.assertEqual(plan.layers[0].expert_union, (4, 2, 3, 1))
-        self.assertEqual(plan.layers[1].expert_union, (1, 3, 2, 4))
-        self.assertEqual(
-            plan.useful_keys(accepted_draft_tokens=1),
-            {
-                (0, 2),
-                (0, 3),
-                (0, 4),
-                (1, 1),
-                (1, 2),
-                (1, 3),
-            },
-        )
-        prefix = plan.prefix(draft_tokens=1)
-        self.assertEqual(prefix.layers[0].routes_by_position, ((4, 2), (2, 3)))
-        self.assertEqual(prefix.layers[0].expert_union, (4, 2, 3))
-
-    def test_adaptive_block_scheduler_uses_expected_commits_per_missing_expert(self):
-        table = mx.array(
-            [[0], [0], [1], [2], [3]],
-            dtype=mx.int32,
-        )
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=1),
-            model=SimpleNamespace(
-                pipeline_layers=[
-                    SimpleNamespace(
-                        ffn=SimpleNamespace(
-                            gate=SimpleNamespace(hash=True, tid2eid=table),
-                            switch_mlp=SimpleNamespace(layer=0),
-                        )
-                    )
-                ]
-            ),
-        )
-        plan = _hash_expert_prefetch_plan(model, [0, 1, 2, 3, 4])
-        draft = DraftResult(
-            [1, 2, 3, 4],
-            [mx.zeros((5,))] * 4,
-            [0.9, 0.2, 0.2, 0.2],
-            0.1,
-        )
-
-        decision = _select_adaptive_block(draft, plan, set(), 15)
-
-        self.assertEqual(
-            tuple(candidate.draft_tokens for candidate in decision.candidates),
-            (1, 2, 4),
-        )
-        self.assertEqual(
-            tuple(candidate.predicted_hash_bytes for candidate in decision.candidates),
-            (15, 30, 60),
-        )
-        self.assertEqual(decision.original_tokens, 4)
-        self.assertEqual(decision.selected_tokens, 1)
-        self.assertEqual(decision.selection_reason, "storage_score")
-
-    def test_adaptive_block_scheduler_preserves_high_confidence_full_block(self):
-        table = mx.array(
-            [[0], [0], [1], [2], [3]],
-            dtype=mx.int32,
-        )
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=1),
-            model=SimpleNamespace(
-                pipeline_layers=[
-                    SimpleNamespace(
-                        ffn=SimpleNamespace(
-                            gate=SimpleNamespace(hash=True, tid2eid=table),
-                            switch_mlp=SimpleNamespace(layer=0),
-                        )
-                    )
-                ]
-            ),
-        )
-        plan = _hash_expert_prefetch_plan(model, [0, 1, 2, 3, 4])
-        draft = DraftResult(
-            [1, 2, 3, 4],
-            [mx.zeros((5,))] * 4,
-            [0.999, 0.999, 0.999, 0.999],
-            0.1,
-        )
-
-        decision = _select_adaptive_block(draft, plan, set(), 15)
-
-        self.assertEqual(decision.selected_tokens, 4)
-        self.assertEqual(decision.selection_reason, "high_confidence_full")
-        self.assertGreaterEqual(decision.full_commit_fraction, 0.90)
-
-    def test_adaptive_block_scheduler_expands_when_routes_reuse_one_expert(self):
-        table = mx.zeros((5, 1), dtype=mx.int32)
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=1),
-            model=SimpleNamespace(
-                pipeline_layers=[
-                    SimpleNamespace(
-                        ffn=SimpleNamespace(
-                            gate=SimpleNamespace(hash=True, tid2eid=table),
-                            switch_mlp=SimpleNamespace(layer=0),
-                        )
-                    )
-                ]
-            ),
-        )
-        plan = _hash_expert_prefetch_plan(model, [0, 1, 2, 3, 4])
-        draft = DraftResult(
-            [1, 2, 3, 4],
-            [mx.zeros((5,))] * 4,
-            [0.9, 0.9, 0.9, 0.9],
-            0.1,
-        )
-
-        decision = _select_adaptive_block(draft, plan, set(), 15)
-
-        self.assertEqual(decision.selected_tokens, 4)
-        self.assertTrue(
-            all(candidate.missing_hash_experts == 1 for candidate in decision.candidates)
-        )
 
     def test_hardware_scheduler_falls_back_when_dspark_costs_more(self):
         draft = DraftResult([2], [mx.zeros((5,))], [0.8], 0.2)
@@ -1346,24 +1114,8 @@ class DSparkTests(unittest.TestCase):
                 layer_routed_expert_assignments=(18, 18),
                 layer_expert_union_counts=(10, 12),
                 layer_expert_union_misses=(3, 4),
-                hash_prefetch_requested_experts=20,
-                hash_prefetch_cache_resident_experts=5,
-                hash_prefetch_experts_read=15,
-                hash_prefetch_bytes_read=200,
-                hash_prefetch_useful_bytes=150,
-                hash_prefetch_wasted_bytes=50,
-                hash_prefetch_page_cache_classified_bytes=200,
-                hash_prefetch_page_cache_resident_bytes_before_read=80,
-                hash_prefetch_page_cache_nonresident_bytes_before_read=120,
-                hash_prefetch_useful_page_cache_resident_bytes_before_read=60,
-                hash_prefetch_useful_page_cache_nonresident_bytes_before_read=90,
-                hash_prefetch_wasted_page_cache_resident_bytes_before_read=20,
-                hash_prefetch_wasted_page_cache_nonresident_bytes_before_read=30,
-                hash_prefetch_read_seconds=0.04,
-                hash_prefetch_wait_seconds=0.01,
-                hash_prefetch_plan_seconds=0.003,
-                hash_prefetch_layer_ids=(0, 1, 2),
-                hash_prefetch_layer_union_counts=(6, 7, 7),
+
+
                 output_budget_trimmed_tokens=3,
                 fallback_target_step_seconds=0.05,
                 fallback_speculative_seconds=0.30,
@@ -1374,24 +1126,6 @@ class DSparkTests(unittest.TestCase):
                 verification_mode="sequential",
                 sequential_verification_positions=3,
                 sequential_position_seconds=(0.01, 0.02, 0.03),
-                adaptive_block_original_tokens=5,
-                adaptive_block_selected_tokens=2,
-                adaptive_block_selected_expected_committed=2.7,
-                adaptive_block_selected_requested_hash_experts=30,
-                adaptive_block_selected_resident_hash_experts=5,
-                adaptive_block_selected_missing_hash_experts=25,
-                adaptive_block_selected_predicted_hash_bytes=250,
-                adaptive_block_selected_score=0.10,
-                adaptive_block_selection_reason="storage_score",
-                adaptive_block_full_commit_fraction=0.55,
-                adaptive_block_plan_seconds=0.004,
-                adaptive_block_candidate_tokens=(1, 2, 4, 5),
-                adaptive_block_candidate_expected_committed=(1.9, 2.7, 3.2, 3.3),
-                adaptive_block_candidate_requested_hash_experts=(18, 30, 50, 60),
-                adaptive_block_candidate_resident_hash_experts=(3, 5, 7, 8),
-                adaptive_block_candidate_missing_hash_experts=(15, 25, 43, 52),
-                adaptive_block_candidate_predicted_hash_bytes=(150, 250, 430, 520),
-                adaptive_block_candidate_scores=(0.12, 0.10, 0.07, 0.06),
             ),
         )
         metrics.finish(
@@ -1419,59 +1153,9 @@ class DSparkTests(unittest.TestCase):
         self.assertEqual(snapshot["dspark_target_expert_bytes_read"], 600)
         self.assertEqual(snapshot["dspark_verification_expert_bytes_read"], 500)
         self.assertEqual(snapshot["dspark_replay_expert_bytes_read"], 100)
-        self.assertEqual(snapshot["dspark_hash_prefetch_bytes_read"], 200)
-        self.assertEqual(snapshot["dspark_hash_prefetch_useful_bytes"], 150)
-        self.assertEqual(snapshot["dspark_hash_prefetch_wasted_bytes"], 50)
-        self.assertEqual(
-            snapshot["dspark_hash_prefetch_page_cache_classified_bytes"],
-            200,
-        )
-        self.assertEqual(
-            snapshot[
-                "dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read"
-            ],
-            90,
-        )
-        self.assertEqual(
-            snapshot[
-                "dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read"
-            ],
-            30,
-        )
-        self.assertEqual(
-            snapshot["dspark_hash_prefetch_on_demand_expert_bytes_read"],
-            400,
-        )
-        self.assertAlmostEqual(snapshot["dspark_hash_prefetch_useful_rate"], 0.75)
-        self.assertAlmostEqual(snapshot["dspark_hash_prefetch_plan_seconds"], 0.003)
-        self.assertEqual(
-            snapshot["dspark_last_hash_prefetch_union_by_layer"],
-            (6, 7, 7),
-        )
-        self.assertEqual(snapshot["dspark_adaptive_block_decisions"], 1)
         self.assertEqual(snapshot["dspark_fallback_triggered_rounds"], 1)
         self.assertEqual(snapshot["dspark_fallback_would_trigger_rounds"], 1)
         self.assertEqual(snapshot["dspark_fallback_cost_ratios"], (2.0,))
-        self.assertEqual(
-            snapshot["dspark_round_trace"],
-            (
-                {
-                    "proposed_tokens": 2,
-                    "accepted_tokens": 2,
-                    "committed_tokens": 3,
-                    "verification_mode": "sequential",
-                    "sequential_verification_positions": 3,
-                    "hybrid_verification_positions": 0,
-                    "adaptive_original_tokens": 5,
-                    "adaptive_selected_tokens": 2,
-                    "adaptive_selection_reason": "storage_score",
-                    "adaptive_full_commit_fraction": 0.55,
-                    "fallback_cost_ratio": 2.0,
-                    "fallback_would_trigger": True,
-                    "fallback_triggered": True,
-                },
-            ),
-        )
         self.assertAlmostEqual(
             snapshot["dspark_last_fallback_target_step_seconds"],
             0.05,
@@ -1492,51 +1176,6 @@ class DSparkTests(unittest.TestCase):
         self.assertEqual(
             snapshot["dspark_last_sequential_position_seconds"],
             (0.01, 0.02, 0.03),
-        )
-        self.assertEqual(snapshot["dspark_adaptive_block_original_tokens"], 5)
-        self.assertEqual(snapshot["dspark_adaptive_block_selected_tokens"], 2)
-        self.assertEqual(snapshot["dspark_adaptive_block_missing_hash_experts"], 25)
-        self.assertEqual(snapshot["dspark_adaptive_block_predicted_hash_bytes"], 250)
-        self.assertEqual(
-            snapshot[
-                "dspark_adaptive_block_predicted_hash_bytes_per_committed_token"
-            ],
-            250 / 3,
-        )
-        self.assertAlmostEqual(
-            snapshot["dspark_last_adaptive_block_selected_score"],
-            0.10,
-        )
-        self.assertEqual(
-            snapshot["dspark_last_adaptive_block_selection_reason"],
-            "storage_score",
-        )
-        self.assertAlmostEqual(
-            snapshot["dspark_last_adaptive_block_full_commit_fraction"],
-            0.55,
-        )
-        self.assertEqual(
-            snapshot["dspark_adaptive_block_high_confidence_full_decisions"],
-            0,
-        )
-        self.assertEqual(
-            snapshot["dspark_adaptive_block_storage_score_decisions"],
-            1,
-        )
-        self.assertEqual(snapshot["dspark_adaptive_block_full_block_decisions"], 0)
-        self.assertEqual(
-            snapshot["dspark_adaptive_block_selected_length_counts"],
-            ((2, 1),),
-        )
-        self.assertEqual(snapshot["dspark_adaptive_block_trimmed_tokens"], 3)
-        self.assertAlmostEqual(snapshot["dspark_adaptive_block_plan_seconds"], 0.004)
-        self.assertEqual(
-            snapshot["dspark_last_adaptive_block_candidate_tokens"],
-            (1, 2, 4, 5),
-        )
-        self.assertEqual(
-            snapshot["dspark_last_adaptive_block_predicted_hash_bytes"],
-            (150, 250, 430, 520),
         )
         self.assertEqual(snapshot["dspark_draft_expert_bytes_read"], 300)
         self.assertEqual(
@@ -1578,39 +1217,6 @@ class DSparkTests(unittest.TestCase):
             snapshot["dspark_speculative_expert_bytes_per_committed_token"], 300
         )
 
-    def test_metrics_report_hybrid_verification_shape(self):
-        metrics = RuntimeMetrics()
-        metrics.start(4, 0, 1, False, CacheMetrics())
-        metrics.record_dspark_round(
-            DraftResult([2], [], [0.9], 0.1),
-            accepted=1,
-            verification_seconds=0.2,
-            verification=VerificationMetrics(
-                verification_mode="hybrid",
-                hybrid_verification_positions=2,
-                hybrid_attention_layers=43,
-                hybrid_attention_token_calls=86,
-                hybrid_ffn_token_calls=86,
-                hybrid_moe_token_calls=86,
-            ),
-        )
-
-        snapshot = metrics.snapshot()
-
-        self.assertEqual(snapshot["dspark_hybrid_verification_rounds"], 1)
-        self.assertEqual(snapshot["dspark_hybrid_attention_layers"], 43)
-        self.assertEqual(snapshot["dspark_hybrid_attention_token_calls"], 86)
-        self.assertEqual(snapshot["dspark_hybrid_ffn_token_calls"], 86)
-        self.assertEqual(snapshot["dspark_hybrid_moe_token_calls"], 86)
-        self.assertEqual(
-            snapshot["dspark_last_hybrid_verification_positions"],
-            2,
-        )
-        self.assertEqual(snapshot["dspark_last_verification_mode"], "hybrid")
-        self.assertEqual(
-            snapshot["dspark_round_trace"][0]["hybrid_verification_positions"],
-            2,
-        )
 
     def test_next_round_receives_every_committed_hidden_state(self):
         calls = []
@@ -1740,6 +1346,7 @@ class DSparkTests(unittest.TestCase):
             patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
             patch("deepseek_v4_ssd.dspark._target_sequence", side_effect=verify),
             patch("deepseek_v4_ssd.dspark._should_fallback", return_value=True),
+            patch("deepseek_v4_ssd.model.eval_prompt_cache", return_value=(0, 0)) as flush_cache,
         ):
             list(
                 generate_tokens(
@@ -1757,6 +1364,7 @@ class DSparkTests(unittest.TestCase):
             )
 
         self.assertEqual(replayed, [[1, 2]])
+        flush_cache.assert_called_once_with([None])
         verification = recorded_rounds[0][3]
         self.assertEqual(verification.routed_expert_assignments, 18)
         self.assertEqual(verification.expert_union_experts, 10)
@@ -1827,42 +1435,6 @@ class DSparkTests(unittest.TestCase):
         self.assertTrue(verification.fallback_would_trigger)
         self.assertFalse(verification.fallback_triggered)
 
-    def test_sequential_verification_rejects_speculative_hash_prefetch(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "cannot use speculative hash prefetch",
-        ):
-            list(
-                generate_tokens(
-                    [0],
-                    object(),
-                    object(),
-                    [None],
-                    max_tokens=1,
-                    prefill_step_size=1,
-                    temperature=0,
-                    top_p=1,
-                    hash_prefetch=True,
-                    sequential_verification=True,
-                )
-            )
-
-    def test_hybrid_and_sequential_verification_are_mutually_exclusive(self):
-        with self.assertRaisesRegex(ValueError, "mutually exclusive"):
-            list(
-                generate_tokens(
-                    [0],
-                    object(),
-                    object(),
-                    [None],
-                    max_tokens=1,
-                    prefill_step_size=1,
-                    temperature=0,
-                    top_p=1,
-                    sequential_verification=True,
-                    hybrid_verification=True,
-                )
-            )
 
     def test_sequential_verification_replays_the_committed_prefix_sequentially(self):
         replayed = []
@@ -1938,494 +1510,6 @@ class DSparkTests(unittest.TestCase):
 
         self.assertEqual(replayed, [[1, 2]])
 
-    def test_hybrid_verification_replays_with_token_attention(self):
-        replayed = []
-        recorded_rounds = []
-
-        class DSpark:
-            target_layers = (0,)
-
-            def reset_cache(self):
-                pass
-
-            def prefill_context(self, _hidden, _offset):
-                pass
-
-            def draft(self, *_args):
-                return DraftResult(
-                    [2, 4],
-                    [mx.zeros((5,)), mx.zeros((5,))],
-                    [1.0, 1.0],
-                    0.0,
-                )
-
-        def forward(_model, inputs, _cache, _layers):
-            logits = mx.zeros((1, inputs.shape[1], 5))
-            logits[..., 1] = 1
-            return logits, mx.ones((1, inputs.shape[1], 1))
-
-        def verify(_model, tokens, _cache, _layers):
-            logits = mx.zeros((1, len(tokens), 5))
-            logits[0, 0, 2] = 1
-            logits[0, 1, 3] = 1
-            return (
-                logits,
-                mx.full((1, len(tokens), 1), 5),
-                [None],
-                VerificationMetrics(
-                    verification_mode="hybrid",
-                    hybrid_verification_positions=len(tokens),
-                ),
-            )
-
-        def replay(_model, inputs, _cache, _layers):
-            replayed.append(inputs.reshape(-1).tolist())
-            return (
-                mx.zeros((1, inputs.shape[1], 5)),
-                mx.full((1, inputs.shape[1], 1), 7),
-                (0.01,),
-                0,
-                0,
-            )
-
-        with (
-            patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
-            patch(
-                "deepseek_v4_ssd.model._hybrid_forward_with_hidden",
-                side_effect=replay,
-            ),
-            patch(
-                "deepseek_v4_ssd.dspark._hybrid_target_sequence",
-                side_effect=verify,
-            ),
-            patch("deepseek_v4_ssd.dspark._should_fallback", return_value=True),
-        ):
-            list(
-                generate_tokens(
-                    [0],
-                    object(),
-                    DSpark(),
-                    [None],
-                    max_tokens=5,
-                    prefill_step_size=1,
-                    temperature=0,
-                    top_p=1,
-                    hybrid_verification=True,
-                    record_round=lambda *values: recorded_rounds.append(values),
-                )
-            )
-
-        self.assertEqual(replayed, [[1, 2]])
-        self.assertEqual(recorded_rounds[0][3].verification_mode, "hybrid")
-        self.assertEqual(
-            recorded_rounds[0][3].hybrid_verification_positions,
-            3,
-        )
-
-    def test_rejected_draft_classifies_exact_prefetch_bytes(self):
-        recorded_rounds = []
-        planned = []
-        useful = []
-
-        class DSpark:
-            target_layers = (0,)
-
-            def reset_cache(self):
-                pass
-
-            def prefill_context(self, _hidden, _offset):
-                pass
-
-            def draft(self, *_args):
-                return DraftResult(
-                    [2, 4],
-                    [mx.zeros((5,)), mx.zeros((5,))],
-                    [1.0, 1.0],
-                    0.0,
-                )
-
-        class Prefetch:
-            def metrics(self, useful_keys):
-                useful.append(useful_keys)
-                return SpeculativePrefetchMetrics(
-                    requested_experts=5,
-                    experts_read=5,
-                    bytes_read=75,
-                    useful_bytes=45,
-                    wasted_bytes=30,
-                    read_seconds=0.02,
-                    wait_seconds=0.005,
-                )
-
-        class TargetExpertCache:
-            def __init__(self):
-                self.snapshots = iter(
-                    (
-                        CacheMetrics(),
-                        CacheMetrics(bytes_read=100),
-                        CacheMetrics(bytes_read=100),
-                    )
-                )
-
-            def metrics_snapshot(self):
-                return next(self.snapshots)
-
-            @contextmanager
-            def capture_expert_unions(self):
-                yield ExpertUnionProfile()
-
-            @contextmanager
-            def speculative_prefetch(self, experts_by_layer):
-                planned.append(experts_by_layer)
-                yield Prefetch()
-
-        table = mx.array(
-            [
-                [0, 0],
-                [0, 1],
-                [1, 2],
-                [2, 3],
-                [3, 4],
-            ],
-            dtype=mx.int32,
-        )
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=1),
-            model=SimpleNamespace(
-                pipeline_layers=[
-                    SimpleNamespace(
-                        ffn=SimpleNamespace(
-                            gate=SimpleNamespace(hash=True, tid2eid=table),
-                            switch_mlp=SimpleNamespace(layer=0),
-                        )
-                    )
-                ]
-            ),
-        )
-
-        def forward(_model, inputs, _cache, _layers):
-            logits = mx.zeros((1, inputs.shape[1], 5))
-            logits[..., 1] = 1
-            return logits, mx.ones((1, inputs.shape[1], 1))
-
-        def verify(_model, tokens, _cache, _layers):
-            logits = mx.zeros((1, len(tokens), 5))
-            logits[0, 0, 2] = 1
-            logits[0, 1, 3] = 1
-            return logits, mx.ones((1, len(tokens), 1)), [None], VerificationMetrics()
-
-        with (
-            patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
-            patch("deepseek_v4_ssd.dspark._target_sequence", side_effect=verify),
-            patch("deepseek_v4_ssd.dspark._should_fallback", return_value=True),
-        ):
-            list(
-                generate_tokens(
-                    [0],
-                    model,
-                    DSpark(),
-                    [None],
-                    max_tokens=5,
-                    prefill_step_size=1,
-                    temperature=0,
-                    top_p=1,
-                    record_round=lambda *values: recorded_rounds.append(values),
-                    target_expert_cache=TargetExpertCache(),
-                    hash_prefetch=True,
-                )
-            )
-
-        self.assertEqual(planned, [{0: (0, 1, 2, 3, 4)}])
-        self.assertEqual(useful, [{(0, 0), (0, 1), (0, 2)}])
-        verification = recorded_rounds[0][3]
-        self.assertEqual(verification.hash_prefetch_requested_experts, 5)
-        self.assertEqual(verification.hash_prefetch_bytes_read, 75)
-        self.assertEqual(verification.hash_prefetch_useful_bytes, 45)
-        self.assertEqual(verification.hash_prefetch_wasted_bytes, 30)
-        self.assertEqual(verification.hash_prefetch_layer_ids, (0,))
-        self.assertEqual(verification.hash_prefetch_layer_union_counts, (5,))
-
-    def test_adaptive_block_truncates_verification_with_greedy_parity(self):
-        verification_inputs = []
-        adaptive_rounds = []
-
-        class DSpark:
-            target_layers = (0,)
-
-            def reset_cache(self):
-                pass
-
-            def prefill_context(self, _hidden, _offset):
-                pass
-
-            def draft(self, *_args):
-                return DraftResult(
-                    [2, 4, 3, 4],
-                    [mx.zeros((5,))] * 4,
-                    [0.9, 0.2, 0.2, 0.2],
-                    0.0,
-                )
-
-        class TargetExpertCache:
-            model = SimpleNamespace(expert_blob_size=15)
-
-            def __init__(self):
-                self.snapshots = iter((CacheMetrics(), CacheMetrics(), CacheMetrics()))
-
-            def metrics_snapshot(self):
-                return next(self.snapshots)
-
-            def resident_expert_keys(self, _experts_by_layer):
-                return frozenset()
-
-            @contextmanager
-            def capture_expert_unions(self):
-                yield ExpertUnionProfile()
-
-        table = mx.array([[0], [0], [0], [2], [1]], dtype=mx.int32)
-        model = SimpleNamespace(
-            args=SimpleNamespace(num_hash_layers=1),
-            model=SimpleNamespace(
-                pipeline_layers=[
-                    SimpleNamespace(
-                        ffn=SimpleNamespace(
-                            gate=SimpleNamespace(hash=True, tid2eid=table),
-                            switch_mlp=SimpleNamespace(layer=0),
-                        )
-                    )
-                ]
-            ),
-        )
-
-        def forward(_model, inputs, _cache, _layers):
-            logits = mx.zeros((1, inputs.shape[1], 5))
-            logits[..., 1] = 1
-            return logits, mx.ones((1, inputs.shape[1], 1))
-
-        def verify(_model, tokens, _cache, _layers):
-            verification_inputs.append(list(tokens))
-            logits = mx.zeros((1, len(tokens), 5))
-            for index, token in enumerate((2, 3, 3, 3, 3)[: len(tokens)]):
-                logits[0, index, token] = 1
-            return logits, mx.ones((1, len(tokens), 1)), [None], VerificationMetrics()
-
-        def run(adaptive, *, max_tokens=7, rounds=None):
-            with (
-                patch("deepseek_v4_ssd.model.forward_with_hidden", side_effect=forward),
-                patch("deepseek_v4_ssd.dspark._target_sequence", side_effect=verify),
-                patch("deepseek_v4_ssd.dspark._should_fallback", return_value=True),
-            ):
-                return list(
-                    generate_tokens(
-                        [0],
-                        model,
-                        DSpark(),
-                        [None],
-                        max_tokens=max_tokens,
-                        prefill_step_size=1,
-                        temperature=0,
-                        top_p=1,
-                        target_expert_cache=TargetExpertCache(),
-                        adaptive_block=adaptive,
-                        record_round=(
-                            (lambda *values: rounds.append(values))
-                            if rounds is not None
-                            else None
-                        ),
-                    )
-                )
-
-        baseline = run(False)
-        adaptive = run(True, rounds=adaptive_rounds)
-
-        self.assertEqual([token for token, _, _ in adaptive], [token for token, _, _ in baseline])
-        self.assertEqual(verification_inputs, [[1, 2, 4, 3, 4], [1, 2]])
-        verification = adaptive_rounds[0][3]
-        self.assertEqual(verification.adaptive_block_original_tokens, 4)
-        self.assertEqual(verification.adaptive_block_selected_tokens, 1)
-        self.assertEqual(verification.adaptive_block_candidate_tokens, (1, 2, 4))
-        self.assertEqual(
-            verification.adaptive_block_candidate_missing_hash_experts,
-            (1, 2, 3),
-        )
-
-        budget_rounds = []
-        budget_limited = run(False, max_tokens=4, rounds=budget_rounds)
-        self.assertEqual(
-            [token for token, _, _ in budget_limited],
-            [token for token, _, _ in baseline[:4]],
-        )
-        self.assertEqual(verification_inputs[-1], [1, 2])
-        budget_draft, _, _, budget_metrics = budget_rounds[0]
-        self.assertEqual(budget_draft.tokens, [2])
-        self.assertEqual(budget_metrics.output_budget_trimmed_tokens, 3)
-        self.assertEqual(budget_metrics.committed_tokens, 2)
-
-    def test_block_and_sequential_verifiers_match_fixture_target_steps(self):
-        mx.random.seed(7)
-        arguments = deepseek_v4.ModelArgs(
-            vocab_size=64,
-            hidden_size=32,
-            intermediate_size=64,
-            moe_intermediate_size=32,
-            num_hidden_layers=3,
-            num_attention_heads=2,
-            n_routed_experts=4,
-            num_experts_per_tok=2,
-            q_lora_rank=16,
-            qk_rope_head_dim=16,
-            head_dim=16,
-            o_groups=1,
-            o_lora_rank=16,
-            hc_mult=1,
-            compress_ratios=[0, 4, 128],
-            num_hash_layers=0,
-            sliding_window=8,
-        )
-        model = deepseek_v4.Model(arguments)
-        sequential_cache = model.make_cache()
-        verification_cache = model.make_cache()
-        oracle_cache = model.make_cache()
-        hybrid_cache = model.make_cache()
-        prefix = mx.array([[1, 2, 3]])
-        forward_with_hidden(model, prefix, sequential_cache, (1, 2))
-        forward_with_hidden(model, prefix, verification_cache, (1, 2))
-        forward_with_hidden(model, prefix, oracle_cache, (1, 2))
-        forward_with_hidden(model, prefix, hybrid_cache, (1, 2))
-
-        tokens = [4, 5, 6, 7, 8]
-        sequential_logits = []
-        sequential_hidden = []
-        for token in tokens:
-            logits, hidden = forward_with_hidden(
-                model,
-                mx.array([[token]]),
-                sequential_cache,
-                (1, 2),
-            )
-            mx.eval(logits, hidden)
-            sequential_logits.append(logits)
-            sequential_hidden.append(hidden)
-        expected_logits = mx.concatenate(sequential_logits, axis=1)
-        expected_hidden = mx.concatenate(sequential_hidden, axis=1)
-        oracle_logits, oracle_hidden, oracle_verified_cache, oracle_metrics = (
-            sequential_verification_forward_with_hidden(
-                model,
-                mx.array([tokens]),
-                oracle_cache,
-                (1, 2),
-            )
-        )
-        actual_logits, actual_hidden, verified_cache, metrics = (
-            verification_forward_with_hidden(
-                model,
-                mx.array([tokens]),
-                verification_cache,
-                (1, 2),
-            )
-        )
-        hybrid_logits, hybrid_hidden, hybrid_verified_cache, hybrid_metrics = (
-            hybrid_verification_forward_with_hidden(
-                model,
-                mx.array([tokens]),
-                hybrid_cache,
-                (1, 2),
-            )
-        )
-        mx.eval(
-            expected_logits,
-            expected_hidden,
-            oracle_logits,
-            oracle_hidden,
-            actual_logits,
-            actual_hidden,
-            hybrid_logits,
-            hybrid_hidden,
-        )
-
-        self.assertEqual(
-            mx.max(mx.abs(oracle_logits - expected_logits)).item(),
-            0,
-        )
-        self.assertEqual(
-            mx.max(mx.abs(oracle_hidden - expected_hidden)).item(),
-            0,
-        )
-        self.assertEqual(oracle_metrics.verification_mode, "sequential")
-        self.assertEqual(oracle_metrics.sequential_verification_positions, 5)
-        self.assertEqual(len(oracle_metrics.sequential_position_seconds), 5)
-        self.assertEqual(oracle_metrics.block_attention_layers, 0)
-
-        self.assertEqual(
-            mx.argmax(actual_logits, axis=-1).tolist(),
-            mx.argmax(expected_logits, axis=-1).tolist(),
-        )
-        self.assertLess(mx.mean(mx.abs(actual_logits - expected_logits)).item(), 0.01)
-        self.assertLess(mx.mean(mx.abs(actual_hidden - expected_hidden)).item(), 0.01)
-        self.assertEqual(metrics.per_position_cache_copies, 0)
-        self.assertEqual(metrics.state_fetch_count, 0)
-        self.assertEqual(metrics.block_attention_layers, 3)
-        self.assertEqual(metrics.verification_mode, "block")
-
-        self.assertEqual(
-            mx.argmax(hybrid_logits, axis=-1).tolist(),
-            mx.argmax(expected_logits, axis=-1).tolist(),
-        )
-        self.assertLess(
-            mx.mean(mx.abs(hybrid_logits - expected_logits)).item(),
-            0.01,
-        )
-        self.assertLess(
-            mx.mean(mx.abs(hybrid_hidden - expected_hidden)).item(),
-            0.01,
-        )
-        self.assertEqual(hybrid_metrics.verification_mode, "hybrid")
-        self.assertEqual(hybrid_metrics.hybrid_verification_positions, 5)
-        self.assertEqual(hybrid_metrics.hybrid_attention_layers, 3)
-        self.assertEqual(hybrid_metrics.hybrid_attention_token_calls, 15)
-        self.assertEqual(hybrid_metrics.hybrid_ffn_token_calls, 15)
-        self.assertEqual(hybrid_metrics.hybrid_moe_token_calls, 15)
-        self.assertEqual(hybrid_metrics.block_attention_layers, 0)
-
-        retained_cache = model.make_cache()
-        forward_with_hidden(model, prefix, retained_cache, (1, 2))
-        expected, _ = forward_with_hidden(
-            model, mx.array([[9]]), retained_cache, (1, 2)
-        )
-        actual, _ = forward_with_hidden(
-            model, mx.array([[9]]), verification_cache, (1, 2)
-        )
-        mx.eval(expected, actual)
-        self.assertLess(mx.max(mx.abs(actual - expected)).item(), 0.005)
-
-        expected, _ = forward_with_hidden(
-            model, mx.array([[10]]), sequential_cache, (1, 2)
-        )
-        actual, _ = forward_with_hidden(
-            model, mx.array([[10]]), verified_cache, (1, 2)
-        )
-        mx.eval(expected, actual)
-        self.assertEqual(
-            mx.argmax(actual, axis=-1).tolist(),
-            mx.argmax(expected, axis=-1).tolist(),
-        )
-        self.assertLess(mx.mean(mx.abs(actual - expected)).item(), 0.01)
-
-        oracle, _ = forward_with_hidden(
-            model, mx.array([[10]]), oracle_verified_cache, (1, 2)
-        )
-        mx.eval(oracle)
-        self.assertEqual(mx.max(mx.abs(oracle - expected)).item(), 0)
-
-        hybrid, _ = forward_with_hidden(
-            model, mx.array([[10]]), hybrid_verified_cache, (1, 2)
-        )
-        mx.eval(hybrid)
-        self.assertEqual(
-            mx.argmax(hybrid, axis=-1).tolist(),
-            mx.argmax(expected, axis=-1).tolist(),
-        )
-        self.assertLess(mx.mean(mx.abs(hybrid - expected)).item(), 0.01)
 
     def test_greedy_verification_stops_at_the_first_mismatch(self):
         draft = DraftResult(
@@ -2458,35 +1542,6 @@ class DSparkTests(unittest.TestCase):
         self.assertEqual(token, 1)
 
 class CacheMetricsTests(unittest.TestCase):
-    def test_adaptive_prefill_decision_metrics_close_selected_byte_accounting(self):
-        cache = ExpertCache.__new__(ExpertCache)
-        cache.model = SimpleNamespace(expert_count=10, expert_blob_size=24)
-        cache.metrics = CacheMetrics()
-        cache._lock = threading.Lock()
-        before = cache.metrics_snapshot()
-
-        cache.record_adaptive_prefill_decision(
-            union_experts=7,
-            read_experts=7,
-            full_layer=False,
-            plan_seconds=0.125,
-        )
-        cache.record_adaptive_prefill_decision(
-            union_experts=9,
-            read_experts=10,
-            full_layer=True,
-            plan_seconds=0.25,
-        )
-
-        delta = cache.metrics_snapshot().delta(before)
-        self.assertEqual(delta.adaptive_prefill_planned_layers, 2)
-        self.assertEqual(delta.adaptive_prefill_full_layers, 1)
-        self.assertEqual(delta.adaptive_prefill_selective_layers, 1)
-        self.assertEqual(delta.adaptive_prefill_union_experts, 16)
-        self.assertEqual(delta.adaptive_prefill_read_experts, 17)
-        self.assertEqual(delta.adaptive_prefill_bytes_read, 0)
-        self.assertEqual(delta.adaptive_prefill_avoided_bytes, 3 * 24)
-        self.assertEqual(delta.adaptive_prefill_plan_seconds, 0.375)
 
     def test_expert_file_cache_policy_configures_darwin_bypass_flags(self):
         with (
@@ -2521,8 +1576,8 @@ class CacheMetricsTests(unittest.TestCase):
             routed_expert_assignments=12,
             expert_union_experts=10,
             expert_union_misses=4,
-            speculative_prefetch_rounds=1,
-            speculative_prefetch_bytes_read=30,
+
+
             page_cache_probe_calls=2,
             page_cache_classified_bytes=80,
             page_cache_resident_bytes_before_read=30,
@@ -2537,8 +1592,8 @@ class CacheMetricsTests(unittest.TestCase):
             routed_expert_assignments=42,
             expert_union_experts=31,
             expert_union_misses=9,
-            speculative_prefetch_rounds=3,
-            speculative_prefetch_bytes_read=90,
+
+
             page_cache_probe_calls=7,
             page_cache_classified_bytes=480,
             page_cache_resident_bytes_before_read=130,
@@ -2555,8 +1610,6 @@ class CacheMetricsTests(unittest.TestCase):
         self.assertEqual(delta.routed_expert_assignments, 30)
         self.assertEqual(delta.expert_union_experts, 21)
         self.assertEqual(delta.expert_union_misses, 5)
-        self.assertEqual(delta.speculative_prefetch_rounds, 2)
-        self.assertEqual(delta.speculative_prefetch_bytes_read, 60)
         self.assertEqual(delta.page_cache_probe_calls, 5)
         self.assertEqual(delta.page_cache_classified_bytes, 400)
         self.assertEqual(delta.page_cache_resident_bytes_before_read, 100)
@@ -2878,74 +1931,6 @@ class ExpertCacheTests(unittest.TestCase):
                 self.assertEqual(profile.cache_misses, 2)
                 self.assertEqual(profile.layers[0].layer, 0)
 
-    def test_speculative_prefetch_uses_scratch_without_lfu_admission(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "experts").mkdir()
-            regions = (
-                Tensor("w1.weight", "I8", (1, 4), 0, 4),
-                Tensor("w1.scale", "F8_E8M0", (1, 1), 4, 1),
-                Tensor("w2.weight", "I8", (1, 4), 5, 4),
-                Tensor("w2.scale", "F8_E8M0", (1, 1), 9, 1),
-                Tensor("w3.weight", "I8", (1, 4), 10, 4),
-                Tensor("w3.scale", "F8_E8M0", (1, 1), 14, 1),
-            )
-            blob_size = 15
-            (root / "experts/layer_00.bin").write_bytes(
-                bytes(range(blob_size * 4))
-            )
-            model = InstalledModel(
-                root=root,
-                model_id="fixture",
-                revision="fixture",
-                layer_count=1,
-                expert_count=4,
-                selected_expert_count=1,
-                expert_blob_size=blob_size,
-                common_tensors=(),
-                expert_regions=regions,
-            )
-
-            with ExpertCache(model, slots=2, read_workers=1) as cache:
-                cache.get_many(0, [0])
-                cache.get_many(0, [2])
-                cache.configure_speculative_scratch(1)
-                with cache.speculative_prefetch({0: [0, 1]}) as prefetch:
-                    resident = cache.get_many(0, [0, 1])
-                    scratch_w1 = resident.individual_weights[resident.slots[1]].w1
-                    mx.eval(scratch_w1)
-                    self.assertEqual(
-                        scratch_w1.view(mx.uint8).tolist(),
-                        [[15, 16, 17, 18]],
-                    )
-                    cache.get_many(0, [3])
-                    misses = cache.metrics.misses
-                    cache.get_many(0, [0])
-                    self.assertEqual(cache.metrics.misses, misses)
-                    scratch_bytes = cache.metrics.bytes_read
-                    cache.get_many(0, [1])
-                    self.assertEqual(cache.metrics.bytes_read, scratch_bytes)
-                    self.assertEqual(cache.resident_count, 2)
-                    self.assertTrue(cache.speculative_prefetch_active(0))
-
-                metrics = prefetch.metrics({(0, 1)})
-                self.assertFalse(cache.speculative_prefetch_active(0))
-                self.assertEqual(cache.resident_count, 2)
-                self.assertEqual(metrics.requested_experts, 2)
-                self.assertEqual(metrics.cache_resident_experts, 1)
-                self.assertEqual(metrics.experts_read, 1)
-                self.assertEqual(metrics.bytes_read, blob_size)
-                self.assertEqual(metrics.useful_bytes, blob_size)
-                self.assertEqual(metrics.wasted_bytes, 0)
-                self.assertEqual(cache.metrics.speculative_scratch_hits, 2)
-                self.assertEqual(
-                    cache.metrics.speculative_prefetch_bytes_read,
-                    blob_size,
-                )
-
-                cache.get_many(0, [1])
-                self.assertEqual(cache.resident_count, 2)
-                self.assertEqual(cache.metrics.bytes_read, blob_size * 5)
 
     def test_layer_limits_keep_resident_experts_across_layers(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -3128,7 +2113,7 @@ class ExpertCacheTests(unittest.TestCase):
                 offsets = []
                 original_pread_views = cache._pread_views
 
-                def record_read(layer, views, offset):
+                def record_read(layer, views, offset, **kwargs):
                     offsets.append(offset)
                     return original_pread_views(layer, views, offset)
 
@@ -3139,7 +2124,6 @@ class ExpertCacheTests(unittest.TestCase):
                 with cache.batched_layer(
                     0,
                     experts=(1, 3),
-                    adaptive=True,
                 ) as batched:
                     selected_scales = mx.take(
                         batched.w1_scales[:, 0, 0],
@@ -3151,10 +2135,6 @@ class ExpertCacheTests(unittest.TestCase):
                 self.assertEqual(selected_scales.tolist(), [28, 76])
                 self.assertEqual(offsets, [blob_size, blob_size * 3])
                 self.assertEqual(cache.metrics.bytes_read, blob_size * 2)
-                self.assertEqual(
-                    cache.metrics.adaptive_prefill_bytes_read,
-                    blob_size * 2,
-                )
 
 class MXFP8PoolingCacheTests(unittest.TestCase):
     def test_generation_cache_state_exposes_raw_quantized_arrays(self):
@@ -3375,152 +2355,7 @@ class MXFP8PoolingCacheTests(unittest.TestCase):
 
 
 class MXFP4Tests(unittest.TestCase):
-    def test_adaptive_prefill_plans_each_route_once_and_reuses_exact_tiles(self):
-        route_calls = []
-        routing_syncs = []
-        traced = []
-        gathered = []
 
-        cache = SimpleNamespace(
-            route_trace_enabled=True,
-            record_routing_sync=lambda seconds: routing_syncs.append(seconds),
-            record_routes=lambda layer, selected: traced.append(
-                (layer, selected.copy())
-            ),
-        )
-        switch = _StreamingSwitchGLU(5, cache, lambda up, _gate: up)
-        routes = (
-            mx.array([[[0, 2], [2, 1]]]),
-            mx.array([[[3, 1], [3, 2]]]),
-        )
-
-        class MoE:
-            sharding_group = None
-            switch_mlp = switch
-
-            @staticmethod
-            def gate(value, token_ids):
-                route_calls.append(token_ids.reshape(-1).tolist())
-                indices = routes[len(route_calls) - 1]
-                scores = mx.full(indices.shape, 0.5)
-                return indices, scores
-
-            @staticmethod
-            def shared_experts(value):
-                return value * 10
-
-        layer = SimpleNamespace(
-            ffn=MoE(),
-            ffn_hc=lambda residual: (
-                residual + 1,
-                mx.zeros_like(residual),
-                mx.zeros_like(residual),
-            ),
-            ffn_norm=lambda value: value,
-        )
-        attention = mx.arange(16).reshape(1, 4, 4).astype(mx.float32)
-        input_ids = mx.array([[10, 11, 12, 13]])
-
-        tiles, expert_union, plan_seconds = _plan_adaptive_prefill_layer(
-            layer,
-            5,
-            attention,
-            input_ids,
-            2,
-        )
-
-        def gather(value, indices, batched):
-            gathered.append((value, indices, batched))
-            return mx.stack([value * 2, value * 4], axis=-2)
-
-        with (
-            patch.object(switch, "_gather_qmm", side_effect=gather),
-            patch(
-                "deepseek_v4_ssd.model.deepseek_v4.hc_expand",
-                side_effect=lambda value, residual, _post, _combine: (
-                    value + residual
-                ),
-            ),
-        ):
-            outputs = [
-                _finish_adaptive_prefill_tile(layer, tile, object())
-                for tile in tiles
-            ]
-        mx.eval(*outputs)
-
-        self.assertEqual(route_calls, [[10, 11], [12, 13]])
-        self.assertEqual(expert_union, (0, 1, 2, 3))
-        self.assertEqual(len(routing_syncs), 2)
-        self.assertEqual(len(traced), 2)
-        self.assertTrue(all(layer_id == 5 for layer_id, _ in traced))
-        self.assertEqual(len(gathered), 2)
-        self.assertGreaterEqual(plan_seconds, 0)
-        for tile, output in zip(tiles, outputs, strict=True):
-            expected = tile.value * 13 + tile.residual
-            self.assertLess(mx.max(mx.abs(output - expected)).item(), 1e-5)
-
-    def test_tokenwise_moe_acquires_one_layer_expert_union(self):
-        acquired = []
-        routing_syncs = []
-
-        class Cache:
-            route_trace_enabled = False
-
-            @staticmethod
-            def current_batched(_layer):
-                return None
-
-            @staticmethod
-            def record_routing_sync(seconds):
-                routing_syncs.append(seconds)
-
-            @staticmethod
-            def get_many(layer, experts):
-                acquired.append((layer, tuple(experts)))
-                return object()
-
-        cache = Cache()
-        switch = _StreamingSwitchGLU(7, cache, lambda up, _gate: up)
-
-        class MoE:
-            switch_mlp = switch
-
-            @staticmethod
-            def gate(value, token_ids):
-                token = int(token_ids.item())
-                indices = mx.array([[[token % 3, (token + 1) % 3]]])
-                scores = mx.full((1, 1, 2), 0.5)
-                return indices, scores
-
-            @staticmethod
-            def shared_experts(value):
-                return value * 2
-
-        values = [mx.full((1, 1, 4), float(token)) for token in (1, 2, 3)]
-        calls = []
-
-        def forward_with_resident(value, indices, resident):
-            calls.append((value.shape, indices.shape, resident))
-            return mx.stack([value, value], axis=-2)
-
-        with patch.object(
-            switch,
-            "forward_with_resident",
-            side_effect=forward_with_resident,
-        ):
-            outputs = _tokenwise_moe_with_expert_union(
-                MoE(),
-                values,
-                mx.array([[1, 2, 3]]),
-            )
-        mx.eval(*outputs)
-
-        self.assertEqual(acquired, [(7, (1, 2, 2, 0, 0, 1))])
-        self.assertEqual(len(routing_syncs), 3)
-        self.assertEqual(len(calls), 3)
-        self.assertTrue(all(shape == (1, 1, 4) for shape, _, _ in calls))
-        self.assertTrue(all(shape == (1, 1, 2) for _, shape, _ in calls))
-        self.assertTrue(all(output.shape == (1, 1, 4) for output in outputs))
 
     def test_ready_experts_keep_router_selection_order(self):
         def quantized(value: float):

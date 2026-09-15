@@ -445,3 +445,6 @@
 "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "由 ANE 分担查询投影计算；无法使用时改用 GPU。可能改变数值舍入结果。";
 "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "关闭时使用全部选定专家。开启后少算一个专家，可能降低质量。不能与 DSpark 或 MTP 同时使用。";
 "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "由 ANE 计算的查询投影输出比例。0 只使用 GPU，1 只使用 ANE，默认为 0.25。";
+
+"Route-aware" = "路由感知";
+"Route-aware cache remembers expert usage and adjusts memory across layers." = "路由感知缓存会记住专家使用记录，并调整各层的内存分配。";

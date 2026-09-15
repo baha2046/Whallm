@@ -1,5 +1,39 @@
 # 研究結論與決策
 
+> 2026-09-15 更新：十個方向中的第 4、5、6、7、9、10 項已移除，第 8 項不實作。
+> 第 3 項改為[正式的三模型分開讀取](PREFILL_IO.md)。下列較早的 prototype、待重啟與旗標描述是歷史記錄；
+> 現在的入口見 [功能表](FEATURE_MATRIX.md)，移除程式見[封存說明](../research/archive/SSD_DIRECTIONS_RETIRED_2026-09-15.md)。
+
+
+## 2026-09-15：完整路由感知快取
+
+[功能](ROUTE_AWARE_CACHE.md) 已接入原始碼、App 設定與 CLI／Server。
+使用跨淘汰的全專家長短期統計、輸入參考與讀取成本，動態分配固定 Slots。
+與之前僅計 resident frequency 的六項實驗分開，並保留 LRU／LFU 舊預設。
+
+本機兩輪同容量對照：V4／Qwen 1K Decode 分別 +17.57%／+15.76%，
+完整請求時間 −10.54%／−9.87%。4K 完整請求均接近持平；
+V4 Decode 的兩輪為 +19.79%／−6.42%，不能稱為穩定的長輸入收益。
+16 次計時生成輸出一致、無新增 swapout，MLX／RSS 均通過 +1 GB 限制。
+因此保留手動選項，不自動取代 LRU。
+[完整條件、範圍與原始證據](benchmarks/2026-09-15-route-aware-cache/README.md)。
+
+## 2026-09-15：本機 SSD 串流六項實驗
+
+依指定對話的六項建議，以目前工作樹在 M5 Pro 64 GiB 測 V4 與 Qwen。
+完整 [條件、逐項結果與原始證據](benchmarks/2026-09-15-ssd-streaming-ablation/README.md)
+分開列出完整生成、逐層 observer、真權重 I/O component 與排除結果。
+
+- V4 直接 Prefill 讀取在 1K／4K 有正向訊號，4K TTFT −14.65%、request −6.35%。
+  保留研究候選，未經更多工作負載與生命週期驗收，不改 App 預設。
+- V4 LFU 的 4K Decode +5.24%，兩輪範圍 +1.75–8.74%；動態熱門度與成本加權沒有通用收益。
+- 自適應讀取少讀卻更慢；重新排列未比原 ID 合併讀取明顯更快，依停止條件不做全模型改排。
+- Qwen MTP 本題接受 0 個候選後 fallback，request 變慢。V4 DSpark 和預設生成的 token 不一致，
+  普通生成關閉整層 Prefill 也重現此輸出；相同輸出的 DSpark 版本互相比較，聯集／預讀仍未加速。
+- Qwen contiguous 一輪有 16 pages 系統 swapout，排除速度採用。逐層 GPU 等待 I/O 尚未完成歸因。
+
+Python 432 項通過。所有實驗改動透過研究 runner 啟用，普通 runtime／App 預設不變。
+
 ## 2026-09-08：依使用者要求整合 UI 並預設開啟
 
 LRU 與 Qwen 四字詞合批已加入 Model Advanced Settings 並預設開啟；Python

@@ -92,38 +92,18 @@ class CacheMetrics:
     routed_expert_assignments: int = 0
     expert_union_experts: int = 0
     expert_union_misses: int = 0
-    speculative_prefetch_rounds: int = 0
-    speculative_prefetch_requested_experts: int = 0
-    speculative_prefetch_cache_resident_experts: int = 0
-    speculative_prefetch_experts_read: int = 0
-    speculative_prefetch_bytes_read: int = 0
-    speculative_prefetch_read_seconds: float = 0.0
-    speculative_prefetch_wait_seconds: float = 0.0
-    speculative_scratch_hits: int = 0
     staged_expert_reads: int = 0
     staged_w13_bytes_read: int = 0
     staged_w2_bytes_read: int = 0
     staged_read_seconds: float = 0.0
     staged_w2_wait_seconds: float = 0.0
     staged_first_stage_submit_seconds: float = 0.0
-    adaptive_prefill_planned_layers: int = 0
-    adaptive_prefill_full_layers: int = 0
-    adaptive_prefill_selective_layers: int = 0
-    adaptive_prefill_union_experts: int = 0
-    adaptive_prefill_read_experts: int = 0
-    adaptive_prefill_bytes_read: int = 0
-    adaptive_prefill_avoided_bytes: int = 0
-    adaptive_prefill_plan_seconds: float = 0.0
     page_cache_probe_calls: int = 0
     page_cache_probe_failures: int = 0
     page_cache_classified_bytes: int = 0
     page_cache_resident_bytes_before_read: int = 0
     page_cache_nonresident_bytes_before_read: int = 0
     page_cache_unclassified_bytes: int = 0
-    speculative_prefetch_page_cache_classified_bytes: int = 0
-    speculative_prefetch_page_cache_resident_bytes_before_read: int = 0
-    speculative_prefetch_page_cache_nonresident_bytes_before_read: int = 0
-    speculative_prefetch_page_cache_unclassified_bytes: int = 0
 
     @property
     def hit_rate(self) -> float:
@@ -161,37 +141,8 @@ class CacheMetrics:
             expert_union_misses=(
                 self.expert_union_misses - before.expert_union_misses
             ),
-            speculative_prefetch_rounds=(
-                self.speculative_prefetch_rounds
-                - before.speculative_prefetch_rounds
-            ),
-            speculative_prefetch_requested_experts=(
-                self.speculative_prefetch_requested_experts
-                - before.speculative_prefetch_requested_experts
-            ),
-            speculative_prefetch_cache_resident_experts=(
-                self.speculative_prefetch_cache_resident_experts
-                - before.speculative_prefetch_cache_resident_experts
-            ),
-            speculative_prefetch_experts_read=(
-                self.speculative_prefetch_experts_read
-                - before.speculative_prefetch_experts_read
-            ),
-            speculative_prefetch_bytes_read=(
-                self.speculative_prefetch_bytes_read
-                - before.speculative_prefetch_bytes_read
-            ),
-            speculative_prefetch_read_seconds=(
-                self.speculative_prefetch_read_seconds
-                - before.speculative_prefetch_read_seconds
-            ),
-            speculative_prefetch_wait_seconds=(
-                self.speculative_prefetch_wait_seconds
-                - before.speculative_prefetch_wait_seconds
-            ),
-            speculative_scratch_hits=(
-                self.speculative_scratch_hits - before.speculative_scratch_hits
-            ),
+
+
             staged_expert_reads=(
                 self.staged_expert_reads - before.staged_expert_reads
             ),
@@ -211,38 +162,8 @@ class CacheMetrics:
                 self.staged_first_stage_submit_seconds
                 - before.staged_first_stage_submit_seconds
             ),
-            adaptive_prefill_planned_layers=(
-                self.adaptive_prefill_planned_layers
-                - before.adaptive_prefill_planned_layers
-            ),
-            adaptive_prefill_full_layers=(
-                self.adaptive_prefill_full_layers
-                - before.adaptive_prefill_full_layers
-            ),
-            adaptive_prefill_selective_layers=(
-                self.adaptive_prefill_selective_layers
-                - before.adaptive_prefill_selective_layers
-            ),
-            adaptive_prefill_union_experts=(
-                self.adaptive_prefill_union_experts
-                - before.adaptive_prefill_union_experts
-            ),
-            adaptive_prefill_read_experts=(
-                self.adaptive_prefill_read_experts
-                - before.adaptive_prefill_read_experts
-            ),
-            adaptive_prefill_bytes_read=(
-                self.adaptive_prefill_bytes_read
-                - before.adaptive_prefill_bytes_read
-            ),
-            adaptive_prefill_avoided_bytes=(
-                self.adaptive_prefill_avoided_bytes
-                - before.adaptive_prefill_avoided_bytes
-            ),
-            adaptive_prefill_plan_seconds=(
-                self.adaptive_prefill_plan_seconds
-                - before.adaptive_prefill_plan_seconds
-            ),
+
+
             page_cache_probe_calls=(
                 self.page_cache_probe_calls - before.page_cache_probe_calls
             ),
@@ -265,22 +186,6 @@ class CacheMetrics:
             page_cache_unclassified_bytes=(
                 self.page_cache_unclassified_bytes
                 - before.page_cache_unclassified_bytes
-            ),
-            speculative_prefetch_page_cache_classified_bytes=(
-                self.speculative_prefetch_page_cache_classified_bytes
-                - before.speculative_prefetch_page_cache_classified_bytes
-            ),
-            speculative_prefetch_page_cache_resident_bytes_before_read=(
-                self.speculative_prefetch_page_cache_resident_bytes_before_read
-                - before.speculative_prefetch_page_cache_resident_bytes_before_read
-            ),
-            speculative_prefetch_page_cache_nonresident_bytes_before_read=(
-                self.speculative_prefetch_page_cache_nonresident_bytes_before_read
-                - before.speculative_prefetch_page_cache_nonresident_bytes_before_read
-            ),
-            speculative_prefetch_page_cache_unclassified_bytes=(
-                self.speculative_prefetch_page_cache_unclassified_bytes
-                - before.speculative_prefetch_page_cache_unclassified_bytes
             ),
         )
 
@@ -318,6 +223,8 @@ class _Entry:
     frequency: int
     last_access: int
     version: int = 0
+    layer: int = -1
+    expert: int = -1
 
 
 @dataclass(frozen=True)
@@ -381,28 +288,6 @@ class StagedReadyExpert:
             cache.metrics.staged_w2_wait_seconds += waited
         self.w2_read = read
         self.finished = True
-
-
-@dataclass(frozen=True)
-class SpeculativePrefetchMetrics:
-    requested_experts: int = 0
-    cache_resident_experts: int = 0
-    experts_read: int = 0
-    bytes_read: int = 0
-    useful_bytes: int = 0
-    wasted_bytes: int = 0
-    read_seconds: float = 0.0
-    wait_seconds: float = 0.0
-    page_cache_classified_bytes: int = 0
-    page_cache_resident_bytes_before_read: int = 0
-    page_cache_nonresident_bytes_before_read: int = 0
-    page_cache_unclassified_bytes: int = 0
-    useful_page_cache_resident_bytes_before_read: int = 0
-    useful_page_cache_nonresident_bytes_before_read: int = 0
-    useful_page_cache_unclassified_bytes: int = 0
-    wasted_page_cache_resident_bytes_before_read: int = 0
-    wasted_page_cache_nonresident_bytes_before_read: int = 0
-    wasted_page_cache_unclassified_bytes: int = 0
 
 
 class _ReadLimiter:
@@ -724,8 +609,6 @@ class _StagedSlotPool(_SlotPool):
         self._loaded[slot] = 0
 
 
-
-
 class ExpertCache:
     """A fixed-size, layer-aware LFU/LRU slot pool for routed expert weights."""
 
@@ -744,6 +627,7 @@ class ExpertCache:
         file_cache_policy: str = "cached",
         staged_expert_streaming: bool = False,
         eviction_policy: str = "lfu",
+        separate_prefill_io: bool = False,
     ) -> None:
         if slots < installed_model.selected_expert_count:
             raise ValueError("slot count must hold at least one token's routed experts")
@@ -755,7 +639,7 @@ class ExpertCache:
             raise ValueError(
                 f"unknown expert-file cache policy: {file_cache_policy}"
             )
-        if eviction_policy not in ("lfu", "lru"):
+        if eviction_policy not in ("lfu", "lru", "route"):
             raise ValueError(f"unknown expert eviction policy: {eviction_policy}")
         self.eviction_policy = eviction_policy
         self.model = installed_model
@@ -779,6 +663,11 @@ class ExpertCache:
             raise ValueError("direct-I/O alignment cannot be negative")
         if self.layer_count < 1:
             raise ValueError("expert cache layer count must be greater than zero")
+        from .route_cache import RouteCachePolicy
+        self._route_policy = (RouteCachePolicy(self.layer_count, installed_model.expert_count,
+                                               slots, installed_model.selected_expert_count)
+                              if eviction_policy == "route" else None)
+        self._route_phase = "decode"
         self.metrics = CacheMetrics()
         self._pool = (
             _StagedSlotPool(installed_model, slots)
@@ -788,13 +677,14 @@ class ExpertCache:
         self._entries: dict[tuple[int, int], _Entry] = {}
         self._free_slots = list(reversed(range(slots)))
         self._heap: list[tuple[int, int, int, int, int]] = []
+        self._route_heaps = [[] for _ in range(self.layer_count)] if self._route_policy is not None else []
         self._layer_counts = [0] * self.layer_count
         base = slots // self.layer_count
         self._layer_reserve = base // 2
         self._clock = 0
         self._last_decay = 0
         self._pinned_layers: set[int] = set()
-        self._speculative_pinned_keys: set[tuple[int, int]] = set()
+        self._pinned_expert_keys: set[tuple[int, int]] = set()
         self._expert_union_profiles: list[ExpertUnionProfile] = []
         self._lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=read_workers)
@@ -804,9 +694,6 @@ class ExpertCache:
             else None
         )
         self._prefetched_layers: dict[int, _LayerRead] = {}
-        self.speculative_slots = 0
-        self._speculative_pool: _SlotPool | None = None
-        self._active_speculative_prefetch: _SpeculativeExpertPrefetch | None = None
         self._batched_layer: tuple[int, BatchedExperts] | None = None
         self._active_prefetch_trace: _ActivePrefetchTrace | None = None
         self._route_trace_path = route_trace_path
@@ -822,6 +709,7 @@ class ExpertCache:
         else:
             self._route_trace = None
         self._descriptors: list[int] = []
+        self._prefill_reader = None
         try:
             for layer in range(self.layer_count):
                 descriptor = os.open(
@@ -837,6 +725,12 @@ class ExpertCache:
                     os.close(descriptor)
                     raise
                 self._descriptors.append(descriptor)
+            if separate_prefill_io:
+                from .prefill_io import PrefillReader
+                self._prefill_reader = PrefillReader(
+                    self.expert_directory, self.layer_count,
+                    self.model.expert_blob_size, read_limiter,
+                )
         except Exception:
             for descriptor in self._descriptors:
                 os.close(descriptor)
@@ -849,9 +743,6 @@ class ExpertCache:
             raise
 
     def close(self) -> None:
-        speculative = self._active_speculative_prefetch
-        if speculative is not None:
-            speculative.close()
         for job in self._prefetched_layers.values():
             for future in job.futures:
                 future.cancel()
@@ -859,6 +750,8 @@ class ExpertCache:
         self._executor.shutdown(wait=True)
         if self._staged_w2_executor is not None:
             self._staged_w2_executor.shutdown(wait=True)
+        if self._prefill_reader is not None:
+            self._prefill_reader.close()
         for descriptor in self._descriptors:
             os.close(descriptor)
         self._descriptors.clear()
@@ -881,9 +774,8 @@ class ExpertCache:
         with self._lock:
             if (
                 self._pinned_layers
+                or self._pinned_expert_keys
                 or self._batched_layer is not None
-                or self._active_speculative_prefetch is not None
-                or self._speculative_pinned_keys
             ):
                 raise RuntimeError("cannot release expert slots while they are in use")
         self.discard_prefetched_layers()
@@ -894,6 +786,8 @@ class ExpertCache:
             self._entries.clear()
             self._free_slots = list(reversed(range(self.slots)))
             self._heap.clear()
+            if self._route_policy is not None:
+                self._route_heaps = [[] for _ in range(self.layer_count)]
             self._layer_counts = [0] * self.layer_count
             self._clock = 0
             self._last_decay = 0
@@ -905,9 +799,6 @@ class ExpertCache:
             pending = list(self._prefetched_layers.values())
             self._prefetched_layers.clear()
         cancel_and_drain(future for job in pending for future in job.futures)
-
-
-
 
 
     def resident_expert_keys(
@@ -927,6 +818,9 @@ class ExpertCache:
         with self._lock:
             return replace(self.metrics)
 
+    def prefill_io_snapshot(self) -> dict | None:
+        return self._prefill_reader.snapshot() if self._prefill_reader is not None else None
+
     def record_routing_sync(self, seconds: float) -> None:
         with self._lock:
             self.metrics.routing_sync_seconds += seconds
@@ -945,11 +839,98 @@ class ExpertCache:
 
     @contextmanager
     def trace_routes(self, phase: str):
-        if self._route_trace is None:
-            yield
-            return
-        with self._route_trace.phase(phase):
-            yield
+        previous = self._route_phase
+        self._route_phase = phase
+        try:
+            if self._route_trace is None:
+                yield
+            else:
+                with self._route_trace.phase(phase):
+                    yield
+        finally:
+            self._route_phase = previous
+            if self._route_policy is not None and phase == "prefill" and previous != "prefill":
+                with self._lock:
+                    self._route_policy.rebalance()
+                    self._rebuild_route_heap_locked()
+
+    def begin_route_request(self) -> None:
+        # One prompt may have several Prefill phases (layer-major + final token).
+        if self._route_policy is not None:
+            with self._lock:
+                self._route_policy.begin_prefill()
+
+    @property
+    def route_cache_enabled(self) -> bool:
+        return self._route_policy is not None
+
+    def observe_batched_routes(self, layer: int, selected: np.ndarray) -> None:
+        # Normal acquisitions observe at get_many/iter_ready; batched Prefill has no slots.
+        if self._route_policy is not None:
+            with self._lock:
+                self._observe_access_locked(layer, selected)
+
+    def route_cache_snapshot(self) -> dict | None:
+        with self._lock:
+            if self._route_policy is None:
+                return None
+            result = self._route_policy.snapshot()
+            for row, resident in zip(result["layers"], self._layer_counts):
+                row["resident_slots"] = resident
+            return result
+
+    def _observe_access_locked(self, layer, selected):
+        if self._route_policy is not None and self._route_policy.observe(layer, selected, self._route_phase):
+            self._rebuild_route_heap_locked()
+
+    def _rebuild_route_heap_locked(self):
+        self._route_heaps = [[] for _ in range(self.layer_count)]
+        for (layer, expert), entry in self._entries.items():
+            entry.version += 1
+            self._route_heaps[layer].append((float(self._route_policy.scores[layer, expert]),
+                                            entry.last_access, entry.version, layer, expert))
+        for heap in self._route_heaps:
+            heapq.heapify(heap)
+
+    def _evict_route_locked(self, protected, incoming_layer):
+        # First inspect over-budget layers. Lower tiers matter only if every
+        # candidate in the preceding tier is protected; avoid touching their heaps.
+        tiers = ([], [], [])
+        for layer, (count, quota) in enumerate(zip(self._layer_counts, self._route_policy.quotas.tolist())):
+            if not count:
+                continue
+            eligible = count > quota or (layer == incoming_layer and count >= quota)
+            category = 2 if layer in self._pinned_layers else (0 if eligible else 1)
+            tiers[category].append(layer)
+        held = []
+        candidates = []
+        winner = None
+        try:
+            for layers in tiers:
+                for layer in layers:
+                    heap = self._route_heaps[layer]
+                    while heap:
+                        item = heapq.heappop(heap)
+                        key = (layer, item[4])
+                        entry = self._entries.get(key)
+                        if entry is None or (self._eviction_rank(entry), entry.last_access, entry.version) != item[:3]:
+                            continue
+                        held.append(item)
+                        if key in protected or key in self._pinned_expert_keys:
+                            continue
+                        candidates.append(item)
+                        break
+                if candidates:
+                    break
+            if not candidates:
+                raise RuntimeError("no expert cache slot can be evicted")
+            winner = min(candidates)
+            key = (winner[3], winner[4])
+            return key, self._entries[key]
+        finally:
+            for item in held:
+                if item != winner:
+                    heapq.heappush(self._route_heaps[item[3]], item)
 
     def record_routes(self, layer: int, selected: np.ndarray) -> None:
         active = self._active_prefetch_trace
@@ -1079,7 +1060,6 @@ class ExpertCache:
         layer: int,
         enabled: bool = True,
         experts: list[int] | tuple[int, ...] | None = None,
-        adaptive: bool = False,
     ):
         if not enabled:
             yield None
@@ -1100,10 +1080,6 @@ class ExpertCache:
         batched = self._pool.batched(packed)
         with self._lock:
             self.metrics.bytes_read += len(job.experts) * self.model.expert_blob_size
-            if adaptive:
-                self.metrics.adaptive_prefill_bytes_read += (
-                    len(job.experts) * self.model.expert_blob_size
-                )
             self.metrics.read_seconds += elapsed
             self.metrics.batched_layers += 1
             if was_ready:
@@ -1135,28 +1111,6 @@ class ExpertCache:
             self._active_prefetch_trace = None
             self._batched_layer = None
 
-    def record_adaptive_prefill_decision(
-        self,
-        *,
-        union_experts: int,
-        read_experts: int,
-        full_layer: bool,
-        plan_seconds: float,
-    ) -> None:
-        if not 0 < union_experts <= self.model.expert_count:
-            raise ValueError("adaptive prefill union is outside expert capacity")
-        if not union_experts <= read_experts <= self.model.expert_count:
-            raise ValueError("adaptive prefill read set does not cover its union")
-        with self._lock:
-            self.metrics.adaptive_prefill_planned_layers += 1
-            self.metrics.adaptive_prefill_full_layers += int(full_layer)
-            self.metrics.adaptive_prefill_selective_layers += int(not full_layer)
-            self.metrics.adaptive_prefill_union_experts += union_experts
-            self.metrics.adaptive_prefill_read_experts += read_experts
-            self.metrics.adaptive_prefill_avoided_bytes += (
-                self.model.expert_count - read_experts
-            ) * self.model.expert_blob_size
-            self.metrics.adaptive_prefill_plan_seconds += plan_seconds
 
     @contextmanager
     def pin_layer(self, layer: int):
@@ -1168,93 +1122,6 @@ class ExpertCache:
             with self._lock:
                 self._pinned_layers.discard(layer)
 
-    def configure_speculative_scratch(self, slots: int) -> None:
-        """Allocate a fixed scratch pool used only by speculative verification."""
-        if slots < 0:
-            raise ValueError("speculative scratch slots must be zero or greater")
-        with self._lock:
-            if self._active_speculative_prefetch is not None:
-                raise RuntimeError("cannot resize active speculative scratch")
-            if self._speculative_pool is not None:
-                if slots != self.speculative_slots:
-                    raise RuntimeError("speculative scratch is already configured")
-                return
-            self.speculative_slots = slots
-            if slots == 0:
-                return
-            pool = (
-                _StagedSlotPool(self.model, slots)
-                if self.staged_expert_streaming
-                else _SlotPool(self.model, slots)
-            )
-            self._speculative_pool = pool
-        pool.prepare(list(range(slots)))
-
-    @contextmanager
-    def speculative_prefetch(
-        self,
-        experts_by_layer: dict[int, list[int] | tuple[int, ...]],
-    ) -> Iterator[_SpeculativeExpertPrefetch]:
-        """Read exact speculative experts into scratch without LFU admission."""
-        handle = self._begin_speculative_prefetch(experts_by_layer)
-        try:
-            yield handle
-        finally:
-            handle.close()
-
-    def speculative_prefetch_active(self, layer: int) -> bool:
-        with self._lock:
-            active = self._active_speculative_prefetch
-            return active is not None and active.covers_layer(layer)
-
-    def _begin_speculative_prefetch(
-        self,
-        experts_by_layer: dict[int, list[int] | tuple[int, ...]],
-    ) -> _SpeculativeExpertPrefetch:
-        requested: list[tuple[int, int]] = []
-        seen: set[tuple[int, int]] = set()
-        for layer, experts in experts_by_layer.items():
-            if not 0 <= layer < self.layer_count:
-                raise ValueError(f"invalid layer {layer}")
-            for expert in experts:
-                if not 0 <= expert < self.model.expert_count:
-                    raise ValueError(f"invalid expert {expert}")
-                key = (layer, expert)
-                if key not in seen:
-                    requested.append(key)
-                    seen.add(key)
-
-        with self._lock:
-            if self._active_speculative_prefetch is not None:
-                raise RuntimeError("a speculative prefetch is already active")
-            pool = self._speculative_pool
-            if pool is None:
-                raise RuntimeError("speculative scratch is not configured")
-            resident = {key for key in requested if key in self._entries}
-            missing = [key for key in requested if key not in resident]
-            if len(missing) > self.speculative_slots:
-                raise ValueError(
-                    f"speculative prefetch needs {len(missing)} scratch slots, "
-                    f"but only {self.speculative_slots} are configured"
-                )
-            self._speculative_pinned_keys.update(resident)
-            scratch_slots = {key: slot for slot, key in enumerate(missing)}
-            for slot in scratch_slots.values():
-                pool.mark_empty(slot)
-            handle = _SpeculativeExpertPrefetch(
-                self,
-                tuple(requested),
-                frozenset(resident),
-                scratch_slots,
-            )
-            self._active_speculative_prefetch = handle
-
-        try:
-            handle.start()
-        except Exception:
-            handle.close()
-            raise
-        return handle
 
     def get_many(self, layer: int, expert_ids: list[int]) -> ResidentExperts:
         check_cancelled()
@@ -1271,22 +1138,15 @@ class ExpertCache:
                 raise ValueError(f"invalid expert {expert}")
 
         missing: list[int] = []
-        scratch: list[int] = []
         resident: list[int] = []
         protected = {(layer, expert) for expert in unique}
         with self._lock:
-            speculative = self._active_speculative_prefetch
+            self._observe_access_locked(layer, expert_ids)
             for expert in unique:
                 entry = self._entries.get((layer, expert))
                 if entry is None:
                     self.metrics.misses += 1
-                    if (
-                        speculative is not None
-                        and speculative.has_scratch(layer, expert)
-                    ):
-                        scratch.append(expert)
-                    else:
-                        missing.append(expert)
+                    missing.append(expert)
                 else:
                     self.metrics.hits += 1
                     self._touch(layer, expert, entry, frequencies[expert])
@@ -1295,10 +1155,10 @@ class ExpertCache:
                 layer,
                 len(expert_ids),
                 len(unique),
-                len(missing) + len(scratch),
+                len(missing),
             )
             assigned = self._reserve_slots(layer, missing, frequencies, protected)
-        self._record_residency(layer, expert_ids, [*missing, *scratch])
+        self._record_residency(layer, expert_ids, missing)
 
         started = time.perf_counter()
         futures = {
@@ -1317,12 +1177,6 @@ class ExpertCache:
                 self._release_slots(layer, assigned)
             raise
         elapsed = time.perf_counter() - started if missing else 0.0
-        scratch_weights = (
-            speculative.scratch_weights(layer, scratch)
-            if scratch and speculative is not None
-            else ()
-        )
-
         with self._lock:
             self.metrics.bytes_read += len(missing) * self.model.expert_blob_size
             self.metrics.read_seconds += elapsed
@@ -1336,7 +1190,6 @@ class ExpertCache:
             )
             self.metrics.pack_seconds += time.perf_counter() - pack_started
             weights_by_expert = dict(zip(main_experts, main_weights))
-            weights_by_expert.update(zip(scratch, scratch_weights))
             individual_weights = tuple(weights_by_expert[expert] for expert in unique)
             return ResidentExperts(
                 individual_weights,
@@ -1362,6 +1215,7 @@ class ExpertCache:
         missing: list[int] = []
         protected = {(layer, expert) for expert in unique}
         with self._lock:
+            self._observe_access_locked(layer, expert_ids)
             for expert in unique:
                 entry = self._entries.get((layer, expert))
                 if entry is None:
@@ -1463,6 +1317,7 @@ class ExpertCache:
         missing: list[int] = []
         protected = {(layer, expert) for expert in unique}
         with self._lock:
+            self._observe_access_locked(layer, expert_ids)
             for expert in unique:
                 entry = self._entries.get((layer, expert))
                 if entry is None:
@@ -1527,6 +1382,11 @@ class ExpertCache:
                 if handle.w2_read is None:
                     raise RuntimeError("staged expert completed without w2 read")
                 ready_at = max(ready_at, handle.w2_read.finished)
+                if self._route_policy is not None:
+                    with self._lock:
+                        self._route_policy.record_read(layer,
+                            w13_read.finished - w13_read.started +
+                            handle.w2_read.finished - handle.w2_read.started)
                 completed.add(expert)
         finally:
             for future, expert in begin_futures.items():
@@ -1586,14 +1446,14 @@ class ExpertCache:
                 slot = self._free_slots.pop()
             else:
                 eviction_started = time.perf_counter()
-                victim_key, victim = self._evict(protected)
+                victim_key, victim = self._evict(protected, layer)
                 self.metrics.eviction_seconds += time.perf_counter() - eviction_started
                 slot = victim.slot
                 del self._entries[victim_key]
                 self._layer_counts[victim_key[0]] -= 1
                 self.metrics.evictions += 1
                 self._pool.mark_empty(slot)
-            entry = _Entry(slot, frequencies[expert], 0)
+            entry = _Entry(slot, frequencies[expert], 0, layer=layer, expert=expert)
             self._entries[(layer, expert)] = entry
             self._layer_counts[layer] += 1
             self._touch(layer, expert, entry, 0)
@@ -1617,18 +1477,22 @@ class ExpertCache:
         entry.last_access = self._clock
         entry.version += 1
         heapq.heappush(
-            self._heap,
+            self._route_heaps[layer] if self._route_policy is not None else self._heap,
             (self._eviction_rank(entry), entry.last_access, entry.version, layer, expert),
         )
 
-    def _eviction_rank(self, entry: _Entry) -> int:
+    def _eviction_rank(self, entry: _Entry) -> float:
+        if self._route_policy is not None:
+            # Slot owns one expert, so retain its identity independently of the heap.
+            return float(self._route_policy.scores[entry.layer, entry.expert])
         # Keep actual assignment counts for profiling and decay. LRU changes
         # ranking only; reservation, pinning and in-flight protection are shared.
         return entry.frequency if self.eviction_policy == "lfu" else 0
 
-    def _evict(self, protected: set[tuple[int, int]]) -> tuple[tuple[int, int], _Entry]:
+    def _evict(self, protected: set[tuple[int, int]], incoming_layer: int | None = None) -> tuple[tuple[int, int], _Entry]:
+        if self._route_policy is not None:
+            return self._evict_route_locked(protected, incoming_layer)
         protected_items: list[tuple[int, int, int, int, int]] = []
-        speculative_items: list[tuple[int, int, int, int, int]] = []
         pinned_items: list[tuple[int, int, int, int, int]] = []
         reserved_items: list[tuple[int, int, int, int, int]] = []
         try:
@@ -1643,11 +1507,8 @@ class ExpertCache:
                     entry.version,
                 ) != (frequency, last_access, version):
                     continue
-                if key in protected:
+                if key in protected or key in self._pinned_expert_keys:
                     protected_items.append(item)
-                    continue
-                if key in self._speculative_pinned_keys:
-                    speculative_items.append(item)
                     continue
                 if layer in self._pinned_layers:
                     pinned_items.append(item)
@@ -1665,7 +1526,6 @@ class ExpertCache:
         finally:
             for item in (
                 *protected_items,
-                *speculative_items,
                 *pinned_items,
                 *reserved_items,
             ):
@@ -1675,6 +1535,9 @@ class ExpertCache:
         if self._clock - self._last_decay < max(self.slots * 8, 64):
             return
         self._last_decay = self._clock
+        if self._route_policy is not None:
+            self._rebuild_route_heap_locked()
+            return
         self._heap = []
         for (layer, expert), entry in self._entries.items():
             entry.frequency = max(1, entry.frequency // 2)
@@ -1785,7 +1648,11 @@ class ExpertCache:
             views,
             expert * self.model.expert_blob_size,
         )
-        return _SpeculativeRead(started, time.perf_counter(), page_cache)
+        finished = time.perf_counter()
+        if self._route_policy is not None:
+            with self._lock:
+                self._route_policy.record_read(layer, finished - started)
+        return _SpeculativeRead(started, finished, page_cache)
 
     def _read_expert_ids(
         self,
@@ -1795,12 +1662,18 @@ class ExpertCache:
     ) -> _SpeculativeRead:
         started = time.perf_counter()
         view = memoryview(packed).cast("B")
-        for expert in experts:
-            self._pread_views(
-                layer,
-                self._pool.write_views(view, expert),
-                expert * self.model.expert_blob_size,
-            )
+        try:
+            for expert in experts:
+                views = self._pool.write_views(view, expert)
+                try:
+                    self._pread_views(layer, views,
+                                      expert * self.model.expert_blob_size,
+                                      prefill=True)
+                finally:
+                    for part in views:
+                        part.release()
+        finally:
+            view.release()
         return _SpeculativeRead(started, time.perf_counter())
 
     def _pread_views(
@@ -1808,26 +1681,32 @@ class ExpertCache:
         layer: int,
         views: list[memoryview],
         offset: int,
+        *,
+        prefill: bool = False,
     ) -> PageCacheReadClassification:
+        reader = self._prefill_reader if (prefill or self._route_phase == "prefill") else None
+        descriptor = reader.descriptors[layer] if reader is not None else self._descriptors[layer]
         pending = list(views)
         position = offset
         page_cache = PageCacheReadClassification()
         while pending:
-            if self.file_cache_policy == "bypass":
+            if reader is None and self.file_cache_policy == "bypass":
                 self._validate_direct_read(position, pending)
             sample = None
             requested = sum(len(view) for view in pending)
             if self.page_cache_probe:
                 sample = page_cache_residency_snapshot(
-                    self._descriptors[layer],
+                    descriptor,
                     position,
                     requested,
                 )
-            if self._read_limiter is None:
-                count = os.preadv(self._descriptors[layer], pending, position)
+            if reader is not None:
+                count = reader.read(layer, pending, position)
+            elif self._read_limiter is None:
+                count = os.preadv(descriptor, pending, position)
             else:
                 count = self._read_limiter.preadv(
-                    self._descriptors[layer], pending, position
+                    descriptor, pending, position
                 )
             if count <= 0:
                 raise EOFError(
@@ -1890,219 +1769,3 @@ class ExpertCache:
                     "cache-bypass iovec length is not "
                     f"{alignment}-byte aligned"
                 )
-
-
-class _SpeculativeExpertPrefetch:
-    """One exact prefetch transaction backed by the cache's scratch pool."""
-
-    def __init__(
-        self,
-        cache: ExpertCache,
-        requested: tuple[tuple[int, int], ...],
-        resident: frozenset[tuple[int, int]],
-        scratch_slots: dict[tuple[int, int], int],
-    ) -> None:
-        self._cache = cache
-        self._requested = requested
-        self._resident = resident
-        self._scratch_slots = scratch_slots
-        self._futures: dict[tuple[int, int], Future[_SpeculativeRead]] = {}
-        self._reads: dict[tuple[int, int], _SpeculativeRead] = {}
-        self._wait_seconds = 0.0
-        self._read_time_recorded = False
-        self._closed = False
-
-    def start(self) -> None:
-        cache = self._cache
-        pool = cache._speculative_pool
-        if pool is None:
-            raise RuntimeError("speculative scratch is not configured")
-        with cache._lock:
-            cache.metrics.speculative_prefetch_rounds += 1
-            cache.metrics.speculative_prefetch_requested_experts += len(
-                self._requested
-            )
-            cache.metrics.speculative_prefetch_cache_resident_experts += len(
-                self._resident
-            )
-        for (layer, expert), slot in self._scratch_slots.items():
-            self._futures[(layer, expert)] = cache._executor.submit(
-                cache._read_expert_into_pool,
-                pool,
-                layer,
-                expert,
-                slot,
-            )
-
-    def covers_layer(self, layer: int) -> bool:
-        return any(key[0] == layer for key in self._requested)
-
-    def has_scratch(self, layer: int, expert: int) -> bool:
-        return (layer, expert) in self._scratch_slots
-
-    def scratch_weights(
-        self,
-        layer: int,
-        experts: list[int],
-    ) -> tuple[ExpertWeights, ...]:
-        if self._closed:
-            raise RuntimeError("speculative prefetch is closed")
-        keys = [(layer, expert) for expert in experts]
-        if any(key not in self._scratch_slots for key in keys):
-            raise RuntimeError("requested expert is not in speculative scratch")
-        wait_started = time.perf_counter()
-        self._finish_reads(keys)
-        waited = time.perf_counter() - wait_started
-        self._wait_seconds += waited
-        cache = self._cache
-        pool = cache._speculative_pool
-        if pool is None:
-            raise RuntimeError("speculative scratch is not configured")
-        pack_started = time.perf_counter()
-        weights = pool.select_individual(
-            [self._scratch_slots[key] for key in keys]
-        )
-        with cache._lock:
-            cache.metrics.speculative_prefetch_wait_seconds += waited
-            cache.metrics.speculative_scratch_hits += len(keys)
-            cache.metrics.pack_seconds += time.perf_counter() - pack_started
-        return weights
-
-    def metrics(
-        self,
-        useful_keys: set[tuple[int, int]] | frozenset[tuple[int, int]],
-    ) -> SpeculativePrefetchMetrics:
-        read_keys = set(self._reads)
-        useful = read_keys.intersection(useful_keys)
-        wasted = read_keys.difference(useful_keys)
-        read_seconds = 0.0
-        if self._reads:
-            read_seconds = max(read.finished for read in self._reads.values()) - min(
-                read.started for read in self._reads.values()
-            )
-        blob_size = self._cache.model.expert_blob_size
-
-        def page_bytes(
-            keys: set[tuple[int, int]],
-            name: str,
-        ) -> int:
-            return sum(
-                int(getattr(self._reads[key].page_cache, name)) for key in keys
-            )
-
-        return SpeculativePrefetchMetrics(
-            requested_experts=len(self._requested),
-            cache_resident_experts=len(self._resident),
-            experts_read=len(read_keys),
-            bytes_read=len(read_keys) * blob_size,
-            useful_bytes=len(useful) * blob_size,
-            wasted_bytes=len(wasted) * blob_size,
-            read_seconds=read_seconds,
-            wait_seconds=self._wait_seconds,
-            page_cache_classified_bytes=page_bytes(
-                read_keys, "classified_bytes"
-            ),
-            page_cache_resident_bytes_before_read=page_bytes(
-                read_keys, "resident_bytes"
-            ),
-            page_cache_nonresident_bytes_before_read=page_bytes(
-                read_keys, "nonresident_bytes"
-            ),
-            page_cache_unclassified_bytes=page_bytes(
-                read_keys, "unclassified_bytes"
-            ),
-            useful_page_cache_resident_bytes_before_read=page_bytes(
-                useful, "resident_bytes"
-            ),
-            useful_page_cache_nonresident_bytes_before_read=page_bytes(
-                useful, "nonresident_bytes"
-            ),
-            useful_page_cache_unclassified_bytes=page_bytes(
-                useful, "unclassified_bytes"
-            ),
-            wasted_page_cache_resident_bytes_before_read=page_bytes(
-                wasted, "resident_bytes"
-            ),
-            wasted_page_cache_nonresident_bytes_before_read=page_bytes(
-                wasted, "nonresident_bytes"
-            ),
-            wasted_page_cache_unclassified_bytes=page_bytes(
-                wasted, "unclassified_bytes"
-            ),
-        )
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        error: BaseException | None = None
-        try:
-            self._finish_reads(list(self._futures))
-        except BaseException as caught:
-            error = caught
-            for future in self._futures.values():
-                future.cancel()
-            for future in self._futures.values():
-                try:
-                    future.result()
-                except BaseException:
-                    pass
-        finally:
-            cache = self._cache
-            pool = cache._speculative_pool
-            with cache._lock:
-                self._record_read_time_locked()
-                cache._speculative_pinned_keys.difference_update(self._resident)
-                if cache._active_speculative_prefetch is self:
-                    cache._active_speculative_prefetch = None
-            if pool is not None:
-                for slot in self._scratch_slots.values():
-                    pool.mark_empty(slot)
-            self._closed = True
-        if error is not None:
-            raise error
-
-    def _finish_reads(self, keys: list[tuple[int, int]]) -> None:
-        cache = self._cache
-        pool = cache._speculative_pool
-        if pool is None:
-            raise RuntimeError("speculative scratch is not configured")
-        completed: list[tuple[tuple[int, int], _SpeculativeRead]] = []
-        for key in keys:
-            if key in self._reads:
-                continue
-            read = self._futures[key].result()
-            pool.mark_loaded(self._scratch_slots[key])
-            self._reads[key] = read
-            completed.append((key, read))
-        if completed:
-            bytes_read = len(completed) * cache.model.expert_blob_size
-            page_cache = PageCacheReadClassification()
-            for _, read in completed:
-                page_cache += read.page_cache
-            with cache._lock:
-                cache.metrics.bytes_read += bytes_read
-                cache.metrics.speculative_prefetch_experts_read += len(completed)
-                cache.metrics.speculative_prefetch_bytes_read += bytes_read
-                metrics = cache.metrics
-                metrics.speculative_prefetch_page_cache_classified_bytes += (
-                    page_cache.classified_bytes
-                )
-                metrics.speculative_prefetch_page_cache_resident_bytes_before_read += (
-                    page_cache.resident_bytes
-                )
-                metrics.speculative_prefetch_page_cache_nonresident_bytes_before_read += (
-                    page_cache.nonresident_bytes
-                )
-                metrics.speculative_prefetch_page_cache_unclassified_bytes += (
-                    page_cache.unclassified_bytes
-                )
-
-    def _record_read_time_locked(self) -> None:
-        if self._read_time_recorded or not self._reads:
-            return
-        elapsed = max(read.finished for read in self._reads.values()) - min(
-            read.started for read in self._reads.values()
-        )
-        self._cache.metrics.read_seconds += elapsed
-        self._cache.metrics.speculative_prefetch_read_seconds += elapsed
-        self._read_time_recorded = True

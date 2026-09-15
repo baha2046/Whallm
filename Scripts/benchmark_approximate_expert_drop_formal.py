@@ -17,7 +17,7 @@ try:
         _run_fresh_process,
         _run_worker,
     )
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,
@@ -30,7 +30,7 @@ except ImportError:
         _run_fresh_process,
         _run_worker,
     )
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _runtime_tree_sha256,
         _sha256,

@@ -23,7 +23,6 @@
         "promptCache",
         "dspark",
         "stagedExpertStreaming",
-        "adaptiveExpertPrefill",
         "approximation",
         "readyExpertDecode",
         "batchedExpertPrefill",

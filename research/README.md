@@ -1,7 +1,26 @@
 # 研究入口
 
+2026-09-15 最新決定：[移除範圍與歷史保存](archive/SSD_DIRECTIONS_RETIRED_2026-09-15.md)。
+第 3 項已接入三模型；下方較早的「待實作／保留原型」描述是當時狀態。
+
+2026-09-15 新增 [完整路由感知快取研究](ROUTE_AWARE_CACHE_2026-09-15.md)。
+跨淘汰歷史、長短期統計、逐層容量分配已接入工作目錄，
+目前功能契約見 [路由感知快取](../docs/ROUTE_AWARE_CACHE.md)。
+
 目前 runtime 行為以 [docs](../docs/README.md) 為準。
 本目錄保存研究問題、實驗與尚未採用的方向。
+
+## 2026-09-15：本機 SSD streaming 六項實驗
+
+使用者已選擇本機 V4＋Qwen。依 [執行表與比較規則](SSD_STREAMING_ABLATION_2026-09-15.md)
+依指定對話的六項實驗驗證統計、快取、讀取、排列與推測解碼聯集預讀。
+[實測報告與原始資料](../docs/benchmarks/2026-09-15-ssd-streaming-ablation/README.md) 已收斂：
+V4 direct Prefill 的 4K request 縮短 6.35%；其餘訊號、退步、輸出差異及 swapout 排除個別列出。
+App 預設不變。GPU 等待 I/O 的逐層歸因仍未完成；不把前景等待時間當成 GPU idle。
+
+[Prefill／Decode 技術整理與 GPT 6 Pro 討論](PREFILL_DECODE_GPT6_PRO_2026-09-15.md)
+整理目前三模型的硬體、記憶體、kernel 路徑與舊實驗限制，並列出可比較的後續量測。
+這是研究建議，不修改下方既有執行階段，也不代表已採用或測得加速。
 
 ## 2026-09-12：模組化 runtime 與自有 mlx-lm fork
 

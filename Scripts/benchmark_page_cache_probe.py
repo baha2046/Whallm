@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 try:
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _load_prompts,
         _package_version,
@@ -22,7 +22,7 @@ try:
         _sysctl,
     )
 except ImportError:
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _load_prompts,
         _package_version,
@@ -168,8 +168,6 @@ def main() -> None:
             dspark_fallback_enabled=True,
             layer_major_prefill_enabled=False,
             sequential_verification_enabled=False,
-            hybrid_verification_enabled=False,
-            hybrid_hash_prefetch_enabled=False,
             expert_page_cache_probe_enabled=label == "probe",
         )
         row["mode"] = label

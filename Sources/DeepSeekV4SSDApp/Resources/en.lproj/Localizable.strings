@@ -445,3 +445,6 @@
 "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding.";
 "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP.";
 "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.";
+
+"Route-aware" = "Route-aware";
+"Route-aware cache remembers expert usage and adjusts memory across layers." = "Route-aware cache remembers expert usage and adjusts memory across layers.";

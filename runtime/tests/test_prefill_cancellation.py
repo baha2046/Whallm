@@ -57,7 +57,7 @@ class PrefillCancellationTests(unittest.TestCase):
 
     def test_expert_reads_cancel_without_leaking_slots_and_allow_reuse(self):
         with tempfile.TemporaryDirectory() as directory:
-            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1) as cache:
+            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1, separate_prefill_io=True) as cache:
                 cancelled = threading.Event()
                 original = cache._read_expert_into_slot
                 def read(*args):
@@ -73,7 +73,7 @@ class PrefillCancellationTests(unittest.TestCase):
 
     def test_cancelled_batched_read_never_exposes_partial_weights(self):
         with tempfile.TemporaryDirectory() as directory:
-            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1) as cache:
+            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1, separate_prefill_io=True) as cache:
                 cancelled = threading.Event()
                 original = cache._read_expert_ids
                 def read(*args):

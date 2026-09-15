@@ -613,6 +613,8 @@ class StreamingExperts(nn.Module):
     def __call__(self, value: mx.array, indices: mx.array) -> mx.array:
         batched = self.cache.current_batched(self.layer)
         if isinstance(batched, QwenBatchedExperts):
+            if getattr(self.cache, "route_cache_enabled", False):
+                self.cache.observe_batched_routes(self.layer, np.asarray(indices, dtype=np.int32))
             source = mx.expand_dims(value, (-2, -3))
             grouped = self.grouped_prefill and indices.size >= 64
             selected = indices
@@ -673,7 +675,6 @@ class StreamingExperts(nn.Module):
         grouped = mx.concatenate(outputs, axis=0)
         restored = mx.take(grouped, mx.array(np.argsort(order)), axis=0)
         return restored.reshape(*selected.shape, -1)
-
 
 
 class SparseMoE(nn.Module):
@@ -1185,6 +1186,7 @@ def load(
         read_limiter=read_limiter,
         page_cache_probe=getattr(config, "expert_page_cache_probe", False),
         file_cache_policy=getattr(config, "expert_file_cache_policy", "cached"),
+        separate_prefill_io=getattr(config, "separate_prefill_io", True),
         eviction_policy=getattr(config, "expert_eviction_policy", "lfu"),
     )
     try:

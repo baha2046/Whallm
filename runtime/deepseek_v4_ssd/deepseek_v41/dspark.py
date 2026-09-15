@@ -152,6 +152,7 @@ def load_dspark(installed, args, config, read_limiter):
     cache = ExpertCache(sidecar, config.dspark_slots, config.read_workers, config.prefetch_read_workers,
                         layer_count=3, expert_directory=installed.root / 'dspark/experts',
                         read_limiter=read_limiter, file_cache_policy=config.expert_file_cache_policy,
+        separate_prefill_io=getattr(config, "separate_prefill_io", True),
                         eviction_policy=config.expert_eviction_policy)
     try:
         model = DSpark(args, cache)

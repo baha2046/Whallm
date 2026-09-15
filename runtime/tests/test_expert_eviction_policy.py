@@ -29,6 +29,7 @@ class EvictionPolicyTests(unittest.TestCase):
             legacy.pop(key)
         self.assertEqual(_parse_runtime(legacy,'runtime','qwen3.8-flash-next').expert_eviction_policy,'lfu')
         self.assertEqual(_parse_runtime({**legacy,'expert_eviction_policy':'lru'},'runtime','qwen3.8-flash-next').expert_eviction_policy,'lru')
+        self.assertEqual(_parse_runtime({**legacy,'expert_eviction_policy':'route'},'runtime','qwen3.8-flash-next').expert_eviction_policy,'route')
         for invalid in ('future',None,True,[]):
             with self.assertRaises(ModelCatalogError):
                 _parse_runtime({**legacy,'expert_eviction_policy':invalid},'runtime','qwen3.8-flash-next')
@@ -70,17 +71,6 @@ class EvictionPolicyTests(unittest.TestCase):
             ctypes.memset(address(clone.keys),0,clone.keys.nbytes)
             self.assertTrue(np.array_equal(np.asarray(original.keys.view(storage)),before))
 
-    def test_lru_protects_requested_and_speculatively_pinned_keys(self):
-        with tempfile.TemporaryDirectory() as d:
-            model=fixture(Path(d))
-            with ExpertCache(model, slots=3, eviction_policy='lru') as cache:
-                cache.get_many(0,[0,1,2])
-                cache._speculative_pinned_keys.add((0,0))
-                cache.get_many(0,[1,3])
-                self.assertEqual(set(cache._entries), {(0,0),(0,1),(0,3)})
-                cache._speculative_pinned_keys.clear()
-                cache.get_many(0,[2])
-                self.assertNotIn((0,0),cache._entries)
 
     def test_layer_reserve_survives_lru_and_rebuild(self):
         with tempfile.TemporaryDirectory() as d:

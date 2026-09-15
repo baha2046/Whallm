@@ -33,7 +33,7 @@ class ReadyGroupsTests(unittest.TestCase):
                     actual=ready_experts(value,indices,candidate,0,mx.zeros_like(value),state)
                 self.assertTrue(mx.array_equal(expected,actual).item());self.assertIn(state['groups'],(2,3))
                 first_groups=state['groups']
-                self.assertFalse(candidate._speculative_pinned_keys)
+                self.assertFalse(candidate._pinned_expert_keys)
                 self.assertEqual(candidate.metrics.bytes_read,control.metrics.bytes_read)
                 a={key:(e.slot,e.frequency,e.last_access) for key,e in control._entries.items()}
                 b={key:(e.slot,e.frequency,e.last_access) for key,e in candidate._entries.items()}
@@ -49,7 +49,7 @@ class ReadyGroupsTests(unittest.TestCase):
                 value=mx.ones((1,1,2560),mx.bfloat16);indices=mx.array([[[0,1,2,3]]]);state=dict(calls=0,groups=0,max_groups=0)
                 with patch.object(c,'_read_expert_into_slot',side_effect=EOFError('truncated')):
                     with self.assertRaises(EOFError):ready_experts(value,indices,c,0,mx.zeros_like(value),state)
-                self.assertFalse(c._speculative_pinned_keys);self.assertEqual(set(c._entries),{(0,0)})
+                self.assertFalse(c._pinned_expert_keys);self.assertEqual(set(c._entries),{(0,0)})
                 self.assertEqual(len(c._free_slots),11)
                 actual=ready_experts(value,indices,c,0,mx.zeros_like(value),state)
                 expected=StreamingExperts(0,c)(value,indices);mx.eval(expected)
@@ -74,7 +74,7 @@ class ReadyGroupsTests(unittest.TestCase):
                      patch.object(ready,'check_cancelled',side_effect=[None,None,RuntimeError('cancel')]):
                     with self.assertRaisesRegex(RuntimeError,'cancel'):
                         ready_experts(value,indices,c,0,mx.zeros_like(value),dict(calls=0,groups=0,max_groups=0))
-                self.assertTrue(event.is_set());self.assertFalse(c._speculative_pinned_keys)
+                self.assertTrue(event.is_set());self.assertFalse(c._pinned_expert_keys)
                 self.assertEqual(set(c._entries),{(0,0)});self.assertEqual(len(c._free_slots),11)
 
 

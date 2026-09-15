@@ -73,10 +73,6 @@ class PrefillSlotReleaseTests(unittest.TestCase):
                 with cache.batched_layer(0):
                     with self.assertRaisesRegex(RuntimeError, 'in use'):
                         cache.release_prefill_slots()
-                cache.configure_speculative_scratch(1)
-                with cache.speculative_prefetch({0: [1]}):
-                    with self.assertRaisesRegex(RuntimeError, 'in use'):
-                        cache.release_prefill_slots()
                 self.assertEqual(cache.resident_count, 1)
 
     def test_qwen_pool_releases_and_refills(self):

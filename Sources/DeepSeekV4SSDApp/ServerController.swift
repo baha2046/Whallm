@@ -244,6 +244,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var anePrefillRatio: Double? = 0.25
   var qwenGroupedExperts: Bool?
   var recentExpertCache: Bool?
+  var routeAwareExpertCache: Bool?
   var mtpEnabled: Bool? = false
   var mtpSlots: Int? = 32
   var dsparkEnabled = false
@@ -640,17 +641,14 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let dsparkPromptCache: Bool
       let dsparkConfidenceThreshold: Double
       let dsparkSlots: Int
-      let dsparkHashPrefetch: Bool
-      let dsparkAdaptiveBlock: Bool
       let dsparkFallbackEnabled: Bool
       let dsparkSequentialVerification: Bool
-      let dsparkHybridVerification: Bool
       let expertRouteTrace: String?
       let expertPageCacheProbe: Bool
+      let separatePrefillIO: Bool
       let expertFileCachePolicy: String
       let readyExpertDecode: Bool
       let stagedExpertStreaming: Bool
-      let adaptiveExpertPrefillThreshold: Double?
       let powerSavingLimitGBps: Double?
       let qwenQuantizedKV: Bool
       let qwenQuantizedIndex: Bool
@@ -690,17 +688,14 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case dsparkPromptCache = "dspark_prompt_cache"
         case dsparkConfidenceThreshold = "dspark_confidence_threshold"
         case dsparkSlots = "dspark_slots"
-        case dsparkHashPrefetch = "dspark_hash_prefetch"
-        case dsparkAdaptiveBlock = "dspark_adaptive_block"
         case dsparkFallbackEnabled = "dspark_fallback_enabled"
         case dsparkSequentialVerification = "dspark_sequential_verification"
-        case dsparkHybridVerification = "dspark_hybrid_verification"
         case expertRouteTrace = "expert_route_trace"
         case expertPageCacheProbe = "expert_page_cache_probe"
+        case separatePrefillIO = "separate_prefill_io"
         case expertFileCachePolicy = "expert_file_cache_policy"
         case readyExpertDecode = "ready_expert_decode"
         case stagedExpertStreaming = "staged_expert_streaming"
-        case adaptiveExpertPrefillThreshold = "adaptive_expert_prefill_threshold"
         case powerSavingLimitGBps = "power_saving_limit_gbps"
         case qwenQuantizedKV = "qwen_quantized_kv"
         case qwenQuantizedIndex = "qwen_quantized_index"
@@ -758,27 +753,19 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encode(dsparkPromptCache, forKey: .dsparkPromptCache)
         try values.encode(dsparkConfidenceThreshold, forKey: .dsparkConfidenceThreshold)
         try values.encode(dsparkSlots, forKey: .dsparkSlots)
-        try values.encode(dsparkHashPrefetch, forKey: .dsparkHashPrefetch)
-        try values.encode(dsparkAdaptiveBlock, forKey: .dsparkAdaptiveBlock)
         try values.encode(dsparkFallbackEnabled, forKey: .dsparkFallbackEnabled)
         try values.encode(
           dsparkSequentialVerification, forKey: .dsparkSequentialVerification)
-        try values.encode(dsparkHybridVerification, forKey: .dsparkHybridVerification)
         if let expertRouteTrace {
           try values.encode(expertRouteTrace, forKey: .expertRouteTrace)
         } else {
           try values.encodeNil(forKey: .expertRouteTrace)
         }
         try values.encode(expertPageCacheProbe, forKey: .expertPageCacheProbe)
+        try values.encode(separatePrefillIO, forKey: .separatePrefillIO)
         try values.encode(expertFileCachePolicy, forKey: .expertFileCachePolicy)
         try values.encode(readyExpertDecode, forKey: .readyExpertDecode)
         try values.encode(stagedExpertStreaming, forKey: .stagedExpertStreaming)
-        if let adaptiveExpertPrefillThreshold {
-          try values.encode(
-            adaptiveExpertPrefillThreshold, forKey: .adaptiveExpertPrefillThreshold)
-        } else {
-          try values.encodeNil(forKey: .adaptiveExpertPrefillThreshold)
-        }
         if let powerSavingLimitGBps {
           try values.encode(powerSavingLimitGBps, forKey: .powerSavingLimitGBps)
         } else {

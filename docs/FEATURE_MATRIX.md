@@ -92,7 +92,7 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 | FP8／BF16 KV cache | `--bf16-kv-cache` | 同左 | DeepSeek V4 可選 BF16；其他模型固定 |
 | FP4 index cache | `--no-fp4-index-cache` | 同左 | 固定開啟，沒有控制項 |
 | Ready expert decode | `--no-ready-expert-decode` | 同左 | 三模型皆有開關 |
-| LRU／LFU 專家資料淘汰方式 | `--expert-eviction-policy` | 同左 | Expert cache eviction 選單：LRU／LFU；App 預設 LRU，CLI 預設 LFU |
+| 專家快取淘汰方式 | `--expert-eviction-policy lru\|lfu\|route` | 同左 | Expert cache eviction 選單：LRU／LFU／[路由感知](ROUTE_AWARE_CACHE.md)；App 預設 LRU，CLI 預設 LFU |
 | Prompt cache 模式 | `--prompt-cache off\|memory\|disk` | 同左 | 不使用／記憶體／磁碟；新預設記憶體 |
 | Prompt cache 筆數 | `--prompt-cache-entries` | 同左 | Prompt cache entries；不使用時隱藏 |
 | Prompt cache 記憶體限額 | `--prompt-cache-memory-gib` | 同左 | Prompt cache GiB；不使用時隱藏 |
@@ -118,18 +118,17 @@ Qwen MTP 不使用一般 prompt cache；DeepSeek DSpark 的跨請求重用另由
 | --- | --- | --- | --- |
 | Qwen 下一層預讀 | `--qwen-next-layer-prefetch` | JSON `qwen_next_layer_prefetch` | 進階設定；預設關閉 |
 | DSpark prompt cache | `--dspark-prompt-cache` | 同左 | 固定關閉 |
-| DSpark hash 預讀 | `--dspark-hash-prefetch` | 同左 | 固定關閉 |
-| DSpark adaptive block | `--dspark-adaptive-block` | 同左 | 固定關閉 |
 | DSpark 停止保護 | `--no-dspark-fallback` 關閉保護 | 同左 | 保護固定開啟 |
 | DSpark 逐 token 驗證 | `--dspark-sequential-verification` | 同左 | 固定關閉 |
-| DSpark 混合驗證 | `--dspark-hybrid-verification` | 同左 | 固定關閉 |
 | 專家檔案頁面快取探測 | `--expert-page-cache-probe` | 同左 | 固定關閉 |
+| Prefill／Decode 分開讀取 | `--[no-]separate-prefill-io` | JSON `separate_prefill_io` | 三模型預設啟用 |
 | 專家檔案 cached／bypass | `--expert-file-cache-policy` | 同左 | 固定 cached |
 | 路由追蹤 | `--expert-route-trace` | JSON `expert_route_trace` | 無控制項 |
 | Split-slot prototype | 無旗標 | JSON `staged_expert_streaming` 可解析，受相容檢查 | 固定關閉 |
-| Adaptive expert prefill prototype | 無旗標 | JSON `adaptive_expert_prefill_threshold` 可解析，受相容檢查 | 固定 null |
 
-最後兩項沒有直接 CLI 開關，屬已停止的內部研究原型；JSON 型別接受欄位不等於完整模型驗證。
+Split-slot 沒有直接 CLI 開關，仍屬內部研究原型。
+自適應 Prefill、DSpark hash 預讀／adaptive block／hybrid 驗證已移除；
+[移除範圍與歷史保存](../research/archive/SSD_DIRECTIONS_RETIRED_2026-09-15.md)。
 
 ## Log、效能與 App 功能
 

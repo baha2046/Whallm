@@ -25,7 +25,7 @@ from deepseek_v4_ssd.io_metrics import (
 from deepseek_v4_ssd.manifest import InstalledModel
 
 try:
-    from .benchmark_dspark_adaptive import (
+    from .benchmark_common import (
         _command_output,
         _package_version,
         _runtime_tree_sha256,
@@ -33,7 +33,7 @@ try:
         _sysctl,
     )
 except ImportError:
-    from benchmark_dspark_adaptive import (
+    from benchmark_common import (
         _command_output,
         _package_version,
         _runtime_tree_sha256,

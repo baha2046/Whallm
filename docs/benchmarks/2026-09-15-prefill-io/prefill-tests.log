@@ -1,0 +1,9 @@
+test_catalog_migrates_disabled_retired_settings_and_validates_new_option (runtime.tests.test_prefill_io.PrefillIOTests.test_catalog_migrates_disabled_retired_settings_and_validates_new_option) ... ok
+test_direct_short_read_can_finish_through_aligned_copy_and_eof_is_rejected (runtime.tests.test_prefill_io.PrefillIOTests.test_direct_short_read_can_finish_through_aligned_copy_and_eof_is_rejected) ... ok
+test_three_native_layouts_batched_and_demand_reads_are_byte_exact (runtime.tests.test_prefill_io.PrefillIOTests.test_three_native_layouts_batched_and_demand_reads_are_byte_exact) ... ok
+test_unaligned_short_read_cancel_and_open_failure_release_resources (runtime.tests.test_prefill_io.PrefillIOTests.test_unaligned_short_read_cancel_and_open_failure_release_resources) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.076s
+
+OK

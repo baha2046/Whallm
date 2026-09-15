@@ -17,7 +17,6 @@ from .io_metrics import EXPERT_FILE_CACHE_POLICIES
 from .model import (
     RuntimeConfig,
     _POWER_SAVING_LIMITS_GBPS,
-    _validate_adaptive_expert_prefill_config,
 )
 
 CATALOG_VERSION = 1
@@ -200,12 +199,16 @@ def _parse_model(value: Any, index: int) -> ModelSpec:
 def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
     if isinstance(value, dict):
         value = dict(value)
-        for removed in ("qwen_grouped_decode", "qwen_short_block"):
+        for removed in ("qwen_grouped_decode", "qwen_short_block",
+                        "dspark_hash_prefetch", "dspark_adaptive_block", "dspark_hybrid_verification"):
             if removed in value:
                 if value.pop(removed) is not False:
                     raise ModelCatalogError(f"{prefix}.{removed} has been removed; remove this setting")
+        if "adaptive_expert_prefill_threshold" in value:
+            if value.pop("adaptive_expert_prefill_threshold") is not None:
+                raise ModelCatalogError(f"{prefix}.adaptive_expert_prefill_threshold has been removed; remove this setting")
     names = {field.name for field in fields(RuntimeConfig)}
-    required = names - {'qwen_quantized_kv', 'qwen_quantized_index', 'v41_ced_prefill', 'v41_packed_kv', 'v41_packed_index', 'deepseek_ane_prefill', 'qwen_grouped_experts', 'expert_eviction_policy', 'v41_layer_major_prefill', 'v41_candidate_index', 'v41_next_layer_prefetch'}
+    required = names - {'separate_prefill_io', 'qwen_quantized_kv', 'qwen_quantized_index', 'v41_ced_prefill', 'v41_packed_kv', 'v41_packed_index', 'deepseek_ane_prefill', 'qwen_grouped_experts', 'expert_eviction_policy', 'v41_layer_major_prefill', 'v41_candidate_index', 'v41_next_layer_prefetch'}
     if not isinstance(value, dict) or not required <= set(value) <= names:
         raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
@@ -254,12 +257,10 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
         "dspark_enabled",
         "mtp_enabled",
         "dspark_prompt_cache",
-        "dspark_hash_prefetch",
-        "dspark_adaptive_block",
         "dspark_fallback_enabled",
         "dspark_sequential_verification",
-        "dspark_hybrid_verification",
         "expert_page_cache_probe",
+        "separate_prefill_io",
         "ready_expert_decode",
         "v41_next_layer_prefetch",
         "v41_candidate_index",
@@ -297,33 +298,20 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
             raise ValueError(f"{name} must be a string or null")
     if config.expert_file_cache_policy not in EXPERT_FILE_CACHE_POLICIES:
         raise ValueError("expert_file_cache_policy is not supported")
-    if config.expert_eviction_policy not in ("lfu", "lru"):
-        raise ValueError("expert_eviction_policy must be lfu or lru")
+    if config.expert_eviction_policy not in ("lfu", "lru", "route"):
+        raise ValueError("expert_eviction_policy must be lfu, lru or route")
     for name in (
         "dspark_prompt_cache",
-        "dspark_hash_prefetch",
-        "dspark_adaptive_block",
         "dspark_sequential_verification",
-        "dspark_hybrid_verification",
     ):
         if getattr(config, name) and not config.dspark_enabled:
             raise ValueError(f"{name} requires dspark_enabled")
     if not config.dspark_fallback_enabled and not config.dspark_enabled:
         raise ValueError("dspark_fallback_enabled requires dspark_enabled when false")
-    if config.dspark_sequential_verification and config.dspark_hash_prefetch:
-        raise ValueError(
-            "dspark_sequential_verification cannot use dspark_hash_prefetch"
-        )
-    if config.dspark_hybrid_verification and config.dspark_sequential_verification:
-        raise ValueError(
-            "dspark_hybrid_verification and dspark_sequential_verification "
-            "are mutually exclusive"
-        )
     if config.staged_expert_streaming and not config.ready_expert_decode:
         raise ValueError("staged_expert_streaming requires ready_expert_decode")
     if config.staged_expert_streaming and config.dspark_enabled:
         raise ValueError("staged_expert_streaming does not support dspark_enabled")
-    _validate_adaptive_expert_prefill_config(config)
 
 
 def _parse_defaults(value: Any, prefix: str) -> ModelDefaults:
@@ -601,6 +589,7 @@ class ModelManager:
                     "fp4_index_cache": config.fp4_index_cache,
                     "expert_page_cache_probe": config.expert_page_cache_probe,
                     "expert_file_cache_policy": config.expert_file_cache_policy,
+                    "separate_prefill_io": config.separate_prefill_io,
                     "expert_eviction_policy": config.expert_eviction_policy,
                     "expert_file_direct_io_alignment_bytes": getattr(
                         cache, "direct_io_alignment", 0
@@ -610,17 +599,9 @@ class ModelManager:
                         getattr(getattr(runtime, "model", None), "dspark", None)
                     ),
                     "dspark_prompt_cache": config.dspark_prompt_cache,
-                    "dspark_hash_prefetch": config.dspark_hash_prefetch,
-                    "dspark_adaptive_block": config.dspark_adaptive_block,
                     "dspark_fallback_enabled": config.dspark_fallback_enabled,
                     "dspark_sequential_verification": (
                         config.dspark_sequential_verification
-                    ),
-                    "dspark_hybrid_verification": (
-                        config.dspark_hybrid_verification
-                    ),
-                    "dspark_hash_prefetch_scratch_slots": getattr(
-                        cache, "speculative_slots", 0
                     ),
                     "dspark_confidence_threshold": config.dspark_confidence_threshold,
                     "dspark_slots": config.dspark_slots,

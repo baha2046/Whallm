@@ -95,8 +95,6 @@ def _route_phase(expert_cache, phase: str):
     return trace_routes(phase) if callable(trace_routes) else nullcontext()
 
 
-
-
 @contextmanager
 def _approximation_mode(runtime: Any, mode: str):
     if mode not in APPROXIMATION_MODES:
@@ -334,14 +332,8 @@ class RuntimeMetrics:
         self._dspark_block_attention_layers = 0
         self._dspark_block_verification_rounds = 0
         self._dspark_sequential_verification_rounds = 0
-        self._dspark_hybrid_verification_rounds = 0
-        self._dspark_hybrid_attention_layers = 0
-        self._dspark_hybrid_attention_token_calls = 0
-        self._dspark_hybrid_ffn_token_calls = 0
-        self._dspark_hybrid_moe_token_calls = 0
         self._dspark_last_verification_mode = ""
         self._dspark_last_sequential_position_seconds: tuple[float, ...] = ()
-        self._dspark_last_hybrid_verification_positions = 0
         self._dspark_last_layer_seconds: tuple[float, ...] = ()
         self._dspark_confidence_sum = 0.0
         self._dspark_confidence_count = 0
@@ -365,50 +357,6 @@ class RuntimeMetrics:
         self._dspark_verification_expert_bytes_read = 0
         self._dspark_replay_expert_bytes_read = 0
         self._dspark_verification_expert_read_seconds = 0.0
-        self._dspark_hash_prefetch_requested_experts = 0
-        self._dspark_hash_prefetch_cache_resident_experts = 0
-        self._dspark_hash_prefetch_experts_read = 0
-        self._dspark_hash_prefetch_bytes_read = 0
-        self._dspark_hash_prefetch_useful_bytes = 0
-        self._dspark_hash_prefetch_wasted_bytes = 0
-        self._dspark_hash_prefetch_page_cache_classified_bytes = 0
-        self._dspark_hash_prefetch_page_cache_resident_bytes_before_read = 0
-        self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read = 0
-        self._dspark_hash_prefetch_page_cache_unclassified_bytes = 0
-        self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read = 0
-        self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read = 0
-        self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes = 0
-        self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read = 0
-        self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read = 0
-        self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes = 0
-        self._dspark_hash_prefetch_read_seconds = 0.0
-        self._dspark_hash_prefetch_wait_seconds = 0.0
-        self._dspark_hash_prefetch_plan_seconds = 0.0
-        self._dspark_last_hash_prefetch_layer_ids: tuple[int, ...] = ()
-        self._dspark_last_hash_prefetch_layer_union_counts: tuple[int, ...] = ()
-        self._dspark_adaptive_block_decisions = 0
-        self._dspark_adaptive_block_original_tokens = 0
-        self._dspark_adaptive_block_selected_tokens = 0
-        self._dspark_adaptive_block_expected_committed = 0.0
-        self._dspark_adaptive_block_requested_hash_experts = 0
-        self._dspark_adaptive_block_resident_hash_experts = 0
-        self._dspark_adaptive_block_missing_hash_experts = 0
-        self._dspark_adaptive_block_predicted_hash_bytes = 0
-        self._dspark_adaptive_block_high_confidence_full_decisions = 0
-        self._dspark_adaptive_block_storage_score_decisions = 0
-        self._dspark_adaptive_block_full_block_decisions = 0
-        self._dspark_adaptive_block_selected_length_counts: dict[int, int] = {}
-        self._dspark_last_adaptive_block_selected_score = 0.0
-        self._dspark_last_adaptive_block_selection_reason = ""
-        self._dspark_last_adaptive_block_full_commit_fraction = 0.0
-        self._dspark_adaptive_block_plan_seconds = 0.0
-        self._dspark_last_adaptive_block_candidate_tokens: tuple[int, ...] = ()
-        self._dspark_last_adaptive_block_expected_committed: tuple[float, ...] = ()
-        self._dspark_last_adaptive_block_requested_hash_experts: tuple[int, ...] = ()
-        self._dspark_last_adaptive_block_resident_hash_experts: tuple[int, ...] = ()
-        self._dspark_last_adaptive_block_missing_hash_experts: tuple[int, ...] = ()
-        self._dspark_last_adaptive_block_predicted_hash_bytes: tuple[int, ...] = ()
-        self._dspark_last_adaptive_block_scores: tuple[float, ...] = ()
         self._dspark_last_expert_union_layer_ids: tuple[int, ...] = ()
         self._dspark_last_layer_routed_expert_assignments: tuple[int, ...] = ()
         self._dspark_last_layer_expert_union_counts: tuple[int, ...] = ()
@@ -494,14 +442,8 @@ class RuntimeMetrics:
             self._dspark_block_attention_layers = 0
             self._dspark_block_verification_rounds = 0
             self._dspark_sequential_verification_rounds = 0
-            self._dspark_hybrid_verification_rounds = 0
-            self._dspark_hybrid_attention_layers = 0
-            self._dspark_hybrid_attention_token_calls = 0
-            self._dspark_hybrid_ffn_token_calls = 0
-            self._dspark_hybrid_moe_token_calls = 0
             self._dspark_last_verification_mode = ""
             self._dspark_last_sequential_position_seconds = ()
-            self._dspark_last_hybrid_verification_positions = 0
             self._dspark_last_layer_seconds = ()
             self._dspark_confidence_sum = 0.0
             self._dspark_confidence_count = 0
@@ -525,50 +467,6 @@ class RuntimeMetrics:
             self._dspark_verification_expert_bytes_read = 0
             self._dspark_replay_expert_bytes_read = 0
             self._dspark_verification_expert_read_seconds = 0.0
-            self._dspark_hash_prefetch_requested_experts = 0
-            self._dspark_hash_prefetch_cache_resident_experts = 0
-            self._dspark_hash_prefetch_experts_read = 0
-            self._dspark_hash_prefetch_bytes_read = 0
-            self._dspark_hash_prefetch_useful_bytes = 0
-            self._dspark_hash_prefetch_wasted_bytes = 0
-            self._dspark_hash_prefetch_page_cache_classified_bytes = 0
-            self._dspark_hash_prefetch_page_cache_resident_bytes_before_read = 0
-            self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read = 0
-            self._dspark_hash_prefetch_page_cache_unclassified_bytes = 0
-            self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read = 0
-            self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read = 0
-            self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes = 0
-            self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read = 0
-            self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read = 0
-            self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes = 0
-            self._dspark_hash_prefetch_read_seconds = 0.0
-            self._dspark_hash_prefetch_wait_seconds = 0.0
-            self._dspark_hash_prefetch_plan_seconds = 0.0
-            self._dspark_last_hash_prefetch_layer_ids = ()
-            self._dspark_last_hash_prefetch_layer_union_counts = ()
-            self._dspark_adaptive_block_decisions = 0
-            self._dspark_adaptive_block_original_tokens = 0
-            self._dspark_adaptive_block_selected_tokens = 0
-            self._dspark_adaptive_block_expected_committed = 0.0
-            self._dspark_adaptive_block_requested_hash_experts = 0
-            self._dspark_adaptive_block_resident_hash_experts = 0
-            self._dspark_adaptive_block_missing_hash_experts = 0
-            self._dspark_adaptive_block_predicted_hash_bytes = 0
-            self._dspark_adaptive_block_high_confidence_full_decisions = 0
-            self._dspark_adaptive_block_storage_score_decisions = 0
-            self._dspark_adaptive_block_full_block_decisions = 0
-            self._dspark_adaptive_block_selected_length_counts = {}
-            self._dspark_last_adaptive_block_selected_score = 0.0
-            self._dspark_last_adaptive_block_selection_reason = ""
-            self._dspark_last_adaptive_block_full_commit_fraction = 0.0
-            self._dspark_adaptive_block_plan_seconds = 0.0
-            self._dspark_last_adaptive_block_candidate_tokens = ()
-            self._dspark_last_adaptive_block_expected_committed = ()
-            self._dspark_last_adaptive_block_requested_hash_experts = ()
-            self._dspark_last_adaptive_block_resident_hash_experts = ()
-            self._dspark_last_adaptive_block_missing_hash_experts = ()
-            self._dspark_last_adaptive_block_predicted_hash_bytes = ()
-            self._dspark_last_adaptive_block_scores = ()
             self._dspark_last_expert_union_layer_ids = ()
             self._dspark_last_layer_routed_expert_assignments = ()
             self._dspark_last_layer_expert_union_counts = ()
@@ -666,30 +564,13 @@ class RuntimeMetrics:
             self._dspark_block_attention_layers += (
                 verification.block_attention_layers
             )
-            self._dspark_hybrid_attention_layers += (
-                verification.hybrid_attention_layers
-            )
-            self._dspark_hybrid_attention_token_calls += (
-                verification.hybrid_attention_token_calls
-            )
-            self._dspark_hybrid_ffn_token_calls += (
-                verification.hybrid_ffn_token_calls
-            )
-            self._dspark_hybrid_moe_token_calls += (
-                verification.hybrid_moe_token_calls
-            )
             if verification.verification_mode == "block":
                 self._dspark_block_verification_rounds += 1
             elif verification.verification_mode == "sequential":
                 self._dspark_sequential_verification_rounds += 1
-            elif verification.verification_mode == "hybrid":
-                self._dspark_hybrid_verification_rounds += 1
             self._dspark_last_verification_mode = verification.verification_mode
             self._dspark_last_sequential_position_seconds = (
                 verification.sequential_position_seconds
-            )
-            self._dspark_last_hybrid_verification_positions = (
-                verification.hybrid_verification_positions
             )
             self._dspark_last_layer_seconds = verification.layer_seconds
             self._dspark_confidence_sum += sum(draft.confidence)
@@ -730,21 +611,6 @@ class RuntimeMetrics:
                     "sequential_verification_positions": (
                         verification.sequential_verification_positions
                     ),
-                    "hybrid_verification_positions": (
-                        verification.hybrid_verification_positions
-                    ),
-                    "adaptive_original_tokens": (
-                        verification.adaptive_block_original_tokens
-                    ),
-                    "adaptive_selected_tokens": (
-                        verification.adaptive_block_selected_tokens
-                    ),
-                    "adaptive_selection_reason": (
-                        verification.adaptive_block_selection_reason
-                    ),
-                    "adaptive_full_commit_fraction": (
-                        verification.adaptive_block_full_commit_fraction
-                    ),
                     "fallback_cost_ratio": verification.fallback_cost_ratio,
                     "fallback_would_trigger": (
                         verification.fallback_would_trigger
@@ -775,147 +641,6 @@ class RuntimeMetrics:
             )
             self._dspark_verification_expert_read_seconds += (
                 verification.expert_read_seconds
-            )
-            self._dspark_hash_prefetch_requested_experts += (
-                verification.hash_prefetch_requested_experts
-            )
-            self._dspark_hash_prefetch_cache_resident_experts += (
-                verification.hash_prefetch_cache_resident_experts
-            )
-            self._dspark_hash_prefetch_experts_read += (
-                verification.hash_prefetch_experts_read
-            )
-            self._dspark_hash_prefetch_bytes_read += (
-                verification.hash_prefetch_bytes_read
-            )
-            self._dspark_hash_prefetch_useful_bytes += (
-                verification.hash_prefetch_useful_bytes
-            )
-            self._dspark_hash_prefetch_wasted_bytes += (
-                verification.hash_prefetch_wasted_bytes
-            )
-            self._dspark_hash_prefetch_page_cache_classified_bytes += (
-                verification.hash_prefetch_page_cache_classified_bytes
-            )
-            self._dspark_hash_prefetch_page_cache_resident_bytes_before_read += (
-                verification.hash_prefetch_page_cache_resident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read += (
-                verification.hash_prefetch_page_cache_nonresident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_page_cache_unclassified_bytes += (
-                verification.hash_prefetch_page_cache_unclassified_bytes
-            )
-            self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read += (
-                verification.hash_prefetch_useful_page_cache_resident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read += (
-                verification.hash_prefetch_useful_page_cache_nonresident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes += (
-                verification.hash_prefetch_useful_page_cache_unclassified_bytes
-            )
-            self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read += (
-                verification.hash_prefetch_wasted_page_cache_resident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read += (
-                verification.hash_prefetch_wasted_page_cache_nonresident_bytes_before_read
-            )
-            self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes += (
-                verification.hash_prefetch_wasted_page_cache_unclassified_bytes
-            )
-            self._dspark_hash_prefetch_read_seconds += (
-                verification.hash_prefetch_read_seconds
-            )
-            self._dspark_hash_prefetch_wait_seconds += (
-                verification.hash_prefetch_wait_seconds
-            )
-            self._dspark_hash_prefetch_plan_seconds += (
-                verification.hash_prefetch_plan_seconds
-            )
-            self._dspark_last_hash_prefetch_layer_ids = (
-                verification.hash_prefetch_layer_ids
-            )
-            self._dspark_last_hash_prefetch_layer_union_counts = (
-                verification.hash_prefetch_layer_union_counts
-            )
-            if verification.adaptive_block_candidate_tokens:
-                self._dspark_adaptive_block_decisions += 1
-                if (
-                    verification.adaptive_block_selection_reason
-                    == "high_confidence_full"
-                ):
-                    self._dspark_adaptive_block_high_confidence_full_decisions += 1
-                elif verification.adaptive_block_selection_reason == "storage_score":
-                    self._dspark_adaptive_block_storage_score_decisions += 1
-                if (
-                    verification.adaptive_block_selected_tokens
-                    == verification.adaptive_block_original_tokens
-                ):
-                    self._dspark_adaptive_block_full_block_decisions += 1
-                selected_tokens = verification.adaptive_block_selected_tokens
-                self._dspark_adaptive_block_selected_length_counts[
-                    selected_tokens
-                ] = (
-                    self._dspark_adaptive_block_selected_length_counts.get(
-                        selected_tokens,
-                        0,
-                    )
-                    + 1
-                )
-                self._dspark_last_adaptive_block_selected_score = (
-                    verification.adaptive_block_selected_score
-                )
-                self._dspark_last_adaptive_block_selection_reason = (
-                    verification.adaptive_block_selection_reason
-                )
-                self._dspark_last_adaptive_block_full_commit_fraction = (
-                    verification.adaptive_block_full_commit_fraction
-                )
-                self._dspark_last_adaptive_block_candidate_tokens = (
-                    verification.adaptive_block_candidate_tokens
-                )
-                self._dspark_last_adaptive_block_expected_committed = (
-                    verification.adaptive_block_candidate_expected_committed
-                )
-                self._dspark_last_adaptive_block_requested_hash_experts = (
-                    verification.adaptive_block_candidate_requested_hash_experts
-                )
-                self._dspark_last_adaptive_block_resident_hash_experts = (
-                    verification.adaptive_block_candidate_resident_hash_experts
-                )
-                self._dspark_last_adaptive_block_missing_hash_experts = (
-                    verification.adaptive_block_candidate_missing_hash_experts
-                )
-                self._dspark_last_adaptive_block_predicted_hash_bytes = (
-                    verification.adaptive_block_candidate_predicted_hash_bytes
-                )
-                self._dspark_last_adaptive_block_scores = (
-                    verification.adaptive_block_candidate_scores
-                )
-            self._dspark_adaptive_block_original_tokens += (
-                verification.adaptive_block_original_tokens
-            )
-            self._dspark_adaptive_block_selected_tokens += (
-                verification.adaptive_block_selected_tokens
-            )
-            self._dspark_adaptive_block_expected_committed += (
-                verification.adaptive_block_selected_expected_committed
-            )
-            self._dspark_adaptive_block_requested_hash_experts += (
-                verification.adaptive_block_selected_requested_hash_experts
-            )
-            self._dspark_adaptive_block_resident_hash_experts += (
-                verification.adaptive_block_selected_resident_hash_experts
-            )
-            self._dspark_adaptive_block_missing_hash_experts += (
-                verification.adaptive_block_selected_missing_hash_experts
-            )
-            self._dspark_adaptive_block_predicted_hash_bytes += (
-                verification.adaptive_block_selected_predicted_hash_bytes
-            )
-            self._dspark_adaptive_block_plan_seconds += (
-                verification.adaptive_block_plan_seconds
             )
             self._dspark_last_expert_union_layer_ids = (
                 verification.layer_expert_union_layer_ids
@@ -1173,30 +898,6 @@ class RuntimeMetrics:
                 "request_expert_union_misses": (
                     self._expert_request.expert_union_misses
                 ),
-                "request_speculative_prefetch_rounds": (
-                    self._expert_request.speculative_prefetch_rounds
-                ),
-                "request_speculative_prefetch_requested_experts": (
-                    self._expert_request.speculative_prefetch_requested_experts
-                ),
-                "request_speculative_prefetch_cache_resident_experts": (
-                    self._expert_request.speculative_prefetch_cache_resident_experts
-                ),
-                "request_speculative_prefetch_experts_read": (
-                    self._expert_request.speculative_prefetch_experts_read
-                ),
-                "request_speculative_prefetch_bytes_read": (
-                    self._expert_request.speculative_prefetch_bytes_read
-                ),
-                "request_speculative_prefetch_read_seconds": (
-                    self._expert_request.speculative_prefetch_read_seconds
-                ),
-                "request_speculative_prefetch_wait_seconds": (
-                    self._expert_request.speculative_prefetch_wait_seconds
-                ),
-                "request_speculative_scratch_hits": (
-                    self._expert_request.speculative_scratch_hits
-                ),
                 "request_staged_expert_reads": (
                     self._expert_request.staged_expert_reads
                 ),
@@ -1214,30 +915,6 @@ class RuntimeMetrics:
                 ),
                 "request_staged_first_stage_submit_seconds": (
                     self._expert_request.staged_first_stage_submit_seconds
-                ),
-                "request_adaptive_prefill_planned_layers": (
-                    self._expert_request.adaptive_prefill_planned_layers
-                ),
-                "request_adaptive_prefill_full_layers": (
-                    self._expert_request.adaptive_prefill_full_layers
-                ),
-                "request_adaptive_prefill_selective_layers": (
-                    self._expert_request.adaptive_prefill_selective_layers
-                ),
-                "request_adaptive_prefill_union_experts": (
-                    self._expert_request.adaptive_prefill_union_experts
-                ),
-                "request_adaptive_prefill_read_experts": (
-                    self._expert_request.adaptive_prefill_read_experts
-                ),
-                "request_adaptive_prefill_bytes_read": (
-                    self._expert_request.adaptive_prefill_bytes_read
-                ),
-                "request_adaptive_prefill_avoided_bytes": (
-                    self._expert_request.adaptive_prefill_avoided_bytes
-                ),
-                "request_adaptive_prefill_plan_seconds": (
-                    self._expert_request.adaptive_prefill_plan_seconds
                 ),
                 "mtp_enabled": self._mtp_enabled,
                 "mtp_fallback": self._mtp_fallback,
@@ -1359,29 +1036,11 @@ class RuntimeMetrics:
                 "dspark_sequential_verification_rounds": (
                     self._dspark_sequential_verification_rounds
                 ),
-                "dspark_hybrid_verification_rounds": (
-                    self._dspark_hybrid_verification_rounds
-                ),
-                "dspark_hybrid_attention_layers": (
-                    self._dspark_hybrid_attention_layers
-                ),
-                "dspark_hybrid_attention_token_calls": (
-                    self._dspark_hybrid_attention_token_calls
-                ),
-                "dspark_hybrid_ffn_token_calls": (
-                    self._dspark_hybrid_ffn_token_calls
-                ),
-                "dspark_hybrid_moe_token_calls": (
-                    self._dspark_hybrid_moe_token_calls
-                ),
                 "dspark_last_verification_mode": (
                     self._dspark_last_verification_mode
                 ),
                 "dspark_last_sequential_position_seconds": (
                     self._dspark_last_sequential_position_seconds
-                ),
-                "dspark_last_hybrid_verification_positions": (
-                    self._dspark_last_hybrid_verification_positions
                 ),
                 "dspark_last_verification_layer_seconds": (
                     self._dspark_last_layer_seconds
@@ -1427,168 +1086,6 @@ class RuntimeMetrics:
                 ),
                 "dspark_target_expert_read_seconds": (
                     self._dspark_verification_expert_read_seconds
-                ),
-                "dspark_hash_prefetch_requested_experts": (
-                    self._dspark_hash_prefetch_requested_experts
-                ),
-                "dspark_hash_prefetch_cache_resident_experts": (
-                    self._dspark_hash_prefetch_cache_resident_experts
-                ),
-                "dspark_hash_prefetch_experts_read": (
-                    self._dspark_hash_prefetch_experts_read
-                ),
-                "dspark_hash_prefetch_bytes_read": (
-                    self._dspark_hash_prefetch_bytes_read
-                ),
-                "dspark_hash_prefetch_useful_bytes": (
-                    self._dspark_hash_prefetch_useful_bytes
-                ),
-                "dspark_hash_prefetch_wasted_bytes": (
-                    self._dspark_hash_prefetch_wasted_bytes
-                ),
-                "dspark_hash_prefetch_page_cache_classified_bytes": (
-                    self._dspark_hash_prefetch_page_cache_classified_bytes
-                ),
-                "dspark_hash_prefetch_page_cache_resident_bytes_before_read": (
-                    self._dspark_hash_prefetch_page_cache_resident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_page_cache_nonresident_bytes_before_read": (
-                    self._dspark_hash_prefetch_page_cache_nonresident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_page_cache_unclassified_bytes": (
-                    self._dspark_hash_prefetch_page_cache_unclassified_bytes
-                ),
-                "dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read": (
-                    self._dspark_hash_prefetch_useful_page_cache_resident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read": (
-                    self._dspark_hash_prefetch_useful_page_cache_nonresident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_useful_page_cache_unclassified_bytes": (
-                    self._dspark_hash_prefetch_useful_page_cache_unclassified_bytes
-                ),
-                "dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read": (
-                    self._dspark_hash_prefetch_wasted_page_cache_resident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read": (
-                    self._dspark_hash_prefetch_wasted_page_cache_nonresident_bytes_before_read
-                ),
-                "dspark_hash_prefetch_wasted_page_cache_unclassified_bytes": (
-                    self._dspark_hash_prefetch_wasted_page_cache_unclassified_bytes
-                ),
-                "dspark_hash_prefetch_on_demand_expert_bytes_read": max(
-                    0,
-                    self._dspark_target_expert_bytes_read
-                    - self._dspark_hash_prefetch_bytes_read,
-                ),
-                "dspark_hash_prefetch_read_seconds": (
-                    self._dspark_hash_prefetch_read_seconds
-                ),
-                "dspark_hash_prefetch_wait_seconds": (
-                    self._dspark_hash_prefetch_wait_seconds
-                ),
-                "dspark_hash_prefetch_plan_seconds": (
-                    self._dspark_hash_prefetch_plan_seconds
-                ),
-                "dspark_hash_prefetch_useful_rate": (
-                    self._dspark_hash_prefetch_useful_bytes
-                    / self._dspark_hash_prefetch_bytes_read
-                    if self._dspark_hash_prefetch_bytes_read
-                    else 0.0
-                ),
-                "dspark_hash_prefetch_bytes_per_committed_token": (
-                    self._dspark_hash_prefetch_bytes_read
-                    / self._dspark_committed_tokens
-                    if self._dspark_committed_tokens
-                    else 0.0
-                ),
-                "dspark_last_hash_prefetch_layer_ids": (
-                    self._dspark_last_hash_prefetch_layer_ids
-                ),
-                "dspark_last_hash_prefetch_union_by_layer": (
-                    self._dspark_last_hash_prefetch_layer_union_counts
-                ),
-                "dspark_adaptive_block_decisions": (
-                    self._dspark_adaptive_block_decisions
-                ),
-                "dspark_adaptive_block_original_tokens": (
-                    self._dspark_adaptive_block_original_tokens
-                ),
-                "dspark_adaptive_block_selected_tokens": (
-                    self._dspark_adaptive_block_selected_tokens
-                ),
-                "dspark_adaptive_block_expected_committed": (
-                    self._dspark_adaptive_block_expected_committed
-                ),
-                "dspark_adaptive_block_requested_hash_experts": (
-                    self._dspark_adaptive_block_requested_hash_experts
-                ),
-                "dspark_adaptive_block_resident_hash_experts": (
-                    self._dspark_adaptive_block_resident_hash_experts
-                ),
-                "dspark_adaptive_block_missing_hash_experts": (
-                    self._dspark_adaptive_block_missing_hash_experts
-                ),
-                "dspark_adaptive_block_predicted_hash_bytes": (
-                    self._dspark_adaptive_block_predicted_hash_bytes
-                ),
-                "dspark_adaptive_block_high_confidence_full_decisions": (
-                    self._dspark_adaptive_block_high_confidence_full_decisions
-                ),
-                "dspark_adaptive_block_storage_score_decisions": (
-                    self._dspark_adaptive_block_storage_score_decisions
-                ),
-                "dspark_adaptive_block_full_block_decisions": (
-                    self._dspark_adaptive_block_full_block_decisions
-                ),
-                "dspark_adaptive_block_selected_length_counts": tuple(
-                    sorted(
-                        self._dspark_adaptive_block_selected_length_counts.items()
-                    )
-                ),
-                "dspark_adaptive_block_predicted_hash_bytes_per_committed_token": (
-                    self._dspark_adaptive_block_predicted_hash_bytes
-                    / self._dspark_committed_tokens
-                    if self._dspark_committed_tokens
-                    else 0.0
-                ),
-                "dspark_last_adaptive_block_selected_score": (
-                    self._dspark_last_adaptive_block_selected_score
-                ),
-                "dspark_last_adaptive_block_selection_reason": (
-                    self._dspark_last_adaptive_block_selection_reason
-                ),
-                "dspark_last_adaptive_block_full_commit_fraction": (
-                    self._dspark_last_adaptive_block_full_commit_fraction
-                ),
-                "dspark_adaptive_block_trimmed_tokens": max(
-                    0,
-                    self._dspark_adaptive_block_original_tokens
-                    - self._dspark_adaptive_block_selected_tokens,
-                ),
-                "dspark_adaptive_block_plan_seconds": (
-                    self._dspark_adaptive_block_plan_seconds
-                ),
-                "dspark_last_adaptive_block_candidate_tokens": (
-                    self._dspark_last_adaptive_block_candidate_tokens
-                ),
-                "dspark_last_adaptive_block_expected_committed": (
-                    self._dspark_last_adaptive_block_expected_committed
-                ),
-                "dspark_last_adaptive_block_requested_hash_experts": (
-                    self._dspark_last_adaptive_block_requested_hash_experts
-                ),
-                "dspark_last_adaptive_block_resident_hash_experts": (
-                    self._dspark_last_adaptive_block_resident_hash_experts
-                ),
-                "dspark_last_adaptive_block_missing_hash_experts": (
-                    self._dspark_last_adaptive_block_missing_hash_experts
-                ),
-                "dspark_last_adaptive_block_predicted_hash_bytes": (
-                    self._dspark_last_adaptive_block_predicted_hash_bytes
-                ),
-                "dspark_last_adaptive_block_scores": (
-                    self._dspark_last_adaptive_block_scores
                 ),
                 "dspark_draft_expert_bytes_read": dspark_expert.bytes_read,
                 "dspark_draft_page_cache_probe_calls": (
@@ -1808,6 +1305,11 @@ class ModelRuntime:
                     options = replace(options, max_tokens=available_tokens)
                 dspark = getattr(self.model, "dspark", None)
                 mtp = getattr(self.model, "mtp", None)
+                for cache in (self.expert_cache, getattr(dspark, "expert_cache", None),
+                              getattr(mtp, "expert_cache", None)):
+                    begin_request = getattr(cache, "begin_route_request", None)
+                    if callable(begin_request):
+                        begin_request()
                 dspark_prompt_cache_enabled = bool(
                     dspark is not None
                     and getattr(self.config, "dspark_prompt_cache", False)
@@ -2067,7 +1569,11 @@ class ModelRuntime:
                 check_cancelled()
                 started = time.perf_counter()
                 try:
-                    token, _ = next(responses)
+                    phase = "prefill" if generation_tokens == 0 else "decode"
+                    with _route_phase(self.expert_cache, phase), _route_phase(
+                        getattr(mtp, "expert_cache", None), phase
+                    ):
+                        token, _ = next(responses)
                 except StopIteration:
                     break
                 check_cancelled()
@@ -2132,16 +1638,8 @@ class ModelRuntime:
                 record_round=self.metrics.record_dspark_round,
                 record_fallback=self.metrics.record_dspark_fallback,
                 target_expert_cache=self.expert_cache,
-                hash_prefetch=getattr(
-                    self.config,
-                    "dspark_hash_prefetch",
-                    False,
-                ),
-                adaptive_block=getattr(
-                    self.config,
-                    "dspark_adaptive_block",
-                    False,
-                ),
+
+
                 fallback_enabled=getattr(
                     self.config,
                     "dspark_fallback_enabled",
@@ -2152,11 +1650,7 @@ class ModelRuntime:
                     "dspark_sequential_verification",
                     False,
                 ),
-                hybrid_verification=getattr(
-                    self.config,
-                    "dspark_hybrid_verification",
-                    False,
-                ),
+
                 prefilled_tokens=prefilled_tokens,
                 record_prefill_snapshot=(
                     lambda processed, target_cache, context_state: (
@@ -2182,7 +1676,11 @@ class ModelRuntime:
                 check_cancelled()
                 started = time.perf_counter()
                 try:
-                    token, _, _ = next(responses)
+                    phase = "prefill" if generation_tokens == 0 else "decode"
+                    with _route_phase(self.expert_cache, phase), _route_phase(
+                        getattr(dspark, "expert_cache", None), phase
+                    ):
+                        token, _, _ = next(responses)
                 except StopIteration:
                     break
                 check_cancelled()
@@ -2234,9 +1732,13 @@ class ModelRuntime:
                     getattr(self.config, "prefill_step_size", 128),
                     len(tokens) - 1,
                 )
-                self.support.prefill(
-                    self.model, tokens[:-1], cache, step_size, self.expert_cache, self.config,
-                )
+                begin_request = getattr(self.expert_cache, "begin_route_request", None)
+                if callable(begin_request):
+                    begin_request()
+                with _route_phase(self.expert_cache, "prefill"):
+                    self.support.prefill(
+                        self.model, tokens[:-1], cache, step_size, self.expert_cache, self.config,
+                    )
                 self._store_prompt_cache(
                     _PromptCacheEntry(cache, tokens[:-1]),
                     persist=True,

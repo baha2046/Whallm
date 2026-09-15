@@ -20,7 +20,6 @@ class DeepSeekV4Support(ModelSupport):
             model, tokens, cache, step_size, expert_cache,
             getattr(config, "moe_prefill_step_size", 0),
             getattr(config, "batched_expert_prefill", True),
-            getattr(config, "adaptive_expert_prefill_threshold", None),
         )
 
     def open_codec(self, root, tokenizer):
@@ -144,6 +143,7 @@ def _load(installed_model, config, raw_config, common_weights, read_limiter):
         read_limiter=read_limiter,
         page_cache_probe=config.expert_page_cache_probe,
         file_cache_policy=config.expert_file_cache_policy,
+        separate_prefill_io=getattr(config, "separate_prefill_io", True),
         eviction_policy=config.expert_eviction_policy,
         staged_expert_streaming=config.staged_expert_streaming,
     )
@@ -169,40 +169,6 @@ def _load(installed_model, config, raw_config, common_weights, read_limiter):
                 raise ValueError("DSpark sequential verification requires DSpark")
             if not installed_model.has_dspark:
                 raise ValueError("installed model does not contain DSpark")
-            if config.dspark_hash_prefetch:
-                raise ValueError(
-                    "DSpark sequential verification cannot use hash prefetch"
-                )
-        if config.dspark_hybrid_verification:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark hybrid verification requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            if config.dspark_sequential_verification:
-                raise ValueError(
-                    "DSpark hybrid and sequential verification are mutually exclusive"
-                )
-        if config.dspark_adaptive_block:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark adaptive block scheduling requires DSpark")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            if int(getattr(args, "num_hash_layers", 0)) < 1:
-                raise ValueError(
-                    "DSpark adaptive block scheduling requires target hash layers"
-                )
-        if config.dspark_hash_prefetch:
-            if not config.dspark_enabled:
-                raise ValueError("DSpark hash prefetch requires DSpark to be enabled")
-            if not installed_model.has_dspark:
-                raise ValueError("installed model does not contain DSpark")
-            hash_layers = min(args.num_hash_layers, installed_model.layer_count)
-            scratch_slots = (
-                hash_layers
-                * installed_model.selected_expert_count
-                * (installed_model.dspark_block_size + 1)
-            )
-            cache.configure_speculative_scratch(scratch_slots)
         for layer_index, layer in enumerate(model.layers):
             layer.ffn.switch_mlp = _StreamingSwitchGLU(
                 layer_index,

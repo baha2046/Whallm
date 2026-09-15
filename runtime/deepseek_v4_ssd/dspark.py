@@ -17,7 +17,6 @@ from .expert_cache import (
     CacheMetrics,
     ExpertCache,
     ExpertUnionProfile,
-    SpeculativePrefetchMetrics,
 )
 
 
@@ -192,11 +191,6 @@ class VerificationMetrics:
     verification_mode: str = "single"
     sequential_verification_positions: int = 0
     sequential_position_seconds: tuple[float, ...] = ()
-    hybrid_verification_positions: int = 0
-    hybrid_attention_layers: int = 0
-    hybrid_attention_token_calls: int = 0
-    hybrid_ffn_token_calls: int = 0
-    hybrid_moe_token_calls: int = 0
     committed_tokens: int | None = None
     output_budget_trimmed_tokens: int = 0
     fallback_target_step_seconds: float = 0.0
@@ -225,213 +219,12 @@ class VerificationMetrics:
     layer_routed_expert_assignments: tuple[int, ...] = ()
     layer_expert_union_counts: tuple[int, ...] = ()
     layer_expert_union_misses: tuple[int, ...] = ()
-    hash_prefetch_requested_experts: int = 0
-    hash_prefetch_cache_resident_experts: int = 0
-    hash_prefetch_experts_read: int = 0
-    hash_prefetch_bytes_read: int = 0
-    hash_prefetch_useful_bytes: int = 0
-    hash_prefetch_wasted_bytes: int = 0
-    hash_prefetch_page_cache_classified_bytes: int = 0
-    hash_prefetch_page_cache_resident_bytes_before_read: int = 0
-    hash_prefetch_page_cache_nonresident_bytes_before_read: int = 0
-    hash_prefetch_page_cache_unclassified_bytes: int = 0
-    hash_prefetch_useful_page_cache_resident_bytes_before_read: int = 0
-    hash_prefetch_useful_page_cache_nonresident_bytes_before_read: int = 0
-    hash_prefetch_useful_page_cache_unclassified_bytes: int = 0
-    hash_prefetch_wasted_page_cache_resident_bytes_before_read: int = 0
-    hash_prefetch_wasted_page_cache_nonresident_bytes_before_read: int = 0
-    hash_prefetch_wasted_page_cache_unclassified_bytes: int = 0
-    hash_prefetch_read_seconds: float = 0.0
-    hash_prefetch_wait_seconds: float = 0.0
-    hash_prefetch_plan_seconds: float = 0.0
-    hash_prefetch_layer_ids: tuple[int, ...] = ()
-    hash_prefetch_layer_union_counts: tuple[int, ...] = ()
-    adaptive_block_original_tokens: int = 0
-    adaptive_block_selected_tokens: int = 0
-    adaptive_block_selected_expected_committed: float = 0.0
-    adaptive_block_selected_requested_hash_experts: int = 0
-    adaptive_block_selected_resident_hash_experts: int = 0
-    adaptive_block_selected_missing_hash_experts: int = 0
-    adaptive_block_selected_predicted_hash_bytes: int = 0
-    adaptive_block_selected_score: float = 0.0
-    adaptive_block_selection_reason: str = ""
-    adaptive_block_full_commit_fraction: float = 0.0
-    adaptive_block_plan_seconds: float = 0.0
-    adaptive_block_candidate_tokens: tuple[int, ...] = ()
-    adaptive_block_candidate_expected_committed: tuple[float, ...] = ()
-    adaptive_block_candidate_requested_hash_experts: tuple[int, ...] = ()
-    adaptive_block_candidate_resident_hash_experts: tuple[int, ...] = ()
-    adaptive_block_candidate_missing_hash_experts: tuple[int, ...] = ()
-    adaptive_block_candidate_predicted_hash_bytes: tuple[int, ...] = ()
-    adaptive_block_candidate_scores: tuple[float, ...] = ()
-
-
-@dataclass(frozen=True)
-class HashExpertLayerRoutes:
-    layer: int
-    routes_by_position: tuple[tuple[int, ...], ...]
-    expert_union: tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class HashExpertPrefetchPlan:
-    layers: tuple[HashExpertLayerRoutes, ...] = ()
-    resolve_seconds: float = 0.0
-
-    @property
-    def experts_by_layer(self) -> dict[int, tuple[int, ...]]:
-        return {layer.layer: layer.expert_union for layer in self.layers}
-
-    def keys_for_draft_tokens(self, draft_tokens: int) -> set[tuple[int, int]]:
-        """Return hash-route keys for anchor plus a draft prefix."""
-        if draft_tokens < 0:
-            raise ValueError("draft token count must be zero or greater")
-        keys: set[tuple[int, int]] = set()
-        input_count = draft_tokens + 1
-        for layer in self.layers:
-            for routes in layer.routes_by_position[:input_count]:
-                keys.update((layer.layer, expert) for expert in routes)
-        return keys
-
-    def useful_keys(self, accepted_draft_tokens: int) -> set[tuple[int, int]]:
-        return self.keys_for_draft_tokens(accepted_draft_tokens)
-
-    def prefix(self, draft_tokens: int) -> HashExpertPrefetchPlan:
-        """Trim a full-block plan to anchor plus ``draft_tokens`` inputs."""
-        if draft_tokens < 0:
-            raise ValueError("draft token count must be zero or greater")
-        input_count = draft_tokens + 1
-        layers: list[HashExpertLayerRoutes] = []
-        for layer in self.layers:
-            routes = layer.routes_by_position[:input_count]
-            union = tuple(
-                dict.fromkeys(expert for position in routes for expert in position)
-            )
-            layers.append(HashExpertLayerRoutes(layer.layer, routes, union))
-        return HashExpertPrefetchPlan(tuple(layers), self.resolve_seconds)
-
-
-@dataclass(frozen=True)
-class AdaptiveBlockCandidate:
-    draft_tokens: int
-    expected_committed_tokens: float
-    requested_hash_experts: int
-    resident_hash_experts: int
-    missing_hash_experts: int
-    predicted_hash_bytes: int
-    score: float
-
-
-@dataclass(frozen=True)
-class AdaptiveBlockDecision:
-    original_tokens: int = 0
-    selected_tokens: int = 0
-    candidates: tuple[AdaptiveBlockCandidate, ...] = ()
-    selection_reason: str = ""
-    full_commit_fraction: float = 0.0
-    plan_seconds: float = 0.0
-
-    @property
-    def selected_candidate(self) -> AdaptiveBlockCandidate | None:
-        return next(
-            (
-                candidate
-                for candidate in self.candidates
-                if candidate.draft_tokens == self.selected_tokens
-            ),
-            None,
-        )
-
-
-def _expected_committed_tokens(confidence: list[float], length: int) -> float:
-    """Estimate accepted draft tokens plus the correction or bonus token."""
-    expected = 1.0
-    survival = 1.0
-    for value in confidence[:length]:
-        survival *= min(1.0, max(0.0, value))
-        expected += survival
-    return expected
-
-
-def _adaptive_candidate_lengths(length: int) -> tuple[int, ...]:
-    if length < 1:
-        return ()
-    return tuple(sorted({size for size in (1, 2, 4, length) if size <= length}))
 
 
 # The first five-workload calibration over-trimmed drafts that the target later
 # accepted completely. Keep a full block when confidence predicts at least 90%
 # utilization; lower-confidence blocks still use the storage score below.
 _ADAPTIVE_FULL_BLOCK_COMMIT_FRACTION_FLOOR = 0.90
-
-
-def _select_adaptive_block(
-    draft: DraftResult,
-    plan: HashExpertPrefetchPlan,
-    resident_keys: set[tuple[int, int]] | frozenset[tuple[int, int]],
-    expert_blob_size: int,
-) -> AdaptiveBlockDecision:
-    """Choose a draft prefix by expected commits per missing hash expert.
-
-    The first prototype deliberately scores only the exact, observable hash-layer
-    routes. It does not pretend to predict the learned-router layers.
-    """
-    if expert_blob_size < 1:
-        raise ValueError("expert blob size must be greater than zero")
-    started = time.perf_counter()
-    original_tokens = len(draft.tokens)
-    lengths = _adaptive_candidate_lengths(original_tokens)
-    if not lengths or not plan.layers:
-        return AdaptiveBlockDecision(
-            original_tokens=original_tokens,
-            selected_tokens=original_tokens,
-            plan_seconds=plan.resolve_seconds + time.perf_counter() - started,
-        )
-
-    candidates: list[AdaptiveBlockCandidate] = []
-    for length in lengths:
-        keys = plan.keys_for_draft_tokens(length)
-        resident = len(keys.intersection(resident_keys))
-        missing = len(keys) - resident
-        expected = _expected_committed_tokens(draft.confidence, length)
-        candidates.append(
-            AdaptiveBlockCandidate(
-                draft_tokens=length,
-                expected_committed_tokens=expected,
-                requested_hash_experts=len(keys),
-                resident_hash_experts=resident,
-                missing_hash_experts=missing,
-                predicted_hash_bytes=missing * expert_blob_size,
-                score=expected / max(1, missing),
-            )
-        )
-    storage_selected = max(
-        candidates,
-        key=lambda candidate: (
-            candidate.score,
-            candidate.expected_committed_tokens,
-            candidate.draft_tokens,
-        ),
-    )
-    full_candidate = candidates[-1]
-    full_commit_fraction = (
-        full_candidate.expected_committed_tokens
-        / (full_candidate.draft_tokens + 1)
-    )
-    if full_commit_fraction >= _ADAPTIVE_FULL_BLOCK_COMMIT_FRACTION_FLOOR:
-        selected = full_candidate
-        selection_reason = "high_confidence_full"
-    else:
-        selected = storage_selected
-        selection_reason = "storage_score"
-    return AdaptiveBlockDecision(
-        original_tokens=original_tokens,
-        selected_tokens=selected.draft_tokens,
-        candidates=tuple(candidates),
-        selection_reason=selection_reason,
-        full_commit_fraction=full_commit_fraction,
-        plan_seconds=plan.resolve_seconds + time.perf_counter() - started,
-    )
 
 
 def _truncate_draft(draft: DraftResult, length: int) -> DraftResult:
@@ -442,54 +235,6 @@ def _truncate_draft(draft: DraftResult, length: int) -> DraftResult:
         logprobs=draft.logprobs[:length],
         confidence=draft.confidence[:length],
         seconds=draft.seconds,
-    )
-
-
-def _hash_expert_prefetch_plan(
-    main_model,
-    token_ids: list[int],
-) -> HashExpertPrefetchPlan:
-    """Resolve the exact checkpoint tid2eid routes for target hash layers."""
-    if not token_ids:
-        return HashExpertPrefetchPlan()
-    started = time.perf_counter()
-    core = getattr(main_model, "model", main_model)
-    layers = getattr(core, "pipeline_layers", None)
-    if layers is None:
-        layers = getattr(main_model, "layers", ())
-    layers = tuple(layers)
-    args = getattr(main_model, "args", getattr(core, "args", None))
-    hash_layer_count = int(getattr(args, "num_hash_layers", 0))
-    if hash_layer_count < 1:
-        return HashExpertPrefetchPlan()
-    if len(layers) < hash_layer_count:
-        raise RuntimeError("main model does not expose every configured hash layer")
-
-    inputs = mx.array(token_ids, dtype=mx.int32)
-    planned: list[HashExpertLayerRoutes] = []
-    for position in range(hash_layer_count):
-        layer = layers[position]
-        gate = getattr(getattr(layer, "ffn", None), "gate", None)
-        if gate is None or not getattr(gate, "hash", False):
-            raise RuntimeError(f"main model layer {position} is not a hash router")
-        table = getattr(gate, "tid2eid", None)
-        if table is None:
-            raise RuntimeError(f"main model layer {position} has no tid2eid table")
-        selected = table[inputs]
-        mx.eval(selected)
-        selected_array = np.asarray(selected, dtype=np.int32)
-        if selected_array.ndim != 2 or selected_array.shape[0] != len(token_ids):
-            raise RuntimeError("hash router produced an incompatible expert table")
-        routes = tuple(
-            tuple(int(expert) for expert in row) for row in selected_array.tolist()
-        )
-        union = tuple(dict.fromkeys(expert for row in routes for expert in row))
-        switch_mlp = getattr(getattr(layer, "ffn", None), "switch_mlp", None)
-        layer_id = int(getattr(switch_mlp, "layer", position))
-        planned.append(HashExpertLayerRoutes(layer_id, routes, union))
-    return HashExpertPrefetchPlan(
-        tuple(planned),
-        time.perf_counter() - started,
     )
 
 
@@ -771,11 +516,8 @@ def generate_tokens(
     | None = None,
     record_fallback: Callable[[], None] | None = None,
     target_expert_cache: ExpertCache | None = None,
-    hash_prefetch: bool = False,
-    adaptive_block: bool = False,
     fallback_enabled: bool = True,
     sequential_verification: bool = False,
-    hybrid_verification: bool = False,
     prefilled_tokens: int = 0,
     record_prefill_snapshot: Callable[[int, object, object], None] | None = None,
 ) -> Iterator[tuple[int, mx.array, bool]]:
@@ -786,18 +528,7 @@ def generate_tokens(
         raise ValueError(
             "prefilled DSpark prompt tokens must be a strict prompt prefix"
         )
-    if adaptive_block and target_expert_cache is None:
-        raise ValueError("adaptive block scheduling requires the target expert cache")
-    if sequential_verification and hash_prefetch:
-        raise ValueError(
-            "sequential verification cannot use speculative hash prefetch"
-        )
-    if sequential_verification and hybrid_verification:
-        raise ValueError(
-            "sequential and hybrid verification are mutually exclusive"
-        )
     from .model import (
-        _hybrid_forward_with_hidden,
         _sequential_forward_with_hidden,
         eval_prompt_cache,
         forward_with_hidden,
@@ -878,153 +609,94 @@ def generate_tokens(
             if target_expert_cache is not None
             else CacheMetrics()
         )
-        full_verification_inputs = [anchor, *draft.tokens]
-        hash_plan = (
-            _hash_expert_prefetch_plan(main_model, full_verification_inputs)
-            if (hash_prefetch or adaptive_block)
-            and draft.tokens
-            and target_expert_cache is not None
-            else HashExpertPrefetchPlan()
-        )
-        adaptive_decision = AdaptiveBlockDecision()
-        if adaptive_block and draft.tokens and target_expert_cache is not None:
-            adaptive_decision = _select_adaptive_block(
-                draft,
-                hash_plan,
-                target_expert_cache.resident_expert_keys(
-                    hash_plan.experts_by_layer
-                ),
-                target_expert_cache.model.expert_blob_size,
-            )
-            draft = _truncate_draft(draft, adaptive_decision.selected_tokens)
-            hash_plan = hash_plan.prefix(adaptive_decision.selected_tokens)
         verification_inputs = [anchor, *draft.tokens]
-        prefetch = (
-            target_expert_cache.speculative_prefetch(hash_plan.experts_by_layer)
-            if hash_prefetch
-            and hash_plan.layers
-            and target_expert_cache is not None
-            else nullcontext(None)
-        )
         capture = (
             target_expert_cache.capture_expert_unions()
             if target_expert_cache is not None
             else nullcontext(None)
         )
-        exact_prefetch = None
-        with prefetch as exact_prefetch:
-            with capture as expert_union:
-                if draft.tokens:
-                    (
-                        logits,
-                        verified_hidden,
-                        verified_cache,
-                        verification_metrics,
-                    ) = (
-                        _sequential_target_sequence(
-                            main_model,
-                            verification_inputs,
-                            prompt_cache,
-                            dspark.target_layers,
-                        )
-                        if sequential_verification
-                        else _hybrid_target_sequence(
-                            main_model,
-                            verification_inputs,
-                            prompt_cache,
-                            dspark.target_layers,
-                        )
-                        if hybrid_verification
-                        else _target_sequence(
-                            main_model,
-                            verification_inputs,
-                            prompt_cache,
-                            dspark.target_layers,
-                        )
-                    )
-                else:
-                    logits, verified_hidden = forward_with_hidden(
+        with capture as expert_union:
+            if draft.tokens:
+                (
+                    logits,
+                    verified_hidden,
+                    verified_cache,
+                    verification_metrics,
+                ) = (
+                    _sequential_target_sequence(
                         main_model,
-                        mx.array([[anchor]], dtype=mx.int32),
+                        verification_inputs,
                         prompt_cache,
                         dspark.target_layers,
                     )
-                    verified_cache = None
-                    verification_metrics = VerificationMetrics(
-                        verification_mode=(
-                            "sequential"
-                            if sequential_verification
-                            else "hybrid"
-                            if hybrid_verification
-                            else "single"
-                        ),
-                        sequential_verification_positions=(
-                            1 if sequential_verification else 0
-                        ),
-                        hybrid_verification_positions=(
-                            1 if hybrid_verification else 0
-                        ),
+                    if sequential_verification
+                    else _target_sequence(
+                        main_model,
+                        verification_inputs,
+                        prompt_cache,
+                        dspark.target_layers,
                     )
-            expert_after_verification = (
-                target_expert_cache.metrics_snapshot()
-                if target_expert_cache is not None
-                else CacheMetrics()
-            )
-            target_logprobs = sampling_logprobs(logits[0], temperature, top_p)
-            mx.eval(target_logprobs, verified_hidden)
+                )
+            else:
+                logits, verified_hidden = forward_with_hidden(
+                    main_model,
+                    mx.array([[anchor]], dtype=mx.int32),
+                    prompt_cache,
+                    dspark.target_layers,
+                )
+                verified_cache = None
+                verification_metrics = VerificationMetrics(
+                    verification_mode=(
+                        "sequential"
+                        if sequential_verification
+                        else "single"
+                    ),
+                    sequential_verification_positions=(
+                        1 if sequential_verification else 0
+                    ),
+                )
+        expert_after_verification = (
+            target_expert_cache.metrics_snapshot()
+            if target_expert_cache is not None
+            else CacheMetrics()
+        )
+        target_logprobs = sampling_logprobs(logits[0], temperature, top_p)
+        mx.eval(target_logprobs, verified_hidden)
 
-            accepted, next_token, next_logprobs = _verify(
-                draft,
-                target_logprobs,
-                temperature,
-            )
-            if draft.tokens:
-                assert verified_cache is not None
-                if accepted == len(draft.tokens):
-                    prompt_cache[:] = verified_cache
-                else:
-                    replay_started = time.perf_counter()
-                    replay_inputs = mx.array(
-                        [[anchor, *draft.tokens[:accepted]]],
-                        dtype=mx.int32,
-                    )
-                    if sequential_verification:
-                        replay_logits, replay_hidden, _, _, _ = (
-                            _sequential_forward_with_hidden(
-                                main_model,
-                                replay_inputs,
-                                prompt_cache,
-                                dspark.target_layers,
-                            )
-                        )
-                    elif hybrid_verification:
-                        replay_logits, replay_hidden, _, _, _ = (
-                            _hybrid_forward_with_hidden(
-                                main_model,
-                                replay_inputs,
-                                prompt_cache,
-                                dspark.target_layers,
-                            )
-                        )
-                        verified_hidden = replay_hidden
-                    else:
-                        replay_logits, replay_hidden = forward_with_hidden(
+        accepted, next_token, next_logprobs = _verify(
+            draft,
+            target_logprobs,
+            temperature,
+        )
+        if draft.tokens:
+            assert verified_cache is not None
+            if accepted == len(draft.tokens):
+                prompt_cache[:] = verified_cache
+            else:
+                replay_started = time.perf_counter()
+                replay_inputs = mx.array(
+                    [[anchor, *draft.tokens[:accepted]]],
+                    dtype=mx.int32,
+                )
+                if sequential_verification:
+                    replay_logits, replay_hidden, _, _, _ = (
+                        _sequential_forward_with_hidden(
                             main_model,
                             replay_inputs,
                             prompt_cache,
                             dspark.target_layers,
                         )
-                        mx.eval(replay_logits, replay_hidden)
-                        eval_prompt_cache(prompt_cache)
-                    verification_metrics = replace(
-                        verification_metrics,
-                        cache_replay_seconds=time.perf_counter() - replay_started,
                     )
-        hash_prefetch_metrics = (
-            exact_prefetch.metrics(hash_plan.useful_keys(accepted))
-            if exact_prefetch is not None
-            else SpeculativePrefetchMetrics()
-        )
+                else:
+                    replay_logits, replay_hidden = forward_with_hidden(
+                        main_model, replay_inputs, prompt_cache, dspark.target_layers,
+                    )
+                    mx.eval(replay_logits, replay_hidden)
+                    eval_prompt_cache(prompt_cache)
+                verification_metrics = replace(
+                    verification_metrics,
+                    cache_replay_seconds=time.perf_counter() - replay_started,
+                )
         expert_after_round = (
             target_expert_cache.metrics_snapshot()
             if target_expert_cache is not None
@@ -1037,7 +709,6 @@ def generate_tokens(
             if isinstance(expert_union, ExpertUnionProfile)
             else ExpertUnionProfile()
         )
-        adaptive_selected = adaptive_decision.selected_candidate
         verification_metrics = replace(
             verification_metrics,
             committed_tokens=min(
@@ -1065,123 +736,6 @@ def generate_tokens(
             ),
             layer_expert_union_misses=tuple(
                 layer.cache_misses for layer in profile.layers
-            ),
-            hash_prefetch_requested_experts=(
-                hash_prefetch_metrics.requested_experts
-            ),
-            hash_prefetch_cache_resident_experts=(
-                hash_prefetch_metrics.cache_resident_experts
-            ),
-            hash_prefetch_experts_read=hash_prefetch_metrics.experts_read,
-            hash_prefetch_bytes_read=hash_prefetch_metrics.bytes_read,
-            hash_prefetch_useful_bytes=hash_prefetch_metrics.useful_bytes,
-            hash_prefetch_wasted_bytes=hash_prefetch_metrics.wasted_bytes,
-            hash_prefetch_page_cache_classified_bytes=(
-                hash_prefetch_metrics.page_cache_classified_bytes
-            ),
-            hash_prefetch_page_cache_resident_bytes_before_read=(
-                hash_prefetch_metrics.page_cache_resident_bytes_before_read
-            ),
-            hash_prefetch_page_cache_nonresident_bytes_before_read=(
-                hash_prefetch_metrics.page_cache_nonresident_bytes_before_read
-            ),
-            hash_prefetch_page_cache_unclassified_bytes=(
-                hash_prefetch_metrics.page_cache_unclassified_bytes
-            ),
-            hash_prefetch_useful_page_cache_resident_bytes_before_read=(
-                hash_prefetch_metrics.useful_page_cache_resident_bytes_before_read
-            ),
-            hash_prefetch_useful_page_cache_nonresident_bytes_before_read=(
-                hash_prefetch_metrics.useful_page_cache_nonresident_bytes_before_read
-            ),
-            hash_prefetch_useful_page_cache_unclassified_bytes=(
-                hash_prefetch_metrics.useful_page_cache_unclassified_bytes
-            ),
-            hash_prefetch_wasted_page_cache_resident_bytes_before_read=(
-                hash_prefetch_metrics.wasted_page_cache_resident_bytes_before_read
-            ),
-            hash_prefetch_wasted_page_cache_nonresident_bytes_before_read=(
-                hash_prefetch_metrics.wasted_page_cache_nonresident_bytes_before_read
-            ),
-            hash_prefetch_wasted_page_cache_unclassified_bytes=(
-                hash_prefetch_metrics.wasted_page_cache_unclassified_bytes
-            ),
-            hash_prefetch_read_seconds=hash_prefetch_metrics.read_seconds,
-            hash_prefetch_wait_seconds=hash_prefetch_metrics.wait_seconds,
-            hash_prefetch_plan_seconds=(
-                hash_plan.resolve_seconds if hash_prefetch else 0.0
-            ),
-            hash_prefetch_layer_ids=tuple(
-                layer.layer for layer in hash_plan.layers if hash_prefetch
-            ),
-            hash_prefetch_layer_union_counts=tuple(
-                len(layer.expert_union)
-                for layer in hash_plan.layers
-                if hash_prefetch
-            ),
-            adaptive_block_original_tokens=adaptive_decision.original_tokens,
-            adaptive_block_selected_tokens=adaptive_decision.selected_tokens,
-            adaptive_block_selected_expected_committed=(
-                adaptive_selected.expected_committed_tokens
-                if adaptive_selected is not None
-                else 0.0
-            ),
-            adaptive_block_selected_requested_hash_experts=(
-                adaptive_selected.requested_hash_experts
-                if adaptive_selected is not None
-                else 0
-            ),
-            adaptive_block_selected_resident_hash_experts=(
-                adaptive_selected.resident_hash_experts
-                if adaptive_selected is not None
-                else 0
-            ),
-            adaptive_block_selected_missing_hash_experts=(
-                adaptive_selected.missing_hash_experts
-                if adaptive_selected is not None
-                else 0
-            ),
-            adaptive_block_selected_predicted_hash_bytes=(
-                adaptive_selected.predicted_hash_bytes
-                if adaptive_selected is not None
-                else 0
-            ),
-            adaptive_block_selected_score=(
-                adaptive_selected.score
-                if adaptive_selected is not None
-                else 0.0
-            ),
-            adaptive_block_selection_reason=adaptive_decision.selection_reason,
-            adaptive_block_full_commit_fraction=(
-                adaptive_decision.full_commit_fraction
-            ),
-            adaptive_block_plan_seconds=adaptive_decision.plan_seconds,
-            adaptive_block_candidate_tokens=tuple(
-                candidate.draft_tokens
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_expected_committed=tuple(
-                candidate.expected_committed_tokens
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_requested_hash_experts=tuple(
-                candidate.requested_hash_experts
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_resident_hash_experts=tuple(
-                candidate.resident_hash_experts
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_missing_hash_experts=tuple(
-                candidate.missing_hash_experts
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_predicted_hash_bytes=tuple(
-                candidate.predicted_hash_bytes
-                for candidate in adaptive_decision.candidates
-            ),
-            adaptive_block_candidate_scores=tuple(
-                candidate.score for candidate in adaptive_decision.candidates
             ),
         )
         verification_seconds = time.perf_counter() - verify_started
@@ -1276,17 +830,6 @@ def _sequential_target_sequence(main_model, tokens, cache, target_layers):
     from .model import sequential_verification_forward_with_hidden
 
     return sequential_verification_forward_with_hidden(
-        main_model,
-        mx.array([tokens], dtype=mx.int32),
-        cache,
-        target_layers,
-    )
-
-
-def _hybrid_target_sequence(main_model, tokens, cache, target_layers):
-    from .model import hybrid_verification_forward_with_hidden
-
-    return hybrid_verification_forward_with_hidden(
         main_model,
         mx.array([tokens], dtype=mx.int32),
         cache,

@@ -5,6 +5,24 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerConfigurationTests: XCTestCase {
+  @MainActor
+  func testRouteAwareCacheRoundTripsAndReachesCatalog() async throws {
+    for descriptor in ModelPackages.descriptors {
+      let kind = try XCTUnwrap(ModelKind(rawValue: descriptor.kind))
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      settings.routeAwareExpertCache = true
+      let restored = try JSONDecoder().decode(ModelAdvancedSettings.self, from: JSONEncoder().encode(settings))
+      XCTAssertEqual(restored.routeAwareExpertCache, true)
+      let catalog = try ModelLibrary.makeServerCatalog(
+        models: [installedModel(kind)], aliases: [:], settings: [kind: restored],
+        powerSavingLimitGBps: nil)
+      XCTAssertEqual(try XCTUnwrap(catalog.models.first).runtime.expertEvictionPolicy, "route")
+    }
+    for language in [AppLanguage.simplifiedChinese, .traditionalChinese] {
+      XCTAssertNotEqual(L10n.string("Route-aware", language: language), "Route-aware")
+    }
+  }
+
   func testAllModelsDefaultTo8192OutputTokensAndPreserveSavedValues() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
@@ -620,17 +638,23 @@ final class ServerConfigurationTests: XCTestCase {
         "fp4_index_cache",
         "mtp_enabled", "mtp_slots",
         "dspark_enabled", "dspark_prompt_cache", "dspark_confidence_threshold",
-        "dspark_slots", "dspark_hash_prefetch", "dspark_adaptive_block",
+        "dspark_slots",
         "dspark_fallback_enabled", "dspark_sequential_verification",
-        "dspark_hybrid_verification", "expert_route_trace", "expert_page_cache_probe",
-        "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
-        "adaptive_expert_prefill_threshold", "qwen_next_layer_prefetch",
+        "expert_route_trace", "expert_page_cache_probe",
+        "separate_prefill_io", "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
+        "qwen_next_layer_prefetch",
         "qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
         "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "deepseek_ane_prefill", "v41_layer_major_prefill",
         "qwen_grouped_experts", "expert_eviction_policy",
         "power_saving_limit_gbps",
       ]
     )
+    for model in models {
+      let config = try XCTUnwrap(model["runtime"] as? [String: Any])
+      XCTAssertEqual(config["separate_prefill_io"] as? Bool, true)
+      XCTAssertNil(config["dspark_hash_prefetch"])
+      XCTAssertNil(config["adaptive_expert_prefill_threshold"])
+    }
     XCTAssertEqual(runtime["layer_major_prefill_threshold"] as? Int, 1_024)
     XCTAssertEqual(runtime["qwen_next_layer_prefetch"] as? Bool, false)
     XCTAssertNil(runtime["qwen_grouped_decode"])
