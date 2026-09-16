@@ -1,5 +1,9 @@
 """N2: isolated cache branches and cross-version restart for no-hint grouping."""
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import hashlib
@@ -202,7 +206,7 @@ def main():
     files = [*sorted((root / "runtime/deepseek_v4_ssd").glob("*.py")), Path(__file__),
         root / "Scripts/research_qwen_sorted_experts.py", root / "Scripts/prepare_r0_prompts.py",
         root / "Scripts/benchmark_research_baseline.py", root / "Scripts/analyze_qwen_nohint_validation.py",
-        root / "research/QWEN_NOHINT_CACHE_2026-09-06.md",
+        archived_path("research/QWEN_NOHINT_CACHE_2026-09-06.md"),
         root / "Native/ANEBridge/WhallmANE.m", root / "Native/ANEBridge/LICENSE",
         root / "Scripts/build-ane-bridge.sh", root / ".build/native/libWhallmANE.dylib"]
     source = {str(p.relative_to(root)): digest(p) for p in files}

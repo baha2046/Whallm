@@ -1,4 +1,6 @@
 """Failure/lifetime and numerical gates for the isolated research pipeline."""
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 import os
 import tempfile
 import threading

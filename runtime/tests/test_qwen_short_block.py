@@ -1,4 +1,6 @@
 """Numerical/budget gates for the new research verifier's expert stage."""
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 import tempfile
 import unittest
 from pathlib import Path

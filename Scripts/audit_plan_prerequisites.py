@@ -1,4 +1,8 @@
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import datetime
@@ -267,10 +271,9 @@ def main() -> None:
     ]
     physical_claim_fields = _find_physical_device_claim_fields(project_files)
     storage_spec = project_root / STORAGE_NATIVE_SPEC_PATH
-    direct_transfer_artifact = (
-        project_root
-        / "docs/benchmarks/2026-08-27-dspark-learned-router-frozen-transfer-m2-max.json"
-    )
+    direct_transfer_artifact = project_root / "docs/benchmarks/2026-08-27-dspark-learned-router-frozen-transfer-m2-max.json"
+    if project_root.resolve() == Path(__file__).resolve().parents[1]:
+        direct_transfer_artifact = archived_path("docs/benchmarks/2026-08-27-dspark-learned-router-frozen-transfer-m2-max.json")
     route_labels = None
     if direct_transfer_artifact.is_file():
         raw = json.loads(direct_transfer_artifact.read_text(encoding="utf-8"))

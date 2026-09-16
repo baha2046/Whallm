@@ -1,4 +1,6 @@
 from __future__ import annotations
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 
 import mmap
 import os

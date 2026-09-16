@@ -1,5 +1,9 @@
 """Fresh-process Qwen baseline and separate route-observer checks for research B."""
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import hashlib
@@ -40,7 +44,7 @@ def prepare_prompts(root: Path, model: Path, directory: Path) -> list[dict]:
     directory.mkdir()
     prompts = []
     for name, seed in SEEDS.items():
-        source = root / f"docs/benchmarks/prompts/2026-09-01-ssd-cache-oracle/{name}.txt"
+        source = archived_path(f"docs/benchmarks/prompts/2026-09-01-ssd-cache-oracle/{name}.txt")
         original = source.read_text()
         marker = "<|im_start|>user\n"
         if not original.startswith(marker):
@@ -88,7 +92,7 @@ def main() -> None:
     prompts = prepare_prompts(root, model, prompts_dir)
     source_files = sorted((root / "runtime/deepseek_v4_ssd").glob("*.py"))
     source_files += [Path(__file__), root / "Scripts/prepare_r0_prompts.py",
-                     root / "research/PREFILL_DECODE_B_ROUND1_2026-09-05.md"]
+                     archived_path("research/PREFILL_DECODE_B_ROUND1_2026-09-05.md")]
     artifact = {
         "schema_version": 1, "evidence_kind": "current_baseline_and_observer_validation",
         "formal_performance_result": False, "status": "running",

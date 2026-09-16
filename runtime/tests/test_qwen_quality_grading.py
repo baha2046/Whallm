@@ -1,3 +1,4 @@
+from Scripts.archived_evidence import MissingLocalArchive, archived_path
 import json
 import sys
 import unittest
@@ -38,7 +39,10 @@ class QualityGradingTests(unittest.TestCase):
             self.assertFalse(grade(case, text)['passed'])
 
     def test_official_reference_solutions(self):
-        suite = Path(__file__).resolve().parents[2] / 'docs/benchmarks/prompts/2026-09-06-qwen-quality-q1.json'
+        try:
+            suite = archived_path('docs/benchmarks/prompts/2026-09-06-qwen-quality-q1.json')
+        except MissingLocalArchive as error:
+            self.skipTest(str(error))
         for case in json.loads(suite.read_text())['cases']:
             if case['grader'] == 'python':
                 with self.subTest(case=case['id']):

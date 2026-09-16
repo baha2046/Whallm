@@ -3,6 +3,10 @@
 This checks structured answers, not general quality or statistical non-inferiority.
 """
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import importlib.metadata
@@ -52,14 +56,14 @@ def main():
     root = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    baseline = json.loads((root / "docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json").read_text())
+    baseline = json.loads((archived_path("docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json")).read_text())
     suite = json.loads(args.suite.read_text())
     target_tokens = suite.get("target_tokens", 1024)
     max_tokens = suite.get("max_tokens", 128)
     model = Path(baseline["installed_model"]["path"])
     assert digest(model / "manifest.json") == baseline["installed_model"]["manifest_sha256"]
     tokenizer = AutoTokenizer.from_pretrained(model / "tokenizer", trust_remote_code=True)
-    protocol = root / suite.get("protocol", "research/QWEN_TASK_ACCURACY_2026-09-06.md")
+    protocol = archived_path(suite.get("protocol", "research/QWEN_TASK_ACCURACY_2026-09-06.md"))
     (output / "protocol-at-start.md").write_bytes(protocol.read_bytes())
     (output / "suite.json").write_bytes(args.suite.read_bytes())
     sources = [*sorted((root / "runtime/deepseek_v4_ssd").glob("*.py")), Path(__file__),

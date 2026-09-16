@@ -1,5 +1,9 @@
 """N3: exercise the real runtime toggle and previously saved cache states."""
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import importlib.metadata
@@ -96,7 +100,7 @@ def main():
     files = [*sorted((root / "runtime/deepseek_v4_ssd").glob("*.py")), Path(__file__),
         root / "Scripts/benchmark_qwen_nohint_cache.py", root / "Scripts/research_qwen_sorted_experts.py",
         root / "Scripts/analyze_qwen_nohint_validation.py", root / "Scripts/benchmark_research_baseline.py",
-        root / "Scripts/prepare_r0_prompts.py", root / "research/QWEN_NOHINT_INTEGRATION_2026-09-06.md",
+        root / "Scripts/prepare_r0_prompts.py", archived_path("research/QWEN_NOHINT_INTEGRATION_2026-09-06.md"),
         root / "runtime/tests/test_qwen_grouped_experts.py",
         root / "runtime/tests/test_qwen_nohint_validation.py",
         root / "Native/ANEBridge/WhallmANE.m", root / "Native/ANEBridge/LICENSE",

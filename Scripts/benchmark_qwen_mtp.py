@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import hashlib
@@ -108,7 +112,7 @@ def main() -> None:
     parser.add_argument(
         "--prompts",
         type=Path,
-        default=Path("docs/benchmarks/prompts/2026-08-26-adaptive-128"),
+        default=None,
     )
     parser.add_argument("--prompt-suffix", default="128")
     parser.add_argument("--max-tokens", type=int, default=64)
@@ -126,6 +130,8 @@ def main() -> None:
     parser.add_argument("--formal", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
+    if arguments.prompts is None:
+        arguments.prompts = archived_path("docs/benchmarks/prompts/2026-08-26-adaptive-128")
 
     if arguments.max_tokens < 1:
         parser.error("--max-tokens must be positive")

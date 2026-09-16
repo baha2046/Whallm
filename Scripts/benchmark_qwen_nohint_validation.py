@@ -1,5 +1,9 @@
 """Frozen new-prompt, long-decode extension for the existing no-hint candidate."""
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import importlib.metadata
@@ -42,10 +46,10 @@ def main():
     root = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    baseline = json.loads((root / "docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json").read_text())
+    baseline = json.loads((archived_path("docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json")).read_text())
     model = Path(baseline["installed_model"]["path"])
     assert digest(model / "manifest.json") == baseline["installed_model"]["manifest_sha256"]
-    protocol = root / "research/QWEN_NOHINT_VALIDATION_2026-09-06.md"
+    protocol = archived_path("research/QWEN_NOHINT_VALIDATION_2026-09-06.md")
     files = [*sorted((root / "runtime/deepseek_v4_ssd").glob("*.py")), Path(__file__), protocol,
              root / "Scripts/research_qwen_sorted_experts.py", root / "Scripts/benchmark_research_baseline.py",
              root / "Scripts/prepare_r0_prompts.py"]

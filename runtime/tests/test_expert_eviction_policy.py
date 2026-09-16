@@ -1,3 +1,5 @@
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 import tempfile
 import unittest
 from dataclasses import asdict

@@ -1,4 +1,6 @@
 """Native-weight checks for research-only reader and union patches."""
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 import hashlib
 import tempfile
 import unittest

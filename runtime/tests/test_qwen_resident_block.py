@@ -1,4 +1,6 @@
 """Native canonical-shape correctness and bounded allocation tests."""
+from Scripts.archived_evidence import enable_archived_research
+enable_archived_research()
 import tempfile
 import unittest
 from pathlib import Path

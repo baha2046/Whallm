@@ -1,5 +1,9 @@
 """Pre-registered QSA or sorted-expert Prefill research, with reversed pairs."""
 from __future__ import annotations
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 
 import argparse
 import hashlib
@@ -27,11 +31,11 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    baseline_path = root / "docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json"
+    baseline_path = archived_path("docs/benchmarks/2026-09-05-qwen-research-baseline-m5-pro.json")
     baseline = json.loads(baseline_path.read_text())
     controls = {r["case"]: r for r in baseline["runs"] if r["kind"] == "baseline" and r["case"].endswith("-4096")}
     sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-    protocol = root / ("research/QWEN_GROUPED_EXPERTS_2026-09-06.md" if args.sorted_experts else "research/QWEN_ATTENTION_GRANULARITY_2026-09-06.md")
+    protocol = archived_path("research/QWEN_GROUPED_EXPERTS_2026-09-06.md" if args.sorted_experts else "research/QWEN_ATTENTION_GRANULARITY_2026-09-06.md")
     (output / "protocol-at-start.md").write_bytes(protocol.read_bytes())
     files = list((root / "runtime/deepseek_v4_ssd").glob("*.py")) + [Path(__file__), root / "Scripts/research_qwen_attention.py", protocol]
     if args.sorted_experts:

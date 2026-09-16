@@ -39,7 +39,8 @@ def main():
         transcript,schema,expected=tools[i]
         cases.append(dict(id=f'tool-{i+1:02}',category='tool',grader='json',prompt='Continue this tool-use transcript with exactly one next action. These are simulated tools.\n'+transcript+'\nAllowed calls: '+schema+'\nReturn {"name":tool_name,"arguments":arguments_object}.',expected=expected))
     suite=dict(schema_version=2,quality_q1=True,target_tokens=4096,max_tokens=1024,protocol='research/QWEN_QUALITY_Q1_2026-09-06.md',cases=cases,sources={n:json.loads((SETUP/(n+'-source.json')).read_text()) for n in ['humaneval','gsm8k']},limits=['32-task expanded objective screen; not a full public benchmark or adoption result.','Code and math use fixed hash-selected public test examples; checkpoint training overlap is unknown.','Chinese and tool tasks are locally authored; tool cases continue fixed multistep transcripts, not live agent episodes.','4K includes marked inert padding; this does not validate real long-document understanding or long-form answer quality.','Greedy, thinking off, one output per task; sampling and thinking mode remain untested.','Stop on the first control-correct/candidate-wrong pair. Confirm it with one reversed pair, without changing questions or code.','Incomplete and early-stopped samples receive no fixed-sample confidence interval; no category offsets another.','The code child denies home/project reads, file writes, networking, fork, signals and Mach IPC, with CPU/time/output limits; it is not a VM and does not claim a hard memory cap.'])
-    dest=ROOT/'docs/benchmarks/prompts/2026-09-06-qwen-quality-q1.json'
+    dest=ROOT/'scratch/qwen-quality-q1/2026-09-06-qwen-quality-q1.json'
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(suite,ensure_ascii=False,indent=2)+'\n')
     print(dest)
 

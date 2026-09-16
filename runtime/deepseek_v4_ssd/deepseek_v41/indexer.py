@@ -16,7 +16,7 @@ Queries and keys are FP4 fake-quantized (blocks of 32, power-of-two scales), no
 Hadamard rotation (a V4 feature V4.1 dropped). Scores are ReLU'd, then collapsed
 over heads by ``weights_proj(x) * head_dim**-0.5 * n_heads**-0.5``.
 
-Reference artifact worth knowing (documented in docs/upstream-notes.md): the
+Reference behavior worth knowing: the
 reference reads keys through a process-global pointer that the *last* owner set.
 During decode, a ratio-2 owner whose group is incomplete therefore scores
 against layer 20's keys. This port always reads the owner's own cache.

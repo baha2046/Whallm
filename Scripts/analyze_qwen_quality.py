@@ -1,4 +1,8 @@
 """Verify Q1 paired evidence and report screening results without adoption claims."""
+if __package__:
+    from .archived_evidence import archived_path
+else:
+    from archived_evidence import archived_path
 import argparse
 import hashlib
 import json
@@ -107,7 +111,7 @@ def main():
     report.update(results=results, confirmation=confirmation, raw_results_sha256=digest(args.results),
                   analysis_source_sha256=digest(Path(__file__)),
                   suite_sha256=digest(args.results.parent / 'suite.json'),
-                  grading_note_sha256=digest(Path(__file__).resolve().parents[1] / 'research/QWEN_QUALITY_Q1_GRADING_NOTE_2026-09-06.md'))
+                  grading_note_sha256=digest(archived_path('research/QWEN_QUALITY_Q1_GRADING_NOTE_2026-09-06.md')))
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
     print(json.dumps({k: report[k] for k in ('decision', 'category_summary', 'unrun_cases')}, indent=2))
 
