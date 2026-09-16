@@ -6,12 +6,25 @@ app_path=${1:?Usage: verify-packaged-app.sh APP_PATH ZIP_PATH}
 zip_path=${2:?Usage: verify-packaged-app.sh APP_PATH ZIP_PATH}
 require_notarization=${REQUIRE_NOTARIZATION:-0}
 expected_local_build=${EXPECTED_LOCAL_BUILD:-}
+expected_sdk_version=${EXPECTED_SDK_VERSION:-}
 verification_root=$(mktemp -d)
 trap 'rm -rf "$verification_root"' EXIT
 
 verify_signature() {
   local target=$1
   codesign --verify --deep --strict "$target"
+  if [[ -n $expected_sdk_version ]]; then
+    local actual_sdk
+    actual_sdk=$(otool -l "$target/Contents/MacOS/dsv4-app" | awk '
+      $1 == "cmd" { build_version = ($2 == "LC_BUILD_VERSION") }
+      build_version && $1 == "sdk" { print $2; exit }
+    ')
+    if [[ $actual_sdk != $expected_sdk_version ]]; then
+      print -u2 "Packaged App SDK mismatch: expected $expected_sdk_version, found $actual_sdk. Native control appearance may regress."
+      exit 1
+    fi
+    print "App SDK verified: $actual_sdk"
+  fi
   if [[ $require_notarization == 1 ]]; then
     xcrun stapler validate "$target"
     spctl --assess --type execute --verbose=2 "$target"

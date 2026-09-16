@@ -22,27 +22,8 @@ struct ContentView: View {
 
   var body: some View {
     NavigationSplitView {
-      List(selection: $selectedPage) {
-        Section {
-          ForEach(AppPage.primaryPages) { page in
-            Label(page.title(language: selectedLanguage), systemImage: page.icon)
-              .padding(.vertical, 6)
-              .tag(page)
-          }
-        }
-        Section(L10n.string("General", language: selectedLanguage)) {
-          Label(
-            AppPage.settings.title(language: selectedLanguage),
-            systemImage: AppPage.settings.icon
-          )
-          .padding(.vertical, 6)
-          .tag(AppPage.settings)
-        }
-      }
-      .listStyle(.sidebar)
-      .scrollContentBackground(.hidden)
-      .background(AppTheme.sidebarBackground)
-      .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 250)
+      AppSidebar(selection: $selectedPage, language: selectedLanguage)
+        .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 250)
     } detail: {
       NavigationStack(path: $modelNavigationPath) {
         VStack(spacing: 0) {
@@ -172,6 +153,8 @@ struct ContentView: View {
         session: throughputSession, language: selectedLanguage)
     case .logs:
       LogsView(server: server, configuration: $configuration, language: selectedLanguage)
+    case .about:
+      AboutView(language: selectedLanguage)
     case .settings:
       SettingsView(
         languageCode: $languageCode,
@@ -203,47 +186,23 @@ struct ContentView: View {
   }
 
   private func modelAdvancedPage(for modelKind: ModelKind) -> some View {
-    let backLabel = L10n.string("Back to Model", language: selectedLanguage)
-
-    return VStack(spacing: 0) {
-      HStack(spacing: 12) {
-        Button {
-          modelNavigationPath.removeAll()
-        } label: {
-          Label(backLabel, systemImage: "chevron.backward")
-        }
-        .buttonStyle(TertiaryIconButtonStyle())
-        .accessibilityLabel(backLabel)
-        .help(backLabel)
-
-        Text(modelKind.displayName)
-          .font(.title2.bold())
-          .accessibilityAddTraits(.isHeader)
-        Spacer()
-      }
-      .frame(maxWidth: AppLayout.contentWidth)
-      .frame(maxWidth: .infinity)
-      .padding(.horizontal, 40)
-      .padding(.vertical, 8)
-
-      Divider()
-
-      ModelAdvancedView(
-        settings: $advancedSettings,
-        alias: $aliasDraft,
-        aliasError: aliasError,
-        settingsLocked: modelAdvancedSettingsAreLocked(
-          modelID: modelKind.apiModelID,
-          loadedModel: server.performance.loadedModel,
-          loadingModel: server.performance.loadingModel,
-          modelActionID: server.modelAction?.modelID
-        ),
-        mtpAvailable: modelLibrary.usableModel(for: modelKind)?.hasMTP == true,
-        dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
-        modelKind: modelKind,
-        language: selectedLanguage
-      )
-    }
+    ModelAdvancedView(
+      settings: $advancedSettings,
+      alias: $aliasDraft,
+      aliasError: aliasError,
+      settingsLocked: modelAdvancedSettingsAreLocked(
+        modelID: modelKind.apiModelID,
+        loadedModel: server.performance.loadedModel,
+        loadingModel: server.performance.loadingModel,
+        modelActionID: server.modelAction?.modelID
+      ),
+      modelURL: modelLibrary.usableModel(for: modelKind)?.url,
+      mtpAvailable: modelLibrary.usableModel(for: modelKind)?.hasMTP == true,
+      dsparkAvailable: modelLibrary.usableModel(for: modelKind)?.hasDSpark == true,
+      modelKind: modelKind,
+      language: selectedLanguage,
+      onBack: { modelNavigationPath.removeAll() }
+    )
     .background(AppTheme.pageBackground)
     .navigationBarBackButtonHidden()
   }
@@ -264,19 +223,22 @@ struct ContentView: View {
   }
 }
 
-private enum AppPage: String, CaseIterable, Identifiable {
+enum AppPage: String, CaseIterable, Identifiable {
   case server
   case model
   case advanced
   case chat
-  case metric
+  case metric // Preserve the saved page identifier; the visible title is Status.
   case throughput
   case logs
   case settings
+  case about
 
   var id: String { rawValue }
 
-  static let primaryPages: [AppPage] = [.server, .model, .advanced, .chat, .metric, .throughput, .logs]
+  static let primaryPages: [AppPage] = [.server, .model, .metric, .advanced, .logs]
+  static let playgroundPages: [AppPage] = [.chat, .throughput]
+  static let generalPages: [AppPage] = [.settings, .about]
 
   var icon: String {
     switch self {
@@ -288,6 +250,7 @@ private enum AppPage: String, CaseIterable, Identifiable {
     case .throughput: "speedometer"
     case .logs: "doc.text"
     case .settings: "gearshape"
+    case .about: "info.circle"
     }
   }
 
@@ -297,10 +260,35 @@ private enum AppPage: String, CaseIterable, Identifiable {
     case .model: L10n.string("Model", language: language)
     case .advanced: L10n.string("Advance", language: language)
     case .chat: L10n.string("Chat", language: language)
-    case .metric: L10n.string("Metric", language: language)
+    case .metric: L10n.string("Status", language: language)
     case .throughput: L10n.string("Throughput", language: language)
     case .logs: L10n.string("Logs", language: language)
     case .settings: L10n.string("Settings", language: language)
+    case .about: L10n.string("About", language: language)
+    }
+  }
+}
+
+struct AppSidebar: View {
+  @Binding var selection: AppPage
+  let language: AppLanguage
+
+  var body: some View {
+    List(selection: $selection) {
+      Section { rows(AppPage.primaryPages) }
+      Section(L10n.string("Playground", language: language)) { rows(AppPage.playgroundPages) }
+      Section(L10n.string("General", language: language)) { rows(AppPage.generalPages) }
+    }
+    .listStyle(.sidebar)
+    .scrollContentBackground(.hidden)
+    .background(AppTheme.sidebarBackground)
+  }
+
+  private func rows(_ pages: [AppPage]) -> some View {
+    ForEach(pages) { page in
+      Label(page.title(language: language), systemImage: page.icon)
+        .padding(.vertical, 6)
+        .tag(page)
     }
   }
 }
@@ -1665,24 +1653,66 @@ private struct AdvancedView: View {
   }
 }
 
-private struct ModelAdvancedView: View {
+struct ModelAdvancedView: View {
   @Binding var settings: ModelAdvancedSettings
   @Binding var alias: String
   let aliasError: String?
   let settingsLocked: Bool
+  let modelURL: URL?
+  @State var memoryProfile: MemoryPlanningProfile?
   let mtpAvailable: Bool
   let dsparkAvailable: Bool
   let modelKind: ModelKind
   let language: AppLanguage
+  var onBack: () -> Void = {}
 
   var body: some View {
+    VStack(spacing: 0) {
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 24) {
+          modelHeading.fixedSize()
+          Spacer(minLength: 16)
+          memoryOverview.fixedSize()
+        }
+        VStack(alignment: .leading, spacing: 12) {
+          modelHeading
+          memoryOverview.frame(maxWidth: .infinity, alignment: .trailing)
+        }
+      }
+      .padding(.horizontal, 40)
+      .padding(.vertical, 12)
+      Divider()
+      settingsForm
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+    .task(id: modelURL) {
+      memoryProfile = modelURL.flatMap { MemoryPlanningProfile.load(at: $0, kind: modelKind) }
+    }
+  }
+
+  private var modelHeading: some View {
+    HStack(spacing: 12) {
+      Button(action: onBack) {
+        Label(L10n.string("Back to Model", language: language), systemImage: "chevron.backward")
+      }
+      .buttonStyle(TertiaryIconButtonStyle())
+      .accessibilityLabel(L10n.string("Back to Model", language: language))
+      .help(L10n.string("Back to Model", language: language))
+      Text(modelKind.displayName)
+        .font(.title2.bold())
+        .accessibilityAddTraits(.isHeader)
+    }
+  }
+
+  private var settingsForm: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
         SectionHeader(title: L10n.string("Model", language: language))
         VStack(spacing: 0) {
           SettingRow(
             "Alias",
-            hint: "Optional request name for this model. Changes are saved automatically.",
+            hint: impactHint("Alias", "Optional request name for this model. Changes are saved automatically."),
             language: language
           ) {
             VStack(alignment: .trailing, spacing: 6) {
@@ -1762,17 +1792,12 @@ private struct ModelAdvancedView: View {
         SectionHeader(title: L10n.string("Runtime", language: language))
           .padding(.top, 12)
         VStack(spacing: 0) {
-          integerField(
-            "Slots",
-            hint: L10n.string(
-              "Number of routed experts in the Active Parameters Cache. The recommended value is %lld.",
-              language: language, Int64(modelKind.descriptor.defaults.slots)),
-            value: $settings.slots
-          )
+          cacheMemoryField("Expert cache GiB", keyPath: \.expertCacheGiB,
+            legacySlots: settings.slots, minimum: modelKind == .qwen3_8FlashNext ? 10 : 6)
           Divider()
           SettingRow(
             "Expert cache eviction",
-            hint: "Route-aware cache remembers expert usage and adjusts memory across layers.",
+            hint: impactHint("Expert cache eviction", "Route-aware cache remembers expert usage and adjusts memory across layers."),
             language: language
           ) {
             Picker(L10n.string("Expert cache eviction", language: language), selection: expertEvictionPolicy) {
@@ -1799,8 +1824,8 @@ private struct ModelAdvancedView: View {
           )
           Divider()
           integerField(
-            "Memory limit GiB",
-            hint: "0 selects the model-safe automatic limit.",
+            "MLX memory guideline GiB",
+            hint: "0 selects the automatic guideline. This does not reserve memory.",
             value: $settings.memoryLimitGiB
           )
           Divider()
@@ -1913,7 +1938,7 @@ private struct ModelAdvancedView: View {
             Divider()
             SettingRow(
               "Prompt cache",
-              hint: "Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again.",
+              hint: impactHint("Prompt cache", "Memory reuses prompts until the model unloads. Disk also keeps them after restart. Off processes each prompt again."),
               language: language
             ) {
               Picker(L10n.string("Prompt cache", language: language), selection: promptCacheMode) {
@@ -1943,7 +1968,7 @@ private struct ModelAdvancedView: View {
           Divider()
           SettingRow(
             "Warmup prompt",
-            hint: "Optional UTF-8 prompt file path",
+            hint: impactHint("Warmup prompt", "Optional UTF-8 prompt file path"),
             language: language
           ) {
             TextField(
@@ -1963,12 +1988,8 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!mtpAvailable)
             Divider()
-            integerField(
-              "MTP slots",
-              hint:
-                "Number of MTP experts kept in memory. More slots use more memory. The default is 32.",
-              value: mtpSlots
-            )
+            cacheMemoryField("MTP expert cache GiB", keyPath: \.mtpCacheGiB,
+              legacySlots: settings.mtpSlots ?? 32, minimum: 10)
             .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
           }
           if modelKind.descriptor.editableSettings.contains("kvCachePrecision") {
@@ -1988,12 +2009,8 @@ private struct ModelAdvancedView: View {
             )
             .disabled(!dsparkAvailable)
             Divider()
-            integerField(
-              "DSpark slots",
-              hint:
-                "Number of DSpark routed experts kept in memory. The recommended value is 768.",
-              value: $settings.dsparkSlots
-            )
+            cacheMemoryField("DSpark expert cache GiB", keyPath: \.dsparkCacheGiB,
+              legacySlots: settings.dsparkSlots, minimum: 30)
             .disabled(!settings.dsparkEnabled || !dsparkAvailable)
             Divider()
             doubleField(
@@ -2013,8 +2030,81 @@ private struct ModelAdvancedView: View {
       .padding(.horizontal, 40)
       .padding(.vertical, 24)
     }
-    .background(AppTheme.pageBackground)
-    .environment(\.locale, language.locale)
+  }
+
+
+  private func impactHint(_ label: String, _ hint: String) -> String {
+    if label == "Use MTP" && !mtpAvailable {
+      return L10n.string("Install the MTP files before enabling this setting.", language: language)
+    }
+    if label == "Use DSpark" && !dsparkAvailable {
+      return L10n.string("Install the DSpark files before enabling this setting.", language: language)
+    }
+    let key = AdvancedSettingImpact.key(for: label, modelKind: modelKind)
+    if label == "Prompt cache entries" {
+      return L10n.string(key, language: language, Int64(modelKind.descriptor.defaults.promptCacheEntries))
+    }
+    let recommendedSlots: Int? = switch label {
+    case "Expert cache GiB": modelKind.descriptor.defaults.slots
+    case "MTP expert cache GiB": 32
+    case "DSpark expert cache GiB": 768
+    default: nil
+    }
+    if let recommendedSlots {
+      let gib = ExpertMemory.legacyGiB(slots: recommendedSlots, blobBytes: blobBytes)
+      let formatted = String(format: "%.3f", locale: language.locale, gib)
+      return L10n.string(key, language: language, formatted)
+    }
+    return L10n.string(key.isEmpty ? hint : key, language: language)
+  }
+
+  private var blobBytes: UInt64 {
+    memoryProfile?.manifest.expertBlobSize ?? ExpertMemory.blobBytes(for: modelKind)
+  }
+
+  private func cacheMemoryField(_ label: String,
+    keyPath: WritableKeyPath<ModelAdvancedSettings, Double?>, legacySlots: Int, minimum: Int
+  ) -> some View {
+    let value = settings[keyPath: keyPath] ?? ExpertMemory.legacyGiB(slots: legacySlots, blobBytes: blobBytes)
+    let capacity = try? ExpertMemory.capacity(gib: value, blobBytes: blobBytes, minimum: minimum)
+    return VStack(alignment: .leading, spacing: 0) {
+      doubleField(label,
+        hint: "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load.",
+        value: Binding(get: {
+          settings[keyPath: keyPath] ?? ExpertMemory.legacyGiB(slots: legacySlots, blobBytes: blobBytes)
+        }, set: { settings[keyPath: keyPath] = $0 }))
+      Text(capacity.map { L10n.string("Capacity: %lld experts", language: language, Int64($0)) }
+        ?? L10n.string("Expert cache memory is too small or invalid.", language: language))
+        .font(.caption).foregroundStyle(capacity == nil ? .red : .secondary)
+        .padding(.horizontal, 20).padding(.bottom, 12)
+    }
+  }
+
+  private var memoryOverview: some View {
+    HStack(spacing: 20) {
+      Text(L10n.string("Estimated peak memory", language: language))
+        .font(.callout.weight(.semibold))
+        .foregroundStyle(.secondary)
+      ForEach([65_536, 131_072], id: \.self) { tokens in
+        let estimate = memoryProfile?.estimate(settings, mtpAvailable: mtpAvailable,
+          dsparkAvailable: dsparkAvailable, contextTokens: tokens)
+        let value = estimate.map { String(format: "%.1f GiB", locale: language.locale,
+          $0.total / ExpertMemory.gib) } ?? "— GiB"
+        VStack(alignment: .trailing, spacing: 3) {
+          Text(tokens == 65_536 ? "64K" : "128K")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Text(value)
+            .font(.system(size: 16, weight: .bold))
+            .monospacedDigit()
+        }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.string("Estimated peak memory for %lld tokens: %@",
+          language: language, Int64(tokens), value))
+      }
+    }
+    .help(L10n.string("Capacity estimate for an input-heavy context, including retained caches. 128K is extrapolated; actual usage may vary.", language: language))
   }
 
   private var layerMajorPrefillThreshold: Binding<Int> {
@@ -2095,7 +2185,7 @@ private struct ModelAdvancedView: View {
   }
 
   private func integerField(_ label: String, hint: String, value: Binding<Int>) -> some View {
-    SettingRow(label, hint: hint, language: language) {
+    SettingRow(label, hint: impactHint(label, hint), language: language) {
       TextField(
         L10n.string(label, language: language),
         value: value,
@@ -2107,7 +2197,7 @@ private struct ModelAdvancedView: View {
   }
 
   private func doubleField(_ label: String, hint: String, value: Binding<Double>) -> some View {
-    SettingRow(label, hint: hint, language: language) {
+    SettingRow(label, hint: impactHint(label, hint), language: language) {
       TextField(
         L10n.string(label, language: language),
         value: value,
@@ -2119,7 +2209,7 @@ private struct ModelAdvancedView: View {
   }
 
   private func toggleField(_ label: String, hint: String, value: Binding<Bool>) -> some View {
-    SettingRow(label, hint: hint, language: language) {
+    SettingRow(label, hint: impactHint(label, hint), language: language) {
       Toggle(L10n.string(label, language: language), isOn: value)
         .labelsHidden()
         .accessibilityLabel(L10n.string(label, language: language))
@@ -2187,7 +2277,7 @@ private struct LogsView: View {
   }
 }
 
-private struct SettingsView: View {
+struct SettingsView: View {
   @Binding var languageCode: String
   let language: AppLanguage
   @ObservedObject var appUpdater: AppUpdater
@@ -2195,34 +2285,6 @@ private struct SettingsView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 14) {
-        HStack(spacing: 20) {
-          Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
-            .resizable()
-            .interpolation(.high)
-            .frame(width: 76, height: 76)
-            .accessibilityHidden(true)
-          VStack(alignment: .leading, spacing: 5) {
-            Text("Whallm")
-              .font(.title.bold())
-            Text(L10n.string("Local DeepSeek inference from SSD.", language: language))
-              .font(.title3)
-              .foregroundStyle(.secondary)
-            Text(
-              L10n.string(
-                "Version %@ · build %@",
-                language: language,
-                appVersion,
-                buildVersion
-              )
-            )
-            .font(.callout.monospacedDigit())
-            .foregroundStyle(.tertiary)
-            .textSelection(.enabled)
-          }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .appCard(padding: 22)
-
         SectionHeader(title: L10n.string("Preferences", language: language))
           .padding(.top, 12)
 
@@ -2297,6 +2359,50 @@ private struct SettingsView: View {
           }
         }
         .appCard()
+      }
+      .frame(maxWidth: AppLayout.contentWidth)
+      .frame(maxWidth: .infinity)
+      .padding(.horizontal, 40)
+      .padding(.vertical, 24)
+    }
+    .background(AppTheme.pageBackground)
+    .environment(\.locale, language.locale)
+  }
+}
+
+struct AboutView: View {
+  let language: AppLanguage
+
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(spacing: 20) {
+          Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+            .resizable()
+            .interpolation(.high)
+            .frame(width: 76, height: 76)
+            .accessibilityHidden(true)
+          VStack(alignment: .leading, spacing: 5) {
+            Text("Whallm")
+              .font(.title.bold())
+            Text(L10n.string("Local DeepSeek inference from SSD.", language: language))
+              .font(.title3)
+              .foregroundStyle(.secondary)
+            Text(
+              L10n.string(
+                "Version %@ · build %@",
+                language: language,
+                appVersion,
+                buildVersion
+              )
+            )
+            .font(.callout.monospacedDigit())
+            .foregroundStyle(.tertiary)
+            .textSelection(.enabled)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCard(padding: 22)
 
         SectionHeader(title: L10n.string("Project", language: language))
           .padding(.top, 12)

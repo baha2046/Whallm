@@ -353,6 +353,9 @@ final class ModelLibrary: ObservableObject {
         modelKind: modelKind.rawValue,
         runtime: ModelCatalog.Entry.Runtime(
           slots: settings.slots,
+          expertCacheBytes: try settings.expertCacheGiB.map { try ExpertMemory.bytes(gib: $0) },
+          mtpCacheBytes: try settings.mtpCacheGiB.map { try ExpertMemory.bytes(gib: $0) },
+          dsparkCacheBytes: try settings.dsparkCacheGiB.map { try ExpertMemory.bytes(gib: $0) },
           readWorkers: settings.readWorkers,
           prefetchReadWorkers: settings.prefetchReadWorkers ?? 2,
           prefillStepSize: settings.prefillStepSize,

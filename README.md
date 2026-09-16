@@ -59,6 +59,11 @@ Model weights are not included with the app. DeepSeek V4.1's expert and Engram f
 
 A slot holds one expert's weights. More slots keep more experts in memory and may reduce SSD reads. Saved custom settings are preserved.
 
+The current source replaces the main, MTP and DSpark slot controls with **expert cache GiB**. Capacity is rounded down using each installed model’s expert size; old capacities are preserved. The fixed Advanced Settings header shows **64K and 128K peak memory estimates** side by side, with token lengths above the GiB values. Estimates include expert capacity and retained prompt caches, and take the largest load, prefill or generation phase. V4.1 uses the observed buffer lifetimes for the tested packed-cache, layer-major, CED and candidate-index configuration; other configurations keep the structural estimate.
+
+The fixed estimate header, shorter descriptions, and Playground/About/Status navigation updates are included in the validated local package; they have not been publicly released.
+The 128K values are extrapolations, not measured peaks or guaranteed upper bounds. A request may leave expert capacity unused, so its measured usage can be lower than the planning value.
+
 In **Model → Advanced Settings**:
 
 - **Max tokens** defaults to **8192** for all three models.

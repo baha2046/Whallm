@@ -2380,6 +2380,12 @@ def _catalog_overrides(specs, arguments, config, explicit):
         for name in explicit
         if renamed.get(name, name) in runtime
     }
+    # An explicit legacy slot flag must override a catalog's memory budget too.
+    for slot, budget in (("slots", "expert_cache_bytes"),
+                         ("mtp_slots", "mtp_cache_bytes"),
+                         ("dspark_slots", "dspark_cache_bytes")):
+        if slot in explicit:
+            overrides[budget] = None
     models = []
     for spec in specs:
         model = spec.to_json()

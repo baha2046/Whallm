@@ -10,6 +10,14 @@ app_version=${APP_VERSION:-1.0.0}
 build_version=${BUILD_VERSION:-$app_version}
 build_flavor=${WHALLM_BUILD_FLAVOR:-distribution}
 swift_build_arguments=(--package-path "$project_root" -c release)
+# Swift 6.4's Clang link command forwards --sysroot but can omit -isysroot,
+# recording the deployment target as the SDK and selecting legacy AppKit controls.
+# Pass the selected SDK explicitly to Clang as well; keep the deployment target.
+sdk_path=$(xcrun --sdk macosx --show-sdk-path)
+sdk_version=$(xcrun --sdk macosx --show-sdk-version)
+swift_build_arguments+=(--sdk "$sdk_path"
+  -Xswiftc -Xclang-linker -Xswiftc -isysroot
+  -Xswiftc -Xclang-linker -Xswiftc "$sdk_path")
 case $build_flavor in
   local) swift_build_arguments+=(-Xswiftc -DWHALLM_LOCAL_BUILD) ;;
   distribution) ;;
@@ -213,6 +221,7 @@ if [[ -n ${NOTARY_PROFILE:-} ]]; then
 fi
 
 EXPECTED_LOCAL_BUILD=$([[ $build_flavor == local ]] && print 1 || print 0) \
+EXPECTED_SDK_VERSION="$sdk_version" \
 REQUIRE_NOTARIZATION=$([[ -n ${NOTARY_PROFILE:-} ]] && print 1 || print 0) \
   "$project_root/Scripts/verify-packaged-app.sh" "$app_path" "$zip_path"
 

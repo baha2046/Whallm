@@ -218,7 +218,11 @@ enum PromptCacheMode: String, Codable, CaseIterable, Identifiable {
 struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   private static let legacyModelPreference = "modelAdvancedSettingsLegacyModelKind"
 
-  var slots = 1_152
+  var slots = 1_152 // Legacy capacity, used until a memory budget is saved.
+  var expertCacheGiB: Double?
+  var mtpCacheGiB: Double?
+  var dsparkCacheGiB: Double?
+  var estimateInputTokens: Int?
   var readWorkers = 4
   var prefetchReadWorkers: Int? = 2
   var moePrefillStepSize: Int? = 0
@@ -328,6 +332,20 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   }
 
   func validate(for modelKind: ModelKind) throws {
+    for value in [expertCacheGiB, mtpCacheGiB, dsparkCacheGiB].compactMap({ $0 }) {
+      _ = try ExpertMemory.bytes(gib: value)
+    }
+    let blob = ExpertMemory.blobBytes(for: modelKind)
+    if let expertCacheGiB {
+      _ = try ExpertMemory.capacity(gib: expertCacheGiB, blobBytes: blob,
+        minimum: modelKind == .qwen3_8FlashNext ? 10 : 6)
+    }
+    if mtpEnabled == true, let mtpCacheGiB {
+      _ = try ExpertMemory.capacity(gib: mtpCacheGiB, blobBytes: blob, minimum: 10)
+    }
+    if dsparkEnabled, let dsparkCacheGiB {
+      _ = try ExpertMemory.capacity(gib: dsparkCacheGiB, blobBytes: blob, minimum: 30)
+    }
     guard slots >= 6 else {
       throw ConfigurationError(L10n.string("Slots must be at least 6."))
     }
@@ -615,6 +633,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
   struct Entry: Codable, Equatable, Sendable {
     struct Runtime: Codable, Equatable, Sendable {
       let slots: Int
+      var expertCacheBytes: UInt64? = nil
+      var mtpCacheBytes: UInt64? = nil
+      var dsparkCacheBytes: UInt64? = nil
       let readWorkers: Int
       let prefetchReadWorkers: Int
       let prefillStepSize: Int
@@ -662,6 +683,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
 
       enum CodingKeys: String, CodingKey {
         case slots
+        case expertCacheBytes = "expert_cache_bytes"
+        case mtpCacheBytes = "mtp_cache_bytes"
+        case dsparkCacheBytes = "dspark_cache_bytes"
         case readWorkers = "read_workers"
         case prefetchReadWorkers = "prefetch_read_workers"
         case prefillStepSize = "prefill_step_size"
@@ -711,6 +735,9 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         try values.encode(slots, forKey: .slots)
+        try values.encodeIfPresent(expertCacheBytes, forKey: .expertCacheBytes)
+        try values.encodeIfPresent(mtpCacheBytes, forKey: .mtpCacheBytes)
+        try values.encodeIfPresent(dsparkCacheBytes, forKey: .dsparkCacheBytes)
         try values.encode(qwenQuantizedKV, forKey: .qwenQuantizedKV)
         try values.encode(qwenQuantizedIndex, forKey: .qwenQuantizedIndex)
         try values.encode(v41PackedKV, forKey: .v41PackedKV)
@@ -921,7 +948,7 @@ enum AppKeychain {
   }
 }
 
-private struct ConfigurationError: LocalizedError {
+struct ConfigurationError: LocalizedError {
   let message: String
 
   init(_ message: String) {

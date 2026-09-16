@@ -181,6 +181,17 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+def _load_prompt_cache_file(path: Path):
+    try:
+        return mx.load(path, return_metadata=True)
+    except RuntimeError as error:
+        # MLX reports malformed safetensors as RuntimeError. Only translate
+        # file-format errors; allocation and GPU execution failures must escape.
+        if not str(error).startswith(("[load_safetensors]", "[read] Unable to read ")):
+            raise
+        raise ValueError(f"Invalid prompt cache file: {path}") from error
+
+
 def _sha256_json(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode()).hexdigest()
 
@@ -1193,6 +1204,8 @@ class ModelRuntime:
         self._model_id = getattr(installed, "model_id", "deepseek-v4")
         self._revision = getattr(installed, "revision", "")
         self._manifest_format = getattr(installed, "format_version", 1)
+        from .memory_budget import resolve_cache_budgets
+        config = resolve_cache_budgets(installed, config)
         self.config = config
         self.support.validate_config(config)
         self.metrics = RuntimeMetrics()
@@ -1203,6 +1216,7 @@ class ModelRuntime:
         self._persistent_dspark_prompt_caches: list[
             _PersistentDSparkPromptCacheEntry
         ] = []
+        self._failed_prompt_cache_paths: set[Path] = set()
         self._prompt_cache_directory: Path | None = None
         self._generation_lock = threading.Lock()
         self._generation_stream = mx.new_thread_unsafe_stream(mx.gpu)
@@ -1787,13 +1801,17 @@ class ModelRuntime:
             for entry in self._persistent_prompt_caches
             if len(entry.tokens) < len(prompt_tokens)
             and prompt_tokens[: len(entry.tokens)] == entry.tokens
+            and entry.path not in getattr(self, "_failed_prompt_cache_paths", ())
         ]
-        if persistent:
-            entry = max(persistent, key=lambda item: len(item.tokens))
+        for entry in sorted(persistent, key=lambda item: len(item.tokens), reverse=True):
+            check_cancelled()
             loaded = self._load_persistent_prompt_cache(entry)
+            check_cancelled()
             if loaded is not None:
                 self._record_persistent_prompt_cache_hit(entry)
                 return loaded
+            self._exclude_persistent_prompt_cache(entry.path)
+        check_cancelled()
         return _PromptCacheEntry(
             self.support.new_cache(self.model),
             [],
@@ -1854,13 +1872,17 @@ class ModelRuntime:
             and entry.target_layers == tuple(dspark.target_layers)
             and len(entry.tokens) < len(prompt_tokens)
             and prompt_tokens[: len(entry.tokens)] == entry.tokens
+            and entry.path not in getattr(self, "_failed_prompt_cache_paths", ())
         ]
-        if persistent:
-            descriptor = max(persistent, key=lambda item: len(item.tokens))
+        for descriptor in sorted(persistent, key=lambda item: len(item.tokens), reverse=True):
+            check_cancelled()
             loaded = self._load_persistent_dspark_prompt_cache(descriptor, dspark)
+            check_cancelled()
             if loaded is not None:
                 self._store_dspark_prompt_cache(loaded, persist=False)
                 return self._clone_dspark_prompt_cache_entry(loaded), "persistent"
+            self._exclude_persistent_prompt_cache(descriptor.path)
+        check_cancelled()
         return (
             _DSparkPromptCacheEntry(
                 self.support.new_cache(self.model),
@@ -2077,6 +2099,8 @@ class ModelRuntime:
             try:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 data_path = directory / metadata["data"]
+                if data_path in getattr(self, "_failed_prompt_cache_paths", ()):
+                    continue
                 cache_format = int(metadata.get("format", 0))
                 tokens = [int(token) for token in metadata["tokens"]]
                 expected_contract_sha256, blocks, cache_key = (
@@ -2154,6 +2178,8 @@ class ModelRuntime:
             try:
                 metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
                 data_path = directory / metadata["data"]
+                if data_path in getattr(self, "_failed_prompt_cache_paths", ()):
+                    continue
                 revision = str(metadata.get("revision", ""))
                 target_layers = tuple(
                     int(layer) for layer in metadata["targetLayers"]
@@ -2186,12 +2212,25 @@ class ModelRuntime:
         )
         return entries[:maximum]
 
+    def _exclude_persistent_prompt_cache(self, path: Path) -> None:
+        # Keep the original files, but do not repeatedly load a failed payload
+        # during this model's lifetime, including after a persistence rescan.
+        if not hasattr(self, "_failed_prompt_cache_paths"):
+            self._failed_prompt_cache_paths = set()
+        self._failed_prompt_cache_paths.add(path)
+        self._persistent_prompt_caches = [
+            entry for entry in self._persistent_prompt_caches if entry.path != path
+        ]
+        self._persistent_dspark_prompt_caches = [
+            entry for entry in self._persistent_dspark_prompt_caches if entry.path != path
+        ]
+
     def _load_persistent_prompt_cache(
         self,
         entry: _PersistentPromptCacheEntry,
     ) -> _PromptCacheEntry | None:
         try:
-            arrays, metadata = mx.load(entry.path, return_metadata=True)
+            arrays, metadata = _load_prompt_cache_file(entry.path)
             schema = json.loads(metadata["state"])
             state = _decode_cache_state(schema, arrays)
             cache = self.support.new_cache(self.model)
@@ -2213,7 +2252,7 @@ class ModelRuntime:
         dspark,
     ) -> _DSparkPromptCacheEntry | None:
         try:
-            arrays, metadata = mx.load(entry.path, return_metadata=True)
+            arrays, metadata = _load_prompt_cache_file(entry.path)
             schema = json.loads(metadata["state"])
             state = _decode_cache_state(schema, arrays)
             if not isinstance(state, dict) or set(state) != {"target", "context"}:
@@ -2237,7 +2276,7 @@ class ModelRuntime:
             if context_arrays:
                 mx.eval(*context_arrays)
             return loaded
-        except Exception:
+        except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
             return None
 
     def _persist_prompt_cache(self, entry: _PromptCacheEntry) -> None:
@@ -2481,6 +2520,8 @@ class ModelRuntime:
         self._persistent_prompt_caches.clear()
         self._dspark_prompt_caches.clear()
         self._persistent_dspark_prompt_caches.clear()
+        if hasattr(self, "_failed_prompt_cache_paths"):
+            self._failed_prompt_cache_paths.clear()
         if not getattr(self, "_closed", False):
             self._closed = True
             self.support.close(self.model, self.expert_cache)

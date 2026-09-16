@@ -131,6 +131,8 @@ def _persistence_cache_state(cache: Any) -> list[dict[str, Any]]:
 
 
 def _restore_persistence_item(target: Any, saved: dict[str, Any]) -> None:
+    if not isinstance(saved, dict):
+        raise ValueError("invalid prompt cache item")
     kind = saved.get("kind")
     if kind == "qsa_quantized":
         if not isinstance(target, QSAQuantizedCache):
@@ -153,6 +155,8 @@ def _restore_persistence_item(target: Any, saved: dict[str, Any]) -> None:
 
 
 def _restore_persistence_cache(cache: Any, state: list[dict[str, Any]]) -> None:
+    if not isinstance(state, list) or not all(isinstance(saved, dict) for saved in state):
+        raise ValueError("invalid prompt cache state")
     if len(cache) != len(state):
         raise ValueError("prompt cache layer count does not match")
     for target, saved in zip(cache, state):

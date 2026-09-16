@@ -47,6 +47,39 @@ class V41PromptCacheTests(unittest.TestCase):
         self.model = tiny_model()
         self.support = get_support('deepseek-v4.1')
 
+    def test_corrupt_disk_prefix_recovers_and_generates_the_cold_output(self):
+        backend = Tokenizer(models.WordLevel({str(i): i for i in range(16)}, unk_token='0'))
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, unk_token='0')
+        prompt = [1, 2, 3, 4, 5, 6, 7, 8]
+        options = GenerationOptions(max_tokens=3, temperature=0)
+        for all_bad in (False, True):
+            with self.subTest(all_bad=all_bad), TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / 'config.json').write_text(json.dumps(asdict(self.model.args)))
+                installed = SimpleNamespace(root=root, model_kind='deepseek-v4.1',
+                                            model_id='fixture/v41', revision='fixture',
+                                            format_version=3, maximum_context=32)
+                def open_runtime(disk):
+                    config = RuntimeConfig(prompt_cache_entries=2 if disk else 0,
+                                           persistent_prompt_cache=disk,
+                                           prompt_cache_directory=root / 'cache', prefill_step_size=3)
+                    with patch('deepseek_v4_ssd.generation.load_model',
+                               return_value=(self.model, SimpleNamespace(close=lambda: None))), \
+                         patch('deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained', return_value=tokenizer):
+                        return ModelRuntime(installed, config)
+                with open_runtime(False) as cold:
+                    expected = [p.token for p in cold.stream(prompt, options)]
+                with open_runtime(True) as warm:
+                    self.assertEqual([p.token for p in warm.stream(prompt, options)], expected)
+                with open_runtime(True) as recovered:
+                    for entry in recovered._persistent_prompt_caches:
+                        if all_bad or len(entry.tokens) > 3:
+                            entry.path.write_bytes(b'corrupt fixture')
+                    self.assertEqual([p.token for p in recovered.stream(prompt, options)], expected)
+                    self.assertEqual(recovered.metrics.snapshot()['prompt_cache_reused_tokens'], 0 if all_bad else 3)
+                    # Follow-up requests still work after persistence rescans.
+                    self.assertEqual([p.token for p in recovered.stream(prompt, options)], expected)
+
     def test_clone_and_disk_round_trip_continue_at_partial_group_and_ring_wrap(self):
         original = [DeepSeekV41PromptCache(self.model.model.make_cache(max_seq_len=4, dtype=mx.bfloat16))]
         prefix = mx.array([[1, 2, 3, 4, 5, 6, 7]])

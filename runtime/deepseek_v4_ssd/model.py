@@ -76,6 +76,9 @@ class RuntimeConfig:
     ready_expert_decode: bool = True
     staged_expert_streaming: bool = False
     power_saving_limit_gbps: float | None = None
+    expert_cache_bytes: int | None = None
+    mtp_cache_bytes: int | None = None
+    dspark_cache_bytes: int | None = None
 
 
 def _apply_prompt_cache_mode(config: RuntimeConfig, mode: str | None) -> RuntimeConfig:
@@ -649,6 +652,8 @@ def load_model(
     config: RuntimeConfig = RuntimeConfig(),
 ):
     from .model_support import support_for_installed
+    from .memory_budget import resolve_cache_budgets
+    config = resolve_cache_budgets(installed_model, config)
     support = support_for_installed(installed_model)
     support.validate_config(config)
     if (

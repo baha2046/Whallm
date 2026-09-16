@@ -95,7 +95,7 @@
 "Number of linear conversations to keep. The recommended value is 2." = "可保留的線性對話數量。推薦值是 2。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 1152." = "Active Parameters Cache 的 routed expert 數量。建議值是 1152。";
 "Number of routed experts in the Active Parameters Cache. The recommended value is 3072." = "Active Parameters Cache 的 routed expert 數量。建議值是 3072。";
-"Number of workers that read expert blobs at the same time. The recommended value is 4." = "同時讀取 expert blob 的工作數量。建議值是 8。";
+"Number of workers that read expert blobs at the same time. The recommended value is 4." = "同時讀取 expert blob 的工作數量。建議值是 4。";
 "Optional for local use" = "本機使用時可留空";
 "Optional UTF-8 prompt file path" = "可選的 UTF-8 prompt 檔案路徑";
 "Port" = "連接埠";
@@ -448,3 +448,76 @@
 
 "Route-aware" = "路由感知";
 "Route-aware cache remembers expert usage and adjusts memory across layers." = "路由感知快取會記住專家使用紀錄，並調整各層的記憶體分配。";
+
+/* Memory planning and setting effects */
+"Expert cache GiB" = "專家快取 GiB";
+"MTP expert cache GiB" = "MTP 專家快取 GiB";
+"DSpark expert cache GiB" = "DSpark 專家快取 GiB";
+"Expert cache memory must be greater than 0 and at most 1024 GiB." = "專家快取記憶體必須大於 0，且不超過 1024 GiB。";
+"Expert cache memory is too small for this model." = "專家快取記憶體不足以執行這個模型。";
+"Expert cache memory is too small or invalid." = "專家快取記憶體太小，或數值無效。";
+"Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load." = "只配置專家權重容量，不含常駐權重與暫存。向下取整為完整專家數量，下次載入模型時生效。";
+"Capacity: %lld experts" = "可容納 %lld 個專家";
+"Conservative peak estimate" = "保守預估峰值";
+"About %.1f GiB" = "約 %.1f GiB";
+"For %lld input tokens and up to %lld output tokens." = "以 %lld 個輸入 token、最多 %lld 個輸出 token 估算。";
+"Memory breakdown" = "記憶體組成";
+"Model and expert cache" = "模型與專家快取";
+"Conversation and prompt cache" = "對話狀態與重用快取";
+"MTP / DSpark" = "MTP／DSpark";
+"Temporary buffers and safety reserve" = "暫存與安全預留";
+"This estimate leaves little memory for macOS and other apps." = "此估算留給 macOS 與其他 App 的記憶體不多。";
+"Install a usable model to estimate memory." = "安裝可用的模型後即可估算記憶體。";
+"Estimate unavailable. Check cache budgets and input/output lengths against the model context limit." = "無法估算。請檢查快取容量，以及輸入與輸出長度是否超過模型的上下文上限。";
+"Planning estimate, not a measured peak or a hard limit. Includes loading copies and safety reserve; system file cache and other apps are excluded. API requests can exceed the lengths shown here." = "供配置參考，尚未經峰值實測校準，也不是硬上限。包含載入副本與安全預留；不含系統檔案快取與其他 App。API 請求可能超過這裡設定的長度。";
+"Input tokens for estimate" = "估算用的輸入 token 數";
+"Only changes this estimate; does not limit requests. Output length uses Max tokens below." = "只影響估算，不限制請求。輸出長度採用下方的最大 token 數。";
+"MLX memory guideline GiB" = "MLX 記憶體指導值 GiB";
+"0 selects the automatic guideline. This does not reserve memory." = "0 代表自動選擇指導值。這不會預先占用記憶體。";
+
+/* Concise settings descriptions and navigation */
+"Retain more experts to reduce SSD reads, at the cost of memory. Applies on next load." = "保留更多專家以減少 SSD 讀取，但會增加記憶體用量。下次載入生效。";
+"May speed up generation, but uses more memory and can be slower for some requests." = "可能加快生成，但會增加記憶體用量，部分請求反而較慢。";
+"Reject weak drafts earlier, but fewer accepted drafts may reduce the speed gain. 0 keeps all drafts." = "調高可提早排除低信心草稿，但可能減少加速效果。0 保留所有草稿。";
+"May speed up generation, but answer quality may drop. Unavailable with MTP or DSpark." = "可能加快生成，但回答品質可能下降。無法與 MTP 或 DSpark 同時使用。";
+"Save memory, but compression adds work and may slightly affect answer quality." = "節省記憶體，但壓縮會增加運算，回答品質可能略受影響。";
+"Reduce cache quantization error, but may use more memory." = "減少快取量化誤差，但可能增加記憶體用量。";
+"May shorten prefill, but needs extra memory and may slightly change output." = "可能縮短 prefill 時間，但需要額外記憶體，輸出可能略有差異。";
+"More ANE work may shorten prefill, but adds memory use and may change output. 0 uses GPU only." = "調高可能縮短 prefill 時間，但會增加記憶體用量，輸出可能略有差異。0 僅使用 GPU。";
+"Shorten prefill, but peak memory may rise and output may differ slightly." = "縮短 prefill 時間，但記憶體峰值可能上升，輸出可能略有差異。";
+"Shorten prefill, but may use more memory. Requires layer-major prefill with MTP off." = "縮短 prefill 時間，但可能增加記憶體用量。需啟用 layer-major prefill 並關閉 MTP。";
+"Larger batches may shorten prefill, but raise peak memory. 0 selects automatically." = "調高可能縮短 prefill 時間，但會提高記憶體峰值。0 為自動選擇。";
+"Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill." = "調高可減少短輸入的整層載入開銷，但較少請求能享有 prefill 加速。";
+"Reduce SSD waiting, but may need more temporary memory." = "減少等待 SSD 的時間，但可能需要更多暫存記憶體。";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down." = "調高可能減少 SSD 等待，但會增加記憶體用量，過多反而可能變慢。";
+"Off saves memory but repeats work. Memory reuses quickly but clears on unload. Disk survives restarts but adds I/O." = "不使用：省記憶體，但每次重算。記憶體：重用快，但卸載後清除。磁碟：重啟後可用，但增加讀寫。";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory." = "調高可保留更多對話快取、縮短重複輸入的等待，但會增加記憶體用量。";
+"LRU adapts quickly but forgets older use. LFU favors frequent use but adapts slowly. Route-aware balances layers but adds bookkeeping." = "LRU：適應快，但易忘記較早使用。LFU：保留常用專家，但適應慢。路由感知：平衡各層，但增加管理開銷。";
+"Speed up attention search, but limiting candidates may affect output." = "加快注意力搜尋，但限制候選範圍可能影響輸出。";
+"Shorten prefill and reduce temporary memory; full-model validation is still limited." = "縮短 prefill 時間並減少暫存，但完整模型驗證仍有限。";
+"Allow longer answers, but generation may take more time and memory." = "調高可容納更完整的回答，但生成可能更久、記憶體用量更多。";
+"Increase answer variety, but responses may be less consistent." = "調高可增加回答變化，但穩定性可能降低。";
+"Consider more candidates for varied answers, but responses may be less focused. 0 removes the limit." = "調高可增加候選與回答變化，但可能較不聚焦。0 不限制候選數。";
+"Choose sampling for chat or thinking automatically, overriding the manual values below." = "自動選擇適合對話或思考的取樣設定，但會取代下方手動值。";
+"A higher guideline may reduce waiting, but allows more memory use. 0 is automatic; too little memory can fail requests." = "調高可能減少等待，但允許更多記憶體用量。0 為自動；記憶體不足可能導致請求失敗。";
+"Prepare matching prompts for faster reuse, but add startup time and cache memory." = "預先準備相符輸入以加快重用，但會增加啟動時間與快取用量。";
+"Save cache memory, but packing and unpacking may slow processing." = "節省快取記憶體，但打包與解包可能增加處理時間。";
+"Status" = "狀態";
+"About" = "關於";
+"Playground" = "試用區";
+"Install the DSpark files before enabling this setting." = "請先安裝 DSpark 檔案再啟用。";
+
+/* Fixed 64K / 128K memory planning header */
+"Estimated peak memory" = "預估峰值記憶體";
+"Estimated peak memory for %lld tokens: %@" = "%lld tokens 的預估峰值記憶體：%@";
+"Capacity estimate for an input-heavy context, including retained caches. 128K is extrapolated; actual usage may vary." = "依輸入為主的長度與對話快取預留估算。128K 為外推值，實際用量可能不同。";
+
+"Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load." = "保留更多專家以減少 SSD 讀取，但會增加記憶體用量。建議約 %@ GiB，下次載入生效。";
+"Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load." = "保留更多專家以減少 SSD 讀取，但會增加記憶體用量。預設約 %@ GiB，下次載入生效。";
+"More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only." = "調高可能縮短 prefill 時間，但會增加記憶體用量，輸出可能略有差異。預設 0.25；0 僅使用 GPU，1 僅使用 ANE。";
+"Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0." = "調高可能縮短 prefill 時間，但會提高記憶體峰值。預設 0，依輸入長度自動選擇 128、256 或 1024。";
+"Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024." = "調高可減少短輸入的整層載入開銷，但較少請求能享有 prefill 加速。預設 1024。";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4." = "調高可能減少 SSD 等待，但會增加記憶體用量，過多反而可能變慢。建議值為 4。";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2." = "調高可能減少 SSD 等待，但會增加記憶體用量，過多反而可能變慢。預設為 2。";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld." = "調高可保留更多對話快取、縮短重複輸入的等待，但會增加記憶體用量。建議值為 %lld。";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB." = "調高可保留更多對話快取、縮短重複輸入的等待，但會增加記憶體用量。建議值為 8 GiB。";

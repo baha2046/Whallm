@@ -448,3 +448,76 @@
 
 "Route-aware" = "Route-aware";
 "Route-aware cache remembers expert usage and adjusts memory across layers." = "Route-aware cache remembers expert usage and adjusts memory across layers.";
+
+/* Memory planning and setting effects */
+"Expert cache GiB" = "Expert cache GiB";
+"MTP expert cache GiB" = "MTP expert cache GiB";
+"DSpark expert cache GiB" = "DSpark expert cache GiB";
+"Expert cache memory must be greater than 0 and at most 1024 GiB." = "Expert cache memory must be greater than 0 and at most 1024 GiB.";
+"Expert cache memory is too small for this model." = "Expert cache memory is too small for this model.";
+"Expert cache memory is too small or invalid." = "Expert cache memory is too small or invalid.";
+"Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load." = "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load.";
+"Capacity: %lld experts" = "Capacity: %lld experts";
+"Conservative peak estimate" = "Conservative peak estimate";
+"About %.1f GiB" = "About %.1f GiB";
+"For %lld input tokens and up to %lld output tokens." = "For %lld input tokens and up to %lld output tokens.";
+"Memory breakdown" = "Memory breakdown";
+"Model and expert cache" = "Model and expert cache";
+"Conversation and prompt cache" = "Conversation and prompt cache";
+"MTP / DSpark" = "MTP / DSpark";
+"Temporary buffers and safety reserve" = "Temporary buffers and safety reserve";
+"This estimate leaves little memory for macOS and other apps." = "This estimate leaves little memory for macOS and other apps.";
+"Install a usable model to estimate memory." = "Install a usable model to estimate memory.";
+"Estimate unavailable. Check cache budgets and input/output lengths against the model context limit." = "Estimate unavailable. Check cache budgets and input/output lengths against the model context limit.";
+"Planning estimate, not a measured peak or a hard limit. Includes loading copies and safety reserve; system file cache and other apps are excluded. API requests can exceed the lengths shown here." = "Planning estimate, not a measured peak or a hard limit. Includes loading copies and safety reserve; system file cache and other apps are excluded. API requests can exceed the lengths shown here.";
+"Input tokens for estimate" = "Input tokens for estimate";
+"Only changes this estimate; does not limit requests. Output length uses Max tokens below." = "Only changes this estimate; does not limit requests. Output length uses Max tokens below.";
+"MLX memory guideline GiB" = "MLX memory guideline GiB";
+"0 selects the automatic guideline. This does not reserve memory." = "0 selects the automatic guideline. This does not reserve memory.";
+
+/* Concise settings descriptions and navigation */
+"Retain more experts to reduce SSD reads, at the cost of memory. Applies on next load." = "Retain more experts to reduce SSD reads, at the cost of memory. Applies on next load.";
+"May speed up generation, but uses more memory and can be slower for some requests." = "May speed up generation, but uses more memory and can be slower for some requests.";
+"Reject weak drafts earlier, but fewer accepted drafts may reduce the speed gain. 0 keeps all drafts." = "Reject weak drafts earlier, but fewer accepted drafts may reduce the speed gain. 0 keeps all drafts.";
+"May speed up generation, but answer quality may drop. Unavailable with MTP or DSpark." = "May speed up generation, but answer quality may drop. Unavailable with MTP or DSpark.";
+"Save memory, but compression adds work and may slightly affect answer quality." = "Save memory, but compression adds work and may slightly affect answer quality.";
+"Reduce cache quantization error, but may use more memory." = "Reduce cache quantization error, but may use more memory.";
+"May shorten prefill, but needs extra memory and may slightly change output." = "May shorten prefill, but needs extra memory and may slightly change output.";
+"More ANE work may shorten prefill, but adds memory use and may change output. 0 uses GPU only." = "More ANE work may shorten prefill, but adds memory use and may change output. 0 uses GPU only.";
+"Shorten prefill, but peak memory may rise and output may differ slightly." = "Shorten prefill, but peak memory may rise and output may differ slightly.";
+"Shorten prefill, but may use more memory. Requires layer-major prefill with MTP off." = "Shorten prefill, but may use more memory. Requires layer-major prefill with MTP off.";
+"Larger batches may shorten prefill, but raise peak memory. 0 selects automatically." = "Larger batches may shorten prefill, but raise peak memory. 0 selects automatically.";
+"Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill." = "Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill.";
+"Reduce SSD waiting, but may need more temporary memory." = "Reduce SSD waiting, but may need more temporary memory.";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down." = "More workers may reduce SSD waiting, but use more memory; too many can slow things down.";
+"Off saves memory but repeats work. Memory reuses quickly but clears on unload. Disk survives restarts but adds I/O." = "Off saves memory but repeats work. Memory reuses quickly but clears on unload. Disk survives restarts but adds I/O.";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory." = "Keep more conversation history to shorten repeated prefill, at the cost of memory.";
+"LRU adapts quickly but forgets older use. LFU favors frequent use but adapts slowly. Route-aware balances layers but adds bookkeeping." = "LRU adapts quickly but forgets older use. LFU favors frequent use but adapts slowly. Route-aware balances layers but adds bookkeeping.";
+"Speed up attention search, but limiting candidates may affect output." = "Speed up attention search, but limiting candidates may affect output.";
+"Shorten prefill and reduce temporary memory; full-model validation is still limited." = "Shorten prefill and reduce temporary memory; full-model validation is still limited.";
+"Allow longer answers, but generation may take more time and memory." = "Allow longer answers, but generation may take more time and memory.";
+"Increase answer variety, but responses may be less consistent." = "Increase answer variety, but responses may be less consistent.";
+"Consider more candidates for varied answers, but responses may be less focused. 0 removes the limit." = "Consider more candidates for varied answers, but responses may be less focused. 0 removes the limit.";
+"Choose sampling for chat or thinking automatically, overriding the manual values below." = "Choose sampling for chat or thinking automatically, overriding the manual values below.";
+"A higher guideline may reduce waiting, but allows more memory use. 0 is automatic; too little memory can fail requests." = "A higher guideline may reduce waiting, but allows more memory use. 0 is automatic; too little memory can fail requests.";
+"Prepare matching prompts for faster reuse, but add startup time and cache memory." = "Prepare matching prompts for faster reuse, but add startup time and cache memory.";
+"Save cache memory, but packing and unpacking may slow processing." = "Save cache memory, but packing and unpacking may slow processing.";
+"Status" = "Status";
+"About" = "About";
+"Playground" = "Playground";
+"Install the DSpark files before enabling this setting." = "Install the DSpark files before enabling this setting.";
+
+/* Fixed 64K / 128K memory planning header */
+"Estimated peak memory" = "Estimated peak memory";
+"Estimated peak memory for %lld tokens: %@" = "Estimated peak memory for %lld tokens: %@";
+"Capacity estimate for an input-heavy context, including retained caches. 128K is extrapolated; actual usage may vary." = "Capacity estimate for an input-heavy context, including retained caches. 128K is extrapolated; actual usage may vary.";
+
+"Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load." = "Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load.";
+"Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load." = "Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load.";
+"More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only." = "More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only.";
+"Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0." = "Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0.";
+"Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024." = "Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024.";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4." = "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4.";
+"More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2." = "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2.";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld." = "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld.";
+"Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB." = "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB.";

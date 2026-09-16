@@ -91,6 +91,39 @@ def _entry(value: int = 7, tokens: list[int] | None = None):
 
 
 class DSparkPromptCacheTests(unittest.TestCase):
+    def test_corrupt_disk_bundle_falls_back_without_mixing_target_and_context(self):
+        for all_bad in (False, True):
+            with self.subTest(all_bad=all_bad), tempfile.TemporaryDirectory() as temporary:
+                runtime, dspark = _runtime(Path(temporary))
+                runtime._persist_dspark_prompt_cache(_entry(7, [1]))
+                runtime._persist_dspark_prompt_cache(_entry(99, [1, 2]))
+                runtime._persistent_dspark_prompt_caches = runtime._scan_persistent_dspark_prompt_caches(dspark)
+                for entry in runtime._persistent_dspark_prompt_caches:
+                    if all_bad or len(entry.tokens) == 2:
+                        entry.path.write_bytes(b'corrupt fixture')
+                with patch.object(runtime.support, 'new_cache', side_effect=lambda _: [_FixtureCache()]), \
+                     patch.object(runtime, '_load_persistent_dspark_prompt_cache', wraps=runtime._load_persistent_dspark_prompt_cache) as load:
+                    acquired, source = runtime._acquire_dspark_prompt_cache([1, 2, 3], dspark)
+                    self.assertEqual(source, 'none' if all_bad else 'persistent')
+                    self.assertEqual(acquired.tokens, [] if all_bad else [1])
+                    self.assertEqual(acquired.cache[0].state[0].tolist(), [0] if all_bad else [7])
+                    if all_bad:
+                        self.assertEqual(acquired.context_state, (None, None, None))
+                    else:
+                        self.assertEqual(acquired.context_state[0][0][0].tolist(), [70])
+                    self.assertEqual([call.args[0].tokens for call in load.call_args_list], [[1, 2], [1]])
+                    rescanned = runtime._scan_persistent_dspark_prompt_caches(dspark)
+                    self.assertEqual([e.tokens for e in rescanned], [] if all_bad else [[1]])
+
+    def test_disk_bundle_recovery_does_not_hide_execution_errors(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime, dspark = _runtime(Path(temporary))
+            runtime._persist_dspark_prompt_cache(_entry())
+            runtime._persistent_dspark_prompt_caches = runtime._scan_persistent_dspark_prompt_caches(dspark)
+            with patch('deepseek_v4_ssd.generation.mx.load', side_effect=RuntimeError('GPU out of memory')):
+                with self.assertRaisesRegex(RuntimeError, 'GPU out of memory'):
+                    runtime._acquire_dspark_prompt_cache([1, 2, 3], dspark)
+
     def test_metrics_expose_last_reuse_source(self):
         metrics = RuntimeMetrics()
         metrics.start(

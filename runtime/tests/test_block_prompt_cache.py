@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from threading import Event
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import mlx.core as mx
+
+from deepseek_v4_ssd.cancellation import GenerationCancelled, cancellation_scope
 
 from deepseek_v4_ssd.generation import (
     GenerationOptions,
@@ -62,6 +65,78 @@ def _runtime(directory: Path, *, entries: int = 8, fp8: bool = True):
 
 
 class BlockPromptCacheTests(unittest.TestCase):
+    def test_invalid_disk_candidate_uses_shorter_prefix_and_stays_excluded(self):
+        for damage in ('header', 'short_read', 'schema', 'invalid_item', 'missing'):
+            with self.subTest(damage=damage), tempfile.TemporaryDirectory() as temporary:
+                runtime = _runtime(Path(temporary))
+                for tokens in ([1], [1, 2]):
+                    runtime._persist_prompt_cache(_PromptCacheEntry([_FixtureCache(len(tokens))], tokens))
+                bad = max(runtime._persistent_prompt_caches, key=lambda e: len(e.tokens))
+                if damage == 'header':
+                    bad.path.write_bytes(b'corrupt fixture')
+                elif damage == 'short_read':
+                    bad.path.write_bytes(b'invalid')
+                elif damage == 'schema':
+                    mx.save_safetensors(bad.path, {'a': mx.array([9])}, {'state': '{}'})
+                elif damage == 'invalid_item':
+                    mx.save_safetensors(bad.path, {'a': mx.array([9])}, {'state': '{"items":[null]}'})
+                else:
+                    bad.path.unlink()
+                with patch.object(runtime.support, 'new_cache', side_effect=lambda _: [_FixtureCache()]), \
+                     patch.object(runtime, '_load_persistent_prompt_cache', wraps=runtime._load_persistent_prompt_cache) as load:
+                    acquired = runtime._acquire_prompt_cache([1, 2, 3])
+                    self.assertEqual(acquired.tokens, [1])
+                    self.assertEqual(acquired.cache[0].state[0].tolist(), [1])
+                    self.assertEqual([call.args[0].tokens for call in load.call_args_list], [[1, 2], [1]])
+                    runtime._persistent_prompt_caches = runtime._scan_persistent_prompt_caches()
+                    self.assertNotIn(bad.path, [e.path for e in runtime._persistent_prompt_caches])
+                    load.reset_mock()
+                    self.assertEqual(runtime._acquire_prompt_cache([1, 2, 3]).tokens, [1])
+                    self.assertEqual(load.call_count, 1)
+                if damage != 'missing':
+                    self.assertTrue(bad.path.exists())
+                # Exclusion lasts only for this loaded model; original evidence stays on disk.
+                runtime.close()
+                fresh = _runtime(Path(temporary))
+                if damage != 'missing':
+                    self.assertIn(bad.path, [e.path for e in fresh._scan_persistent_prompt_caches()])
+
+    def test_all_invalid_candidates_return_fresh_independent_state(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = _runtime(Path(temporary))
+            for tokens in ([1], [1, 2]):
+                runtime._persist_prompt_cache(_PromptCacheEntry([_FixtureCache(99)], tokens))
+            for entry in runtime._persistent_prompt_caches:
+                entry.path.write_bytes(b'corrupt fixture')
+            with patch.object(runtime.support, 'new_cache', side_effect=lambda _: [_FixtureCache()]), \
+                 patch.object(runtime, '_record_persistent_prompt_cache_hit') as hit:
+                acquired = runtime._acquire_prompt_cache([1, 2, 3])
+                self.assertEqual(acquired.tokens, [])
+                self.assertEqual(acquired.cache[0].state[0].tolist(), [0])
+                self.assertEqual(runtime._persistent_prompt_caches, [])
+                self.assertEqual(runtime._scan_persistent_prompt_caches(), [])
+                hit.assert_not_called()
+
+    def test_disk_recovery_does_not_hide_execution_errors_or_cancellation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = _runtime(Path(temporary))
+            runtime._persist_prompt_cache(_PromptCacheEntry([_FixtureCache(1)], [1]))
+            candidate = runtime._persistent_prompt_caches[0]
+            with patch('deepseek_v4_ssd.generation.mx.load', side_effect=RuntimeError('GPU out of memory')):
+                with self.assertRaisesRegex(RuntimeError, 'GPU out of memory'):
+                    runtime._acquire_prompt_cache([1, 2])
+            with patch.object(runtime.support, 'new_cache', side_effect=lambda _: [_FixtureCache()]), \
+                 patch.object(runtime.support, 'evaluate_cache', side_effect=RuntimeError('GPU execution failed')):
+                with self.assertRaisesRegex(RuntimeError, 'GPU execution failed'):
+                    runtime._acquire_prompt_cache([1, 2])
+            event = Event()
+            event.set()
+            with cancellation_scope(event), patch('deepseek_v4_ssd.generation.mx.load') as load:
+                with self.assertRaises(GenerationCancelled):
+                    runtime._acquire_prompt_cache([1, 2])
+                load.assert_not_called()
+            self.assertIn(candidate, runtime._persistent_prompt_caches)
+
     def test_contract_and_token_block_chain_change_every_compatibility_input(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
