@@ -35,7 +35,7 @@ Whallm runs large language models on Apple Silicon Macs by reading the experts i
 
 The default address is `http://127.0.0.1:11434`. Models load when first used. The server keeps one model loaded and handles one generation request at a time. Restart the server if a newly installed model is missing from the chat picker.
 
-Public downloads may contain fewer features than the source described here. See the [build and validation records](docs/VALIDATION.md) for the packaged version's coverage.
+Public downloads may contain fewer features than the source described here.
 
 ## Requirements
 
@@ -81,8 +81,6 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 
 V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. Expert calculations as reads finish and batched expert input processing default to on. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
 
-See [acceleration settings and limits](docs/MODEL_ACCELERATION.md).
-
 ## Benchmarks
 
 These recorded v1.1.7 runs use **Code** context and an output limit of **128 tokens**. The build revisions and cache state were not recorded alongside these rows, so they are reference results, not a controlled comparison of the new acceleration options.
@@ -117,7 +115,7 @@ TTFT is the wait for the first token. Prefill measures input processing; Decode 
 
 To test your Mac, open **Throughput**, choose an installed model, select **Code** or **Novel**, input lengths from **1K to 200K**, and an output limit of **128, 1024, or 4096**. Results can be copied as plain text, JSON, or Markdown. The app unloads the test model when the run finishes or is cancelled. Local builds also offer **Dry run**, which produces simulated results.
 
-SSD speed, prompt length, cache state, and settings affect results. See [Throughput](docs/THROUGHPUT.md) for metric definitions and test conditions.
+SSD speed, prompt length, cache state, and settings affect results.
 
 ## Connect Codex
 
@@ -146,7 +144,7 @@ The API supports text streaming and tool calls through:
 - `POST /v1/chat/completions` and `POST /v1/completions`
 - `POST /api/models/load` and `POST /api/models/unload`
 
-The client executes tools and sends their results back. Images, audio, `logprobs`, `response_format`, and `stop` are not supported. Request bodies are limited to **1 MiB**. See the [API guide](docs/API.md) for supported fields and authentication.
+The client executes tools and sends their results back. Images, audio, `logprobs`, `response_format`, and `stop` are not supported. Request bodies are limited to **1 MiB**.
 
 Inference runs on your Mac. Network access is used for downloads, updates, and API connections. Connected clients may send data elsewhere; **Debug** logs can contain complete prompts and tool results.
 
@@ -154,15 +152,7 @@ Inference runs on your Mac. Network access is used for downloads, updates, and A
 
 The v1.1.7 local build passed **424 Python tests**, **91 Swift tests**, and **12 packaged-runtime tests**. Both the app and extracted ZIP passed signature and isolated startup checks in English, Simplified Chinese, and Traditional Chinese.
 
-Only the three pinned text checkpoints are supported. New acceleration paths have small-model and component tests; full-model speed and quality comparisons are still pending. Very long prompts need more cache memory. See the [validation records](docs/VALIDATION.md) for the scope of each check.
-
-## Documentation
-
-- [Documentation index](docs/README.md)
-- [CLI and UI feature matrix](docs/FEATURE_MATRIX.md)
-- [Acceleration settings](docs/MODEL_ACCELERATION.md)
-- [DeepSeek V4.1](docs/DEEPSEEK_V41.md) and [Qwen](docs/QWEN.md)
-- [API](docs/API.md), [Throughput](docs/THROUGHPUT.md), and [app updates](docs/UPDATES.md)
+Only the three pinned text checkpoints are supported. New acceleration paths have small-model and component tests; full-model speed and quality comparisons are still pending. Very long prompts need more cache memory.
 
 ## License
 

@@ -35,7 +35,7 @@ Whallm 让 Apple Silicon Mac 从 SSD 读取所需的专家权重，在本地运�
 
 默认地址为 `http://127.0.0.1:11434`。模型在首次使用时加载；服务器一次保留一个模型，依次处理生成请求。如果聊天列表中没有刚安装的模型，请重启服务器。
 
-公开下载版的功能可能少于本文所述源码。各次打包包含的内容见[打包与验证记录](docs/VALIDATION.md)。
+公开下载版的功能可能少于本文所述源码。
 
 ## 使用要求
 
@@ -81,8 +81,6 @@ Whallm 将共用权重保留在内存，从 SSD 读取选中的专家。DeepSeek
 
 V4.1 按层处理输入、V4.1／Qwen 缓存压缩、候选索引、CED、下一层预读和 DeepSeek ANE 均**默认关闭**。“专家加载完成就开始计算”与“合批处理输入的专家运算”则默认开启。CED 会跳过后续层不再需要的旧 token。Qwen 缓存压缩和 ANE 可能改变运算结果。UI 会禁用不兼容的组合；这些选项不保证一定加速。
 
-详见[加速设置与限制](docs/MODEL_ACCELERATION.md)。
-
 ## 性能测试
 
 以下 v1.1.7 记录使用 **Code** 素材，输出上限为 **128 tokens**。表格未附各次程序版本和缓存状态，因此仅供参考，不能作为新增加速选项的控制变量比较。
@@ -117,7 +115,7 @@ TTFT 是等待首个 token 的时间。Prefill 为输入处理速度，Decode �
 
 要测试自己的 Mac，打开 **Throughput**，选择已安装模型、**Code** 或 **Novel** 素材、**1K–200K** 输入长度，以及 **128、1024 或 4096** 的输出上限。结果可以复制为纯文本、JSON 或 Markdown。整轮完成或取消后，App 会卸载测试模型。本地打包版另有 **Dry run**，只生成模拟结果。
 
-SSD 速度、输入长度、缓存状态和设置都会影响结果。指标定义与测试条件见 [Throughput](docs/THROUGHPUT.md)。
+SSD 速度、输入长度、缓存状态和设置都会影响结果。
 
 ## 连接 Codex
 
@@ -146,7 +144,7 @@ API 支持文本流式输出和工具调用，提供以下端点：
 - `POST /v1/chat/completions` 和 `POST /v1/completions`
 - `POST /api/models/load` 和 `POST /api/models/unload`
 
-工具由客户端执行，再返回结果。不支持图片、音频、`logprobs`、`response_format` 和 `stop`。请求体上限为 **1 MiB**。支持字段与认证方式见 [API 指南](docs/API.md)。
+工具由客户端执行，再返回结果。不支持图片、音频、`logprobs`、`response_format` 和 `stop`。请求体上限为 **1 MiB**。
 
 推理在你的 Mac 上运行。下载、更新和 API 连接会使用网络。连接的客户端可能将数据发送到其他服务；**Debug** 日志可能包含完整输入和工具结果。
 
@@ -154,15 +152,7 @@ API 支持文本流式输出和工具调用，提供以下端点：
 
 v1.1.7 本地打包版通过 **424 项 Python 测试**、**91 项 Swift 测试**和 **12 项包内运行测试**。App 和 ZIP 解压副本均通过签名，以及英文、简体中文、繁体中文的隔离启动检查。
 
-目前仅支持这三个固定版本的文本模型。新增加速路径已通过小模型和组件测试；完整模型的速度与质量比较仍待验证。很长的输入需要更多缓存内存。各项检查范围见[验证记录](docs/VALIDATION.md)。
-
-## 文档
-
-- [文档索引](docs/README.md)
-- [CLI 与 UI 功能对照](docs/FEATURE_MATRIX.md)
-- [加速设置](docs/MODEL_ACCELERATION.md)
-- [DeepSeek V4.1](docs/DEEPSEEK_V41.md) 和 [Qwen](docs/QWEN.md)
-- [API](docs/API.md)、[Throughput](docs/THROUGHPUT.md) 和 [App 更新](docs/UPDATES.md)
+目前仅支持这三个固定版本的文本模型。新增加速路径已通过小模型和组件测试；完整模型的速度与质量比较仍待验证。很长的输入需要更多缓存内存。
 
 ## 许可证
 

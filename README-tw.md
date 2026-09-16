@@ -35,7 +35,7 @@ Whallm 讓 Apple Silicon Mac 從 SSD 讀取需要的專家權重，在本機執�
 
 預設位址為 `http://127.0.0.1:11434`。模型在首次使用時載入；伺服器一次保留一個模型，依序處理生成請求。若聊天選單沒有剛安裝的模型，請重新啟動伺服器。
 
-公開下載版的功能可能少於本文件所述原始碼。各次打包涵蓋的內容見[打包與驗證紀錄](docs/VALIDATION.md)。
+公開下載版的功能可能少於本文件所述原始碼。
 
 ## 使用需求
 
@@ -81,8 +81,6 @@ Whallm 將共用權重留在記憶體，從 SSD 讀取選中的專家。DeepSeek
 
 V4.1 按層處理輸入、V4.1／Qwen 快取壓縮、候選索引、CED、下一層預讀與 DeepSeek ANE 均**預設關閉**。「專家載入完成就開始計算」與「合批處理輸入的專家運算」則預設開啟。CED 會略過後續層不再需要的舊 token。Qwen 快取壓縮與 ANE 可能改變運算結果。UI 會停用不相容的組合；這些選項不保證一定加速。
 
-詳見[加速設定與限制](docs/MODEL_ACCELERATION.md)。
-
 ## 效能測試
 
 以下 v1.1.7 紀錄使用 **Code** 素材，輸出上限為 **128 tokens**。表格未附各次程式版本與快取狀態，因此僅供參考，不能當成新增加速選項的控制變因比較。
@@ -117,7 +115,7 @@ TTFT 是等待第一個 token 的時間。Prefill 為輸入處理速度，Decode
 
 要測試自己的 Mac，開啟 **Throughput**，選擇已安裝模型、**Code** 或 **Novel** 素材、**1K–200K** 輸入長度，以及 **128、1024 或 4096** 的輸出上限。結果可複製為純文字、JSON 或 Markdown。整輪完成或取消後，App 會卸載測試模型。本機打包版另有 **Dry run**，只產生模擬結果。
 
-SSD 速度、輸入長度、快取狀態與設定都會影響結果。指標定義與測試條件見 [Throughput](docs/THROUGHPUT.md)。
+SSD 速度、輸入長度、快取狀態與設定都會影響結果。
 
 ## 連接 Codex
 
@@ -146,7 +144,7 @@ API 支援文字串流與工具呼叫，提供以下端點：
 - `POST /v1/chat/completions` 與 `POST /v1/completions`
 - `POST /api/models/load` 與 `POST /api/models/unload`
 
-工具由用戶端執行，再回傳結果。不支援圖片、音訊、`logprobs`、`response_format` 與 `stop`。請求本文上限為 **1 MiB**。支援欄位與驗證方式見 [API 指南](docs/API.md)。
+工具由用戶端執行，再回傳結果。不支援圖片、音訊、`logprobs`、`response_format` 與 `stop`。請求本文上限為 **1 MiB**。
 
 推論在你的 Mac 上執行。下載、更新與 API 連線會使用網路。連接的用戶端可能將資料傳往其他服務；**Debug** 記錄可能包含完整輸入與工具結果。
 
@@ -154,15 +152,7 @@ API 支援文字串流與工具呼叫，提供以下端點：
 
 v1.1.7 本機打包版通過 **424 項 Python 測試**、**91 項 Swift 測試**與 **12 項包內執行測試**。App 與 ZIP 解壓副本均通過簽章，以及英文、簡體中文、繁體中文的隔離啟動檢查。
 
-目前只支援這三個固定版本的文字模型。新增加速路徑已通過小模型與元件測試；完整模型的速度與品質比較仍待驗證。很長的輸入需要更多快取記憶體。各項檢查範圍見[驗證紀錄](docs/VALIDATION.md)。
-
-## 文件
-
-- [文件索引](docs/README.md)
-- [CLI 與 UI 功能對照](docs/FEATURE_MATRIX.md)
-- [加速設定](docs/MODEL_ACCELERATION.md)
-- [DeepSeek V4.1](docs/DEEPSEEK_V41.md) 與 [Qwen](docs/QWEN.md)
-- [API](docs/API.md)、[Throughput](docs/THROUGHPUT.md) 與 [App 更新](docs/UPDATES.md)
+目前只支援這三個固定版本的文字模型。新增加速路徑已通過小模型與元件測試；完整模型的速度與品質比較仍待驗證。很長的輸入需要更多快取記憶體。
 
 ## 授權
 
