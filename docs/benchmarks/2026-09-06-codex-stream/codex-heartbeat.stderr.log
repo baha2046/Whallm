@@ -1,6 +1,0 @@
-Reading additional input from stdin...
-2026-09-06T15:52:40.287005Z  WARN codex_models_manager::model_info: Unknown model qwen3.8-flash-next-fp8 is used. This will use fallback model metadata.
-2026-09-06T15:52:40.295520Z  WARN codex_models_manager::model_info: Unknown model qwen3.8-flash-next-fp8 is used. This will use fallback model metadata.
-2026-09-06T15:52:40.410077Z  WARN codex_core_plugins::manager: failed to warm featured plugin ids cache error=remote featured plugin request to https://chatgpt.com/backend-api/plugins/featured?platform=codex failed with status 401 Unauthorized: {"detail":"Unauthorized"}
-2026-09-06T15:52:43.441926Z  WARN codex_core_plugins::manifest: ignoring interface.defaultPrompt[0]: prompt must be at most 128 characters path=file:///private/var/folders/s9/r9my4q9102l407jyxpr241zr0000gn/T/whallm-codex-probe-uqdmgg20/codex-home/.tmp/plugins/plugins/ngs-analysis/.codex-plugin/plugin.json
-2026-09-06T15:52:43.443928Z  WARN codex_core_plugins::manifest: ignoring interface.defaultPrompt[0]: prompt must be at most 128 characters path=file:///private/var/folders/s9/r9my4q9102l407jyxpr241zr0000gn/T/whallm-codex-probe-uqdmgg20/codex-home/.tmp/plugins/plugins/ngs-analysis/.codex-plugin/plugin.json

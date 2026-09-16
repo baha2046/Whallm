@@ -1,1 +1,0 @@
-{"status":"failed-component-shape-limit","error":"OverflowError: [flatten] Shape dimension 2673868800 is outside the supported range [-2147483648, 2147483647]. MLX currently uses 32-bit integers for shape dimensions.","source":"expert_cache-before-paging.py","resolution_candidate":"bounded 2048-slot arenas; exact and performance gates required"}

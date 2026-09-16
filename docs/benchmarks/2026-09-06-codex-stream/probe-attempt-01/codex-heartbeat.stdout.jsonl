@@ -1,8 +1,0 @@
-{"type":"thread.started","thread_id":"01a0776b-4be4-7921-bbe4-f47229a7d5ed"}
-{"type":"turn.started"}
-{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Exceeded skills context budget. All skill descriptions were removed and 6 additional skills were not included in the model-visible skills list."}}
-{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'printf stream-ok'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
-{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/bin/zsh -lc 'printf stream-ok'","aggregated_output":"stream-ok","exit_code":0,"status":"completed"}}
-{"type":"item.completed","item":{"id":"item_2","type":"error","message":"Heads up: Long threads and multiple compactions can cause the model to be less accurate. Start a new thread when possible to keep threads small and targeted."}}
-{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"Whallm could not complete the request: The model did not return the required tool call after one retry."}}
-{"type":"turn.completed","usage":{"input_tokens":10,"cached_input_tokens":0,"cache_write_input_tokens":0,"output_tokens":2,"reasoning_output_tokens":0}}

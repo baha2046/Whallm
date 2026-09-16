@@ -1,4 +1,0 @@
-Ready: http://127.0.0.1:64702
-127.0.0.1 - "GET /healthz HTTP/1.1" 200 -
-ANE Prefill disabled; using original Prefill: bridge library not found
-127.0.0.1 - "POST /v1/chat/completions HTTP/1.1" 200 -

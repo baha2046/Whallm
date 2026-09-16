@@ -1,9 +1,0 @@
-START 1-arena
-END 1-arena: 12.075 tok/s; exact
-START 2-control
-END 2-control: 10.462 tok/s; exact
-START 3-control
-END 3-control: 10.559 tok/s; exact
-START 4-arena
-END 4-arena: 12.143 tok/s; exact
-{"status": "passed-cross-arena-wave-research-only", "fraction_changes": {"decode_tokens_per_second": 0.15208434814550564, "time_to_first_token_seconds": -2.7462277585654782e-05, "request_seconds": -0.04033918006568371, "decode_latency_p95_seconds": -0.14668190713945306, "peak_memory_bytes": -0.0019917613634952147, "expert_bytes_read": 0.0}, "failed_metrics": []}

@@ -1,9 +1,0 @@
-{
-  "app": "/Users/Shared/Project/product/llm-ssd/dist/Whallm.app",
-  "zip": "/Users/Shared/Project/product/llm-ssd/dist/Whallm-macOS-arm64.zip",
-  "intermediate_backup": "/Users/Shared/Project/product/llm-ssd/dist/stream-fix-before-keychain-fix-20260907",
-  "original_backup": "/Users/Shared/Project/product/llm-ssd/dist/before-codex-stream-fix-20260907",
-  "time": "2026-09-07T00:16:38.846031+08:00",
-  "server_idle_before_stop": true,
-  "relocated_signature": "passed"
-}

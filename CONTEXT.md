@@ -18,7 +18,8 @@ This project builds a memory-bounded Apple Silicon runtime for
   change the API model ID.
 - **manifest**: The JSON file that defines an installed model and its integrity metadata.
 - **slot**: A fixed Metal-visible memory region that can hold one expert blob.
-- **main model**: The 43 target-model layers. It excludes DSpark.
+- **main model**: The target model that produces or verifies output tokens. It excludes
+  auxiliary speculative decoding modules such as DSpark.
 - **DSpark**: The optional speculative decoding module stored under `mtp.*`.
 - **N-gram store**: Qwen FP8 N-gram rows stored in `ngram.bin` for read-only row lookup.
 - **Engram store**: DeepSeek V4.1 FP8 embedding rows and E8M0 scales stored in
@@ -26,18 +27,3 @@ This project builds a memory-bounded Apple Silicon runtime for
 - **model kind**: The stable identity that selects a model support package.
 - **model support package**: The installation rules, model loading, conversation format,
   and state operations needed to support one model kind.
-
-## Current scope
-
-The project must complete M1 through M4 in order.
-M2 first supports batch size 1, greedy decode, and a 4K context.
-M3 adds measured SSD expert streaming.
-M4 adds chunked prefill, FP8 KV cache, validated longer contexts, and a measured DSpark decision.
-
-Each checkpoint revision is fixed. Code must reject incompatible model shapes and tensor layouts.
-DeepSeek V4.1 support is text-only and uses the exact `deepseek_v41` MLX architecture.
-Its vision tower remains outside the current support boundary.
-Optional DSpark, layer-major Prefill, packed caches and other acceleration settings
-are described in docs/MODEL_ACCELERATION.md; they do not imply measured speedups.
-Its prompt cache supports memory reuse and disk persistence through its model support package,
-including compressed attention state and Engram token history.

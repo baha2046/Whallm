@@ -1,3 +1,0 @@
-{"type":"thread.started","thread_id":"01a0778d-b55d-73c0-bad8-dc47b30e45a0"}
-{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata for `qwen3.8-flash-next-fp8` not found. Defaulting to fallback metadata; this can degrade performance and cause issues."}}
-{"type":"turn.started"}

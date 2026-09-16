@@ -1,1 +1,0 @@
-Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x = 17, compute x*x + 3*x - 5 and explain each step. Given x

@@ -1,6 +1,0 @@
-<|im_start|>user
-Output the word cache followed by one space exactly 500 times. Do not add a title, punctuation, explanation, or any other word. Continue until all 500 repetitions are complete.<|im_end|>
-<|im_start|>assistant
-<think>
-
-</think>

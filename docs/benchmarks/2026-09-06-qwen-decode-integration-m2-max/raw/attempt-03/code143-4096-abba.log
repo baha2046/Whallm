@@ -1,9 +1,0 @@
-START 1-control
-END 1-control: 7.625 tok/s; exact
-START 2-arena
-END 2-arena: 7.853 tok/s; exact
-START 3-arena
-END 3-arena: 8.064 tok/s; exact
-START 4-control
-END 4-control: 7.786 tok/s; exact
-{"status": "inconclusive-below-5-percent-stop", "fraction_changes": {"decode_tokens_per_second": 0.032842983536995884, "time_to_first_token_seconds": 0.02846466938137393, "request_seconds": 0.0059099407349716415, "decode_latency_p95_seconds": 0.007509989698393449, "peak_memory_bytes": -0.0020081509734384273, "expert_bytes_read": 0.0}, "failed_metrics": []}

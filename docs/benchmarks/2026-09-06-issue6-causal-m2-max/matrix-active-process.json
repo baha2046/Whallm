@@ -1,1 +1,0 @@
-{"pid": 77989, "case": "thinking-sample-chat-seed-20260906", "command": ["/Applications/Whallm.app/Contents/MacOS/python3", "research/issue6_mode_matrix.py", "--output", "docs/benchmarks/2026-09-06-issue6-causal-m2-max/matrix/thinking-sample-chat-seed-20260906", "--mode", "thinking", "--profile", "chat", "--seed", "20260906"]}

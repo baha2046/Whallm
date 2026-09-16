@@ -1,4 +1,0 @@
-Reading additional input from stdin...
-2026-09-06T16:29:30.843090Z  WARN codex_models_manager::model_info: Unknown model qwen3.8-flash-next-fp8 is used. This will use fallback model metadata.
-2026-09-06T16:29:30.898033Z  WARN codex_models_manager::model_info: Unknown model qwen3.8-flash-next-fp8 is used. This will use fallback model metadata.
-2026-09-06T16:29:31.090688Z  WARN codex_core_plugins::manager: failed to warm featured plugin ids cache error=remote featured plugin request to https://chatgpt.com/backend-api/plugins/featured?platform=codex failed with status 401 Unauthorized: {"detail":"Unauthorized"}

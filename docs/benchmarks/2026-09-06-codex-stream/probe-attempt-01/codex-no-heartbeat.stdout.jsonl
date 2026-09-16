@@ -1,5 +1,0 @@
-{"type":"thread.started","thread_id":"01a0776b-438c-7831-8f26-1070c9c86932"}
-{"type":"turn.started"}
-{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Exceeded skills context budget. All skill descriptions were removed and 6 additional skills were not included in the model-visible skills list."}}
-{"type":"error","message":"stream disconnected before completion: idle timeout waiting for SSE"}
-{"type":"turn.failed","error":{"message":"stream disconnected before completion: idle timeout waiting for SSE"}}
