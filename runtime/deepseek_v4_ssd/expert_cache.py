@@ -23,7 +23,7 @@ from .io_metrics import (
     configure_expert_file_cache_policy,
     page_cache_residency_snapshot,
 )
-from .expert_layout import _fused_slot_regions, _qwen_slot_regions
+from .expert_layout import _fused_slot_regions, _qwen_slot_regions, batched_layer_layout
 from .model_support import support_for_installed
 from .manifest import InstalledModel, Tensor
 
@@ -376,6 +376,10 @@ class _SlotPool:
         }
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
+        self._batched_layout = batched_layer_layout(
+            self._regions, self._layout.batched_regions,
+            model.expert_blob_size, model.expert_count,
+        )
         self._slots: list[mx.array | None] = [None] * slots
         self._views: list[memoryview | None] = [None] * slots
         self._loaded = bytearray(slots)
@@ -434,15 +438,14 @@ class _SlotPool:
             raise RuntimeError("expert slot buffer is not prepared")
         return view[region.offset : region.offset + region.length]
 
-    def write_views(self, buffer: memoryview, slot: int) -> list[memoryview]:
-        base = slot * self._model.expert_blob_size
-        return [
-            buffer[
-                base + self._regions[region.name].offset :
-                base + self._regions[region.name].offset + region.length
-            ]
-            for region in self._model.expert_regions
-        ]
+    def write_views(self, buffer: memoryview, expert: int) -> list[memoryview]:
+        """Destination views, in checkpoint order, for one expert of a layer buffer."""
+        views = []
+        for region in self._model.expert_regions:
+            base, stride, inner = self._batched_layout[region.name]
+            start = base + expert * stride + inner
+            views.append(buffer[start : start + region.length])
+        return views
 
     def mark_loaded(self, slot: int) -> None:
         self._loaded[slot] = 1
@@ -455,41 +458,39 @@ class _SlotPool:
 
     def _batched_array(self, packed: mx.array, name: str) -> mx.array:
         region = self._regions[name]
+        base, expert_stride, inner = self._batched_layout[name]
+        experts = self._model.expert_count
         if region.dtype == "U32":
-            shape = (self._model.expert_count, *region.shape)
+            packed_shape = tuple(region.shape)
+        else:
+            if (
+                self._model.expert_blob_size % 4
+                or region.offset % 4
+                or region.shape[-1] % 4
+            ):
+                raise ValueError("batched expert regions must be 4-byte aligned")
+            packed_shape = (*region.shape[:-1], region.shape[-1] // 4)
+        if (base + inner) % 4 or expert_stride % 4:
+            raise ValueError("batched expert layer regions must be 4-byte aligned")
+        start = (base + inner) // 4
+        if inner == 0 and expert_stride == region.length:
+            # A batched region: expert_count consecutive copies, one contiguous view.
+            value = packed[start : start + experts * (expert_stride // 4)]
+            value = value.reshape(experts, *packed_shape)
+        else:
             row_strides = []
             stride = 1
-            for size in reversed(region.shape):
+            for size in reversed(packed_shape):
                 row_strides.append(stride)
                 stride *= size
-            return mx.as_strided(
+            value = mx.as_strided(
                 packed,
-                shape=shape,
-                strides=(
-                    self._model.expert_blob_size // 4,
-                    *reversed(row_strides),
-                ),
-                offset=region.offset // 4,
+                shape=(experts, *packed_shape),
+                strides=(expert_stride // 4, *reversed(row_strides)),
+                offset=start,
             )
-        if (
-            self._model.expert_blob_size % 4
-            or region.offset % 4
-            or region.shape[-1] % 4
-        ):
-            raise ValueError("batched expert regions must be 4-byte aligned")
-        packed_shape = (*region.shape[:-1], region.shape[-1] // 4)
-        shape = (self._model.expert_count, *packed_shape)
-        row_strides = []
-        stride = 1
-        for size in reversed(packed_shape):
-            row_strides.append(stride)
-            stride *= size
-        value = mx.as_strided(
-            packed,
-            shape=shape,
-            strides=(self._model.expert_blob_size // 4, *reversed(row_strides)),
-            offset=region.offset // 4,
-        )
+        if region.dtype == "U32":
+            return value
         return value if name.endswith(".weight") else value.view(mx.uint8)
 
 
@@ -503,6 +504,10 @@ class _StagedSlotPool(_SlotPool):
         }
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
+        self._batched_layout = batched_layer_layout(
+            self._regions, self._layout.batched_regions,
+            model.expert_blob_size, model.expert_count,
+        )
         self._w13_regions, self._w2_regions = _staged_slot_regions(model)
         self._w13_size = sum(
             region.length
@@ -694,6 +699,12 @@ class ExpertCache:
             else None
         )
         self._prefetched_layers: dict[int, _LayerRead] = {}
+        # Region-major layer buffers kept for reuse between layers of one
+        # Prefill. A fresh 7 GiB Metal buffer costs ~140 ms; a reused one ~15 ms.
+        # Reuse is safe because every caller evaluates all work computed from a
+        # batched layer before leaving its context.
+        self._layer_buffers: list[mx.array] = []
+        self._layer_buffer_limit = 2
         self._batched_layer: tuple[int, BatchedExperts] | None = None
         self._active_prefetch_trace: _ActivePrefetchTrace | None = None
         self._route_trace_path = route_trace_path
@@ -799,6 +810,19 @@ class ExpertCache:
             pending = list(self._prefetched_layers.values())
             self._prefetched_layers.clear()
         cancel_and_drain(future for job in pending for future in job.futures)
+        for job in pending:
+            self._recycle_layer_buffer(job.packed)
+
+    def _recycle_layer_buffer(self, packed: mx.array) -> None:
+        with self._lock:
+            if len(self._layer_buffers) < self._layer_buffer_limit:
+                self._layer_buffers.append(packed)
+
+    def release_layer_buffers(self) -> None:
+        """Free the pooled layer buffers after Prefill so decode slots can use the memory."""
+        with self._lock:
+            self._layer_buffers.clear()
+        mx.clear_cache()
 
 
     def resident_expert_keys(
@@ -1029,8 +1053,11 @@ class ExpertCache:
             length = self.model.expert_count * self.model.expert_blob_size
             if length % 4:
                 raise ValueError("batched expert layer must be 4-byte aligned")
-            packed = mx.empty((length // 4,), dtype=mx.uint32)
-            mx.eval(packed)
+            if self._layer_buffers:
+                packed = self._layer_buffers.pop()
+            else:
+                packed = mx.empty((length // 4,), dtype=mx.uint32)
+                mx.eval(packed)
             step = (
                 len(selected) + self.prefetch_read_workers - 1
             ) // self.prefetch_read_workers
@@ -1110,6 +1137,7 @@ class ExpertCache:
                 )
             self._active_prefetch_trace = None
             self._batched_layer = None
+            self._recycle_layer_buffer(job.packed)
 
 
     @contextmanager

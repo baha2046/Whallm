@@ -24,7 +24,8 @@ class V41LayerMajorTests(unittest.TestCase):
                         release_prefill_slots=lambda: events.append('release'),
                         batched_layer=lambda i: (events.append(('layer', i)) or nullcontext()),
                         prefetch_layer=lambda i: events.append(('prefetch', i)))
-                    config = RuntimeConfig(batched_expert_prefill=batched, v41_next_layer_prefetch=True)
+                    config = RuntimeConfig(batched_expert_prefill=batched, v41_next_layer_prefetch=True,
+                                           moe_prefill_step_size=step)
                     _deepseek_v41_prefill(model, tokens, reference, step)
                     _deepseek_v41_layer_major_prefill(model, tokens, candidate, step, experts, config)
                     for token in (10, 11, 12):
@@ -51,8 +52,9 @@ class V41LayerMajorTests(unittest.TestCase):
                 model.packed_kv = model.packed_index = packed
                 reference, candidate = model.make_cache(), model.make_cache()
                 experts = SimpleNamespace()
-                control = RuntimeConfig(batched_expert_prefill=False)
-                ced = RuntimeConfig(batched_expert_prefill=False, v41_ced_prefill=True)
+                control = RuntimeConfig(batched_expert_prefill=False, moe_prefill_step_size=step)
+                ced = RuntimeConfig(batched_expert_prefill=False, v41_ced_prefill=True,
+                                    moe_prefill_step_size=step)
                 _deepseek_v41_layer_major_prefill(model, tokens, reference, step, experts, control)
                 _deepseek_v41_layer_major_prefill(model, tokens, candidate, step, experts, ced)
                 self.assertGreater(model.ced_skipped_layer_tokens, 0)
@@ -62,3 +64,82 @@ class V41LayerMajorTests(unittest.TestCase):
                     expected = model(mx.array([[token]]), reference)
                     actual = model(mx.array([[token]]), candidate)
                     self.assertTrue(mx.array_equal(actual, expected).item(), (step, packed))
+
+    def test_moe_batches_and_dspark_seed_match_token_major_prefill(self):
+        from deepseek_v4_ssd.deepseek_v41.dspark import DSpark
+        from deepseek_v4_ssd.model import forward_with_hidden
+        model = tiny_model()
+        draft = DSpark(model.args, block_size=3, noise_token_id=15,
+                       target_layers=(1, 2, 3), markov_rank=8, expert_count=2, topk=1)
+        model.dspark = draft
+        tokens = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        prefilled = model.make_cache()
+        _, hidden = forward_with_hidden(model, mx.array([tokens]), prefilled, draft.target_layers)
+        draft.prefill_context(hidden, 0)
+        expected_state = draft.cache_state()
+        def close(actual, expected, tolerance):
+            actual, expected = actual.astype(mx.float32), expected.astype(mx.float32)
+            finite = mx.isfinite(expected)
+            return mx.allclose(mx.where(finite, actual, 0), mx.where(finite, expected, 0),
+                               atol=tolerance, rtol=tolerance).item()
+
+        # A whole-layer MoE batch runs different matmul kernels than the
+        # reference's small chunks, so only per-chunk batches are bit-exact. The
+        # fake-quantized caches can then land one FP8/FP4 code apart, so the
+        # inexact cases are checked through the continuation logits and a
+        # coarse draft-context tolerance instead of exact cache equality.
+        from deepseek_v4_ssd.model_support import get_support
+        support = get_support("deepseek-v4.1")
+        for step, moe_step, exact in ((3, 3, True), (4, 4, True), (3, 0, False), (5, 2, False)):
+            with self.subTest(step=step, moe_step=moe_step):
+                reference = support.clone_cache(prefilled)
+                candidate = model.make_cache()
+                experts = SimpleNamespace(release_prefill_slots=lambda: None,
+                                          batched_layer=lambda i: nullcontext(),
+                                          prefetch_layer=lambda i: None,
+                                          release_layer_buffers=lambda: None)
+                config = RuntimeConfig(moe_prefill_step_size=moe_step)
+                draft.reset_cache()
+                _deepseek_v41_layer_major_prefill(model, tokens, candidate, step, experts, config)
+                self.assertEqual(candidate[0].offset, reference[0].offset)
+                if exact:
+                    for a, b in zip(candidate[0].state, reference[0].state):
+                        self.assertTrue(mx.array_equal(a, b).item())
+                actual_state = draft.cache_state()
+                self.assertEqual([offset for _, offset in actual_state], [offset for _, offset in expected_state])
+                for (actual, _), (expected, _) in zip(actual_state, expected_state):
+                    self.assertEqual(actual.shape, expected.shape)
+                    self.assertTrue(close(actual, expected, 1e-4 if exact else 0.25))
+                for token in (12, 13):
+                    expected = model(mx.array([[token]]), reference)
+                    actual = model(mx.array([[token]]), candidate)
+                    self.assertTrue(mx.array_equal(actual, expected).item() if exact else close(actual, expected, 0.02))
+
+    def test_dspark_request_prefills_layer_major_and_finishes_with_the_last_token(self):
+        from deepseek_v4_ssd.deepseek_v41.dspark import DSpark
+        from deepseek_v4_ssd.dspark import generate_tokens
+        from deepseek_v4_ssd.model_support import get_support
+        model = tiny_model()
+        draft = DSpark(model.args, block_size=3, noise_token_id=15,
+                       target_layers=(1, 2, 3), markov_rank=8, expert_count=2, topk=1)
+        model.dspark = draft
+        support = get_support("deepseek-v4.1")
+        self.assertTrue(support.layer_major_prefill_seeds_dspark)
+        config = RuntimeConfig(dspark_enabled=True, v41_next_layer_prefetch=True, v41_ced_prefill=True)
+        support.validate_config(config)
+        prompt = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        reference = model.make_cache()
+        expected = [int(t) for t, _, _ in generate_tokens(prompt, model, draft, reference, max_tokens=6,
+                    prefill_step_size=4, temperature=0, top_p=1, fallback_enabled=False)]
+        candidate = model.make_cache()
+        experts = SimpleNamespace(release_prefill_slots=lambda: None,
+                                  batched_layer=lambda i: nullcontext(),
+                                  prefetch_layer=lambda i: None,
+                                  release_layer_buffers=lambda: None)
+        draft.reset_cache()
+        support.prefill(model, prompt[:-1], candidate, 4, experts, config)
+        self.assertEqual(candidate[0].offset, len(prompt) - 1)
+        actual = [int(t) for t, _, _ in generate_tokens(prompt, model, draft, candidate, max_tokens=6,
+                  prefill_step_size=4, temperature=0, top_p=1, fallback_enabled=False,
+                  prefilled_tokens=len(prompt) - 1)]
+        self.assertEqual(actual, expected)

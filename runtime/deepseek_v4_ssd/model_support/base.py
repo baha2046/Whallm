@@ -12,17 +12,22 @@ class ModelSupport:
     model; the caller may only clone or serialize them through these methods.
     """
 
+    # True when layer-major prefill seeds the DSpark draft context itself, so a
+    # DSpark request can prefill layer by layer and hand over the final token.
+    layer_major_prefill_seeds_dspark = False
+
     def __init__(self, descriptor: ModelDescriptor):
         self.descriptor = descriptor
 
     def validate_config(self, config) -> None:
         features = self.descriptor.features
         if self.descriptor.kind == "deepseek-v4.1" and getattr(config, "dspark_enabled", False):
-            for name in ("v41_layer_major_prefill", "v41_ced_prefill", "v41_next_layer_prefetch", "dspark_prompt_cache", "dspark_sequential_verification"):
+            for name in ("dspark_prompt_cache", "dspark_sequential_verification"):
                 if getattr(config, name, False):
                     raise ValueError(f"{name} is not supported by V4.1 DSpark")
+        # v41_layer_major_prefill defaults to on and only V4.1 consults it.
         for name in ("qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
-                     "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "v41_layer_major_prefill"):
+                     "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch"):
             expected = "qwen3.8-flash-next" if name.startswith("qwen_") else "deepseek-v4.1"
             if getattr(config, name, False) and self.descriptor.kind != expected:
                 raise ValueError(f"{name} is supported only by {expected}")

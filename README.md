@@ -21,8 +21,9 @@ Whallm runs large language models on Apple Silicon Macs by reading the experts i
 | `DeepSeek-V4-Flash-0731` | M5 Pro | 53.6–201.0 tok/s | 5.9–7.7 tok/s | 23 GiB | 1152 |
 | `Qwen3.8-Flash-Next-FP8` | M5 Pro | 99.1–153.7 tok/s | 8.5–10.6 tok/s | 18 GiB | 3072 |
 | `DeepSeek-V4.1-Flash` | M2 Max | 13.9–65.9 tok/s | 1.8–2.2 tok/s | 33 GiB | 1152 |
+| `DeepSeek-V4.1-Flash` | M5 Max | 37.8–160.5 tok/s | 3.7–4.2 tok/s | 93 GiB | 4608 |
 
-> Tested in v1.1.7 using the built-in Throughput benchmark with 1,024 to 16,384 input tokens.
+> Tested in v1.1.7 using the built-in Throughput benchmark with 1,024 to 16,384 input tokens. The M5 Max row was measured from the current source after v1.1.7 with the new V4.1 prefill defaults.
 >
 > See the [full benchmark](#benchmarks) for details.
 
@@ -79,7 +80,7 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 | DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
 | Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
 
-V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. Expert calculations as reads finish and batched expert input processing default to on. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
+V4.1 layer-by-layer input processing and V4.1 next-layer prefetch are **on by default** and also work with DSpark. V4.1/Qwen cache compression, candidate-only scoring, CED, Qwen next-layer prefetch, and DeepSeek ANE are **off by default**. Expert calculations as reads finish and batched expert input processing default to on. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
 
 ## Benchmarks
 
@@ -112,6 +113,17 @@ TTFT is the wait for the first token. Prefill measures input processing; Decode 
 | DeepSeek V4.1 | 1152 | 4096 | 106742.4 | 38.4 | 1.8 | 32.11 |
 | DeepSeek V4.1 | 1152 | 8192 | 144011.4 | 56.9 | 2.1 | 32.19 |
 | DeepSeek V4.1 | 1152 | 16384 | 248481.9 | 65.9 | 1.9 | 32.75 |
+
+### M5 Max (current source, after v1.1.7)
+
+Measured from the source tree with the new V4.1 defaults (layer-by-layer input processing with next-layer prefetch), LRU expert eviction, bf16 KV cache, and a 100 GiB memory limit. The same v1.1.7 App on this Mac reported 19.8, 41.4, 37.3, and 34.6 tok/s prefill for these inputs. See [BENCHMARK.md](BENCHMARK.md) for the full conditions.
+
+| Model | Slots | Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| DeepSeek V4.1 | 4608 | 1024 | 27129 | 37.8 | 4.0 | 92.60 |
+| DeepSeek V4.1 | 4608 | 4096 | 34126 | 120.1 | 3.7 | 92.67 |
+| DeepSeek V4.1 | 4608 | 8192 | 51023 | 160.5 | 4.2 | 92.77 |
+| DeepSeek V4.1 | 4608 | 16384 | 103425 | 158.4 | 4.1 | 92.97 |
 
 To test your Mac, open **Throughput**, choose an installed model, select **Code** or **Novel**, input lengths from **1K to 200K**, and an output limit of **128, 1024, or 4096**. Results can be copied as plain text, JSON, or Markdown. The app unloads the test model when the run finishes or is cancelled. Local builds also offer **Dry run**, which produces simulated results.
 

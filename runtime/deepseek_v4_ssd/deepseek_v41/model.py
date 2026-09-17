@@ -79,22 +79,33 @@ class Block(nn.Module):
                  cache, shared):
         """x [b, s, hc, d]; pre_mix [b, s, hc] from the previous sub-layer.
         Returns (x, ffn_pre) — ffn_pre feeds the next layer (or the head)."""
+        x, attn_pre = self.attention_half(x, pre_mix, start_pos, cache, shared)
+        return self.ffn_half(x, attn_pre)
+
+    def attention_half(self, x: mx.array, pre_mix: mx.array, start_pos: int,
+                       cache, shared):
+        """The attention sub-layer. Returns (x, attn_pre) for :meth:`ffn_half`.
+
+        Layer-major prefill runs this half in attention-sized chunks and the
+        FFN half over much larger token batches; both halves are token-local
+        apart from attention itself, so the split changes no numbers."""
         residual = x
         attn_pre, attn_post, attn_comb = hc_mixes(
             x, self.hc_attn_fn, self.hc_attn_scale, self.hc_attn_base,
             self.hc_mult, self.hc_iters, self.norm_eps, self.hc_eps)
         h = hc_pre(x, pre_mix)
         h = self.attn(self.attn_norm(h), start_pos, cache, shared)
-        x = hc_post(h, residual, attn_post, attn_comb)
+        return hc_post(h, residual, attn_post, attn_comb), attn_pre
 
+    def ffn_half(self, x: mx.array, attn_pre: mx.array):
+        """The MoE sub-layer. Returns (x, ffn_pre)."""
         residual = x
         ffn_pre, ffn_post, ffn_comb = hc_mixes(
             x, self.hc_ffn_fn, self.hc_ffn_scale, self.hc_ffn_base,
             self.hc_mult, self.hc_iters, self.norm_eps, self.hc_eps)
         h = hc_pre(x, attn_pre)
         h = self.ffn(self.ffn_norm(h))
-        x = hc_post(h, residual, ffn_post, ffn_comb)
-        return x, ffn_pre
+        return hc_post(h, residual, ffn_post, ffn_comb), ffn_pre
 
 
 class Model(nn.Module):

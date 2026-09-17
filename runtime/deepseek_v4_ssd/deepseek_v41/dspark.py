@@ -111,6 +111,22 @@ class DSpark(nn.Module):
         for stage in self.mtp:
             stage.attn.seed(main_x, offset)
 
+    def seed_context(self, main_hidden, start):
+        """Replace the draft context with the newest window of main-model states.
+
+        ``main_hidden`` [1, n, dim * len(target_layers)] covers positions
+        [start, start + n). Only the last ``window_size`` positions can ever be
+        attended, so older ones are dropped before the projection. Layer-major
+        prefill uses this instead of the chunked :meth:`prefill_context`.
+        """
+        window = self.mtp[0].attn.window_size
+        n = main_hidden.shape[1]
+        first = start + n - min(n, window)
+        main_x = self._main_x(main_hidden[:, first - start:])
+        for stage in self.mtp:
+            stage.attn.context, stage.attn.offset = None, first
+            stage.attn.seed(main_x, first)
+
     def draft(self, main_model, anchor, main_hidden, start_pos, temperature, top_p, confidence_threshold):
         started = time.perf_counter()
         main_x = self._main_x(main_hidden)

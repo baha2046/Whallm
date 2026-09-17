@@ -1409,13 +1409,26 @@ class ModelRuntime:
 
                 try:
                     if dspark is not None:
+                        dspark_prefilled = reused_tokens
+                        layer_major_prompt = prompt_tokens[reused_tokens:-1]
+                        if (
+                            use_layer_major
+                            and self.support.layer_major_prefill_seeds_dspark
+                            and layer_major_prompt
+                        ):
+                            with _route_phase(self.expert_cache, "prefill"):
+                                self.support.prefill(
+                                    self.model, layer_major_prompt, prompt_cache,
+                                    step_size, self.expert_cache, self.config,
+                                )
+                            dspark_prefilled = len(prompt_tokens) - 1
                         yield from self._stream_dspark(
                             prompt_tokens,
                             prompt_cache,
                             dspark,
                             options,
                             step_size,
-                            reused_tokens,
+                            dspark_prefilled,
                             dspark_prompt_cache_enabled,
                         )
                         completed = True

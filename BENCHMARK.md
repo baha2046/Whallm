@@ -1,7 +1,64 @@
 # Benchmark
 
-Recorded measurements for v1.1.7, v1.1.4, and v1.1.0. Each section states its
-workload and measurement conditions.
+Recorded measurements for the unreleased V4.1 prefill change, v1.1.7, v1.1.4,
+and v1.1.0. Each section states its workload and measurement conditions.
+
+## Unreleased: DeepSeek V4.1 prefill on M5 Max
+
+These rows were measured on 2026-09-17 from the source tree at commit
+`7887a15` plus the uncommitted V4.1 prefill changes (region-major contiguous
+expert layer buffers, pooled layer buffers, attention chunks with the MoE
+batched over 4,096 tokens, and layer-major prefill with next-layer prefetch on
+by default). The runtime ran from a Python 3.13.14 virtual environment with
+MLX 0.32.2, not from the packaged App, through the same `run_trial` function as
+the built-in **Throughput** benchmark.
+
+Environment: MacBook Pro, Apple M5 Max, 128 GB unified memory, macOS 27.0,
+internal SSD (about 13 GB/s for expert reads with the page cache bypassed).
+Workload: **Code** context, output limit **128 tokens**, one run per row.
+Configuration: 4,608 slots, LRU expert eviction, bf16 KV cache, 100 GiB memory
+limit, 4 read workers, 2 prefetch read workers, prompt cache off, DSpark off.
+Cache state: the expert slot cache is released at the start of every
+layer-major prefill and prefill reads bypass the page cache, so prefill rows
+do not depend on earlier runs; decode starts with an empty slot cache. Output
+hashes are the first 16 hex digits of the SHA-256 over the generated token ids.
+
+| Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) | Expert bytes read | Output hash |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1024 | 27129 | 37.8 | 4.03 | 92.60 | 383 GB | 98b10a8ed5f8acf6 |
+| 4096 | 34126 | 120.1 | 3.74 | 92.67 | 415 GB | bb2be29d9724a930 |
+| 8192 | 51023 | 160.5 | 4.15 | 92.77 | 383 GB | 09a7a573f977090c |
+| 16384 | 103425 | 158.4 | 4.09 | 92.97 | 383 GB | 104ced323450be0a |
+
+Expert bytes read cover prefill and decode; every layer-major prefill reads the
+complete 289 GB expert set once. Peak MLX memory is set by the 4,608 slots that
+decode refills after each prefill.
+
+Control rows from the same harness and machine with the v1.1.7 runtime
+(token-major V4.1 prefill, the previous default), same configuration:
+
+| Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) | Expert bytes read | Output hash |
+| ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1024 | 53938 | 19.0 | 4.20 | 92.60 | 506 GB | f623db1be43cfd08 |
+| 4096 | 88111 | 46.5 | 4.10 | 92.68 | 738 GB | 7fd55b255f3b160d |
+
+For reference, the v1.1.7 App's Throughput benchmark on this Mac with the same
+settings reported TTFT 51672 ms (19.8 tok/s), 98919 ms (41.4 tok/s),
+219828 ms (37.3 tok/s), and 472847 ms (34.6 tok/s) for 1,024, 4,096, 8,192,
+and 16,384 input tokens. Those App rows were not produced by this harness, so
+their commit and cache state are not recorded here.
+
+DSpark rows from the same harness and configuration with DSpark enabled
+(768 DSpark slots, confidence threshold 0.6). Decode counts accepted draft
+tokens as generated tokens, so it is not comparable with the rows above. The
+control row uses the previous token-major prefill, which DSpark required before
+this change:
+
+| Prefill | Input tokens | TTFT (ms) | Prefill (tok/s) | Decode (tok/s) | Peak MLX (GiB) | Expert bytes read | Output hash |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| layer-major | 1024 | 23186 | 44.2 | 3.89 | 93.58 | 382 GB | b1f87721338c7e39 |
+| layer-major | 4096 | 33614 | 121.9 | 5.20 | 96.05 | 419 GB | 3da271deec0f6e61 |
+| token-major (control) | 1024 | 44091 | 23.2 | 4.65 | 95.87 | 477 GB | de4d738a8356a3ff |
 
 ## v1.1.7
 

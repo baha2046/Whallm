@@ -80,8 +80,49 @@ def _qwen_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
     return regions
 
 
+def batched_layer_layout(
+    regions: dict[str, Tensor],
+    batched: tuple[str, ...],
+    blob_size: int,
+    expert_count: int,
+) -> dict[str, tuple[int, int, int]]:
+    """Place every slot region in a region-major layer buffer.
+
+    The batched regions must partition the slot exactly. The layer buffer stores
+    each batched region as ``expert_count`` consecutive copies of its slot bytes,
+    so its ``[expert_count, ...]`` view is contiguous and ``gather_qmm`` reads it
+    without copying the whole layer first. Returns ``name -> (base, stride,
+    inner)``: expert ``e`` of ``name`` starts at ``base + e * stride + inner``.
+    """
+    spans = sorted((regions[name].offset, regions[name].length, name) for name in batched)
+    expected = 0
+    for offset, length, name in spans:
+        if offset != expected:
+            raise ValueError(f"batched expert region {name} does not partition the slot")
+        expected += length
+    if expected != blob_size:
+        raise ValueError("batched expert regions do not cover the expert slot")
+    bases = {}
+    base = 0
+    for offset, length, name in spans:
+        bases[name] = (base, offset, length)
+        base += expert_count * length
+    layout = {}
+    for name, region in regions.items():
+        for owner_base, owner_offset, owner_length in bases.values():
+            if (owner_offset <= region.offset
+                    and region.offset + region.length <= owner_offset + owner_length):
+                layout[name] = (owner_base, owner_length, region.offset - owner_offset)
+                break
+        else:
+            raise ValueError(f"expert slot region {name} is outside every batched region")
+    return layout
+
+
 class FusedMXFP4Layout:
     regions = staticmethod(_fused_slot_regions)
+    # Contiguous per-layer arrays: the fused w13 pair and w2, weights and scales.
+    batched_regions = ("w13.weight", "w2.weight", "w13.scale", "w2.scale")
 
     @staticmethod
     def individual(arrays, read):
@@ -106,6 +147,7 @@ class FusedMXFP4Layout:
 
 class GateUpMXFP4Layout:
     regions = staticmethod(_qwen_slot_regions)
+    batched_regions = ("gate_up.weight", "gate_up.scale", "down.weight", "down.scale")
 
     @staticmethod
     def individual(arrays, read):

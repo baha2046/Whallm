@@ -161,3 +161,43 @@ class PrefillSlotReleaseTests(unittest.TestCase):
                 model = SimpleNamespace(model=SimpleNamespace(layers=[object()], embed_tokens=embed))
                 with self.assertRaisesRegex(ValueError, 'checked Qwen'):
                     _qwen_layer_major_prefill(model, [1], prompt_cache, 128, cache)
+
+
+class LayerBufferPoolTests(unittest.TestCase):
+    def test_layer_buffers_are_reused_between_layers_and_released_after_prefill(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1) as cache:
+                with cache.batched_layer(0) as first:
+                    mx.eval(first.w1_scales)
+                    first_buffer = cache._active_prefetch_trace.job.packed
+                    self.assertEqual(cache._layer_buffers, [])
+                self.assertEqual(len(cache._layer_buffers), 1)
+                self.assertIs(cache._layer_buffers[0], first_buffer)
+                with cache.batched_layer(0) as second:
+                    self.assertIs(cache._active_prefetch_trace.job.packed, first_buffer)
+                    self.assertEqual(second.w1_scales[:, 0, 0].tolist(), [4, 28])
+                cache.prefetch_layer(0)
+                self.assertEqual(cache._layer_buffers, [])
+                cache.discard_prefetched_layers()
+                self.assertEqual(len(cache._layer_buffers), 1)
+                cache.release_layer_buffers()
+                self.assertEqual(cache._layer_buffers, [])
+                with cache.batched_layer(0) as third:
+                    self.assertEqual(third.w1_scales[:, 0, 0].tolist(), [4, 28])
+
+    def test_batched_regions_are_contiguous_per_layer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1) as cache:
+                with cache.batched_layer(0) as batched:
+                    packed = cache._active_prefetch_trace.job.packed
+                    mx.eval(batched.w13, batched.w2, batched.w13_scales, batched.w2_scales)
+                    # Expert-major copies of each batched region, in slot order:
+                    # w13 = w3 then w1 for expert 0, then expert 1; then w2; scales alike.
+                    raw = memoryview(packed).cast('B').tobytes()
+                    self.assertEqual(list(raw), [16, 17, 18, 19, 0, 1, 2, 3, 40, 41, 42, 43, 24, 25, 26, 27,
+                                                 8, 9, 10, 11, 32, 33, 34, 35,
+                                                 20, 21, 22, 23, 4, 5, 6, 7, 44, 45, 46, 47, 28, 29, 30, 31,
+                                                 12, 13, 14, 15, 36, 37, 38, 39])
+                    self.assertEqual(batched.w13.shape, (2, 2, 1))
+                    self.assertEqual(batched.w13_scales[:, :, 0].tolist(), [[20, 4], [44, 28]])
+                    self.assertEqual(batched.w2_scales[:, 0, 0].tolist(), [12, 36])

@@ -262,7 +262,10 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.promptCacheMode = descriptor.supports("promptCache") ? .memory : .off
     settings.qwenGroupedExperts = descriptor.supports("groupedExperts")
     settings.slots = descriptor.defaults.slots
-    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && modelKind != .deepSeekV41
+    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill")
+    // V4.1 reads each expert layer once per prompt; reading the next layer
+    // during compute hides most of that I/O on a fast SSD.
+    settings.nextLayerPrefetch = modelKind == .deepSeekV41
     settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
     settings.bf16KVCache = descriptor.defaults.bf16KVCache
     settings.defaultMaxTokens = descriptor.defaults.maxTokens
