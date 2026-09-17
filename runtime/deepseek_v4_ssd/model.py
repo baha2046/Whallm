@@ -79,6 +79,13 @@ class RuntimeConfig:
     expert_cache_bytes: int | None = None
     mtp_cache_bytes: int | None = None
     dspark_cache_bytes: int | None = None
+    # Opt-in Qwen research candidates; no App defaults change.
+    qwen_pooled_index_cache: bool = False
+    qwen_ngram_lookup_optimized: bool = False
+    qwen_compile_tensor_ops: bool = False
+    qwen_phase_memory: bool = False
+    qwen_mtp_draft_tokens: int = 5
+    qwen_mtp_zero_acceptance_limit: int = 1
 
 
 def _apply_prompt_cache_mode(config: RuntimeConfig, mode: str | None) -> RuntimeConfig:
@@ -889,6 +896,7 @@ def _cache_arrays(cache) -> list[mx.array]:
                     "previous_window_kv",
                     "previous_window_gate",
                     "_pending",
+                    "pooled_keys",
                 )
             ]
             for name in ("_chunks", "_index_chunks"):

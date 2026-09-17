@@ -6,6 +6,77 @@ import XCTest
 
 final class ServerConfigurationTests: XCTestCase {
   @MainActor
+  func testQwenOptimizationSwitchesPersistAndReachRuntimeOnlyForQwen() throws {
+    let isolated = try isolatedDefaults()
+    defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
+    for kind in [ModelKind.qwen3_8FlashNext, .deepSeekV4, .deepSeekV41] {
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      for feature in QwenOptimization.allCases {
+        XCTAssertFalse(settings[keyPath: feature.keyPath] == true)
+        settings[keyPath: feature.keyPath] = true
+      }
+      settings.qwenMTPDraftTokens = 3
+      settings.qwenMTPZeroAcceptanceLimit = 4
+      settings.save(for: kind, defaults: isolated.defaults)
+      let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: isolated.defaults)
+      for feature in QwenOptimization.allCases {
+        XCTAssertEqual(restored[keyPath: feature.keyPath], true)
+      }
+      let catalog = try ModelLibrary.makeServerCatalog(models: [installedModel(kind, hasMTP: true)],
+        aliases: [:], settings: [kind: restored], powerSavingLimitGBps: nil)
+      let runtime = try XCTUnwrap(catalog.models.first).runtime
+      let enabled = kind == .qwen3_8FlashNext
+      XCTAssertEqual(runtime.qwenPooledIndexCache, enabled)
+      XCTAssertEqual(runtime.qwenNgramLookupOptimized, enabled)
+      XCTAssertEqual(runtime.qwenCompileTensorOps, enabled)
+      XCTAssertEqual(runtime.qwenPhaseMemory, enabled)
+      XCTAssertEqual(runtime.qwenMTPDraftTokens, enabled ? 3 : 5)
+      XCTAssertEqual(runtime.qwenMTPZeroAcceptanceLimit, enabled ? 4 : 1)
+      let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(runtime)) as? [String: Any])
+      XCTAssertEqual(json["qwen_phase_memory"] as? Bool, enabled)
+      XCTAssertEqual(json["qwen_mtp_draft_tokens"] as? Int, enabled ? 3 : 5)
+    }
+  }
+
+  func testOldQwenSettingsAndMTPPolicyOffPreserveChoices() throws {
+    var settings = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    var old = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(settings)) as? [String: Any])
+    for key in ["qwenPooledIndexCache", "qwenNgramLookupOptimized", "qwenCompileTensorOps",
+                "qwenPhaseMemory", "qwenMTPPolicy", "qwenMTPDraftTokens", "qwenMTPZeroAcceptanceLimit"] {
+      old.removeValue(forKey: key)
+    }
+    let legacy = try JSONDecoder().decode(ModelAdvancedSettings.self, from: JSONSerialization.data(withJSONObject: old))
+    for feature in QwenOptimization.allCases { XCTAssertFalse(legacy[keyPath: feature.keyPath] == true) }
+    XCTAssertEqual(legacy.effectiveQwenMTPDraftTokens, 5)
+    XCTAssertEqual(legacy.effectiveQwenMTPZeroAcceptanceLimit, 1)
+    settings.qwenMTPPolicy = true
+    settings.qwenMTPDraftTokens = 3
+    settings.qwenMTPZeroAcceptanceLimit = 4
+    settings.qwenMTPPolicy = false
+    XCTAssertEqual(settings.effectiveQwenMTPDraftTokens, 5)
+    XCTAssertEqual(settings.effectiveQwenMTPZeroAcceptanceLimit, 1)
+    settings.qwenMTPPolicy = true
+    XCTAssertEqual(settings.effectiveQwenMTPDraftTokens, 3)
+    XCTAssertEqual(settings.effectiveQwenMTPZeroAcceptanceLimit, 4)
+    settings.qwenMTPDraftTokens = 6
+    XCTAssertThrowsError(try settings.validate(for: .qwen3_8FlashNext))
+    settings.qwenMTPDraftTokens = 2
+    settings.qwenMTPZeroAcceptanceLimit = 33
+    XCTAssertThrowsError(try settings.validate(for: .qwen3_8FlashNext))
+  }
+
+  func testQwenOptimizationCopyIsLocalized() {
+    let extra = ["Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load.",
+                 "MTP draft tokens", "Zero-acceptance rounds before stopping MTP",
+                 "Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds."]
+    for language in [AppLanguage.traditionalChinese, .simplifiedChinese] {
+      for key in QwenOptimization.allCases.flatMap({ [$0.title, $0.hint] }) + extra {
+        XCTAssertNotEqual(L10n.string(key, language: language), key)
+      }
+    }
+  }
+
+  @MainActor
   func testRouteAwareCacheRoundTripsAndReachesCatalog() async throws {
     for descriptor in ModelPackages.descriptors {
       let kind = try XCTUnwrap(ModelKind(rawValue: descriptor.kind))
@@ -643,7 +714,8 @@ final class ServerConfigurationTests: XCTestCase {
         "expert_route_trace", "expert_page_cache_probe",
         "separate_prefill_io", "expert_file_cache_policy", "ready_expert_decode", "staged_expert_streaming",
         "qwen_next_layer_prefetch",
-        "qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
+        "qwen_quantized_kv", "qwen_quantized_index", "qwen_pooled_index_cache", "qwen_ngram_lookup_optimized",
+        "qwen_compile_tensor_ops", "qwen_phase_memory", "qwen_mtp_draft_tokens", "qwen_mtp_zero_acceptance_limit", "v41_packed_kv", "v41_packed_index",
         "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "deepseek_ane_prefill", "v41_layer_major_prefill",
         "qwen_grouped_experts", "expert_eviction_policy",
         "power_saving_limit_gbps",

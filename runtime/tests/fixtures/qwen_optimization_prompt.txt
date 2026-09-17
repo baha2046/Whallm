@@ -1,0 +1,3 @@
+Explain why a cache must discard derived state after rollback. Use a short Python example with an append-only token history and complete blocks of four tokens. Discuss how immutable snapshots differ from mutable buffers, and why incomplete blocks must not be retained as complete blocks. Keep the explanation precise and avoid assuming that a faster component guarantees faster end-to-end inference.
+
+請先用繁體中文列出三個正確性條件，再給出 Python 範例。

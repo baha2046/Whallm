@@ -3,6 +3,20 @@
 Recorded measurements for v1.1.7, v1.1.4, and v1.1.0. Each section states its
 workload and measurement conditions.
 
+## Current Throughput sampling
+
+Throughput fixes **`temperature=0` and `seed=42`** for every trial, regardless
+of saved model temperature, Qwen adaptive temperature, or sampling values sent
+to the benchmark endpoint. Chat and other generation endpoints are unchanged.
+Other sampling parameters and model options still apply; fixed sampling does
+not guarantee identical output across different acceleration paths.
+
+Results report `temperature`, `seed`, `top_p`, `top_k`, `min_p`,
+`presence_penalty`, and `repetition_penalty`. JSON exports retain all of them;
+text and Markdown exports also show Temperature and Seed. Missing fields from
+older servers remain unknown, not retroactively labeled 0/42. Historical
+measurements below have not been rerun and do not inherit this new policy.
+
 ## Current Throughput memory metric
 
 Current source uses **Peak Memory** (GiB), not Peak MLX. Each trial samples
@@ -20,6 +34,84 @@ The endpoint and JSON export use `peak_app_memory_bytes` and `memory_scope`
 There is no RSS or MLX fallback. Sampling can miss brief peaks and is not guaranteed
 to match Activity Monitor. No new full-model performance result is claimed here;
 the historical MLX measurements below retain their original meaning.
+
+**Status uses the same physical-footprint metric and process scope**, not RSS.
+Its server-owned monitor samples nominally every **10 ms during model work**
+(including loading, generation, warmup, queued work and unload) and every
+**1 second while idle**. Status/health polling does not enable fast sampling.
+The UI still refreshes roughly once per second, but receives the retained peak,
+so a sampled peak is not lost between UI updates.
+
+Status Maximum covers the time since server start or **Clear metric history**,
+including idle time and model changes; it is not Throughput's independent trial
+window. Clear also resets the server peak. A failed process read makes the
+current sample unavailable and invalidates that window's maximum until Clear;
+there is no RSS, MLX or zero fallback. Memory P95 retains the older, slower UI
+history cadence (generation/completion snapshots, cleared on model changes),
+not a percentile of the 10 ms stream. Different windows and sampling times mean
+Status and Throughput maxima need not be identical.
+
+## Qwen optimization correctness pilot (2026-09-17)
+
+Opt-in runtime candidates retain the existing App defaults:
+
+| RuntimeConfig field | Default | Candidate scope |
+| --- | --- | --- |
+| `qwen_pooled_index_cache` | `false` | Incremental pooling/normalization/RoPE of complete QSA index blocks; raw history still retained |
+| `qwen_ngram_lookup_optimized` | `false` | Deduplicate/sort requested rows, FP8 lookup-table decoding, avoid a redundant host copy |
+| `qwen_compile_tensor_ops` | `false` | Compile pure grouped RMS normalization; no RNG or mutable-cache capture |
+| `qwen_phase_memory` | `false` | Shrink the main expert cache for Prefill; restore capacity for Decode and request cleanup |
+| `qwen_mtp_draft_tokens` | `5` | Draft depth from 1 through 5 |
+| `qwen_mtp_zero_acceptance_limit` | `1` | Consecutive zero-acceptance rounds before request-local fallback, from 1 through 32 |
+
+These fields are optional in runtime catalogs. Qwen model settings now expose
+independent experimental switches, all off by default, applied on next load.
+The custom MTP switch reveals depth and retry choices (initially 2/2); switching
+it off uses 5/1 without erasing the choices. MTP must be installed and enabled
+to edit that strategy. Model locking and two-confirmation reset still apply.
+
+Phase memory is now connected to generation and warmup. For configured capacity
+`S`, Prefill uses `min(S, max(512, S // 2))` slots for the installed Qwen model.
+Small budgets therefore remain unchanged. Decode, completion, cancellation and
+error cleanup restore `S`, without increasing the expert budget. Readers drain
+and GPU work synchronizes before resizing; shrinking drops only slots outside
+the smaller range, while growing preserves existing buffers. The released space
+is available for temporary work, not a guarantee about total process memory or
+speed. The main expert budget changes neither KV nor MTP/DSpark budgets.
+
+On M5 Pro / 64 GiB, an 89-token prompt and 32-token greedy output matched the
+non-MTP baseline exactly for each of the first three candidates and their
+combination. The expert budget was 7.5 GiB, MLX memory limit 40 GiB, prompt cache
+off, LFU eviction, 32 MTP slots, and App-style prefill controls off. These are
+fixed pilot settings, not a copy of every App default. OS page cache was not purged.
+This short correctness check establishes **no speedup** or long-context guarantee.
+
+Default MTP diverged from non-MTP at output token 11. Both outputs reproduced
+with the unchanged `879fc68` source, so this divergence was not introduced by
+these candidates; its cause remains unresolved. Further full-model MTP-depth
+and retry runs stopped at that gate. Unit tests are not a substitute for resolving it.
+
+Reproduce a single fresh-process pilot using the tracked fixture:
+
+```sh
+PYTHONPATH=runtime:. .venv/bin/python Scripts/research_qwen_optimizations.py \
+  --model /path/to/qwen3.8-flash-next.dsv4 \
+  --prompt runtime/tests/fixtures/qwen_optimization_prompt.txt \
+  --variant pooled --output scratch/qwen-pooled-pilot.json
+```
+
+A subsequent phase-memory pilot compared `baseline`, `phase`, and `phase-combined`
+(the latter also enables the other three non-MTP candidates). The same short
+32-token output matched exactly. At 7.5 GiB, capacity changed 3084 → 1542 → 3084
+slots. With `--lifecycle`, baseline and combined runs also matched continuation,
+cancellation-after-first-token, warmup and the next request, both with normal
+Prefill and `--layer-major` batched Prefill. Every checked request boundary
+restored 3084 slots. This is short greedy state validation, not a long-context,
+stochastic, MTP-combination or performance result. The MTP stop above remains.
+
+Run `baseline` separately and compare `generated_token_ids`. The runner records
+source hashes, configuration, workload, environment, token hashes and sampled
+process physical footprint; it does not change saved settings or model files.
 
 ## v1.1.7
 

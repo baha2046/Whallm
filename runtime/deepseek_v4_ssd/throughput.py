@@ -12,6 +12,8 @@ from .cancellation import check_cancelled
 CONTEXT_LENGTHS = (1024, 4096, 8192, 16384, 32768, 65536, 131072, 204800)
 GENERATION_LENGTHS = (128, 1024, 4096)
 CONTEXT_TYPES = ("code", "novel")
+TEMPERATURE = 0.0
+SEED = 42
 CORPUS_DIRECTORY = Path(__file__).with_name("benchmark_contexts")
 
 
@@ -31,6 +33,9 @@ def prompt_tokens(runtime, length, benchmark_context="code"):
 
 
 def run_trial(runtime, options, context_length, track, progress, benchmark_context="code"):
+    # Benchmark controls are fixed even for direct callers. Do not mutate saved
+    # model defaults or silently change the remaining sampling parameters.
+    options = replace(options, temperature=TEMPERATURE, seed=SEED)
     if context_length + options.max_tokens > runtime.installed.maximum_context:
         raise ValueError("Input and generation lengths exceed this model's context limit.")
     tokens, corpus_hash = prompt_tokens(runtime, context_length, benchmark_context)
@@ -68,6 +73,13 @@ def run_trial(runtime, options, context_length, track, progress, benchmark_conte
             "context_tokens": context_length,
             "generation_tokens": generated,
             "generation_limit": options.max_tokens,
+            "temperature": options.temperature,
+            "seed": options.seed,
+            "top_p": options.top_p,
+            "top_k": options.top_k,
+            "min_p": options.min_p,
+            "presence_penalty": options.presence_penalty,
+            "repetition_penalty": options.repetition_penalty,
             "ttft_ms": metrics["time_to_first_token_seconds"] * 1000,
             "tpot_ms": 1000 / decode_tps if decode_tps > 0 else None,
             "prefill_tps": metrics["prefill_tokens_per_second"],

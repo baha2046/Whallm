@@ -380,6 +380,18 @@ class _SlotPool:
         self._views: list[memoryview | None] = [None] * slots
         self._loaded = bytearray(slots)
 
+    def resize(self, slots: int) -> None:
+        """Caller has drained readers and synchronized GPU work."""
+        previous = len(self._slots)
+        if slots < previous:
+            del self._views[slots:]
+            del self._slots[slots:]
+            del self._loaded[slots:]
+        elif slots > previous:
+            self._slots.extend([None] * (slots - previous))
+            self._views.extend([None] * (slots - previous))
+            self._loaded.extend(bytes(slots - previous))
+
     def prepare(self, slots: list[int]) -> None:
         created = []
         for slot in slots:
@@ -644,6 +656,11 @@ class ExpertCache:
         self.eviction_policy = eviction_policy
         self.model = installed_model
         self.slots = slots
+        self._decode_slots = slots
+        self._prefill_slots = slots
+        self._phase_memory_active = False
+        self._memory_phase = None
+        self._phase_resize_count = 0
         self.read_workers = read_workers
         self.prefetch_read_workers = min(read_workers, prefetch_read_workers)
         self.layer_count = layer_count or installed_model.layer_count
@@ -792,6 +809,89 @@ class ExpertCache:
             self._clock = 0
             self._last_decay = 0
         mx.clear_cache()
+
+    def enable_phase_memory(self) -> None:
+        """Opt-in: half capacity during prefill, a full layer when possible.
+
+        Does not allocate workspace or increase the configured expert ceiling.
+        Called at model load, before a request can own expert weights.
+        """
+        if type(self._pool) is not _SlotPool:
+            raise ValueError("phase memory requires direct expert storage")
+        from .qwen_phase_budget import QwenPhaseBudget
+        prefill = min(self._decode_slots, max(self.model.expert_count, self._decode_slots // 2))
+        blob = self.model.expert_blob_size
+        plan = QwenPhaseBudget(self._decode_slots * blob, blob, self.model.selected_expert_count,
+                               (self._decode_slots - prefill) * blob)
+        self._prefill_slots = plan.prefill_slots
+
+    @contextmanager
+    def phase_memory_request(self):
+        # The request lock and generation MLX stream enclose this scope.
+        if self._prefill_slots == self._decode_slots:
+            yield
+            return
+        if self._phase_memory_active:
+            raise RuntimeError("phase memory request is already active")
+        self._phase_memory_active = True
+        self._memory_phase = None
+        try:
+            yield
+        finally:
+            try:
+                self.set_memory_phase("decode")
+            finally:
+                self._phase_memory_active = False
+                self._memory_phase = None
+
+    def set_memory_phase(self, phase: str) -> None:
+        if not self._phase_memory_active or self._memory_phase == phase:
+            return
+        if phase not in ("prefill", "decode"):
+            raise ValueError("unknown expert memory phase")
+        capacity = self._prefill_slots if phase == "prefill" else self._decode_slots
+        if capacity != self.slots:
+            self._resize_phase_slots(capacity)
+        self._memory_phase = phase
+
+    def _resize_phase_slots(self, capacity: int) -> None:
+        if not self.model.selected_expert_count <= capacity <= self._decode_slots:
+            raise ValueError("phase capacity exceeds the configured expert budget")
+        with self._lock:
+            if self._pinned_layers or self._pinned_expert_keys or self._batched_layer is not None:
+                raise RuntimeError("cannot resize expert slots while they are in use")
+        # Demand reads finish before the generation iterator yields. Prefetches
+        # can outlive it: cancel/drain those before dropping their buffers.
+        self.discard_prefetched_layers()
+        mx.synchronize()
+        previous = self.slots
+        with self._lock:
+            removed = [key for key, entry in self._entries.items() if entry.slot >= capacity]
+            for key in removed:
+                del self._entries[key]
+                self._layer_counts[key[0]] -= 1
+            self.metrics.evictions += len(removed)
+            self._pool.resize(capacity)
+            self.slots = capacity
+            occupied = {entry.slot for entry in self._entries.values()}
+            self._free_slots = [slot for slot in reversed(range(capacity)) if slot not in occupied]
+            self._layer_reserve = (capacity // self.layer_count) // 2
+            if self._route_policy is not None:
+                self._route_policy.capacity = min(capacity, self.layer_count * self.model.expert_count)
+                self._route_policy.rebalance()
+                self._rebuild_route_heap_locked()
+            else:
+                self._heap = [(self._eviction_rank(entry), entry.last_access, entry.version, layer, expert)
+                              for (layer, expert), entry in self._entries.items()]
+                heapq.heapify(self._heap)
+            self._phase_resize_count += 1
+        if capacity < previous:
+            mx.clear_cache()
+
+    def phase_memory_snapshot(self) -> dict:
+        with self._lock:
+            return dict(prefill_slots=self._prefill_slots, decode_slots=self._decode_slots,
+                        active_slots=self.slots, resize_count=self._phase_resize_count)
 
     def discard_prefetched_layers(self) -> None:
         """Abandon unused layer reads; caller holds the request lock."""
@@ -1244,16 +1344,16 @@ class ExpertCache:
             ): expert
             for expert in missing
         }
-        for expert, slot in resident:
-            pack_started = time.perf_counter()
-            weights = self._pool.select_individual([slot])[0]
-            with self._lock:
-                self.metrics.pack_seconds += time.perf_counter() - pack_started
-            yield expert, weights
-
         ready_at = started
         completed: set[int] = set()
         try:
+            # Closing while yielding a cache hit must also drain missing reads.
+            for expert, slot in resident:
+                pack_started = time.perf_counter()
+                weights = self._pool.select_individual([slot])[0]
+                with self._lock:
+                    self.metrics.pack_seconds += time.perf_counter() - pack_started
+                yield expert, weights
             for future in as_completed(futures):
                 expert = futures[future]
                 finished = future.result()

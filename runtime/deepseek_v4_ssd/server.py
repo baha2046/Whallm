@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 
 from . import throughput
 from .app_memory import AppMemorySampler
+from .status_memory import StatusMemorySampler
 from .model import _apply_prompt_cache_mode
 
 from .cancellation import GenerationCancelled, cancellation_scope, check_cancelled
@@ -145,7 +146,19 @@ class OpenAIServer(ThreadingHTTPServer):
         self.api_key = api_key
         self.log_level = log_level
         self.metrics = GenerationMetrics()
+        self.status_memory = None
         super().__init__(address, OpenAIHandler)
+        try:
+            self.status_memory = StatusMemorySampler()
+            self.status_memory.start()
+        except BaseException:
+            self.server_close()
+            raise
+
+    def server_close(self):
+        if self.status_memory is not None:
+            self.status_memory.close()
+        super().server_close()
 
     def track(self, pieces: Iterator[GeneratedPiece]) -> Iterator[GeneratedPiece]:
         self.metrics.start()
@@ -378,17 +391,17 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         if path == "/v1/chat/completions":
             self._authorize()
             payload = self._request_json()
-            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.status_memory.activity(), self.app.model_manager.request(payload.get("model")) as model:
                 self._chat(payload, model)
         elif path == "/v1/responses":
             self._authorize()
             payload = self._request_json()
-            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.status_memory.activity(), self.app.model_manager.request(payload.get("model")) as model:
                 self._responses(payload, model)
         elif path == "/v1/completions":
             self._authorize()
             payload = self._request_json()
-            with ClientConnection(self.connection), self.app.model_manager.request(payload.get("model")) as model:
+            with ClientConnection(self.connection), self.app.status_memory.activity(), self.app.model_manager.request(payload.get("model")) as model:
                 self._completion(payload, model)
         elif path == "/api/benchmark/throughput":
             self._authorize()
@@ -397,19 +410,27 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         elif path == "/api/models/load":
             self._authorize()
             payload = self._request_json()
-            self.app.model_manager.load(
-                payload.get("model"), payload.get("configuration")
-            )
+            with self.app.status_memory.activity():
+                self.app.model_manager.load(
+                    payload.get("model"), payload.get("configuration")
+                )
             self._json(200, self._status())
         elif path == "/api/models/configure":
             self._authorize()
             payload = self._request_json()
-            self.app.model_manager.configure(payload.get("configuration"))
+            with self.app.status_memory.activity():
+                self.app.model_manager.configure(payload.get("configuration"))
             self._json(200, self._status())
         elif path == "/api/models/unload":
             self._authorize()
             payload = self._request_json()
-            self.app.model_manager.unload(payload.get("model"))
+            with self.app.status_memory.activity():
+                self.app.model_manager.unload(payload.get("model"))
+            self._json(200, self._status())
+        elif path == "/api/status/memory/reset":
+            self._authorize()
+            self._request_json()
+            self.app.status_memory.reset()
             self._json(200, self._status())
         else:
             raise APIError("Route not found.", status=404, code="not_found")
@@ -426,13 +447,14 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             raise APIError("Choose 128, 1024, or 4096 output tokens.", param="generation_length")
         self._start_sse()
         try:
-            with ClientConnection(self.connection), AppMemorySampler() as memory:
+            with ClientConnection(self.connection), self.app.status_memory.activity(), AppMemorySampler() as memory:
                 self._sse({"phase": "loading"})
                 with self.app.model_manager.request(payload.get("model")) as model:
                     runtime = model.runtime
                     support = support_for_runtime(runtime)
                     options, _ = self._common(
-                        {"max_tokens": generation}, model.defaults, support=support,
+                        {"max_tokens": generation, "temperature": throughput.TEMPERATURE,
+                         "seed": throughput.SEED}, model.defaults, support=support,
                         dspark=bool(getattr(runtime.config, "dspark_enabled", False)),
                     )
                     _validate_approximation_runtime(options, runtime)
@@ -1383,6 +1405,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             "status": "ready",
             "requires_api_key": self.app.api_key is not None,
             **snapshot,
+            "app_memory": self.app.status_memory.snapshot(),
         }
 
     def _authorize(self) -> None:

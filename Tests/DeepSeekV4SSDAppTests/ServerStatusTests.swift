@@ -4,6 +4,51 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ServerStatusTests: XCTestCase {
+  func testMemoryMaximumUsesServerPeakNotStatusPollSamples() throws {
+    let memory = ServerStatus.AppMemory(currentAppMemoryBytes: 100, peakAppMemoryBytes: 900,
+      memoryScope: "app", sampleIntervalSeconds: 0.01, activeRequests: 1, epoch: "window")
+    var live = LivePerformance(snapshot: PerformanceSnapshot(memoryUsage: 100), appMemory: memory)
+    var history = PerformanceHistory()
+    history.record(live.snapshot)
+    XCTAssertEqual(history[.memoryUsage]?.maximum, 100)
+    XCTAssertEqual(live.memoryMaximum, 900)
+    live.memoryResetFailed = true
+    XCTAssertNil(live.memoryMaximum) // Never restore the old peak after a failed Clear.
+    live.memoryResetFailed = false
+    live.appMemory = nil
+    XCTAssertNil(live.memoryMaximum) // No RSS/MLX/local-history fallback for old servers.
+  }
+
+  func testStatusMemoryDecodingKeepsScopeRateAndUnavailableValues() throws {
+    let base = try statusFixture(model: nil, sourceModel: nil, modelPath: nil, runtime: nil,
+                             loadedModel: nil, loadingModel: nil)
+    var json = try XCTUnwrap(JSONSerialization.jsonObject(with: base) as? [String: Any])
+    XCTAssertNil(try ServerStatus.decode(base).appMemory)
+    json["app_memory"] = ["current_app_memory_bytes": 1234, "peak_app_memory_bytes": 5678,
+      "memory_scope": "app", "sample_interval_seconds": 0.01, "active_requests": 1, "epoch": "a"]
+    let active = try XCTUnwrap(ServerStatus.decode(JSONSerialization.data(withJSONObject: json)).appMemory)
+    XCTAssertEqual(active.currentAppMemoryBytes, 1234)
+    XCTAssertEqual(active.peakAppMemoryBytes, 5678)
+    XCTAssertEqual(active.sampleIntervalSeconds, 0.01)
+    XCTAssertEqual(active.memoryScope, "app")
+    json["app_memory"] = ["current_app_memory_bytes": NSNull(), "peak_app_memory_bytes": NSNull(),
+      "memory_scope": "process", "sample_interval_seconds": 1, "active_requests": 0, "epoch": "b"]
+    let idle = try XCTUnwrap(ServerStatus.decode(JSONSerialization.data(withJSONObject: json)).appMemory)
+    XCTAssertNil(idle.currentAppMemoryBytes)
+    XCTAssertNil(idle.peakAppMemoryBytes)
+    XCTAssertEqual(idle.sampleIntervalSeconds, 1)
+    XCTAssertEqual(idle.activeRequests, 0)
+    XCTAssertNotEqual(idle.epoch, active.epoch)
+  }
+
+  func testStatusMemoryHelpIsLocalized() {
+    let keys = ["Memory uses App + inference process physical footprint (inference process only for standalone servers): every 10 ms during model work, every second while idle. Maximum is retained since server start or clearing metric history, including loading and idle time. Memory P95 uses the slower Status refresh samples. Brief peaks may be missed; — means unavailable.",
+                "Unable to reset the memory maximum. Try clearing metric history again."]
+    for language in [AppLanguage.traditionalChinese, .simplifiedChinese] {
+      for key in keys { XCTAssertNotEqual(L10n.string(key, language: language), key) }
+    }
+  }
+
   func testStatusDecodesPerformanceMetrics() throws {
     let data = Data(
       #"{"performance":{"generating":true,"runtime_prompt_tokens":120,"runtime_generation_tokens":12,"accumulated_generation_tokens":42,"completed_request_count":2,"request_seconds":3.5,"time_to_first_token_seconds":0.5,"prefill_tokens_per_second":200,"decode_tokens_per_second":4,"request_ssd_read_bytes_per_second":4194304,"request_expert_cache_hit_rate":0.8,"ssd_bytes_read":1048576,"active_parameters_cache":{"hit_rate":0.75,"hits":3,"misses":1,"resident_slots":3,"capacity_slots":1024}}}"#

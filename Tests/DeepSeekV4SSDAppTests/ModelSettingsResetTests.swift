@@ -52,6 +52,9 @@ final class ModelSettingsResetTests: XCTestCase {
       custom.packedIndexCache = true
       custom.approximationEnabled = true
       custom.defaultMaxTokens = 256
+      for feature in QwenOptimization.allCases { custom[keyPath: feature.keyPath] = true }
+      custom.qwenMTPDraftTokens = 3
+      custom.qwenMTPZeroAcceptanceLimit = 4
       custom.save(for: kind, defaults: store)
       let saved = try XCTUnwrap(ModelAdvancedSettings.load(for: kind, defaults: store))
       XCTAssertTrue(saved.layerMajorPrefill)

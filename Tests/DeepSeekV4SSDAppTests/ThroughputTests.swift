@@ -138,6 +138,7 @@ final class ThroughputTests: XCTestCase {
     XCTAssertEqual(session.results.map(\.contextTokens), [1024, 8192])
     XCTAssertEqual(session.results.map(\.generationTokens), [4096, 4096])
     XCTAssertTrue(session.results.allSatisfy { $0.benchmarkContext == .novel && $0.model == "dry-run" && $0.slots == 2304 })
+    XCTAssertTrue(session.results.allSatisfy { $0.temperature == 0 && $0.seed == 42 })
     let firstExport = try ThroughputOutputFormat.json.render(session.results)
     session.runDryRun()
     XCTAssertEqual(try ThroughputOutputFormat.json.render(session.results), firstExport)
@@ -158,6 +159,10 @@ final class ThroughputTests: XCTestCase {
     XCTAssertEqual(L10n.string("Run Benchmark", language: .english), "Run Benchmark")
     XCTAssertEqual(L10n.string("Run Benchmark", language: .traditionalChinese), "執行測試")
     XCTAssertEqual(L10n.string("Run Benchmark", language: .simplifiedChinese), "运行测试")
+    let samplingHint = "Throughput uses temperature 0 and seed 42. Other model settings still apply. Fixed sampling does not guarantee identical output across acceleration settings."
+    for language in [AppLanguage.traditionalChinese, .simplifiedChinese] {
+      XCTAssertNotEqual(L10n.string(samplingHint, language: language), samplingHint)
+    }
   }
 
   func testDecodesActualCountsAndOptionalTimePerToken() throws {
@@ -174,10 +179,15 @@ final class ThroughputTests: XCTestCase {
     XCTAssertEqual(result.benchmarkContext, .novel)
     XCTAssertEqual(result.corpusSha256, "def")
     XCTAssertNil(result.slots) // Older servers must not invent a current settings value.
+    XCTAssertNil(result.temperature)
+    XCTAssertNil(result.seed)
+    let legacyExport = try ThroughputOutputFormat.json.render([result])
+    XCTAssertFalse(legacyExport.contains("\"temperature\""))
+    XCTAssertFalse(legacyExport.contains("\"seed\""))
   }
 
   func testResultExportsPreserveRunSettingsAndNumbers() throws {
-    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"qwen-test","slots":2304,"benchmark_context":"code","corpus_sha256":"def","context_tokens":4096,"generation_tokens":128,"generation_limit":128,"ttft_ms":500,"tpot_ms":125,"prefill_tps":8192,"decode_tps":8,"elapsed_seconds":16.5,"throughput_tps":256,"peak_app_memory_bytes":1073741824,"memory_scope":"app","output_token_sha256":"abc","prompt_cache_reused_tokens":0,"finish_reason":"length"}}"#))
+    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"qwen-test","slots":2304,"temperature":0,"seed":42,"top_p":0.8,"top_k":20,"min_p":0,"presence_penalty":1.5,"repetition_penalty":1,"benchmark_context":"code","corpus_sha256":"def","context_tokens":4096,"generation_tokens":128,"generation_limit":128,"ttft_ms":500,"tpot_ms":125,"prefill_tps":8192,"decode_tps":8,"elapsed_seconds":16.5,"throughput_tps":256,"peak_app_memory_bytes":1073741824,"memory_scope":"app","output_token_sha256":"abc","prompt_cache_reused_tokens":0,"finish_reason":"length"}}"#))
     let result = try XCTUnwrap(event.result)
     let json = try ThroughputOutputFormat.json.render([result])
     let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]])
@@ -185,12 +195,22 @@ final class ThroughputTests: XCTestCase {
     XCTAssertEqual(rows[0]["memory_scope"] as? String, "app")
     XCTAssertNil(rows[0]["peak_memory_bytes"])
     XCTAssertEqual(rows[0]["slots"] as? Int, 2304)
+    XCTAssertEqual(rows[0]["temperature"] as? Double, 0)
+    XCTAssertEqual(rows[0]["seed"] as? Int, 42)
+    XCTAssertEqual(rows[0]["top_p"] as? Double, 0.8)
+    XCTAssertEqual(rows[0]["top_k"] as? Int, 20)
+    XCTAssertEqual(rows[0]["min_p"] as? Double, 0)
+    XCTAssertEqual(rows[0]["presence_penalty"] as? Double, 1.5)
+    XCTAssertEqual(rows[0]["repetition_penalty"] as? Double, 1)
     XCTAssertEqual(rows[0]["context_tokens"] as? Int, 4096)
     XCTAssertEqual(rows[0]["benchmark_context"] as? String, "code")
     XCTAssertEqual(rows[0]["finish_reason"] as? String, "length")
     XCTAssertEqual(rows[0]["corpus_sha256"] as? String, "def")
     let plain = try ThroughputOutputFormat.plainText.render([result])
     XCTAssertTrue(plain.contains("Peak Memory"))
+    XCTAssertTrue(plain.contains("Temperature"))
+    XCTAssertTrue(plain.contains("Seed"))
+    XCTAssertTrue(plain.contains("42"))
     XCTAssertFalse(plain.contains("MLX"))
     XCTAssertTrue(plain.contains("qwen-test"))
     XCTAssertTrue(plain.contains("2304"))

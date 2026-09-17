@@ -92,6 +92,9 @@ def _use_mlx_lm_generation_stream(stream):
 
 
 def _route_phase(expert_cache, phase: str):
+    memory_phase = getattr(expert_cache, "set_memory_phase", None)
+    if callable(memory_phase):
+        memory_phase(phase)
     trace_routes = getattr(expert_cache, "trace_routes", None)
     return trace_routes(phase) if callable(trace_routes) else nullcontext()
 
@@ -1310,7 +1313,8 @@ class ModelRuntime:
         with self._generation_lock, _approximation_mode(
             self, options.approximation_mode
         ):
-            with mx.stream(self._generation_stream):
+            memory_request = getattr(self.expert_cache, "phase_memory_request", nullcontext)
+            with mx.stream(self._generation_stream), memory_request():
                 # MLX gives fresh request threads the same initial random state.
                 # Reset on the generating thread, after model loading and before
                 # any normal, DSpark, or MTP sampling (including cached prompts).
@@ -1578,6 +1582,8 @@ class ModelRuntime:
                 logits_processors=logits_processors,
                 prefilled_hidden=prefilled_hidden,
                 record_round=self.metrics.record_mtp_round,
+                draft_tokens=getattr(self.config, "qwen_mtp_draft_tokens", 5),
+                zero_acceptance_limit=getattr(self.config, "qwen_mtp_zero_acceptance_limit", 1),
             )
         )
         with closing(responses):
@@ -1746,7 +1752,8 @@ class ModelRuntime:
         if len(tokens) < 2:
             return 0
         with self._generation_lock:
-            with mx.stream(self._generation_stream):
+            memory_request = getattr(self.expert_cache, "phase_memory_request", nullcontext)
+            with mx.stream(self._generation_stream), memory_request():
                 cache = self.support.new_cache(self.model)
                 step_size = _select_prefill_step_size(
                     getattr(self.config, "prefill_step_size", 128),

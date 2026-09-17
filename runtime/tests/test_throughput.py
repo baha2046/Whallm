@@ -14,11 +14,11 @@ from unittest.mock import patch
 
 from test_server import FakeRuntime
 from deepseek_v4_ssd.cancellation import check_cancelled
-from deepseek_v4_ssd.generation import GeneratedPiece
+from deepseek_v4_ssd.generation import GeneratedPiece, GenerationOptions
 from deepseek_v4_ssd.model import RuntimeConfig
 from deepseek_v4_ssd.model_manager import ModelDefaults, ModelManager, ModelSpec
 from deepseek_v4_ssd.server import OpenAIServer
-from deepseek_v4_ssd.throughput import CONTEXT_LENGTHS, CONTEXT_TYPES, CORPUS_DIRECTORY, prompt_tokens
+from deepseek_v4_ssd.throughput import CONTEXT_LENGTHS, CONTEXT_TYPES, CORPUS_DIRECTORY, prompt_tokens, run_trial
 
 
 class BenchmarkRuntime(FakeRuntime):
@@ -63,8 +63,10 @@ class ThroughputTests(unittest.TestCase):
         self.runtime = BenchmarkRuntime()
         self.original_config = self.runtime.config
         self.loads = 0
+        self.loading_memory_states = []
         def load(_):
             self.loads += 1
+            self.loading_memory_states.append(self.server.status_memory.snapshot())
             return self.runtime
         self.manager = ModelManager([
             ModelSpec("deepseek-v4-flash-0731", None, "/tmp/model", "deepseek-v4",
@@ -152,6 +154,128 @@ class ThroughputTests(unittest.TestCase):
         self.assertNotIn("peak_memory_bytes", result)
         self.assertEqual(result["output_token_sha256"], hashlib.sha256(b"12\n13\n").hexdigest())
         self.assertTrue(body.endswith("data: [DONE]\n\n"))
+
+    def test_http_sampling_is_fixed_despite_model_defaults_or_payload(self):
+        # Qwen adaptive sampling normally supplies temperature 0.7, not zero.
+        for qwen in (False, True):
+            self.runtime.installed.is_qwen = qwen
+            with self.subTest(qwen=qwen), urlopen(self.request(temperature=1.8, seed=9)) as response:
+                events = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                          if line.startswith("data: {")]
+            result = next(event["result"] for event in events if "result" in event)
+            self.assertEqual(self.runtime.options.temperature, 0)
+            self.assertEqual(self.runtime.options.seed, 42)
+            self.assertEqual(result["temperature"], 0)
+            self.assertEqual(result["seed"], 42)
+            self.assertEqual(result["top_p"], 0.8 if qwen else 0.98)
+            self.assertEqual(result["top_k"], 20 if qwen else 0)
+            self.assertEqual(result["presence_penalty"], 1.5 if qwen else 0)
+            self.assertEqual(result["repetition_penalty"], 1)
+
+    def test_direct_trial_pins_sampling_without_mutating_options_or_settings(self):
+        options = GenerationOptions(max_tokens=128, temperature=1.7, seed=7,
+            top_p=0.9, top_k=10, min_p=0.05, presence_penalty=0.4, repetition_penalty=1.1)
+        result = run_trial(self.runtime, options, 1024, iter, lambda _: None)
+        self.assertEqual(options.temperature, 1.7)
+        self.assertEqual(options.seed, 7)
+        self.assertEqual(self.runtime.options.temperature, 0)
+        self.assertEqual(self.runtime.options.seed, 42)
+        self.assertIs(self.runtime.config, self.original_config)
+        for key in ("temperature", "seed", "top_p", "top_k", "min_p", "presence_penalty", "repetition_penalty"):
+            self.assertEqual(result[key], getattr(self.runtime.options, key))
+        for key in ("top_p", "top_k", "min_p", "presence_penalty", "repetition_penalty"):
+            self.assertEqual(getattr(self.runtime.options, key), getattr(options, key))
+
+    def test_normal_request_sampling_defaults_are_unchanged(self):
+        from deepseek_v4_ssd.server import _options
+        from deepseek_v4_ssd.model_support import get_support
+        defaults = ModelDefaults(128, 1.7, 0.9, 10)
+        for kind, expected in (("deepseek-v4", 1.7), ("deepseek-v4.1", 1.7), ("qwen3.8-flash-next", 0.7)):
+            support = get_support(kind)
+            with self.subTest(kind=kind):
+                normal = _options({"max_tokens": 128}, defaults, support=support)
+                self.assertEqual(normal.temperature, expected)
+                self.assertIsNone(normal.seed)
+                fixed = _options({"max_tokens": 128, "temperature": 0.3, "seed": 99}, defaults, support=support)
+                self.assertEqual(fixed.temperature, 0.3)
+                self.assertEqual(fixed.seed, 99)
+
+    def test_status_memory_covers_each_generation_route_and_returns_to_idle(self):
+        original = self.runtime.stream
+        observed = []
+        def stream(*args, **kwargs):
+            observed.append(self.server.status_memory.snapshot())
+            yield from original(*args, **kwargs)
+        with patch.object(self.runtime, 'stream', side_effect=stream):
+            for route in ('/v1/completions', '/v1/chat/completions', '/v1/responses', '/api/benchmark/throughput'):
+                body = dict(model='deepseek-v4-flash-0731', prompt='hi', input='hi',
+                            messages=[dict(role='user', content='hi')], max_tokens=2,
+                            context_length=1024, generation_length=128)
+                request = Request(self.url.replace('/api/benchmark/throughput', route),
+                    data=json.dumps(body).encode(), headers={'Authorization': 'Bearer secret', 'Content-Type': 'application/json'})
+                with self.subTest(route=route), urlopen(request) as response:
+                    response.read()
+                self.assertEqual(observed[-1]['sample_interval_seconds'], 0.01)
+                self.assertGreaterEqual(observed[-1]['active_requests'], 1)
+                # HTTP completion may precede the handler's final context exit.
+                deadline = time.monotonic() + 1
+                while self.server.status_memory.snapshot()['active_requests'] and time.monotonic() < deadline:
+                    time.sleep(0.005)
+                self.assertEqual(self.server.status_memory.snapshot()['sample_interval_seconds'], 1)
+        self.assertEqual(self.loading_memory_states[0]['sample_interval_seconds'], 0.01)
+        self.assertEqual(len(observed), 4)
+
+    def test_model_controls_use_fast_sampling_without_generation(self):
+        observed = []
+        def operation(*args, **kwargs):
+            observed.append(self.server.status_memory.snapshot())
+        for action in ('load', 'configure', 'unload'):
+            url = self.url.replace('/api/benchmark/throughput', '/api/models/' + action)
+            request = Request(url, data=b'{"model":"deepseek-v4-flash-0731","configuration":{}}',
+                headers={'Authorization': 'Bearer secret', 'Content-Type': 'application/json'})
+            with patch.object(self.manager, action, side_effect=operation), urlopen(request) as response:
+                result = json.loads(response.read())
+            self.assertEqual(observed[-1]['sample_interval_seconds'], 0.01)
+            self.assertEqual(result['app_memory']['sample_interval_seconds'], 1)
+            self.assertEqual(result['app_memory']['active_requests'], 0)
+
+    def test_status_memory_reset_is_authenticated_and_not_a_work_request(self):
+        from deepseek_v4_ssd.status_memory import StatusMemorySampler
+        self.server.status_memory.close()
+        value = [100]
+        self.server.status_memory = StatusMemorySampler(reader=lambda _: value[0], pids=(11, 22)).start()
+        value[0] = 10
+        with self.server.status_memory.activity():
+            pass
+        status_url = self.url.replace('/api/benchmark/throughput', '/api/status')
+        with urlopen(Request(status_url, headers={'Authorization': 'Bearer secret'})) as response:
+            memory = json.loads(response.read())['app_memory']
+        self.assertEqual(memory['peak_app_memory_bytes'], 200)
+        self.assertEqual(memory['current_app_memory_bytes'], 20)
+        self.assertEqual(memory['memory_scope'], 'app')
+        self.assertEqual(memory['sample_interval_seconds'], 1)
+        reset_url = status_url + '/memory/reset'
+        with self.assertRaises(HTTPError) as denied:
+            urlopen(Request(reset_url, data=b'{}', headers={'Content-Type': 'application/json'}))
+        self.assertEqual(denied.exception.code, 401)
+        denied.exception.close()
+        self.assertEqual(self.server.status_memory.snapshot()['epoch'], memory['epoch'])
+        with urlopen(Request(reset_url, data=b'{}', headers={'Authorization': 'Bearer secret', 'Content-Type': 'application/json'})) as response:
+            reset = json.loads(response.read())['app_memory']
+        self.assertNotEqual(reset['epoch'], memory['epoch'])
+        self.assertEqual(reset['peak_app_memory_bytes'], 20)
+        self.assertEqual(reset['active_requests'], 0)
+        self.assertEqual(reset['sample_interval_seconds'], 1)
+
+    def test_failed_generation_restores_status_idle_sampling(self):
+        self.runtime.fail = True
+        with urlopen(self.request()) as response:
+            response.read()
+        deadline = time.monotonic() + 1
+        while self.server.status_memory.snapshot()['active_requests'] and time.monotonic() < deadline:
+            time.sleep(0.005)
+        self.assertEqual(self.server.status_memory.snapshot()['active_requests'], 0)
+        self.assertEqual(self.server.status_memory.snapshot()['sample_interval_seconds'], 1)
 
     def test_memory_sampling_covers_loading_and_stops_after_result(self):
         from deepseek_v4_ssd.app_memory import AppMemorySampler
@@ -257,3 +381,8 @@ class ThroughputTests(unittest.TestCase):
         self.assertTrue(self.runtime.closed)
         self.assertIsNone(self.manager.status_snapshot()["loaded_model"])
         self.assertFalse(self.server.metrics.snapshot()["generating"])
+        deadline = time.monotonic() + 1
+        while self.server.status_memory.snapshot()['active_requests'] and time.monotonic() < deadline:
+            time.sleep(0.005)
+        self.assertEqual(self.server.status_memory.snapshot()['active_requests'], 0)
+        self.assertEqual(self.server.status_memory.snapshot()['sample_interval_seconds'], 1)

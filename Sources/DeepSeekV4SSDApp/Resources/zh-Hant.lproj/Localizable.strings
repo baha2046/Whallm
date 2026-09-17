@@ -70,6 +70,8 @@
 "Memory" = "記憶體";
 "Memory limit GiB" = "記憶體上限（GiB）";
 "Memory usage" = "記憶體用量";
+"Memory uses App + inference process physical footprint (inference process only for standalone servers): every 10 ms during model work, every second while idle. Maximum is retained since server start or clearing metric history, including loading and idle time. Memory P95 uses the slower Status refresh samples. Brief peaks may be missed; — means unavailable." = "記憶體採用 App＋推論程序的 physical footprint，獨立伺服器只計推論程序。模型工作期間每 10 毫秒取樣，待機時每秒一次。最大值從啟動伺服器或清除紀錄後累積，包含載入與待機。記憶體 P95 仍使用較慢的 Status 更新樣本。可能漏掉短暫峰值；— 表示無法取得。";
+"Unable to reset the memory maximum. Try clearing metric history again." = "無法重設記憶體最大值，請再試一次清除指標紀錄。";
 "Metric" = "指標";
 "Metrics" = "指標";
 "Minimum" = "歷史最低";
@@ -211,6 +213,20 @@
 "Install the MTP files before enabling this setting." = "請先安裝 MTP 檔案，再啟用此設定。";
 "MTP slots" = "MTP slot";
 "Edit expert caches in slots" = "以 slots 編輯專家快取";
+"Reuse QSA pooled keys" = "重用 QSA 索引計算";
+"Optimize N-gram reads" = "最佳化 N-gram 讀取";
+"Compile grouped normalization" = "編譯分組正規化計算";
+"Adjust memory between prompt and answer" = "依讀取問題／產生回答調整記憶體";
+"Customize MTP strategy" = "自訂 MTP 策略";
+"Reuses completed attention-index blocks instead of recalculating them. Retains extra index data." = "重用已完成區塊的注意力索引，避免重複計算；會保留額外索引資料。";
+"Reads repeated N-gram rows once per lookup and uses a decoding table." = "每次查找只讀取一次重複的 N-gram 資料列，並透過查表解碼。";
+"Reuses a compiled normalization calculation, not the whole generation graph." = "重用已編譯的正規化計算；不是重用整個生成流程。";
+"Limits the expert cache to half its capacity while reading a prompt, keeping room for one layer when possible. Restores full capacity for answers. May cause extra SSD reads." = "讀取問題時，專家快取上限降至一半，但預算足夠時至少保留一層的容量。產生回答時恢復完整容量，可能增加 SSD 讀取。";
+"Experimental. MTP output differs from non-MTP in a full-model test; the cause is unresolved. Off uses 5 draft tokens and stops after one zero-acceptance round." = "實驗功能：完整模型測試中，MTP 與未啟用 MTP 的輸出不同，原因尚未釐清。關閉時使用 5 個草稿 token，一輪完全未接受就停止 MTP。";
+"Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load." = "Qwen 實驗功能，尚未證實能加速。變更於下次載入模型時生效。";
+"MTP draft tokens" = "MTP 草稿 token 數";
+"Zero-acceptance rounds before stopping MTP" = "連續幾輪未接受後停止 MTP";
+"Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds." = "請選擇 1–5 個 MTP 草稿 token，以及 1–32 輪連續未接受上限。";
 "Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity." = "將專家、MTP 與 DSpark 快取的 GiB 滑桿改為整數 slots 輸入框。切換不會改動已儲存的容量。";
 "Enter the number of experts to retain. Applies on next model load." = "輸入要保留的專家數量。下次載入模型時生效。";
 "Number of MTP experts kept in memory. More slots use more memory. The default is 32." = "保留在記憶體中的 MTP expert 數量。較多 slot 會使用較多記憶體。預設值為 32。";
@@ -393,6 +409,7 @@
 "Install a model on the Model page to run a benchmark." = "請先到模型頁面安裝模型，再執行測試。";
 "One request at a time. Prompt reuse is off; model settings apply." = "依序執行測試，停用對話快取重用，其餘沿用模型設定。";
 "Run Benchmark" = "執行測試";
+"Throughput uses temperature 0 and seed 42. Other model settings still apply. Fixed sampling does not guarantee identical output across acceleration settings." = "Throughput 固定使用 temperature 0、seed 42，其他模型設定仍然生效。即使固定取樣，不同加速設定也不保證產生完全相同的輸出。";
 "Starting server…" = "正在啟動伺服器⋯";
 "Loading model…" = "正在載入模型⋯";
 "Running benchmark…" = "正在測試⋯";

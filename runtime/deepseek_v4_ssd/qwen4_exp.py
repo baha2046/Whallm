@@ -92,17 +92,22 @@ class GroupRMSNorm(nn.Module):
         self.weight = mx.ones((dimensions,))
         self.group_size = group_size
         self.eps = eps
+        self.compiled = False
 
     def __call__(self, value: mx.array) -> mx.array:
         original_shape = value.shape
         if self.group_size is not None:
             value = value.reshape(*value.shape[:-1], -1, self.group_size)
             weight = self.weight.reshape(-1, self.group_size)
-            normalized = value.astype(mx.float32) * mx.rsqrt(
-                mx.mean(mx.square(value.astype(mx.float32)), axis=-1, keepdims=True)
-                + self.eps
-            )
-            output = (normalized * weight).astype(value.dtype)
+            if self.compiled:
+                from .qwen_tensor_ops import compiled_group_rms_norm
+                output = compiled_group_rms_norm(value, weight, self.eps)
+            else:
+                normalized = value.astype(mx.float32) * mx.rsqrt(
+                    mx.mean(mx.square(value.astype(mx.float32)), axis=-1, keepdims=True)
+                    + self.eps
+                )
+                output = (normalized * weight).astype(value.dtype)
         else:
             output = mx.fast.rms_norm(value, self.weight, self.eps)
         return output.reshape(original_shape)
@@ -219,7 +224,7 @@ def rollback_mtp_cache(cache: CacheList, checkpoint: int) -> None:
 class NGramStore:
     """Read and decode only the requested FP8 N-gram rows."""
 
-    def __init__(self, path: Path, descriptor: NGram, weight_scale: float = 1.0):
+    def __init__(self, path: Path, descriptor: NGram, weight_scale: float = 1.0, *, optimized: bool = False):
         self.path = path
         self.descriptor = descriptor
         expected = descriptor.shard_count * descriptor.shard_row_count * descriptor.row_bytes
@@ -230,6 +235,10 @@ class NGramStore:
         if not math.isfinite(weight_scale) or weight_scale <= 0:
             raise ValueError("Qwen N-gram weight scale must be finite and positive")
         self.weight_scale = weight_scale
+        self.optimized = optimized
+        if optimized:
+            from .qwen_ngram_lookup import fp8_table
+            self._fp8_table = fp8_table(weight_scale)
         self._rows = np.memmap(
             path,
             mode="r",
@@ -246,6 +255,9 @@ class NGramStore:
             row_ids.min() < 0 or row_ids.max() >= self._rows.shape[0]
         ):
             raise ValueError("N-gram row is outside ngram.bin")
+        if self.optimized:
+            from .qwen_ngram_lookup import lookup_rows
+            return lookup_rows(self._rows, row_ids, self._fp8_table)
         copied = np.array(self._rows[row_ids], copy=True)
         exponent = (copied >> 3) & 0x0F
         mantissa = copied & 0x07
@@ -468,7 +480,7 @@ class QSAAttention(nn.Module):
         if main_cache is not None:
             key, value = main_cache.update_and_fetch(key, value)
         output = self._bounded_attention(
-            query, key, value, index_query, raw_index_keys, offset
+            query, key, value, index_query, raw_index_keys, offset, index_cache
         )
         output = output.transpose(0, 2, 1, 3).reshape(batch, length, -1)
         return self.o_proj(output * mx.sigmoid(gate))
@@ -481,23 +493,27 @@ class QSAAttention(nn.Module):
         index_query: mx.array,
         raw_index_keys: mx.array,
         offset: int,
+        index_cache=None,
     ) -> mx.array:
         if query.shape[0] != 1:
             raise ValueError("Qwen SSD runtime supports batch size one")
         ratio = self.args.indexer_compress_ratio
         blocks = raw_index_keys.shape[1] // ratio
-        pooled = raw_index_keys[:, : blocks * ratio].reshape(
-            1, blocks, ratio, self.args.indexer_head_dim
-        ).astype(mx.float32).mean(axis=2).astype(raw_index_keys.dtype)
-        pooled = self.indexer.k_layernorm(pooled)
-        if blocks:
-            positions = mx.arange(blocks) * ratio
-            pooled = _apply_partial_rope(
-                pooled,
-                positions[None],
-                int(self.args.head_dim * self.args.partial_rotary_factor),
-                self.args.rope_theta,
-            )
+        def pool_rows(raw, first_block):
+            count = raw.shape[1] // ratio
+            pooled = raw.reshape(1, count, ratio, self.args.indexer_head_dim
+                ).astype(mx.float32).mean(axis=2).astype(raw.dtype)
+            pooled = self.indexer.k_layernorm(pooled)
+            if count:
+                positions = (mx.arange(count) + first_block) * ratio
+                pooled = _apply_partial_rope(pooled, positions[None],
+                    int(self.args.head_dim * self.args.partial_rotary_factor), self.args.rope_theta)
+            return pooled
+
+        if callable(getattr(index_cache, "pooled", None)):
+            pooled = index_cache.pooled(raw_index_keys, ratio, pool_rows)
+        else:
+            pooled = pool_rows(raw_index_keys[:, :blocks * ratio], 0)
         outputs = []
         query_chunk = 4
         for start in range(0, query.shape[2], query_chunk):
@@ -652,10 +668,16 @@ class StreamingExperts(nn.Module):
         selected = np.asarray(indices, dtype=np.int32)
         if value.size // value.shape[-1] == 1 and getattr(self.cache, "ready_expert_decode", False):
             outputs = {}
-            for expert, weights in self.cache.iter_ready(self.layer, selected.reshape(-1).tolist()):
-                output = self._one(value, weights)
-                mx.async_eval(output)
-                outputs[expert] = output
+            ready = self.cache.iter_ready(self.layer, selected.reshape(-1).tolist())
+            try:
+                for expert, weights in ready:
+                    output = self._one(value, weights)
+                    mx.async_eval(output)
+                    outputs[expert] = output
+            finally:
+                close = getattr(ready, "close", None)
+                if close is not None:
+                    close()
             return mx.stack([outputs[int(expert)] for expert in selected.reshape(-1)], axis=-2)
         resident = self.cache.get_many(self.layer, selected.reshape(-1).tolist())
         flat = selected.reshape(-1)
@@ -784,6 +806,7 @@ class Model(nn.Module):
         self._expert_cache = cache
         self.quantize_kv = False
         self.quantize_index = False
+        self.pooled_index_cache = False
         self.lm_head = nn.Linear(args.hidden_size, args.vocab_size, bias=False)
 
     def __call__(self, input_ids: mx.array, cache=None) -> mx.array:
@@ -802,11 +825,17 @@ class Model(nn.Module):
 
     def make_cache(self):
         from .qwen_quantized_cache import QSAQuantizedCache
+        from .qwen_pooled_cache import QSAPooledIndexCache, QSAPooledQuantizedIndexCache
+        def index_cache():
+            if self.pooled_index_cache:
+                return (QSAPooledQuantizedIndexCache(4, self.args.indexer_head_dim)
+                        if self.quantize_index else QSAPooledIndexCache())
+            return QSAQuantizedCache(4, self.args.indexer_head_dim) if self.quantize_index else KVCache()
         return [
             ArraysCache(size=4)
             if layer.layer_type == "linear_attention"
             else CacheList(QSAQuantizedCache(8, self.args.head_dim) if self.quantize_kv else KVCache(),
-                           QSAQuantizedCache(4, self.args.indexer_head_dim) if self.quantize_index else KVCache())
+                           index_cache())
             for layer in self.layers
         ]
 
@@ -933,8 +962,12 @@ def generate_mtp_tokens(
     logits_processors: list[Callable[[mx.array, mx.array], mx.array]] | None = None,
     prefilled_hidden: mx.array | None = None,
     record_round: Callable[[int, int, float, float, float, bool], None] | None = None,
+    draft_tokens: int = 5,
+    zero_acceptance_limit: int = 1,
 ) -> Iterator[tuple[int, bool]]:
     """Yield tokens from exact target-distribution MTP verification."""
+    from .qwen_mtp_policy import MTPDraftPolicy
+    policy = MTPDraftPolicy(draft_tokens, zero_acceptance_limit)
     if not prompt or max_tokens < 1:
         return
     if prefill_step_size < 1:
@@ -1033,6 +1066,7 @@ def generate_mtp_tokens(
     generated = 1
 
     while generated < max_tokens:
+        check_cancelled()
         remaining = max_tokens - generated
         if remaining == 1:
             logits, predecessor_hidden = main_model.forward_with_hidden(
@@ -1046,7 +1080,7 @@ def generate_mtp_tokens(
             sampling_tokens.append(anchor)
             return
 
-        draft_limit = min(5, remaining - 1)
+        draft_limit = policy.limit(remaining)
         checkpoint = mtp_cache.size()
         draft_started = time.perf_counter()
         draft_tokens: list[int] = []
@@ -1054,6 +1088,7 @@ def generate_mtp_tokens(
         draft_hidden = predecessor_hidden
         draft_input = anchor
         for _ in range(draft_limit):
+            check_cancelled()
             draft_logits, draft_hidden = mtp_model(
                 draft_hidden,
                 mx.array([[draft_input]], dtype=mx.int32),
@@ -1071,6 +1106,7 @@ def generate_mtp_tokens(
             draft_logprobs.append(draft_distribution)
         draft_seconds = time.perf_counter() - draft_started
 
+        check_cancelled()
         verification_started = time.perf_counter()
         verified_cache, copied = _fork_prompt_cache(target_cache)
         if copied:
@@ -1116,6 +1152,7 @@ def generate_mtp_tokens(
             replay_started = time.perf_counter()
             replay_logits = replay_hidden = None
             for input_token in [anchor, *draft_tokens[:accepted]]:
+                check_cancelled()
                 replay_logits, replay_hidden = main_model.forward_with_hidden(
                     mx.array([[input_token]], dtype=mx.int32),
                     target_cache,
@@ -1125,7 +1162,7 @@ def generate_mtp_tokens(
             predecessor_hidden = replay_hidden[:, -1:]
             replay_seconds = time.perf_counter() - replay_started
 
-        fallback = accepted == 0
+        fallback = policy.observe(accepted)
         if record_round is not None:
             record_round(
                 len(draft_tokens),
@@ -1150,9 +1187,10 @@ def generate_mtp_tokens(
         generated += 1
 
         if fallback:
-            # ponytail: one zero-acceptance round disables MTP; replace this
-            # with a measured cost gate only after the correctness matrix passes.
+            # Default remains one zero-acceptance round. A higher opt-in
+            # threshold permits retries, without changing rejection sampling.
             while generated < max_tokens:
+                check_cancelled()
                 logits, predecessor_hidden = main_model.forward_with_hidden(
                     mx.array([[anchor]], dtype=mx.int32),
                     target_cache,
@@ -1190,6 +1228,8 @@ def load(
         eviction_policy=getattr(config, "expert_eviction_policy", "lfu"),
     )
     try:
+        if getattr(config, "qwen_phase_memory", False):
+            cache.enable_phase_memory()
         scale_name = (
             "model.language_model.layers.1.ple.ple_embedding."
             "ngram_embedding.weight_scale"
@@ -1201,10 +1241,16 @@ def load(
             installed.root / installed.ngram.file,
             installed.ngram,
             weight_scale,
+            optimized=getattr(config, "qwen_ngram_lookup_optimized", False),
         )
         model = Model(args, cache, ngram_store)
         model.quantize_kv = config.qwen_quantized_kv
         model.quantize_index = config.qwen_quantized_index
+        model.pooled_index_cache = getattr(config, "qwen_pooled_index_cache", False)
+        if getattr(config, "qwen_compile_tensor_ops", False):
+            for _, module in model.named_modules():
+                if isinstance(module, GroupRMSNorm):
+                    module.compiled = True
         grouped_prefill = bool(
             getattr(config, "qwen_grouped_experts", True)
             and not getattr(config, "mtp_enabled", False)

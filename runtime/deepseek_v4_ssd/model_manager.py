@@ -208,7 +208,7 @@ def _parse_runtime(value: Any, prefix: str, model_kind: str) -> RuntimeConfig:
             if value.pop("adaptive_expert_prefill_threshold") is not None:
                 raise ModelCatalogError(f"{prefix}.adaptive_expert_prefill_threshold has been removed; remove this setting")
     names = {field.name for field in fields(RuntimeConfig)}
-    required = names - {'expert_cache_bytes', 'mtp_cache_bytes', 'dspark_cache_bytes', 'separate_prefill_io', 'qwen_quantized_kv', 'qwen_quantized_index', 'v41_ced_prefill', 'v41_packed_kv', 'v41_packed_index', 'deepseek_ane_prefill', 'qwen_grouped_experts', 'expert_eviction_policy', 'v41_layer_major_prefill', 'v41_candidate_index', 'v41_next_layer_prefetch'}
+    required = names - {'qwen_phase_memory', 'qwen_pooled_index_cache', 'qwen_ngram_lookup_optimized', 'qwen_compile_tensor_ops', 'qwen_mtp_draft_tokens', 'qwen_mtp_zero_acceptance_limit', 'expert_cache_bytes', 'mtp_cache_bytes', 'dspark_cache_bytes', 'separate_prefill_io', 'qwen_quantized_kv', 'qwen_quantized_index', 'v41_ced_prefill', 'v41_packed_kv', 'v41_packed_index', 'deepseek_ane_prefill', 'qwen_grouped_experts', 'expert_eviction_policy', 'v41_layer_major_prefill', 'v41_candidate_index', 'v41_next_layer_prefetch'}
     if not isinstance(value, dict) or not required <= set(value) <= names:
         raise ModelCatalogError(f"{prefix} must contain every required RuntimeConfig field")
     try:
@@ -248,6 +248,10 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
             raise ValueError(f"{name} must be an integer of at least {minimum}")
 
     boolean_names = {
+        "qwen_pooled_index_cache",
+        "qwen_ngram_lookup_optimized",
+        "qwen_compile_tensor_ops",
+        "qwen_phase_memory",
         "fp8_kv_cache",
         "layer_major_prefill",
         "persistent_prompt_cache",
@@ -278,6 +282,11 @@ def validate_runtime_config(config: RuntimeConfig) -> None:
     for name in boolean_names:
         if type(getattr(config, name)) is not bool:
             raise ValueError(f"{name} must be a boolean")
+
+    for name, maximum in (("qwen_mtp_draft_tokens", 5), ("qwen_mtp_zero_acceptance_limit", 32)):
+        value = getattr(config, name)
+        if type(value) is not int or not 1 <= value <= maximum:
+            raise ValueError(f"{name} must be an integer from 1 through {maximum}")
 
     if (
         isinstance(config.ane_prefill_ratio, bool)

@@ -1980,6 +1980,19 @@ struct ModelAdvancedView: View {
             )
             .appInput(width: 340)
           }
+          if modelKind == .qwen3_8FlashNext {
+            Divider()
+            Text(L10n.string("Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load.", language: language))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+              .frame(maxWidth: .infinity, alignment: .leading)
+            ForEach(QwenOptimization.allCases.filter { $0 != .mtpPolicy }) { feature in
+              Divider()
+              toggleField(feature.title, hint: feature.hint,
+                value: optionalToggle(feature.keyPath, defaultValue: false))
+            }
+          }
           if modelKind.descriptor.supports("mtp") {
             Divider()
             toggleField(
@@ -1993,6 +2006,21 @@ struct ModelAdvancedView: View {
             Divider()
             cacheMemoryField(.mtp, minimum: 10)
             .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
+            Divider()
+            toggleField(QwenOptimization.mtpPolicy.title, hint: QwenOptimization.mtpPolicy.hint,
+              value: optionalToggle(\.qwenMTPPolicy, defaultValue: false))
+              .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
+            Text(L10n.string(QwenOptimization.mtpPolicy.hint, language: language))
+              .font(.caption).foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+              .frame(maxWidth: .infinity, alignment: .leading)
+            if settings.qwenMTPPolicy == true {
+              Divider()
+              qwenIntegerChoice("MTP draft tokens", range: 1...5, key: \.qwenMTPDraftTokens)
+              Divider()
+              qwenIntegerChoice("Zero-acceptance rounds before stopping MTP", range: 1...32,
+                key: \.qwenMTPZeroAcceptanceLimit)
+            }
           }
           if modelKind.descriptor.editableSettings.contains("kvCachePrecision") {
             Divider()
@@ -2033,6 +2061,20 @@ struct ModelAdvancedView: View {
     }
   }
 
+
+  private func qwenIntegerChoice(_ label: String, range: ClosedRange<Int>,
+                                 key: WritableKeyPath<ModelAdvancedSettings, Int?>) -> some View {
+    SettingRow(label, hint: L10n.string(QwenOptimization.mtpPolicy.hint, language: language), language: language) {
+      Picker(L10n.string(label, language: language), selection: Binding(
+        get: { settings[keyPath: key] ?? 2 }, set: { settings[keyPath: key] = $0 }
+      )) {
+        ForEach(Array(range), id: \.self) { Text(String($0)).tag($0) }
+      }
+      .labelsHidden()
+      .frame(width: 100)
+    }
+    .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
+  }
 
   private func impactHint(_ label: String, _ hint: String) -> String {
     if label == "Use MTP" && !mtpAvailable {
@@ -2084,10 +2126,10 @@ struct ModelAdvancedView: View {
             .fixedSize()
         }
         VStack(spacing: 6) {
-          Slider(value: Binding(
+          CacheBudgetSlider(value: Binding(
             get: { ExpertMemory.sliderValue(value, in: range) },
             set: { control.setGiB($0, in: &settings, blobBytes: blobBytes, range: range) }
-          ), in: range, step: 0.1)
+          ), range: range)
           .accessibilityLabel(L10n.string(label, language: language))
           .accessibilityValue(String(format: "%.1f GiB", locale: language.locale, value))
           .accessibilityHint(capacityText)
@@ -2581,7 +2623,7 @@ private struct MetricView: View {
             Label(localized("Clear metric history"), systemImage: "trash")
           }
           .buttonStyle(TertiaryIconButtonStyle(color: .red))
-          .disabled(history.isEmpty)
+          .disabled(history.isEmpty && performance.appMemory == nil && !performance.memoryResetFailed)
           .help(localized("Clear metric history"))
           .accessibilityLabel(localized("Clear metric history"))
         }
@@ -2765,6 +2807,16 @@ private struct MetricView: View {
         Divider()
         metricRow(metric)
       }
+      Text(localized("Memory uses App + inference process physical footprint (inference process only for standalone servers): every 10 ms during model work, every second while idle. Maximum is retained since server start or clearing metric history, including loading and idle time. Memory P95 uses the slower Status refresh samples. Brief peaks may be missed; — means unavailable."))
+        .font(.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 12)
+      if performance.memoryResetFailed {
+        Text(localized("Unable to reset the memory maximum. Try clearing metric history again."))
+          .font(.caption).foregroundStyle(.red)
+          .frame(maxWidth: .infinity, alignment: .leading)
+      }
     }
     .appCard()
   }
@@ -2775,7 +2827,9 @@ private struct MetricView: View {
       ? performance.liveFirstTokenWaitTime : performance.snapshot[metric]
     let live = formattedValue(value, for: metric, live: true)
     let statistics = history[metric]
-    let maximum = statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
+    let maximum = metric == .memoryUsage
+      ? performance.memoryMaximum.map { formattedValue($0, for: metric) } ?? "—"
+      : statistics.map { formattedValue($0.maximum, for: metric) } ?? "-"
     let p95 = statistics.map { formattedValue($0.p95, for: metric) } ?? "-"
     return HStack {
       Text(localized(metricTitle(metric)))
@@ -2835,6 +2889,7 @@ private struct MetricView: View {
     for metric: PerformanceMetric,
     live: Bool = false
   ) -> String {
+    if !value.isFinite { return "—" }
     if value == 0 { return "-" }
     if live && !hasLiveValue(metric, value: value) { return "-" }
     switch metric {

@@ -4,6 +4,15 @@ import Foundation
 import Security
 
 struct ServerStatus: Decodable {
+  struct AppMemory: Decodable, Equatable {
+    let currentAppMemoryBytes: Double?
+    let peakAppMemoryBytes: Double?
+    let memoryScope: String
+    let sampleIntervalSeconds: Double
+    let activeRequests: Int
+    let epoch: String
+  }
+
   struct Runtime: Decodable {}
 
   struct Performance: Decodable {
@@ -40,6 +49,7 @@ struct ServerStatus: Decodable {
   let loadedModel: String?
   let loadingModel: String?
   let performance: Performance
+  let appMemory: AppMemory?
 
   static func decode(_ data: Data) throws -> ServerStatus {
     let decoder = JSONDecoder()
@@ -158,6 +168,12 @@ struct LivePerformance: Equatable {
   var dsparkAverageAcceptedLength = 0.0
   var loadedModel: String?
   var loadingModel: String?
+  var appMemory: ServerStatus.AppMemory?
+  var memoryResetFailed = false
+
+  var memoryMaximum: Double? {
+    memoryResetFailed ? nil : appMemory?.peakAppMemoryBytes
+  }
 
   var liveFirstTokenWaitTime: Double {
     if generating && snapshot.outputTokens == 0 {
@@ -247,6 +263,13 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var bf16KVCache = false
   var anePrefillRatio: Double? = 0
   var qwenGroupedExperts: Bool?
+  var qwenPooledIndexCache: Bool? = false
+  var qwenNgramLookupOptimized: Bool? = false
+  var qwenCompileTensorOps: Bool? = false
+  var qwenPhaseMemory: Bool? = false
+  var qwenMTPPolicy: Bool? = false
+  var qwenMTPDraftTokens: Int? = 2
+  var qwenMTPZeroAcceptanceLimit: Int? = 2
   var recentExpertCache: Bool?
   var routeAwareExpertCache: Bool?
   var mtpEnabled: Bool? = false
@@ -345,7 +368,16 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     defaults.set(data, forKey: Self.preferenceKey(for: modelKind))
   }
 
+  var effectiveQwenMTPDraftTokens: Int { qwenMTPPolicy == true ? (qwenMTPDraftTokens ?? 2) : 5 }
+  var effectiveQwenMTPZeroAcceptanceLimit: Int { qwenMTPPolicy == true ? (qwenMTPZeroAcceptanceLimit ?? 2) : 1 }
+
   func validate(for modelKind: ModelKind) throws {
+    if modelKind == .qwen3_8FlashNext && qwenMTPPolicy == true {
+      guard (1...5).contains(effectiveQwenMTPDraftTokens),
+        (1...32).contains(effectiveQwenMTPZeroAcceptanceLimit) else {
+        throw ConfigurationError(L10n.string("Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds."))
+      }
+    }
     for value in [expertCacheGiB, mtpCacheGiB, dsparkCacheGiB].compactMap({ $0 }) {
       _ = try ExpertMemory.bytes(gib: value)
     }
@@ -691,6 +723,12 @@ struct ModelCatalog: Codable, Equatable, Sendable {
       let powerSavingLimitGBps: Double?
       let qwenQuantizedKV: Bool
       let qwenQuantizedIndex: Bool
+      let qwenPooledIndexCache: Bool
+      let qwenNgramLookupOptimized: Bool
+      let qwenCompileTensorOps: Bool
+      let qwenPhaseMemory: Bool
+      let qwenMTPDraftTokens: Int
+      let qwenMTPZeroAcceptanceLimit: Int
       let v41PackedKV: Bool
       let v41PackedIndex: Bool
       let v41CandidateIndex: Bool
@@ -741,6 +779,12 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         case powerSavingLimitGBps = "power_saving_limit_gbps"
         case qwenQuantizedKV = "qwen_quantized_kv"
         case qwenQuantizedIndex = "qwen_quantized_index"
+        case qwenPooledIndexCache = "qwen_pooled_index_cache"
+        case qwenNgramLookupOptimized = "qwen_ngram_lookup_optimized"
+        case qwenCompileTensorOps = "qwen_compile_tensor_ops"
+        case qwenPhaseMemory = "qwen_phase_memory"
+        case qwenMTPDraftTokens = "qwen_mtp_draft_tokens"
+        case qwenMTPZeroAcceptanceLimit = "qwen_mtp_zero_acceptance_limit"
         case v41PackedKV = "v41_packed_kv"
         case v41PackedIndex = "v41_packed_index"
         case v41CandidateIndex = "v41_candidate_index"
@@ -758,6 +802,12 @@ struct ModelCatalog: Codable, Equatable, Sendable {
         try values.encodeIfPresent(dsparkCacheBytes, forKey: .dsparkCacheBytes)
         try values.encode(qwenQuantizedKV, forKey: .qwenQuantizedKV)
         try values.encode(qwenQuantizedIndex, forKey: .qwenQuantizedIndex)
+        try values.encode(qwenPooledIndexCache, forKey: .qwenPooledIndexCache)
+        try values.encode(qwenNgramLookupOptimized, forKey: .qwenNgramLookupOptimized)
+        try values.encode(qwenCompileTensorOps, forKey: .qwenCompileTensorOps)
+        try values.encode(qwenPhaseMemory, forKey: .qwenPhaseMemory)
+        try values.encode(qwenMTPDraftTokens, forKey: .qwenMTPDraftTokens)
+        try values.encode(qwenMTPZeroAcceptanceLimit, forKey: .qwenMTPZeroAcceptanceLimit)
         try values.encode(v41PackedKV, forKey: .v41PackedKV)
         try values.encode(v41PackedIndex, forKey: .v41PackedIndex)
         try values.encode(v41CandidateIndex, forKey: .v41CandidateIndex)
@@ -1027,6 +1077,10 @@ final class ServerController: ObservableObject {
   private var process: Process?
   private var outputTask: Task<Void, Never>?
   private var monitorTask: Task<Void, Never>?
+  private var memoryResetTask: Task<Void, Never>?
+  private var memoryResetRevision = 0
+  private var memoryResetPending = false
+  private var memoryResetFailed = false
   private var modelConfigurationTask: Task<Void, Never>?
   private var pendingModelConfigurations: [String: ModelCatalog.Entry] = [:]
   private var monitorConfiguration: ServerConfiguration?
@@ -1114,6 +1168,45 @@ final class ServerController: ObservableObject {
   func clearPerformanceHistory() {
     performanceHistory.clear()
     lastRecordedCompletedRequestCount = performance.completedRequestCount
+    memoryResetTask?.cancel()
+    memoryResetRevision += 1
+    let revision = memoryResetRevision
+    performance.appMemory = nil
+    performance.snapshot.memoryUsage = .nan
+    performance.memoryResetFailed = false
+    memoryResetFailed = false
+    memoryResetPending = false
+    guard case .running = state, let configuration = monitorConfiguration,
+      let baseURL = configuration.baseURL else { return }
+    memoryResetPending = true
+    memoryResetTask = Task { [weak self] in
+      guard let self else { return }
+      do {
+        var request = URLRequest(url: baseURL.appending(path: "api/status/memory/reset"))
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.timeoutInterval = 2
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if !configuration.apiKey.isEmpty {
+          request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard !Task.isCancelled, revision == self.memoryResetRevision else { return }
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+          let memory = try ServerStatus.decode(data).appMemory else {
+          throw ConfigurationError("Memory reset failed")
+        }
+        self.memoryResetPending = false
+        self.performance.appMemory = memory
+        self.performance.snapshot.memoryUsage = memory.currentAppMemoryBytes ?? .nan
+      } catch {
+        guard !Task.isCancelled, revision == self.memoryResetRevision else { return }
+        self.memoryResetPending = false
+        self.memoryResetFailed = true
+        self.performance.memoryResetFailed = true
+      }
+      self.memoryResetTask = nil
+    }
   }
 
   func configureModel(_ configuration: ModelCatalog.Entry) {
@@ -1276,8 +1369,8 @@ final class ServerController: ObservableObject {
 
   private func refreshPerformance() async {
     guard let process, process.isRunning else { return }
-    let memoryBytes = residentMemoryBytes(process.processIdentifier)
-    performance.snapshot.memoryUsage = Double(memoryBytes)
+    let memoryRevision = memoryResetRevision
+    let canAcceptMemory = !memoryResetPending
     guard case .running = state,
       let configuration = monitorConfiguration,
       let baseURL = configuration.baseURL
@@ -1285,13 +1378,21 @@ final class ServerController: ObservableObject {
 
     var request = URLRequest(url: baseURL.appending(path: "api/status"))
     request.timeoutInterval = 2
+    request.cachePolicy = .reloadIgnoringLocalCacheData
     if !configuration.apiKey.isEmpty {
       request.setValue("Bearer \(configuration.apiKey)", forHTTPHeaderField: "Authorization")
     }
     do {
       let (data, response) = try await URLSession.shared.data(for: request)
-      guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+      guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        performance.snapshot.memoryUsage = .nan
+        performance.appMemory = nil
+        return
+      }
       let status = try ServerStatus.decode(data)
+      // A response started before/during Clear must not restore the old peak.
+      let memory = canAcceptMemory && !memoryResetPending && memoryRevision == memoryResetRevision
+        ? status.appMemory : performance.appMemory
       updateLoadedModel(
         status.loadedModel,
         completedRequestCount: status.performance.completedRequestCount
@@ -1324,7 +1425,7 @@ final class ServerController: ObservableObject {
           decodeTokensPerSecond: status.performance.decodeTokensPerSecond,
           inputTokens: Double(status.performance.runtimePromptTokens),
           outputTokens: Double(status.performance.runtimeGenerationTokens),
-          memoryUsage: Double(memoryBytes),
+          memoryUsage: memory?.currentAppMemoryBytes ?? .nan,
           ssdReadSpeed: bytesPerSecond,
           cacheHitRate: cacheHitRate,
           firstTokenWaitTime: status.performance.timeToFirstTokenSeconds,
@@ -1334,11 +1435,15 @@ final class ServerController: ObservableObject {
         dsparkAcceptanceRate: status.performance.dsparkAcceptanceRate ?? 0,
         dsparkAverageAcceptedLength: status.performance.dsparkAverageAcceptedLength ?? 0,
         loadedModel: status.loadedModel,
-        loadingModel: status.loadingModel
+        loadingModel: status.loadingModel,
+        appMemory: memory,
+        memoryResetFailed: memoryResetFailed
       )
       performance = live
       recordPerformanceSample(live)
     } catch {
+      performance.snapshot.memoryUsage = .nan
+      performance.appMemory = nil
       return
     }
   }
@@ -1370,13 +1475,6 @@ final class ServerController: ObservableObject {
     previousSSDTime = nil
   }
 
-  private func residentMemoryBytes(_ processID: Int32) -> UInt64 {
-    var information = proc_taskinfo()
-    let size = Int32(MemoryLayout<proc_taskinfo>.size)
-    let result = proc_pidinfo(processID, PROC_PIDTASKINFO, 0, &information, size)
-    return result == size ? information.pti_resident_size : 0
-  }
-
   private func seconds(from duration: Duration) -> Double {
     let parts = duration.components
     return Double(parts.seconds) + Double(parts.attoseconds) / 1e18
@@ -1395,6 +1493,11 @@ final class ServerController: ObservableObject {
     outputTask = nil
     monitorTask?.cancel()
     monitorTask = nil
+    memoryResetTask?.cancel()
+    memoryResetTask = nil
+    memoryResetRevision += 1
+    memoryResetPending = false
+    memoryResetFailed = false
     monitorConfiguration = nil
     temporaryModelCatalog?.remove()
     temporaryModelCatalog = nil

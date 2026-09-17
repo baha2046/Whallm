@@ -70,6 +70,8 @@
 "Memory" = "Memory";
 "Memory limit GiB" = "Memory limit GiB";
 "Memory usage" = "Memory usage";
+"Memory uses App + inference process physical footprint (inference process only for standalone servers): every 10 ms during model work, every second while idle. Maximum is retained since server start or clearing metric history, including loading and idle time. Memory P95 uses the slower Status refresh samples. Brief peaks may be missed; — means unavailable." = "Memory uses App + inference process physical footprint (inference process only for standalone servers): every 10 ms during model work, every second while idle. Maximum is retained since server start or clearing metric history, including loading and idle time. Memory P95 uses the slower Status refresh samples. Brief peaks may be missed; — means unavailable.";
+"Unable to reset the memory maximum. Try clearing metric history again." = "Unable to reset the memory maximum. Try clearing metric history again.";
 "Metric" = "Metric";
 "Metrics" = "Metrics";
 "Minimum" = "Minimum";
@@ -211,6 +213,20 @@
 "Install the MTP files before enabling this setting." = "Install the MTP files before enabling this setting.";
 "MTP slots" = "MTP slots";
 "Edit expert caches in slots" = "Edit expert caches in slots";
+"Reuse QSA pooled keys" = "Reuse QSA pooled keys";
+"Optimize N-gram reads" = "Optimize N-gram reads";
+"Compile grouped normalization" = "Compile grouped normalization";
+"Adjust memory between prompt and answer" = "Adjust memory between prompt and answer";
+"Customize MTP strategy" = "Customize MTP strategy";
+"Reuses completed attention-index blocks instead of recalculating them. Retains extra index data." = "Reuses completed attention-index blocks instead of recalculating them. Retains extra index data.";
+"Reads repeated N-gram rows once per lookup and uses a decoding table." = "Reads repeated N-gram rows once per lookup and uses a decoding table.";
+"Reuses a compiled normalization calculation, not the whole generation graph." = "Reuses a compiled normalization calculation, not the whole generation graph.";
+"Limits the expert cache to half its capacity while reading a prompt, keeping room for one layer when possible. Restores full capacity for answers. May cause extra SSD reads." = "Limits the expert cache to half its capacity while reading a prompt, keeping room for one layer when possible. Restores full capacity for answers. May cause extra SSD reads.";
+"Experimental. MTP output differs from non-MTP in a full-model test; the cause is unresolved. Off uses 5 draft tokens and stops after one zero-acceptance round." = "Experimental. MTP output differs from non-MTP in a full-model test; the cause is unresolved. Off uses 5 draft tokens and stops after one zero-acceptance round.";
+"Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load." = "Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load.";
+"MTP draft tokens" = "MTP draft tokens";
+"Zero-acceptance rounds before stopping MTP" = "Zero-acceptance rounds before stopping MTP";
+"Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds." = "Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds.";
 "Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity." = "Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity.";
 "Enter the number of experts to retain. Applies on next model load." = "Enter the number of experts to retain. Applies on next model load.";
 "Number of MTP experts kept in memory. More slots use more memory. The default is 32." = "Number of MTP experts kept in memory. More slots use more memory. The default is 32.";
@@ -393,6 +409,7 @@
 "Install a model on the Model page to run a benchmark." = "Install a model on the Model page to run a benchmark.";
 "One request at a time. Prompt reuse is off; model settings apply." = "One request at a time. Prompt reuse is off; model settings apply.";
 "Run Benchmark" = "Run Benchmark";
+"Throughput uses temperature 0 and seed 42. Other model settings still apply. Fixed sampling does not guarantee identical output across acceleration settings." = "Throughput uses temperature 0 and seed 42. Other model settings still apply. Fixed sampling does not guarantee identical output across acceleration settings.";
 "Starting server…" = "Starting server…";
 "Loading model…" = "Loading model…";
 "Running benchmark…" = "Running benchmark…";

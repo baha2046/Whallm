@@ -32,6 +32,14 @@ struct ThroughputResult: Codable, Identifiable, Sendable {
   let outputTokenSha256: String
   let promptCacheReusedTokens: Int
   let finishReason: String?
+  // Older servers did not report sampling settings; keep those values unknown.
+  var temperature: Double? = nil
+  var seed: UInt32? = nil
+  var topP: Double? = nil
+  var topK: Int? = nil
+  var minP: Double? = nil
+  var presencePenalty: Double? = nil
+  var repetitionPenalty: Double? = nil
 
   static let columns = ["Input / Output", "TTFT (ms)", "TPOT (ms)", "PP tok/s", "TG tok/s", "Total (s)", "Throughput", "Peak Memory"]
 
@@ -58,9 +66,10 @@ enum ThroughputOutputFormat: String, CaseIterable {
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
       return String(decoding: try encoder.encode(results), as: UTF8.self)
     }
-    let headers = ["Model", "Context", "Slots", "Output limit"] + ThroughputResult.columns
+    let headers = ["Model", "Context", "Slots", "Output limit"] + ThroughputResult.columns + ["Temperature", "Seed"]
     let rows = results.map {
-      [$0.model, $0.benchmarkContext.title, $0.slots.map(String.init) ?? "—", String($0.generationLimit)] + $0.cells
+      [$0.model, $0.benchmarkContext.title, $0.slots.map(String.init) ?? "—", String($0.generationLimit)]
+        + $0.cells + [$0.temperature.map { String($0) } ?? "—", $0.seed.map { String($0) } ?? "—"]
     }
     if self == .plainText {
       let table = [headers] + rows
@@ -234,7 +243,8 @@ final class ThroughputSession: ObservableObject {
         ttftMs: prefill * 1000, tpotMs: 1000 / 75, prefillTps: 2400, decodeTps: 75,
         elapsedSeconds: elapsed, throughputTps: Double(length + generationLength) / elapsed,
         peakAppMemoryBytes: 4_294_967_296 + Double(length) * 8192, memoryScope: "simulated",
-        outputTokenSha256: "dry-run", promptCacheReusedTokens: 0, finishReason: "dry_run"
+        outputTokenSha256: "dry-run", promptCacheReusedTokens: 0, finishReason: "dry_run",
+        temperature: 0, seed: 42
       )
     }
     phase = "Dry run complete · simulated results"
@@ -549,6 +559,8 @@ struct ThroughputView: View {
       }
       .frame(height: 61 + CGFloat(session.results.count) * 34 + 12)
       .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius))
+      Text(label("Throughput uses temperature 0 and seed 42. Other model settings still apply. Fixed sampling does not guarantee identical output across acceleration settings."))
+        .font(.caption).foregroundStyle(.secondary)
       Text(label("TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak Memory samples macOS physical footprint about every 10 ms during loading and generation: Whallm + its inference process, or the inference process alone for a standalone server. Brief peaks may be missed; — means unavailable."))
         .font(.caption).foregroundStyle(.secondary)
       Text(label("Output may end early. Loading time is excluded; no extra warm-up is performed."))
