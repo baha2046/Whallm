@@ -1654,6 +1654,7 @@ private struct AdvancedView: View {
 }
 
 struct ModelAdvancedView: View {
+  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = false
   @Binding var settings: ModelAdvancedSettings
   @Binding var alias: String
   let aliasError: String?
@@ -1792,8 +1793,10 @@ struct ModelAdvancedView: View {
         SectionHeader(title: L10n.string("Runtime", language: language))
           .padding(.top, 12)
         VStack(spacing: 0) {
-          cacheMemoryField("Expert cache GiB", keyPath: \.expertCacheGiB,
-            legacySlots: settings.slots, minimum: modelKind == .qwen3_8FlashNext ? 10 : 6)
+          ModelSettingsResetRow(settings: $settings, modelKind: modelKind,
+            settingsLocked: settingsLocked, language: language)
+          Divider()
+          cacheMemoryField(.expert, minimum: modelKind == .qwen3_8FlashNext ? 10 : 6)
           Divider()
           SettingRow(
             "Expert cache eviction",
@@ -1845,7 +1848,7 @@ struct ModelAdvancedView: View {
             doubleField(
               "ANE Prefill share",
               hint:
-                "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.",
+                "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0.",
               value: anePrefillRatio
             )
           }
@@ -1862,14 +1865,14 @@ struct ModelAdvancedView: View {
             Divider()
             toggleField("Compute experts as they load",
               hint: "Starts available expert calculations while other experts are still loading.",
-              value: optionalToggle(\.readyExpertDecode, defaultValue: true))
+              value: optionalToggle(\.readyExpertDecode, defaultValue: false))
 
           }
           if modelKind.descriptor.supports("batchedExpertPrefill") {
             Divider()
             toggleField("Batch expert calculations",
               hint: "Processes the experts for an input batch together.",
-              value: optionalToggle(\.batchedExpertPrefill, defaultValue: true))
+              value: optionalToggle(\.batchedExpertPrefill, defaultValue: false))
             .disabled(!settings.layerMajorPrefill)
           }
           if modelKind.descriptor.supports("nextLayerPrefetch") {
@@ -1988,8 +1991,7 @@ struct ModelAdvancedView: View {
             )
             .disabled(!mtpAvailable)
             Divider()
-            cacheMemoryField("MTP expert cache GiB", keyPath: \.mtpCacheGiB,
-              legacySlots: settings.mtpSlots ?? 32, minimum: 10)
+            cacheMemoryField(.mtp, minimum: 10)
             .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
           }
           if modelKind.descriptor.editableSettings.contains("kvCachePrecision") {
@@ -2009,8 +2011,7 @@ struct ModelAdvancedView: View {
             )
             .disabled(!dsparkAvailable)
             Divider()
-            cacheMemoryField("DSpark expert cache GiB", keyPath: \.dsparkCacheGiB,
-              legacySlots: settings.dsparkSlots, minimum: 30)
+            cacheMemoryField(.dspark, minimum: 30)
             .disabled(!settings.dsparkEnabled || !dsparkAvailable)
             Divider()
             doubleField(
@@ -2051,8 +2052,8 @@ struct ModelAdvancedView: View {
     default: nil
     }
     if let recommendedSlots {
-      let gib = ExpertMemory.legacyGiB(slots: recommendedSlots, blobBytes: blobBytes)
-      let formatted = String(format: "%.3f", locale: language.locale, gib)
+      let gib = ExpertMemory.defaultGiB(slots: recommendedSlots, blobBytes: blobBytes)
+      let formatted = String(format: "%.1f", locale: language.locale, gib)
       return L10n.string(key, language: language, formatted)
     }
     return L10n.string(key.isEmpty ? hint : key, language: language)
@@ -2062,21 +2063,65 @@ struct ModelAdvancedView: View {
     memoryProfile?.manifest.expertBlobSize ?? ExpertMemory.blobBytes(for: modelKind)
   }
 
-  private func cacheMemoryField(_ label: String,
-    keyPath: WritableKeyPath<ModelAdvancedSettings, Double?>, legacySlots: Int, minimum: Int
-  ) -> some View {
-    let value = settings[keyPath: keyPath] ?? ExpertMemory.legacyGiB(slots: legacySlots, blobBytes: blobBytes)
+  @ViewBuilder
+  private func cacheMemoryField(_ control: ExpertCacheControl, minimum: Int) -> some View {
+    let label = control.title
+    let value = settings[keyPath: control.budgetKey]
+      ?? ExpertMemory.legacyGiB(slots: control.legacySlots(in: settings), blobBytes: blobBytes)
     let capacity = try? ExpertMemory.capacity(gib: value, blobBytes: blobBytes, minimum: minimum)
-    return VStack(alignment: .leading, spacing: 0) {
-      doubleField(label,
-        hint: "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load.",
-        value: Binding(get: {
-          settings[keyPath: keyPath] ?? ExpertMemory.legacyGiB(slots: legacySlots, blobBytes: blobBytes)
-        }, set: { settings[keyPath: keyPath] = $0 }))
-      Text(capacity.map { L10n.string("Capacity: %lld experts", language: language, Int64($0)) }
-        ?? L10n.string("Expert cache memory is too small or invalid.", language: language))
-        .font(.caption).foregroundStyle(capacity == nil ? .red : .secondary)
-        .padding(.horizontal, 20).padding(.bottom, 12)
+    let capacityText = capacity.map { L10n.string("Capacity: %lld experts", language: language, Int64($0)) }
+      ?? L10n.string("Expert cache memory is too small or invalid.", language: language)
+    if !editCachesInSlots {
+      let range = ExpertMemory.sliderRange(physicalMemory: ProcessInfo.processInfo.physicalMemory)
+      VStack(alignment: .leading, spacing: 14) {
+        HStack(alignment: .firstTextBaseline) {
+          SettingLabel(label,
+            hint: impactHint(label, "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load."),
+            language: language)
+          Spacer()
+          Text(String(format: "%.1f GiB", locale: language.locale, value))
+            .font(.body.weight(.semibold).monospacedDigit())
+            .fixedSize()
+        }
+        VStack(spacing: 6) {
+          Slider(value: Binding(
+            get: { ExpertMemory.sliderValue(value, in: range) },
+            set: { control.setGiB($0, in: &settings, blobBytes: blobBytes, range: range) }
+          ), in: range, step: 0.1)
+          .accessibilityLabel(L10n.string(label, language: language))
+          .accessibilityValue(String(format: "%.1f GiB", locale: language.locale, value))
+          .accessibilityHint(capacityText)
+          Text(capacityText)
+            .font(.caption)
+            .foregroundStyle(capacity == nil ? .red : .secondary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+          Text(L10n.string("The maximum is this Mac's physical memory, not a safe allocation limit. Leave room for the system and other model memory.", language: language))
+            .font(.caption).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+      .padding(.vertical, 8)
+    } else {
+      SettingRow(control.slotsTitle,
+        hint: L10n.string("Enter the number of experts to retain. Applies on next model load.", language: language),
+        language: language
+      ) {
+        VStack(alignment: .trailing, spacing: 6) {
+          TextField(L10n.string(control.slotsTitle, language: language), value: Binding(
+            get: { control.slots(in: settings, blobBytes: blobBytes) },
+            set: { control.setSlots($0, in: &settings) }
+          ), format: .number.grouping(.never))
+            .labelsHidden()
+            .appInput(width: 120)
+            .accessibilityLabel(L10n.string(control.slotsTitle, language: language))
+            .accessibilityHint(capacityText)
+          Text(capacityText)
+            .font(.caption)
+            .foregroundStyle(capacity == nil ? .red : .secondary)
+            .multilineTextAlignment(.trailing)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
     }
   }
 
@@ -2116,7 +2161,7 @@ struct ModelAdvancedView: View {
 
   private var anePrefillRatio: Binding<Double> {
     Binding(
-      get: { settings.anePrefillRatio ?? 0.25 },
+      get: { settings.anePrefillRatio ?? 0 },
       set: { settings.anePrefillRatio = $0 }
     )
   }
@@ -2278,6 +2323,7 @@ private struct LogsView: View {
 }
 
 struct SettingsView: View {
+  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = false
   @Binding var languageCode: String
   let language: AppLanguage
   @ObservedObject var appUpdater: AppUpdater
@@ -2302,6 +2348,16 @@ struct SettingsView: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .frame(minWidth: 180, alignment: .trailing)
+          }
+          Divider()
+          SettingRow("Edit expert caches in slots",
+            hint: "Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity.",
+            language: language
+          ) {
+            Toggle(L10n.string("Edit expert caches in slots", language: language), isOn: $editCachesInSlots)
+              .labelsHidden()
+              .toggleStyle(.switch)
+              .accessibilityLabel(L10n.string("Edit expert caches in slots", language: language))
           }
 
         }
@@ -2768,7 +2824,7 @@ private struct MetricView: View {
     case .outputTokens: "Output Tokens"
     case .memoryUsage: "Memory usage"
     case .ssdReadSpeed: "SSD read speed"
-    case .cacheHitRate: "Cache Hit rate"
+    case .cacheHitRate: "Expert cache hit rate"
     case .firstTokenWaitTime: "First Token wait time"
     case .completionTime: "Completion time"
     }
@@ -2849,7 +2905,7 @@ private struct SettingLabel: View {
   }
 }
 
-private struct SettingRow<Value: View>: View {
+struct SettingRow<Value: View>: View {
   let title: String
   let hint: String
   let language: AppLanguage

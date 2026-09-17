@@ -583,7 +583,7 @@ class ModelManager:
                     ),
                     "batched_expert_prefill": config.batched_expert_prefill,
                     "ane_prefill": getattr(config, "ane_prefill", True),
-                    "ane_prefill_ratio": getattr(config, "ane_prefill_ratio", 0.25),
+                    "ane_prefill_ratio": getattr(config, "ane_prefill_ratio", 0.0),
                     "ane_prefill_status": ane_status,
                     "prompt_cache_entries": config.prompt_cache_entries,
                     "prompt_cache_memory_gib": config.prompt_cache_memory_gib,

@@ -379,7 +379,7 @@ final class ServerConfigurationTests: XCTestCase {
     }
     XCTAssertFalse(qwen.mtpEnabled ?? true)
     XCTAssertEqual(qwen.mtpSlots, 32)
-    XCTAssertEqual(qwen.anePrefillRatio, 0.25)
+    XCTAssertEqual(qwen.anePrefillRatio, 0)
     qwen.slots = 900
     qwen.bf16KVCache = true
     qwen.mtpEnabled = true
@@ -480,7 +480,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(restored.layerMajorPrefillThreshold, 1_024)
     XCTAssertFalse(restored.mtpEnabled ?? true)
     XCTAssertEqual(restored.mtpSlots, 32)
-    XCTAssertEqual(restored.anePrefillRatio, 0.25)
+    XCTAssertEqual(restored.anePrefillRatio, 0)
   }
 
   func testLegacyAdvancedSettingsMigrateOnlyToTheCurrentModel() throws {
@@ -628,7 +628,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(
       Set(runtime.keys),
       [
-        "slots", "read_workers", "prefetch_read_workers", "prefill_step_size",
+        "slots", "expert_cache_bytes", "dspark_cache_bytes", "read_workers", "prefetch_read_workers", "prefill_step_size",
         "fp8_kv_cache", "memory_limit_gib", "layer_major_prefill",
         "layer_major_prefill_threshold",
         "prompt_cache_entries", "prompt_cache_memory_gib", "persistent_prompt_cache",
@@ -690,6 +690,7 @@ final class ServerConfigurationTests: XCTestCase {
     settings.candidateIndex = true
     settings.cedPrefill = true
     settings.nextLayerPrefetch = true
+    settings.batchedExpertPrefill = true
     settings.deepSeekANEPrefill = true
     settings.readyExpertDecode = false
     settings.approximationEnabled = true

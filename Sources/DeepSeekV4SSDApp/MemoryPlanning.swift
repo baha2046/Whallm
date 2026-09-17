@@ -29,6 +29,24 @@ enum ExpertMemory {
     return Int(budget / blobBytes)
   }
 
+  static func sliderRange(physicalMemory: UInt64) -> ClosedRange<Double> {
+    // Stay on the 0.1 GiB grid without exceeding installed physical memory.
+    0.1...max(0.1, (Double(physicalMemory) / gib * 10).rounded(.down) / 10)
+  }
+
+  static func sliderValue(_ value: Double, in range: ClosedRange<Double>) -> Double {
+    guard value.isFinite else { return range.lowerBound }
+    return min(range.upperBound, max(range.lowerBound, roundedGiB(value)))
+  }
+
+  static func roundedGiB(_ value: Double) -> Double {
+    (value * 10).rounded() / 10
+  }
+
+  static func defaultGiB(slots: Int, blobBytes: UInt64) -> Double {
+    roundedGiB(legacyGiB(slots: slots, blobBytes: blobBytes))
+  }
+
   static func legacyGiB(slots: Int, blobBytes: UInt64) -> Double {
     Double(slots) * Double(blobBytes) / gib
   }
@@ -75,7 +93,7 @@ struct MemoryPlanningProfile {
     let input = contextTokens ?? s.estimateInputTokens ?? 4_096
     let output = contextTokens == nil ? s.defaultMaxTokens : 0
     let maximum = manifest.maximumContext ?? Int(number("max_position_embeddings", 1_048_576))
-    let ratio = s.anePrefillRatio ?? 0.25
+    let ratio = s.anePrefillRatio ?? 0
     guard [.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext].contains(kind),
       input > 0, output >= 0, (contextTokens != nil || output > 0),
       input <= maximum, output <= maximum - input,
@@ -117,7 +135,7 @@ struct MemoryPlanningProfile {
     // DSpark owns its chunked prefill path for both DeepSeek models.
     let threshold = qwen ? 128 : s.layerMajorPrefillThreshold ?? 1_024
     let layerMajor = s.layerMajorPrefill && !dspark && input >= threshold
-    let batched = layerMajor && s.batchedExpertPrefill != false
+    let batched = layerMajor && s.batchedExpertPrefill == true
     let moeStep = !qwen && !v41 && layerMajor
       ? min(Double(input), Double((s.moePrefillStepSize ?? 0) == 0 ? 4_096 : s.moePrefillStepSize!)) : step
     guard let cache = cacheFootprint(s, tokens: tokens, step: step, layerMajor: layerMajor,

@@ -146,7 +146,7 @@ def _ane_output_channels(ratio: float) -> int:
 
 
 class ANEPrefillController:
-    def __init__(self, requested: bool, ratio: float = 0.25):
+    def __init__(self, requested: bool, ratio: float = 0.0):
         self.output_channels = _QWEN_OUTPUT_CHANNELS
         self.requested = requested
         self.requested_ratio = ratio
@@ -244,7 +244,7 @@ class ANEPrefillLinear(nn.Module):
 def install_qwen_ane_prefill(
     model: Any,
     requested: bool,
-    ratio: float = 0.25,
+    ratio: float = 0.0,
 ) -> ANEPrefillController:
     controller = ANEPrefillController(requested, ratio)
     if not requested or controller.ane_channels == 0:
@@ -317,7 +317,7 @@ class ANEQuantizedPrefillLinear(nn.Module):
             return self._linear(value)
 
 
-def install_deepseek_ane_prefill(model, requested, ratio=0.25):
+def install_deepseek_ane_prefill(model, requested, ratio=0.0):
     """Compile only the selected query-projection rows; leave quantized weights resident."""
     core = getattr(model, 'model', model)
     layers = core.layers

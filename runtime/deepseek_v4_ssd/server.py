@@ -18,6 +18,7 @@ from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from . import throughput
+from .app_memory import AppMemorySampler
 from .model import _apply_prompt_cache_mode
 
 from .cancellation import GenerationCancelled, cancellation_scope, check_cancelled
@@ -425,7 +426,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
             raise APIError("Choose 128, 1024, or 4096 output tokens.", param="generation_length")
         self._start_sse()
         try:
-            with ClientConnection(self.connection):
+            with ClientConnection(self.connection), AppMemorySampler() as memory:
                 self._sse({"phase": "loading"})
                 with self.app.model_manager.request(payload.get("model")) as model:
                     runtime = model.runtime
@@ -441,7 +442,11 @@ class OpenAIHandler(BaseHTTPRequestHandler):
                         lambda count: self._sse({"phase": "running", "generated": count}),
                         benchmark_context=benchmark_context,
                     )
-                    self._sse({"result": {**result, "model": model.model_id}})
+                    self._sse({"result": {
+                        **result, "model": model.model_id,
+                        "peak_app_memory_bytes": memory.finish(),
+                        "memory_scope": memory.scope,
+                    }})
         except (GenerationCancelled, BrokenPipeError, ConnectionResetError):
             self.close_connection = True
             return
@@ -2286,7 +2291,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="use the original GPU Prefill path",
     )
-    parser.add_argument("--ane-prefill-ratio", type=float, default=0.25)
+    parser.add_argument("--ane-prefill-ratio", type=float, default=0.0)
     parser.add_argument("--prompt-cache-entries", type=int, default=2)
     parser.add_argument("--prompt-cache-memory-gib", type=int, default=8)
     cache_mode = parser.add_mutually_exclusive_group()

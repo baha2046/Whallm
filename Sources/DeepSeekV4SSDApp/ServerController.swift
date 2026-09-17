@@ -226,8 +226,8 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var readWorkers = 4
   var prefetchReadWorkers: Int? = 2
   var moePrefillStepSize: Int? = 0
-  var readyExpertDecode: Bool? = true
-  var batchedExpertPrefill: Bool? = true
+  var readyExpertDecode: Bool? = false
+  var batchedExpertPrefill: Bool? = false
   var nextLayerPrefetch: Bool? = false
   var packedKVCache: Bool? = false
   var packedIndexCache: Bool? = false
@@ -238,14 +238,14 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var qwenAdaptiveSampling: Bool? = true
   var memoryLimitGiB = 0
   var prefillStepSize = 0
-  var layerMajorPrefill = true
+  var layerMajorPrefill = false
   var layerMajorPrefillThreshold: Int? = 1_024
   var promptCacheMode: PromptCacheMode?
   var promptCacheEntries = 2
   var promptCacheMemoryGiB = 8
   var warmupPromptPath = ""
   var bf16KVCache = false
-  var anePrefillRatio: Double? = 0.25
+  var anePrefillRatio: Double? = 0
   var qwenGroupedExperts: Bool?
   var recentExpertCache: Bool?
   var routeAwareExpertCache: Bool?
@@ -266,7 +266,17 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.promptCacheMode = descriptor.supports("promptCache") ? .memory : .off
     settings.qwenGroupedExperts = descriptor.supports("groupedExperts")
     settings.slots = descriptor.defaults.slots
-    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && modelKind != .deepSeekV41
+    let blob = ExpertMemory.blobBytes(for: modelKind)
+    if blob > 0 {
+      settings.expertCacheGiB = ExpertMemory.defaultGiB(slots: settings.slots, blobBytes: blob)
+      if descriptor.supports("mtp") {
+        settings.mtpCacheGiB = ExpertMemory.defaultGiB(slots: 32, blobBytes: blob)
+      }
+      if descriptor.supports("dspark") {
+        settings.dsparkCacheGiB = ExpertMemory.defaultGiB(slots: 768, blobBytes: blob)
+      }
+    }
+    settings.layerMajorPrefill = false
     settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
     settings.bf16KVCache = descriptor.defaults.bf16KVCache
     settings.defaultMaxTokens = descriptor.defaults.maxTokens
@@ -283,6 +293,10 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     let descriptor = modelKind.descriptor
     settings.promptCacheMode = descriptor.supports("promptCache")
       ? (settings.promptCacheMode ?? .memory) : .off
+    settings.readyExpertDecode = settings.readyExpertDecode ?? false
+    settings.batchedExpertPrefill = settings.batchedExpertPrefill ?? false
+    settings.packedKVCache = settings.packedKVCache ?? false
+    settings.packedIndexCache = settings.packedIndexCache ?? false
     settings.prefetchReadWorkers = settings.prefetchReadWorkers ?? 2
     settings.moePrefillStepSize = settings.moePrefillStepSize ?? 0
     settings.approximationEnabled = descriptor.supports("approximation")
@@ -290,7 +304,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.qwenAdaptiveSampling = settings.qwenAdaptiveSampling ?? true
     settings.recentExpertCache = settings.recentExpertCache ?? true
     settings.layerMajorPrefillThreshold = settings.layerMajorPrefillThreshold ?? 1_024
-    settings.anePrefillRatio = settings.anePrefillRatio ?? 0.25
+    settings.anePrefillRatio = settings.anePrefillRatio ?? 0
     settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill") && settings.layerMajorPrefill
     if !descriptor.editableSettings.contains("kvCachePrecision") {
       settings.bf16KVCache = descriptor.defaults.bf16KVCache
@@ -369,7 +383,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     guard (mtpSlots ?? 32) >= 10 else {
       throw ConfigurationError(L10n.string("MTP slots must be at least 10."))
     }
-    guard (0...1).contains(anePrefillRatio ?? 0.25) else {
+    guard (0...1).contains(anePrefillRatio ?? 0) else {
       throw ConfigurationError(L10n.string("ANE Prefill share must be from 0 through 1."))
     }
     guard dsparkSlots >= 30, (0...1).contains(dsparkConfidenceThreshold) else {
@@ -441,6 +455,10 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     }
     guard identifiedKind == modelKind else { return nil }
     var settings = ModelAdvancedSettings.defaults(for: modelKind)
+    // Preserve slot-based budgets when importing settings predating GiB fields.
+    settings.expertCacheGiB = nil
+    settings.mtpCacheGiB = nil
+    settings.dsparkCacheGiB = nil
     settings.slots = legacy.slots
     settings.readWorkers = legacy.readWorkers
     settings.memoryLimitGiB = legacy.memoryLimitGiB ?? 0
@@ -1047,6 +1065,7 @@ final class ServerController: ObservableObject {
         .compactMap { $0 }
         .joined(separator: ":")
       environment["PYTHONDONTWRITEBYTECODE"] = "1"
+      environment["WHALLM_APP_PID"] = String(ProcessInfo.processInfo.processIdentifier)
       if let pythonHome = configuration.pythonHome {
         environment["PYTHONHOME"] = pythonHome
       }

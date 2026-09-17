@@ -944,7 +944,7 @@ class PrefillTests(unittest.TestCase):
         self.assertFalse(RuntimeConfig().staged_expert_streaming)
         self.assertFalse(RuntimeConfig().qwen_next_layer_prefetch)
         self.assertTrue(RuntimeConfig().ane_prefill)
-        self.assertEqual(RuntimeConfig().ane_prefill_ratio, 0.25)
+        self.assertEqual(RuntimeConfig().ane_prefill_ratio, 0.0)
 
 
     def test_automatic_step_size_uses_larger_chunks_for_long_prompts(self):

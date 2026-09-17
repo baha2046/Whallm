@@ -3,6 +3,24 @@
 Recorded measurements for v1.1.7, v1.1.4, and v1.1.0. Each section states its
 workload and measurement conditions.
 
+## Current Throughput memory metric
+
+Current source uses **Peak Memory** (GiB), not Peak MLX. Each trial samples
+macOS physical footprint at a nominal 10 ms interval, plus start/end samples,
+from before model loading through generation (excluding final unload). It takes
+the maximum of each sample's Whallm + Python inference process total, not the sum
+of their independent peaks. This is an absolute footprint, not growth since start.
+A standalone server counts only its inference process, not its shell or API client.
+Other helper processes and system-wide memory are outside this measurement.
+
+The endpoint and JSON export use `peak_app_memory_bytes` and `memory_scope`
+(`app`, `process`, or `simulated` for App Dry run); Throughput no longer exports
+`peak_memory_bytes`. Failed reads make the metric unavailable: the endpoint sends
+`null`, the App displays `—`, and its JSON export omits the unavailable value.
+There is no RSS or MLX fallback. Sampling can miss brief peaks and is not guaranteed
+to match Activity Monitor. No new full-model performance result is claimed here;
+the historical MLX measurements below retain their original meaning.
+
 ## v1.1.7
 
 These results were recorded with the built-in **Throughput** benchmark using
@@ -19,7 +37,7 @@ no cross-version improvement percentages are calculated for these runs.
 TTFT is the time to the first token, in milliseconds. Prefill measures input
 processing and Decode measures output generation, both in tokens per second.
 Peak MLX is MLX allocation in **GiB**, not process RSS or total Mac memory.
-The app export labels this value GB but divides bytes by 1024³.
+That version's app export labels this value GB but divides bytes by 1024³.
 
 ### M5 Pro
 

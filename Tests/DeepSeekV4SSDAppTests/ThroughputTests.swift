@@ -111,7 +111,7 @@ final class ThroughputTests: XCTestCase {
   }
 
   private static func result(_ length: Int) throws -> ThroughputResult {
-    let data = "data: {\"result\":{\"model\":\"test-model\",\"context_tokens\":\(length),\"generation_tokens\":128,\"generation_limit\":128,\"ttft_ms\":500,\"tpot_ms\":10,\"prefill_tps\":100,\"decode_tps\":100,\"elapsed_seconds\":2,\"throughput_tps\":100,\"peak_memory_bytes\":1024,\"output_token_sha256\":\"test\",\"prompt_cache_reused_tokens\":0,\"benchmark_context\":\"code\",\"corpus_sha256\":\"test\"}}"
+    let data = "data: {\"result\":{\"model\":\"test-model\",\"context_tokens\":\(length),\"generation_tokens\":128,\"generation_limit\":128,\"ttft_ms\":500,\"tpot_ms\":10,\"prefill_tps\":100,\"decode_tps\":100,\"elapsed_seconds\":2,\"throughput_tps\":100,\"peak_app_memory_bytes\":1024,\"memory_scope\":\"app\",\"output_token_sha256\":\"test\",\"prompt_cache_reused_tokens\":0,\"benchmark_context\":\"code\",\"corpus_sha256\":\"test\"}}"
     return try XCTUnwrap(ThroughputEvent.decode(data)?.result)
   }
 
@@ -152,19 +152,24 @@ final class ThroughputTests: XCTestCase {
   }
 
   func testBenchmarkLabelsLoadInAllThreeLanguages() {
+    XCTAssertEqual(L10n.string("Peak Memory", language: .english), "Peak Memory")
+    XCTAssertEqual(L10n.string("Peak Memory", language: .traditionalChinese), "記憶體峰值")
+    XCTAssertEqual(L10n.string("Peak Memory", language: .simplifiedChinese), "内存峰值")
     XCTAssertEqual(L10n.string("Run Benchmark", language: .english), "Run Benchmark")
     XCTAssertEqual(L10n.string("Run Benchmark", language: .traditionalChinese), "執行測試")
     XCTAssertEqual(L10n.string("Run Benchmark", language: .simplifiedChinese), "运行测试")
   }
 
   func testDecodesActualCountsAndOptionalTimePerToken() throws {
-    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"test-model","benchmark_context":"novel","corpus_sha256":"def","context_tokens":4096,"generation_tokens":1,"generation_limit":128,"ttft_ms":500,"tpot_ms":null,"prefill_tps":8192,"decode_tps":0,"elapsed_seconds":0.6,"throughput_tps":6828.3,"peak_memory_bytes":1073741824,"output_token_sha256":"abc","prompt_cache_reused_tokens":0}}"#))
+    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"test-model","benchmark_context":"novel","corpus_sha256":"def","context_tokens":4096,"generation_tokens":1,"generation_limit":128,"ttft_ms":500,"tpot_ms":null,"prefill_tps":8192,"decode_tps":0,"elapsed_seconds":0.6,"throughput_tps":6828.3,"peak_app_memory_bytes":1073741824,"memory_scope":"app","output_token_sha256":"abc","prompt_cache_reused_tokens":0}}"#))
     let result = try XCTUnwrap(event.result)
     XCTAssertEqual(result.contextTokens, 4096)
     XCTAssertEqual(result.generationTokens, 1)
     XCTAssertEqual(result.generationLimit, 128)
     XCTAssertNil(result.tpotMs)
-    XCTAssertEqual(result.peakMemoryBytes, 1073741824)
+    XCTAssertEqual(result.peakAppMemoryBytes, 1073741824)
+    XCTAssertEqual(result.memoryScope, "app")
+    XCTAssertEqual(result.cells.last, "1.00 GiB")
     XCTAssertEqual(result.outputTokenSha256, "abc")
     XCTAssertEqual(result.benchmarkContext, .novel)
     XCTAssertEqual(result.corpusSha256, "def")
@@ -172,16 +177,21 @@ final class ThroughputTests: XCTestCase {
   }
 
   func testResultExportsPreserveRunSettingsAndNumbers() throws {
-    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"qwen-test","slots":2304,"benchmark_context":"code","corpus_sha256":"def","context_tokens":4096,"generation_tokens":128,"generation_limit":128,"ttft_ms":500,"tpot_ms":125,"prefill_tps":8192,"decode_tps":8,"elapsed_seconds":16.5,"throughput_tps":256,"peak_memory_bytes":1073741824,"output_token_sha256":"abc","prompt_cache_reused_tokens":0,"finish_reason":"length"}}"#))
+    let event = try XCTUnwrap(ThroughputEvent.decode(#"data: {"result":{"model":"qwen-test","slots":2304,"benchmark_context":"code","corpus_sha256":"def","context_tokens":4096,"generation_tokens":128,"generation_limit":128,"ttft_ms":500,"tpot_ms":125,"prefill_tps":8192,"decode_tps":8,"elapsed_seconds":16.5,"throughput_tps":256,"peak_app_memory_bytes":1073741824,"memory_scope":"app","output_token_sha256":"abc","prompt_cache_reused_tokens":0,"finish_reason":"length"}}"#))
     let result = try XCTUnwrap(event.result)
     let json = try ThroughputOutputFormat.json.render([result])
     let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]])
+    XCTAssertEqual(rows[0]["peak_app_memory_bytes"] as? Double, 1073741824)
+    XCTAssertEqual(rows[0]["memory_scope"] as? String, "app")
+    XCTAssertNil(rows[0]["peak_memory_bytes"])
     XCTAssertEqual(rows[0]["slots"] as? Int, 2304)
     XCTAssertEqual(rows[0]["context_tokens"] as? Int, 4096)
     XCTAssertEqual(rows[0]["benchmark_context"] as? String, "code")
     XCTAssertEqual(rows[0]["finish_reason"] as? String, "length")
     XCTAssertEqual(rows[0]["corpus_sha256"] as? String, "def")
     let plain = try ThroughputOutputFormat.plainText.render([result])
+    XCTAssertTrue(plain.contains("Peak Memory"))
+    XCTAssertFalse(plain.contains("MLX"))
     XCTAssertTrue(plain.contains("qwen-test"))
     XCTAssertTrue(plain.contains("2304"))
     XCTAssertTrue(plain.contains("4096 / 128"))
@@ -189,11 +199,23 @@ final class ThroughputTests: XCTestCase {
     XCTAssertFalse(plain.contains("\t"))
     XCTAssertEqual(plain.split(separator: "\n").count, 2)
     let markdown = try ThroughputOutputFormat.markdown.render([result])
+    XCTAssertTrue(markdown.contains("| Peak Memory |"))
     XCTAssertTrue(markdown.hasPrefix("| Model | Context | Slots | Output limit |"))
     XCTAssertTrue(markdown.contains("| qwen-test | Code | 2304 | 128 | 4096 / 128 |"))
     XCTAssertEqual(markdown.split(separator: "\n").count, 3)
     let empty = try ThroughputOutputFormat.json.render([])
     XCTAssertEqual(try XCTUnwrap(JSONSerialization.jsonObject(with: Data(empty.utf8)) as? [Any]).count, 0)
+  }
+
+  func testUnavailableMemoryAndLegacyMLXAreNotReportedAsAppMemory() throws {
+    for memory in ["\"peak_app_memory_bytes\":null", "\"peak_memory_bytes\":1073741824"] {
+      let line = "data: {\"result\":{\"model\":\"test\",\"benchmark_context\":\"code\",\"corpus_sha256\":\"test\",\"context_tokens\":1024,\"generation_tokens\":1,\"generation_limit\":128,\"ttft_ms\":1,\"prefill_tps\":1,\"decode_tps\":1,\"elapsed_seconds\":1,\"throughput_tps\":1,\(memory),\"output_token_sha256\":\"test\",\"prompt_cache_reused_tokens\":0}}"
+      let result = try XCTUnwrap(ThroughputEvent.decode(line)?.result)
+      XCTAssertNil(result.peakAppMemoryBytes)
+      XCTAssertEqual(result.cells.last, "—")
+      let json = try ThroughputOutputFormat.json.render([result])
+      XCTAssertFalse(json.contains("peak_memory_bytes"))
+    }
   }
 
   func testDecodesProgressErrorsAndStreamFraming() throws {

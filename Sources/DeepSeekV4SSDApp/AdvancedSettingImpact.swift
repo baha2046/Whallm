@@ -24,7 +24,7 @@ enum AdvancedSettingImpact {
     case "Use ANE for prefill":
       "May shorten prefill, but needs extra memory and may slightly change output."
     case "ANE Prefill share":
-      "More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only."
+      "More ANE work may shorten prefill, but adds memory use and may change output. Default and recommended: 0; 0 uses GPU only, 1 uses ANE only."
     case "Use layer-major prefill", "Batch expert calculations":
       "Shorten prefill, but peak memory may rise and output may differ slightly."
     case "Prefill acceleration":

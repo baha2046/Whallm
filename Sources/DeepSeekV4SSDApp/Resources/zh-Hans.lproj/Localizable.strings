@@ -102,7 +102,7 @@
 "Port must be from 1 through 65535." = "Port 必须介于 1 和 65535。";
 "Prefill step size" = "Prefill 步长";
 "ANE Prefill share" = "ANE Prefill 比例";
-"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "分配给 ANE 的 q_proj output channels 比例。0 只使用 GPU。1 只使用 ANE。默认值是 0.25。";
+"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0." = "分配给 ANE 的 q_proj output channels 比例。0 只使用 GPU，1 只使用 ANE。默认值与建议值为 0。";
 "ANE Prefill share must be from 0 through 1." = "ANE Prefill 比例必须介于 0 与 1。";
 "Preparing download" = "正在准备下载";
 "Preparing repair" = "正在准备修复";
@@ -178,7 +178,7 @@
 "This Mac uses Apple Silicon." = "此 Mac 使用 Apple Silicon。";
 "This runtime does not support Intel Mac." = "此 runtime 不支持 Intel Mac。";
 "This Mac has less than 64 GiB of memory. Performance or stability may be reduced." = "此 Mac 的内存少于 64 GiB。性能或稳定性可能会降低。";
-"Cache Hit rate" = "缓存命中率";
+"Expert cache hit rate" = "专家缓存命中率";
 "Maximum" = "历史最高";
 "Tool call" = "工具调用";
 "Top P" = "Top P";
@@ -210,6 +210,9 @@
 "MTP uses speculative decoding. Text may arrive in short bursts." = "MTP 使用 speculative decoding。文字可能会分批出现。";
 "Install the MTP files before enabling this setting." = "请先安装 MTP 文件，再启用此设置。";
 "MTP slots" = "MTP 槽位";
+"Edit expert caches in slots" = "以 slots 编辑专家缓存";
+"Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity." = "将专家、MTP 和 DSpark 缓存的 GiB 滑块改为整数 slots 输入框。切换不会改动已保存的容量。";
+"Enter the number of experts to retain. Applies on next model load." = "输入要保留的专家数量。下次加载模型时生效。";
 "Number of MTP experts kept in memory. More slots use more memory. The default is 32." = "保留在内存中的 MTP 专家数量。更多槽位会使用更多内存。默认值为 32。";
 "MTP slots must be at least 10." = "MTP 槽位必须至少为 10。";
 "DSpark confidence threshold" = "DSpark 置信度阈值";
@@ -405,8 +408,8 @@
 "PP tok/s" = "输入 tok/s";
 "TG tok/s" = "生成 tok/s";
 "Total (s)" = "总时间（s）";
-"Peak MLX" = "MLX 峰值";
-"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory." = "TTFT：首 token 等待时间；TPOT：每个输出 token 的时间；PP：输入速度；TG：生成速度。吞吐量为每秒输入加输出 token 数。MLX 峰值为模型分配的内存，不含整个系统。";
+"Peak Memory" = "内存峰值";
+"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak Memory samples macOS physical footprint about every 10 ms during loading and generation: Whallm + its inference process, or the inference process alone for a standalone server. Brief peaks may be missed; — means unavailable." = "TTFT：首 token 等待时间；TPOT：每个输出 token 的时间；PP：输入速度；TG：生成速度。吞吐量为每秒输入加输出 token 数。内存峰值在加载与生成期间约每 10 毫秒采样 macOS physical footprint，合计 Whallm 与推理进程；独立启动的服务器仅计推理进程。可能漏掉瞬间峰值；— 表示无法获取。";
 "Output may end early. Loading time is excluded; no extra warm-up is performed." = "模型可能提前结束输出。时间不含模型加载，测试前不额外预热。";
 "Output limit: %lld tokens" = "输出上限：%lld tokens";
 "Configuration" = "测试设置";
@@ -444,7 +447,7 @@
 "Use ANE for prefill" = "使用 ANE 处理输入";
 "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "由 ANE 分担查询投影计算；无法使用时改用 GPU。可能改变数值舍入结果。";
 "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "关闭时使用全部选定专家。开启后少算一个专家，可能降低质量。不能与 DSpark 或 MTP 同时使用。";
-"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "由 ANE 计算的查询投影输出比例。0 只使用 GPU，1 只使用 ANE，默认为 0.25。";
+"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0." = "由 ANE 计算的查询投影输出比例。0 只使用 GPU，1 只使用 ANE，默认值与建议值为 0。";
 
 "Route-aware" = "路由感知";
 "Route-aware cache remembers expert usage and adjusts memory across layers." = "路由感知缓存会记住专家使用记录，并调整各层的内存分配。";
@@ -458,6 +461,7 @@
 "Expert cache memory is too small or invalid." = "专家缓存内存太小，或数值无效。";
 "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load." = "只配置专家权重容量，不含常驻权重与暂存。向下取整为完整专家数量，下次加载模型时生效。";
 "Capacity: %lld experts" = "可容纳 %lld 个专家";
+"The maximum is this Mac's physical memory, not a safe allocation limit. Leave room for the system and other model memory." = "上限为这台 Mac 的物理内存容量，不代表可以安全地全部分配。请为系统与模型其他内存保留空间。";
 "Conservative peak estimate" = "保守预估峰值";
 "About %.1f GiB" = "约 %.1f GiB";
 "For %lld input tokens and up to %lld output tokens." = "以 %lld 个输入 token、最多 %lld 个输出 token 估算。";
@@ -514,7 +518,14 @@
 
 "Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load." = "保留更多专家以减少 SSD 读取，但会增加内存用量。建议约 %@ GiB，下次加载生效。";
 "Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load." = "保留更多专家以减少 SSD 读取，但会增加内存用量。默认约 %@ GiB，下次加载生效。";
-"More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only." = "调高可能缩短 prefill 时间，但会增加内存用量，输出可能略有差异。默认 0.25；0 仅使用 GPU，1 仅使用 ANE。";
+"More ANE work may shorten prefill, but adds memory use and may change output. Default and recommended: 0; 0 uses GPU only, 1 uses ANE only." = "调高可能缩短 prefill 时间，但会增加内存用量，输出可能略有差异。默认值与建议值为 0；0 仅使用 GPU，1 仅使用 ANE。";
+"Default settings" = "默认设置";
+"Restore defaults" = "恢复为默认值";
+"Restore this model's defaults?" = "要恢复此模型的默认值吗？";
+"Confirm restoring defaults" = "再次确认恢复默认值";
+"Continue" = "继续";
+"Restore all advanced settings for this model, including generation settings. Alias and model files are kept." = "恢复此模型的所有高级设置，包括生成设置。保留 Alias 与模型文件。";
+"Your custom advanced settings will be replaced and saved immediately. This cannot be undone." = "自定义高级设置将被替换并立即保存。此操作无法撤销。";
 "Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0." = "调高可能缩短 prefill 时间，但会提高内存峰值。默认 0，按输入长度自动选择 128、256 或 1024。";
 "Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024." = "调高可减少短输入的整层加载开销，但较少请求能享有 prefill 加速。默认 1024。";
 "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4." = "调高可能减少 SSD 等待，但会增加内存用量，过多反而可能变慢。建议值为 4。";

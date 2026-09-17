@@ -1220,7 +1220,7 @@ def load(
         model.ane_prefill = install_qwen_ane_prefill(
             model,
             getattr(config, "ane_prefill", True),
-            getattr(config, "ane_prefill_ratio", 0.25),
+            getattr(config, "ane_prefill_ratio", 0.0),
         )
         return model, cache
     except Exception:

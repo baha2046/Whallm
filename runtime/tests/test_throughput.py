@@ -125,8 +125,8 @@ class ThroughputTests(unittest.TestCase):
         self.assertEqual(result["corpus_sha256"], expected_hash)
 
     def test_auto_load_and_request_scoped_results_restore_settings(self):
-        with patch("deepseek_v4_ssd.throughput.mx.reset_peak_memory"), \
-             patch("deepseek_v4_ssd.throughput.mx.get_peak_memory", return_value=123456):
+        with patch("deepseek_v4_ssd.app_memory.physical_footprint", return_value=123456), \
+             patch("deepseek_v4_ssd.app_memory.app_process_ids", return_value=(11, 22)):
             with urlopen(self.request()) as response:
                 body = response.read().decode()
         events = [json.loads(line[6:]) for line in body.splitlines()
@@ -147,9 +147,48 @@ class ThroughputTests(unittest.TestCase):
         self.assertEqual(result["corpus_sha256"], prompt_tokens(self.runtime, 1024)[1])
         self.assertEqual(result["ttft_ms"], 500)
         self.assertEqual(result["tpot_ms"], 250)
-        self.assertEqual(result["peak_memory_bytes"], 123456)
+        self.assertEqual(result["peak_app_memory_bytes"], 246912)
+        self.assertEqual(result["memory_scope"], "app")
+        self.assertNotIn("peak_memory_bytes", result)
         self.assertEqual(result["output_token_sha256"], hashlib.sha256(b"12\n13\n").hexdigest())
         self.assertTrue(body.endswith("data: [DONE]\n\n"))
+
+    def test_memory_sampling_covers_loading_and_stops_after_result(self):
+        from deepseek_v4_ssd.app_memory import AppMemorySampler
+        samplers = []
+        def create_sampler():
+            sampler = AppMemorySampler(reader=lambda _: 10, pids=(11, 22), interval=60)
+            samplers.append(sampler)
+            return sampler
+        # The 'loading' SSE event is sent before the model manager is entered.
+        original_sse = self.server.RequestHandlerClass._sse
+        def observe_sse(handler, event):
+            if event.get("phase") == "loading":
+                sampler = samplers[-1]
+                self.assertTrue(sampler._thread.is_alive())
+                sampler._reader = lambda _: 100
+                sampler.sample()
+                sampler._reader = lambda _: 10
+            if "result" in event:
+                self.assertIsNone(samplers[-1]._thread)
+            return original_sse(handler, event)
+        with patch("deepseek_v4_ssd.server.AppMemorySampler", side_effect=create_sampler), \
+             patch.object(self.server.RequestHandlerClass, "_sse", observe_sse):
+            with urlopen(self.request()) as response:
+                events = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                          if line.startswith("data: {")]
+        result = next(event["result"] for event in events if "result" in event)
+        self.assertEqual(result["peak_app_memory_bytes"], 200)
+        self.assertIsNone(samplers[-1]._thread)
+
+    def test_unavailable_memory_does_not_fail_generation(self):
+        with patch("deepseek_v4_ssd.app_memory.physical_footprint", return_value=None):
+            with urlopen(self.request()) as response:
+                events = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                          if line.startswith("data: {")]
+        result = next(event["result"] for event in events if "result" in event)
+        self.assertIsNone(result["peak_app_memory_bytes"])
+        self.assertNotIn("peak_memory_bytes", result)
 
     def test_rejects_invalid_lengths_and_auth_before_loading(self):
         for changes in [dict(context_length=True), dict(context_length=200000),

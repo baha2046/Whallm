@@ -95,7 +95,7 @@ def main() -> None:
         action="store_true",
         help="use the original GPU Prefill path",
     )
-    parser.add_argument("--ane-prefill-ratio", type=float, default=0.25)
+    parser.add_argument("--ane-prefill-ratio", type=float, default=0.0)
     parser.add_argument(
         "--qwen-next-layer-prefetch",
         action="store_true",

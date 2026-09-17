@@ -153,6 +153,7 @@ final class MemoryPlanningTests: XCTestCase {
       let p = try kind == .qwen3_8FlashNext ? profile() : deepSeekProfile(kind)
       var s = ModelAdvancedSettings.defaults(for: kind)
       s.layerMajorPrefill = true
+      s.batchedExpertPrefill = true
       s.promptCacheMode = .off
       s.expertCacheGiB = 8
       let a = try XCTUnwrap(p.estimate(s, mtpAvailable: false, dsparkAvailable: false, contextTokens: 32_768))
@@ -260,6 +261,8 @@ final class MemoryPlanningTests: XCTestCase {
   func testPrefillDominatedPeakDoesNotAddReleasedExpertCache() throws {
     let p = try profile()
     var s = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    s.layerMajorPrefill = true
+    s.batchedExpertPrefill = true
     s.expertCacheGiB = 8
     let small = try XCTUnwrap(p.estimate(s, mtpAvailable: false, dsparkAvailable: false, contextTokens: 262_144))
     s.expertCacheGiB = 16

@@ -7,8 +7,6 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-import mlx.core as mx
-
 from .cancellation import check_cancelled
 
 CONTEXT_LENGTHS = (1024, 4096, 8192, 16384, 32768, 65536, 131072, 204800)
@@ -45,7 +43,6 @@ def run_trial(runtime, options, context_length, track, progress, benchmark_conte
     finish = None
     output_hash = hashlib.sha256()
     try:
-        mx.reset_peak_memory()
         started = time.perf_counter()
         last_progress = started
         pieces = track(runtime.stream(tokens, options))
@@ -77,7 +74,6 @@ def run_trial(runtime, options, context_length, track, progress, benchmark_conte
             "decode_tps": decode_tps,
             "elapsed_seconds": elapsed,
             "throughput_tps": (context_length + generated) / elapsed if elapsed > 0 else 0,
-            "peak_memory_bytes": mx.get_peak_memory(),
             "finish_reason": finish,
             "output_token_sha256": output_hash.hexdigest(),
             "prompt_cache_reused_tokens": metrics["prompt_cache_reused_tokens"],

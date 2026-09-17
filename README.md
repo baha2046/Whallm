@@ -84,7 +84,7 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 | DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
 | Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
 
-V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. Expert calculations as reads finish and batched expert input processing default to on. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
+V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. In the App, layer-major prefill, expert calculations as reads finish, and batched expert input processing default to off for new or reset settings. Saved choices are preserved; standalone CLI defaults are unchanged. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
 
 ## Benchmarks
 

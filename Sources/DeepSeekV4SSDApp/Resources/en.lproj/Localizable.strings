@@ -102,7 +102,7 @@
 "Port must be from 1 through 65535." = "Port must be from 1 through 65535.";
 "Prefill step size" = "Prefill step size";
 "ANE Prefill share" = "ANE Prefill share";
-"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.";
+"Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0." = "Share of q_proj output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0.";
 "ANE Prefill share must be from 0 through 1." = "ANE Prefill share must be from 0 through 1.";
 "Preparing download" = "Preparing download";
 "Preparing repair" = "Preparing repair";
@@ -178,7 +178,7 @@
 "This Mac uses Apple Silicon." = "This Mac uses Apple Silicon.";
 "This runtime does not support Intel Mac." = "This runtime does not support Intel Mac.";
 "This Mac has less than 64 GiB of memory. Performance or stability may be reduced." = "This Mac has less than 64 GiB of memory. Performance or stability may be reduced.";
-"Cache Hit rate" = "Cache Hit rate";
+"Expert cache hit rate" = "Expert cache hit rate";
 "Maximum" = "Maximum";
 "Tool call" = "Tool call";
 "Top P" = "Top P";
@@ -210,6 +210,9 @@
 "MTP uses speculative decoding. Text may arrive in short bursts." = "MTP uses speculative decoding. Text may arrive in short bursts.";
 "Install the MTP files before enabling this setting." = "Install the MTP files before enabling this setting.";
 "MTP slots" = "MTP slots";
+"Edit expert caches in slots" = "Edit expert caches in slots";
+"Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity." = "Use integer slot inputs instead of GiB sliders for expert, MTP, and DSpark caches. Switching does not change saved capacity.";
+"Enter the number of experts to retain. Applies on next model load." = "Enter the number of experts to retain. Applies on next model load.";
 "Number of MTP experts kept in memory. More slots use more memory. The default is 32." = "Number of MTP experts kept in memory. More slots use more memory. The default is 32.";
 "MTP slots must be at least 10." = "MTP slots must be at least 10.";
 "DSpark confidence threshold" = "DSpark confidence threshold";
@@ -405,8 +408,8 @@
 "PP tok/s" = "PP tok/s";
 "TG tok/s" = "TG tok/s";
 "Total (s)" = "Total (s)";
-"Peak MLX" = "Peak MLX";
-"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory." = "TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory.";
+"Peak Memory" = "Peak Memory";
+"TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak Memory samples macOS physical footprint about every 10 ms during loading and generation: Whallm + its inference process, or the inference process alone for a standalone server. Brief peaks may be missed; — means unavailable." = "TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak Memory samples macOS physical footprint about every 10 ms during loading and generation: Whallm + its inference process, or the inference process alone for a standalone server. Brief peaks may be missed; — means unavailable.";
 "Output may end early. Loading time is excluded; no extra warm-up is performed." = "Output may end early. Loading time is excluded; no extra warm-up is performed.";
 "Output limit: %lld tokens" = "Output limit: %lld tokens";
 "Configuration" = "Configuration";
@@ -444,7 +447,7 @@
 "Use ANE for prefill" = "Use ANE for prefill";
 "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding." = "Shares query projection work with ANE. Falls back to GPU when unavailable. May change rounding.";
 "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP." = "Off uses all selected experts. On computes one fewer expert and may reduce quality. Unavailable with DSpark or MTP.";
-"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25." = "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default is 0.25.";
+"Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0." = "Share of query projection output channels assigned to ANE. Use 0 for GPU only and 1 for ANE only. The default and recommended value is 0.";
 
 "Route-aware" = "Route-aware";
 "Route-aware cache remembers expert usage and adjusts memory across layers." = "Route-aware cache remembers expert usage and adjusts memory across layers.";
@@ -458,6 +461,7 @@
 "Expert cache memory is too small or invalid." = "Expert cache memory is too small or invalid.";
 "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load." = "Expert blob capacity only; excludes common weights and temporary buffers. Rounded down to whole experts. Applies on next model load.";
 "Capacity: %lld experts" = "Capacity: %lld experts";
+"The maximum is this Mac's physical memory, not a safe allocation limit. Leave room for the system and other model memory." = "The maximum is this Mac's physical memory, not a safe allocation limit. Leave room for the system and other model memory.";
 "Conservative peak estimate" = "Conservative peak estimate";
 "About %.1f GiB" = "About %.1f GiB";
 "For %lld input tokens and up to %lld output tokens." = "For %lld input tokens and up to %lld output tokens.";
@@ -514,7 +518,14 @@
 
 "Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load." = "Retain more experts to reduce SSD reads, at the cost of memory. Recommended: about %@ GiB. Applies on next load.";
 "Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load." = "Retain more experts to reduce SSD reads, at the cost of memory. Default: about %@ GiB. Applies on next load.";
-"More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only." = "More ANE work may shorten prefill, but adds memory use and may change output. Default: 0.25; 0 uses GPU only, 1 uses ANE only.";
+"More ANE work may shorten prefill, but adds memory use and may change output. Default and recommended: 0; 0 uses GPU only, 1 uses ANE only." = "More ANE work may shorten prefill, but adds memory use and may change output. Default and recommended: 0; 0 uses GPU only, 1 uses ANE only.";
+"Default settings" = "Default settings";
+"Restore defaults" = "Restore defaults";
+"Restore this model's defaults?" = "Restore this model's defaults?";
+"Confirm restoring defaults" = "Confirm restoring defaults";
+"Continue" = "Continue";
+"Restore all advanced settings for this model, including generation settings. Alias and model files are kept." = "Restore all advanced settings for this model, including generation settings. Alias and model files are kept.";
+"Your custom advanced settings will be replaced and saved immediately. This cannot be undone." = "Your custom advanced settings will be replaced and saved immediately. This cannot be undone.";
 "Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0." = "Larger batches may shorten prefill, but raise peak memory. 0 automatically selects 128, 256, or 1024. Default: 0.";
 "Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024." = "Avoid whole-layer overhead on shorter prompts, but fewer prompts benefit from faster prefill. Default: 1024.";
 "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4." = "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Recommended: 4.";

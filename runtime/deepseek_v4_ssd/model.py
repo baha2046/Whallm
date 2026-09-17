@@ -58,7 +58,7 @@ class RuntimeConfig:
     qwen_grouped_experts: bool = True
     deepseek_ane_prefill: bool = False
     ane_prefill: bool = True
-    ane_prefill_ratio: float = 0.25
+    ane_prefill_ratio: float = 0.0
     fp4_index_cache: bool = True
     dspark_enabled: bool = False
     dspark_prompt_cache: bool = False

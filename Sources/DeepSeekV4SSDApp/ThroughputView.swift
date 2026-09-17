@@ -27,17 +27,20 @@ struct ThroughputResult: Codable, Identifiable, Sendable {
   let decodeTps: Double
   let elapsedSeconds: Double
   let throughputTps: Double
-  let peakMemoryBytes: Double
+  let peakAppMemoryBytes: Double?
+  let memoryScope: String?
   let outputTokenSha256: String
   let promptCacheReusedTokens: Int
   let finishReason: String?
 
-  static let columns = ["Input / Output", "TTFT (ms)", "TPOT (ms)", "PP tok/s", "TG tok/s", "Total (s)", "Throughput", "Peak MLX"]
+  static let columns = ["Input / Output", "TTFT (ms)", "TPOT (ms)", "PP tok/s", "TG tok/s", "Total (s)", "Throughput", "Peak Memory"]
 
   var cells: [String] {
     ["\(contextTokens) / \(generationTokens)", Self.number(ttftMs), Self.number(tpotMs),
      Self.number(prefillTps), Self.number(decodeTps), Self.number(elapsedSeconds),
-     Self.number(throughputTps), String(format: "%.2f GB", locale: Locale(identifier: "en_US_POSIX"), peakMemoryBytes / 1_073_741_824)]
+     Self.number(throughputTps), peakAppMemoryBytes.map {
+       String(format: "%.2f GiB", locale: Locale(identifier: "en_US_POSIX"), $0 / 1_073_741_824)
+     } ?? "—"]
   }
 
   private static func number(_ value: Double?) -> String {
@@ -230,7 +233,7 @@ final class ThroughputSession: ObservableObject {
         generationTokens: generationLength, generationLimit: generationLength,
         ttftMs: prefill * 1000, tpotMs: 1000 / 75, prefillTps: 2400, decodeTps: 75,
         elapsedSeconds: elapsed, throughputTps: Double(length + generationLength) / elapsed,
-        peakMemoryBytes: 4_294_967_296 + Double(length) * 8192,
+        peakAppMemoryBytes: 4_294_967_296 + Double(length) * 8192, memoryScope: "simulated",
         outputTokenSha256: "dry-run", promptCacheReusedTokens: 0, finishReason: "dry_run"
       )
     }
@@ -546,7 +549,7 @@ struct ThroughputView: View {
       }
       .frame(height: 61 + CGFloat(session.results.count) * 34 + 12)
       .background(AppTheme.cardBackground, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius))
-      Text(label("TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak MLX is model allocation, not total system memory."))
+      Text(label("TTFT: first token · TPOT: time per output token · PP: input speed · TG: output speed. Throughput counts input + output tokens per second. Peak Memory samples macOS physical footprint about every 10 ms during loading and generation: Whallm + its inference process, or the inference process alone for a standalone server. Brief peaks may be missed; — means unavailable."))
         .font(.caption).foregroundStyle(.secondary)
       Text(label("Output may end early. Loading time is excluded; no extra warm-up is performed."))
         .font(.caption).foregroundStyle(.secondary)
