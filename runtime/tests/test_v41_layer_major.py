@@ -118,6 +118,27 @@ class V41LayerMajorTests(unittest.TestCase):
         for a, b in zip(candidate[0].state, reference[0].state):
             self.assertTrue(mx.allclose(a, b, atol=1e-5, rtol=1e-5).item())
 
+    def test_configured_moe_step_size_does_not_change_attention_chunks(self):
+        events = []
+        class Layer:
+            engram = None
+            def forward_attention(self, h, mix, start, *_):
+                events.append(('attention', h.shape[1]))
+                return h, mix
+            def forward_ffn(self, h, mix):
+                events.append(('ffn', h.shape[1]))
+                return h, mix
+        state = SimpleNamespace(offset=0, ensure_capacity=lambda _: None)
+        core = SimpleNamespace(layers=[Layer()], hc_mult=1, engram_hasher=None,
+            args=SimpleNamespace(engram_layer_ids=(), kv_source_layers=()),
+            embed=lambda ids: ids[..., None].astype(mx.float32))
+        _deepseek_v41_layer_major_prefill(SimpleNamespace(model=core), list(range(7)),
+            [SimpleNamespace(cache=state)], 2, SimpleNamespace(),
+            RuntimeConfig(batched_expert_prefill=False, moe_prefill_step_size=3))
+        self.assertEqual([n for phase, n in events if phase == 'attention'], [2, 2, 2, 1])
+        self.assertEqual([n for phase, n in events if phase == 'ffn'], [3, 3, 1])
+        self.assertEqual(state.offset, 7)
+
     def test_ffn_batch_cap_tail_and_prefetch_before_attention(self):
         events = []
         class Layer:

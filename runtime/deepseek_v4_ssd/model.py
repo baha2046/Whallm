@@ -50,10 +50,10 @@ class RuntimeConfig:
     qwen_quantized_index: bool = False
     v41_packed_kv: bool = False
     v41_packed_index: bool = False
-    v41_layer_major_prefill: bool = False
+    v41_layer_major_prefill: bool = True
     v41_ced_prefill: bool = False
     v41_candidate_index: bool = False
-    v41_next_layer_prefetch: bool = False
+    v41_next_layer_prefetch: bool = True
     qwen_next_layer_prefetch: bool = False
     qwen_grouped_experts: bool = True
     deepseek_ane_prefill: bool = False
@@ -156,126 +156,128 @@ def layer_major_prefill(
     release_slots = getattr(expert_cache, "release_prefill_slots", None)
     if batched_experts and callable(release_slots):
         release_slots()
-    inputs = mx.array(token_ids)[None]
-    hidden = core.embed_tokens(inputs)
-    hidden = mx.broadcast_to(
-        hidden[:, :, None, :],
-        (hidden.shape[0], hidden.shape[1], core.args.hc_mult, hidden.shape[2]),
-    )
-    hidden = mx.contiguous(hidden)
+    reuse = getattr(expert_cache, "reuse_layer_buffers", nullcontext)
+    with reuse() if batched_experts else nullcontext():
+        inputs = mx.array(token_ids)[None]
+        hidden = core.embed_tokens(inputs)
+        hidden = mx.broadcast_to(
+            hidden[:, :, None, :],
+            (hidden.shape[0], hidden.shape[1], core.args.hc_mult, hidden.shape[2]),
+        )
+        hidden = mx.contiguous(hidden)
 
-    last_layer = len(core.pipeline_layers) - 1
-    moe_step_size = _select_moe_step_size(moe_step_size, len(token_ids))
-    for layer_index, (layer, layer_cache) in enumerate(
-        zip(core.pipeline_layers, prompt_cache)
-    ):
-        check_cancelled()
-        if not all(
-            hasattr(layer, name)
-            for name in ("attn_hc", "attn_norm", "attn", "ffn_hc", "ffn_norm", "ffn")
+        last_layer = len(core.pipeline_layers) - 1
+        moe_step_size = _select_moe_step_size(moe_step_size, len(token_ids))
+        for layer_index, (layer, layer_cache) in enumerate(
+            zip(core.pipeline_layers, prompt_cache)
         ):
+            check_cancelled()
+            if not all(
+                hasattr(layer, name)
+                for name in ("attn_hc", "attn_norm", "attn", "ffn_hc", "ffn_norm", "ffn")
+            ):
+                outputs = []
+                with expert_cache.pin_layer(layer_index):
+                    for start in range(0, len(token_ids), step_size):
+                        check_cancelled()
+                        end = min(start + step_size, len(token_ids))
+                        chunk = hidden[:, start:end]
+                        chunk_ids = inputs[:, start:end]
+                        mask_cache = (
+                            layer_cache[0]
+                            if isinstance(layer_cache, CacheList)
+                            else layer_cache
+                        )
+                        mask = deepseek_v4.create_attention_mask(
+                            chunk[:, :, 0, :],
+                            mask_cache,
+                            window_size=core.args.sliding_window,
+                            return_array=True,
+                        )
+                        output = layer(chunk, mask, layer_cache, chunk_ids)
+                        eval_prompt_cache([layer_cache], output)
+                        if layer_index != last_layer:
+                            outputs.append(output)
+                if layer_index == last_layer:
+                    _clear_memory_cache()
+                    return
+                hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+                mx.eval(hidden)
+                _clear_memory_cache()
+                continue
+
+            prefetch = getattr(expert_cache, "prefetch_layer", None)
+            record_compute_submit = getattr(
+                expert_cache,
+                "record_compute_submit",
+                None,
+            )
+            use_batched = bool(
+                batched_experts
+                and callable(prefetch)
+                and hasattr(expert_cache, "batched_layer")
+                and layer_index != last_layer
+            )
+            if use_batched:
+                prefetch(layer_index)
+
             outputs = []
-            with expert_cache.pin_layer(layer_index):
-                for start in range(0, len(token_ids), step_size):
-                    check_cancelled()
-                    end = min(start + step_size, len(token_ids))
-                    chunk = hidden[:, start:end]
-                    chunk_ids = inputs[:, start:end]
-                    mask_cache = (
-                        layer_cache[0]
-                        if isinstance(layer_cache, CacheList)
-                        else layer_cache
-                    )
-                    mask = deepseek_v4.create_attention_mask(
-                        chunk[:, :, 0, :],
-                        mask_cache,
-                        window_size=core.args.sliding_window,
-                        return_array=True,
-                    )
-                    output = layer(chunk, mask, layer_cache, chunk_ids)
-                    eval_prompt_cache([layer_cache], output)
-                    if layer_index != last_layer:
-                        outputs.append(output)
+            for start in range(0, len(token_ids), step_size):
+                check_cancelled()
+                end = min(start + step_size, len(token_ids))
+                chunk = hidden[:, start:end]
+                mask_cache = (
+                    layer_cache[0] if isinstance(layer_cache, CacheList) else layer_cache
+                )
+                mask = deepseek_v4.create_attention_mask(
+                    chunk[:, :, 0, :],
+                    mask_cache,
+                    window_size=core.args.sliding_window,
+                    return_array=True,
+                )
+                residual = chunk
+                value, post, combine = layer.attn_hc(chunk)
+                value = layer.attn(layer.attn_norm(value), mask=mask, cache=layer_cache)
+                output = deepseek_v4.hc_expand(value, residual, post, combine)
+                eval_prompt_cache([layer_cache], output)
+                if layer_index != last_layer:
+                    outputs.append(output)
             if layer_index == last_layer:
                 _clear_memory_cache()
                 return
+
+            attention_output = (
+                outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+            )
+            mx.eval(attention_output)
+            check_cancelled()
+            _clear_memory_cache()
+            batch_context = (
+                expert_cache.batched_layer(layer_index)
+                if use_batched
+                else nullcontext()
+            )
+            outputs = []
+            with expert_cache.pin_layer(layer_index), batch_context:
+                if use_batched and layer_index + 1 < last_layer:
+                    prefetch(layer_index + 1)
+                for start in range(0, len(token_ids), moe_step_size):
+                    check_cancelled()
+                    end = min(start + moe_step_size, len(token_ids))
+                    residual = attention_output[:, start:end]
+                    value, post, combine = layer.ffn_hc(residual)
+                    value = layer.ffn(
+                        layer.ffn_norm(value),
+                        inputs[:, start:end],
+                    )
+                    output = deepseek_v4.hc_expand(value, residual, post, combine)
+                    if callable(record_compute_submit):
+                        record_compute_submit(layer_index)
+                    mx.eval(output)
+                    outputs.append(output)
             hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
             mx.eval(hidden)
             _clear_memory_cache()
-            continue
-
-        prefetch = getattr(expert_cache, "prefetch_layer", None)
-        record_compute_submit = getattr(
-            expert_cache,
-            "record_compute_submit",
-            None,
-        )
-        use_batched = bool(
-            batched_experts
-            and callable(prefetch)
-            and hasattr(expert_cache, "batched_layer")
-            and layer_index != last_layer
-        )
-        if use_batched:
-            prefetch(layer_index)
-
-        outputs = []
-        for start in range(0, len(token_ids), step_size):
-            check_cancelled()
-            end = min(start + step_size, len(token_ids))
-            chunk = hidden[:, start:end]
-            mask_cache = (
-                layer_cache[0] if isinstance(layer_cache, CacheList) else layer_cache
-            )
-            mask = deepseek_v4.create_attention_mask(
-                chunk[:, :, 0, :],
-                mask_cache,
-                window_size=core.args.sliding_window,
-                return_array=True,
-            )
-            residual = chunk
-            value, post, combine = layer.attn_hc(chunk)
-            value = layer.attn(layer.attn_norm(value), mask=mask, cache=layer_cache)
-            output = deepseek_v4.hc_expand(value, residual, post, combine)
-            eval_prompt_cache([layer_cache], output)
-            if layer_index != last_layer:
-                outputs.append(output)
-        if layer_index == last_layer:
-            _clear_memory_cache()
-            return
-
-        attention_output = (
-            outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
-        )
-        mx.eval(attention_output)
-        check_cancelled()
-        _clear_memory_cache()
-        batch_context = (
-            expert_cache.batched_layer(layer_index)
-            if use_batched
-            else nullcontext()
-        )
-        outputs = []
-        with expert_cache.pin_layer(layer_index), batch_context:
-            if use_batched and layer_index + 1 < last_layer:
-                prefetch(layer_index + 1)
-            for start in range(0, len(token_ids), moe_step_size):
-                check_cancelled()
-                end = min(start + moe_step_size, len(token_ids))
-                residual = attention_output[:, start:end]
-                value, post, combine = layer.ffn_hc(residual)
-                value = layer.ffn(
-                    layer.ffn_norm(value),
-                    inputs[:, start:end],
-                )
-                output = deepseek_v4.hc_expand(value, residual, post, combine)
-                if callable(record_compute_submit):
-                    record_compute_submit(layer_index)
-                mx.eval(output)
-                outputs.append(output)
-        hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
-        mx.eval(hidden)
-        _clear_memory_cache()
 
 class _EmptySwitchGLU(nn.Module):
     def __init__(self, *_: object, activation: nn.Module, **__: object):

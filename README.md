@@ -84,11 +84,11 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 | DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
 | Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
 
-In the current source, new or reset V4.1 App settings enable layer-major prefill, batched experts and next-layer prefetch. Attention keeps its chunk order; expert calculations process up to 4096 tokens at a time, using contiguous fused weights and at most two reusable layer buffers. DSpark can use this path, but cannot use CED. Saved settings and standalone CLI defaults are preserved.
+In the current source, new or reset V4.1 App settings enable layer-major prefill, batched experts and next-layer prefetch. Attention keeps its chunk order; expert calculations default to batches of up to 4096 tokens, using contiguous fused weights and at most two reusable layer buffers. DSpark can use this path, but cannot use CED. Saved settings are preserved. Python, CLI and standalone server defaults now also enable V4.1 layer-major prefill and next-layer prefetch; use `--no-v41-layer-major-prefill` or `--no-v41-next-layer-prefetch` to opt out. These V4.1 flags do not enable prefetch for V4 or Qwen.
 
 Qwen App defaults enable layer-major prefill and calculations as experts load, while batched prefill and next-layer prefetch remain off. These options remain off by default for V4. Cache compression, candidate-only scoring, CED and DeepSeek ANE remain off by default. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
 
-The V4.1 changes are source-only: full-model speed and peak memory have not been remeasured, and no new app has been packaged. The benchmark tables below predate these changes.
+The merged V4.1 changes have not been remeasured on a full model or packaged into a new App. The tables below predate these changes; [BENCHMARK.md](BENCHMARK.md) also preserves the PR author's separate pre-merge measurements, not validation of the merged runtime.
 
 ## Benchmarks
 

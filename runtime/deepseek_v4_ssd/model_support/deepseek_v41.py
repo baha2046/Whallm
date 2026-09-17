@@ -160,6 +160,7 @@ def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
     import numpy as np
     from ..deepseek_v41.model import SharedState
     from ..deepseek_v41.hyper_connections import make_identity_pre_mix
+    from ..model import _select_moe_step_size
 
     if not token_ids:
         return
@@ -193,6 +194,7 @@ def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
     last_source = max(core.args.kv_source_layers, default=len(core.layers) - 1)
     skipped = 0
     captured = {}
+    moe_step = _select_moe_step_size(config.moe_prefill_step_size, count)
     with expert_cache.reuse_layer_buffers() if batched else nullcontext():
         for layer_id, layer in enumerate(core.layers):
             check_cancelled()
@@ -232,10 +234,10 @@ def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
                     mx.eval(captured[layer_id])
                 outputs, mixes, layer_capture = [], [], []
                 # The FFN is token-local; attention's history and chunk size stay unchanged.
-                for begin in range(0, count - keep_from, 4096):
+                for begin in range(0, count - keep_from, moe_step):
                     check_cancelled()
-                    h, mix = layer.forward_ffn(attention_hidden[:, begin:begin + 4096],
-                                              attention_mix[:, begin:begin + 4096])
+                    h, mix = layer.forward_ffn(attention_hidden[:, begin:begin + moe_step],
+                                              attention_mix[:, begin:begin + moe_step])
                     mx.eval(h, mix)
                     outputs.append(h)
                     mixes.append(mix)

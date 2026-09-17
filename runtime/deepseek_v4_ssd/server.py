@@ -2359,7 +2359,8 @@ def _parser() -> argparse.ArgumentParser:
         help="expert eviction ranking (default LFU)",
     )
     for name in ('qwen_quantized_kv', 'qwen_quantized_index', 'v41_packed_kv', 'v41_packed_index', 'v41_candidate_index', 'v41_ced_prefill', 'v41_next_layer_prefetch', 'deepseek_ane_prefill', 'v41_layer_major_prefill'):
-        parser.add_argument("--" + name.replace("_", "-"), action=argparse.BooleanOptionalAction, default=False)
+        parser.add_argument("--" + name.replace("_", "-"), action=argparse.BooleanOptionalAction,
+                            default=getattr(RuntimeConfig(), name))
     parser.add_argument("--dspark", action="store_true")
     parser.add_argument(
         "--dspark-prompt-cache",

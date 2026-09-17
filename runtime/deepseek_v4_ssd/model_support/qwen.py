@@ -176,39 +176,41 @@ def _qwen_layer_major_prefill(
     release_slots = getattr(expert_cache, "release_prefill_slots", None)
     if batched_expert_prefill and callable(release_slots):
         release_slots()
-    record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
-    inputs = mx.array(token_ids)[None]
-    hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
-    for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
-        check_cancelled()
-        outputs = []
-        from contextlib import nullcontext
-        with expert_cache.batched_layer(layer_index) if batched_expert_prefill else nullcontext():
-            for start in range(0, len(token_ids), step_size):
-                check_cancelled()
-                end = min(start + step_size, len(token_ids))
-                chunk = hidden[:, start:end]
-                chunk_ids = inputs[:, start:end]
-                mask = (
-                    create_ssm_mask(
-                        chunk[..., : core.args.hidden_size],
-                        layer_cache,
+    from contextlib import nullcontext
+    reuse = getattr(expert_cache, "reuse_layer_buffers", nullcontext)
+    with reuse() if batched_expert_prefill else nullcontext():
+        record_compute_submit = getattr(expert_cache, "record_compute_submit", None)
+        inputs = mx.array(token_ids)[None]
+        hidden = mx.tile(core.embed_tokens(inputs), (1, 1, core.args.hc_count))
+        for layer_index, (layer, layer_cache) in enumerate(zip(core.layers, prompt_cache)):
+            check_cancelled()
+            outputs = []
+            with expert_cache.batched_layer(layer_index) if batched_expert_prefill else nullcontext():
+                for start in range(0, len(token_ids), step_size):
+                    check_cancelled()
+                    end = min(start + step_size, len(token_ids))
+                    chunk = hidden[:, start:end]
+                    chunk_ids = inputs[:, start:end]
+                    mask = (
+                        create_ssm_mask(
+                            chunk[..., : core.args.hidden_size],
+                            layer_cache,
+                        )
+                        if layer.layer_type == "linear_attention"
+                        else None
                     )
-                    if layer.layer_type == "linear_attention"
-                    else None
-                )
-                output = layer(chunk, chunk_ids, mask, layer_cache)
-                if (
-                    batched_expert_prefill and next_layer_prefetch
-                    and start == 0
-                    and layer_index + 1 < len(core.layers)
-                ):
-                    expert_cache.prefetch_layer(layer_index + 1)
-                if callable(record_compute_submit):
-                    record_compute_submit(layer_index)
-                eval_prompt_cache([layer_cache], output)
-                outputs.append(output)
-        hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
-        mx.eval(hidden)
-        if layer_index + 1 == len(core.layers):
-            return hidden
+                    output = layer(chunk, chunk_ids, mask, layer_cache)
+                    if (
+                        batched_expert_prefill and next_layer_prefetch
+                        and start == 0
+                        and layer_index + 1 < len(core.layers)
+                    ):
+                        expert_cache.prefetch_layer(layer_index + 1)
+                    if callable(record_compute_submit):
+                        record_compute_submit(layer_index)
+                    eval_prompt_cache([layer_cache], output)
+                    outputs.append(output)
+            hidden = outputs[0] if len(outputs) == 1 else mx.concatenate(outputs, axis=1)
+            mx.eval(hidden)
+            if layer_index + 1 == len(core.layers):
+                return hidden

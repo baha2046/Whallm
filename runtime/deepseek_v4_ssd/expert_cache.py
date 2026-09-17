@@ -23,7 +23,7 @@ from .io_metrics import (
     configure_expert_file_cache_policy,
     page_cache_residency_snapshot,
 )
-from .expert_layout import _fused_slot_regions, _qwen_slot_regions
+from .expert_layout import _fused_slot_regions, _qwen_slot_regions, batched_layer_layout
 from .model_support import support_for_installed
 from .manifest import InstalledModel, Tensor
 
@@ -376,9 +376,9 @@ class _SlotPool:
         }
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
-        self._layer_regions, self._layer_strides = (
-            self._layout.layer_regions(model) if model.model_kind == "deepseek-v4.1"
-            else (self._regions, {name: model.expert_blob_size for name in self._regions})
+        self._batched_layout = batched_layer_layout(
+            self._regions, self._layout.batched_regions,
+            model.expert_blob_size, model.expert_count,
         )
         self._slots: list[mx.array | None] = [None] * slots
         self._views: list[memoryview | None] = [None] * slots
@@ -470,13 +470,30 @@ class _SlotPool:
         return self._layout.batched(packed, self._batched_array)
 
     def layer_write_views(self, buffer: memoryview, expert: int) -> list[memoryview]:
-        return [buffer[self._layer_regions[r.name].offset + expert * self._layer_strides[r.name]:
-                       self._layer_regions[r.name].offset + expert * self._layer_strides[r.name] + r.length]
-                for r in self._model.expert_regions]
+        views = []
+        for region in self._model.expert_regions:
+            base, stride, inner = self._batched_layout[region.name]
+            start = base + expert * stride + inner
+            views.append(buffer[start:start + region.length])
+        return views
 
     def _batched_array(self, packed: mx.array, name: str) -> mx.array:
-        region = self._layer_regions[name]
-        expert_stride = self._layer_strides[name]
+        region = self._regions[name]
+        base, expert_stride, inner = self._batched_layout[name]
+        offset = base + inner
+        if offset % 4 or expert_stride % 4:
+            raise ValueError("batched expert layer regions must be 4-byte aligned")
+        if inner == 0 and expert_stride == region.length:
+            # Slice/reshape preserves contiguous batched projections for gather_qmm.
+            shape = (self._model.expert_count, *region.shape)
+            if region.dtype != "U32":
+                if region.shape[-1] % 4:
+                    raise ValueError("batched expert regions must be 4-byte aligned")
+                shape = (*shape[:-1], shape[-1] // 4)
+            end = offset + self._model.expert_count * expert_stride
+            value = packed[offset // 4:end // 4].reshape(shape)
+            return value if region.dtype == "U32" or name.endswith(".weight") else value.view(mx.uint8)
+        region = Tensor(region.name, region.dtype, region.shape, offset, region.length)
         if region.dtype == "U32":
             shape = (self._model.expert_count, *region.shape)
             row_strides = []
@@ -526,8 +543,10 @@ class _StagedSlotPool(_SlotPool):
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
         self._w13_regions, self._w2_regions = _staged_slot_regions(model)
-        self._layer_regions = self._regions
-        self._layer_strides = {name: model.expert_blob_size for name in self._regions}
+        self._batched_layout = batched_layer_layout(
+            self._regions, self._layout.batched_regions,
+            model.expert_blob_size, model.expert_count,
+        )
         self._w13_size = sum(
             region.length
             for name, region in self._w13_regions.items()

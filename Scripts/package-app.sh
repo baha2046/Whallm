@@ -67,6 +67,18 @@ if [[ ! -d $python_framework || ! -d $site_packages ]]; then
   exit 1
 fi
 
+# A standalone interpreter resolves to an unrelated directory that the check
+# above accepts, so confirm the framework layout the rewrites below require.
+if [[ ${python_framework:t} != Python.framework ||
+      ! -f $python_framework/Versions/$python_version/Python ]]; then
+  print -u2 "Not a framework build: $python_executable"
+  print -u2 "Packaging bundles Python.framework, but the environment resolved to"
+  print -u2 "$python_framework."
+  print -u2 "Recreate the environment from a framework Python such as"
+  print -u2 "/opt/homebrew/opt/python@$python_version/bin/python$python_version."
+  exit 1
+fi
+
 swift build "${swift_build_arguments[@]}" --product dsv4-app
 "$project_root/Scripts/build-ane-bridge.sh" "$ane_bridge"
 binary_path=$(swift build "${swift_build_arguments[@]}" --show-bin-path)/dsv4-app
@@ -103,6 +115,18 @@ for localization in "$project_root/Sources/DeepSeekV4SSDApp/Resources"/*.lproj; 
 done
 ditto "$site_packages" "$app_path/Contents/Resources/python/site-packages"
 ditto "$python_framework" "$app_path/Contents/Frameworks/Python.framework"
+# Homebrew creates the framework symlinks only in a linked keg, and both
+# codesign and the PYTHONHOME the App resolves need them, so restore any that
+# the copied environment left out.
+bundled_framework=$app_path/Contents/Frameworks/Python.framework
+if [[ ! -e $bundled_framework/Versions/Current ]]; then
+  ln -s "$python_version" "$bundled_framework/Versions/Current"
+fi
+for framework_link in Python Resources Headers; do
+  if [[ ! -e $bundled_framework/$framework_link ]]; then
+    ln -s "Versions/Current/$framework_link" "$bundled_framework/$framework_link"
+  fi
+done
 if [[ -d ${python_framework:h}/Libraries ]]; then
   ditto "${python_framework:h}/Libraries" "$app_path/Contents/Frameworks/Libraries"
 fi

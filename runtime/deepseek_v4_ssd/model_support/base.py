@@ -21,8 +21,10 @@ class ModelSupport:
             for name in ("v41_ced_prefill", "dspark_prompt_cache", "dspark_sequential_verification"):
                 if getattr(config, name, False):
                     raise ValueError(f"{name} is not supported by V4.1 DSpark")
+        # The two V4.1 prefill defaults are consulted only by its support package.
+        # They must not prevent a default RuntimeConfig from loading V4 or Qwen.
         for name in ("qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
-                     "v41_candidate_index", "v41_ced_prefill", "v41_next_layer_prefetch", "v41_layer_major_prefill"):
+                     "v41_candidate_index", "v41_ced_prefill"):
             expected = "qwen3.8-flash-next" if name.startswith("qwen_") else "deepseek-v4.1"
             if getattr(config, name, False) and self.descriptor.kind != expected:
                 raise ValueError(f"{name} is supported only by {expected}")

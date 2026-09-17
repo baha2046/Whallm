@@ -80,34 +80,49 @@ def _qwen_slot_regions(model: InstalledModel) -> dict[str, Tensor]:
     return regions
 
 
+def batched_layer_layout(
+    regions: dict[str, Tensor],
+    batched: tuple[str, ...],
+    blob_size: int,
+    expert_count: int,
+) -> dict[str, tuple[int, int, int]]:
+    """Place every slot region in a region-major layer buffer.
+
+    The batched regions must partition the slot exactly. The layer buffer stores
+    each batched region as ``expert_count`` consecutive copies of its slot bytes,
+    so its ``[expert_count, ...]`` view is contiguous and ``gather_qmm`` reads it
+    without copying the whole layer first. Returns ``name -> (base, stride,
+    inner)``: expert ``e`` of ``name`` starts at ``base + e * stride + inner``.
+    """
+    spans = sorted((regions[name].offset, regions[name].length, name) for name in batched)
+    expected = 0
+    for offset, length, name in spans:
+        if offset != expected:
+            raise ValueError(f"batched expert region {name} does not partition the slot")
+        expected += length
+    if expected != blob_size:
+        raise ValueError("batched expert regions do not cover the expert slot")
+    bases = {}
+    base = 0
+    for offset, length, name in spans:
+        bases[name] = (base, offset, length)
+        base += expert_count * length
+    layout = {}
+    for name, region in regions.items():
+        for owner_base, owner_offset, owner_length in bases.values():
+            if (owner_offset <= region.offset
+                    and region.offset + region.length <= owner_offset + owner_length):
+                layout[name] = (owner_base, owner_length, region.offset - owner_offset)
+                break
+        else:
+            raise ValueError(f"expert slot region {name} is outside every batched region")
+    return layout
+
+
 class FusedMXFP4Layout:
     regions = staticmethod(_fused_slot_regions)
-
-    @staticmethod
-    def layer_regions(model):
-        """Contiguous fused projections across experts, without an SSD repack.
-
-        w1/w3 are aliases of w13; the batched matmul consumes the contiguous
-        fused array, while these aliases preserve the individual tensor values.
-        """
-        source = _fused_slot_regions(model)
-        regions, strides = {}, {}
-        offset = 0
-        for name in ("w13.weight", "w2.weight", "w13.scale", "w2.scale"):
-            region = source[name]
-            regions[name] = Tensor(name, region.dtype, region.shape, offset, region.length)
-            strides[name] = region.length
-            if name.startswith("w13"):
-                suffix = name.split(".")[1]
-                for alias in (f"w3.{suffix}", f"w1.{suffix}"):
-                    part = source[alias]
-                    regions[alias] = Tensor(alias, part.dtype, part.shape,
-                                           offset + part.offset - region.offset, part.length)
-                    strides[alias] = region.length
-            offset += model.expert_count * region.length
-        if offset != model.expert_count * model.expert_blob_size:
-            raise ValueError("batched expert layout does not preserve the layer size")
-        return regions, strides
+    # Contiguous per-layer arrays: the fused w13 pair and w2, weights and scales.
+    batched_regions = ("w13.weight", "w2.weight", "w13.scale", "w2.scale")
 
     @staticmethod
     def individual(arrays, read):
@@ -132,6 +147,7 @@ class FusedMXFP4Layout:
 
 class GateUpMXFP4Layout:
     regions = staticmethod(_qwen_slot_regions)
+    batched_regions = ("gate_up.weight", "gate_up.scale", "down.weight", "down.scale")
 
     @staticmethod
     def individual(arrays, read):
