@@ -1980,12 +1980,6 @@ struct ModelAdvancedView: View {
             .appInput(width: 340)
           }
           if modelKind == .qwen3_8FlashNext {
-            Divider()
-            Text(L10n.string("Speed improvements are not yet verified. Changes apply on next model load.", language: language))
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-              .frame(maxWidth: .infinity, alignment: .leading)
             ForEach(QwenOptimization.allCases.filter { $0 != .mtpPolicy }) { feature in
               Divider()
               toggleField(feature.title, hint: feature.hint,
@@ -2009,10 +2003,6 @@ struct ModelAdvancedView: View {
             toggleField(QwenOptimization.mtpPolicy.title, hint: QwenOptimization.mtpPolicy.hint,
               value: optionalToggle(\.qwenMTPPolicy, defaultValue: false))
               .disabled(!mtpEnabled.wrappedValue || !mtpAvailable)
-            Text(L10n.string(QwenOptimization.mtpPolicy.hint, language: language))
-              .font(.caption).foregroundStyle(.secondary)
-              .fixedSize(horizontal: false, vertical: true)
-              .frame(maxWidth: .infinity, alignment: .leading)
             if settings.qwenMTPPolicy == true {
               Divider()
               qwenIntegerChoice("MTP draft tokens", range: 1...5, key: \.qwenMTPDraftTokens)
@@ -3168,6 +3158,15 @@ struct ChatView: View {
   @State private var showingClearConfirmation = false
 
   var body: some View {
+    // Do not propagate the transcript's ideal height to the window. The page
+    // owns a viewport; only the transcript scrolls as streamed content grows.
+    GeometryReader { geometry in
+      chatContent
+        .frame(width: geometry.size.width, height: geometry.size.height)
+    }
+  }
+
+  private var chatContent: some View {
     VStack(alignment: .leading, spacing: 16) {
       HStack(spacing: 12) {
         HStack(spacing: 8) {
@@ -3282,7 +3281,8 @@ struct ChatView: View {
           }
         }
       }
-      .frame(maxHeight: .infinity)
+      .frame(minHeight: 0, maxHeight: .infinity)
+      .layoutPriority(1)
       .appCard(padding: 10)
 
       if let errorMessage {

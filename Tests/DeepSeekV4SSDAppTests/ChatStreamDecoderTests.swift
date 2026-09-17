@@ -48,6 +48,30 @@ final class ChatStreamDecoderTests: XCTestCase {
   }
 
   @MainActor
+  func testLongChatStaysWithinViewport() throws {
+    let suite = "ChatViewportTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    ChatHistory.save([
+      ChatMessage(role: "user", content: "Explain in detail"),
+      ChatMessage(role: "assistant", content: String(repeating: "Long response line\n", count: 500))
+    ], defaults: defaults)
+    let session = ChatSession(defaults: defaults)
+    for language in [AppLanguage.english, .traditionalChinese, .simplifiedChinese] {
+      let host = NSHostingView(rootView: ChatView(
+        configuration: .localDefault, server: ServerController(), session: session,
+        language: language))
+      for height in [600.0, 900.0] {
+        host.frame = NSRect(x: 0, y: 0, width: 1_000, height: height)
+        host.layoutSubtreeIfNeeded()
+        XCTAssertLessThanOrEqual(host.fittingSize.height, height,
+          "The transcript must not increase the window's minimum height")
+        XCTAssertEqual(host.frame.height, height)
+      }
+    }
+  }
+
+  @MainActor
   func testChatSeedLayoutPreview() throws {
     guard let directory = ProcessInfo.processInfo.environment["WHALLM_CHAT_PREVIEWS"] else { return }
     let url = URL(fileURLWithPath: directory)
