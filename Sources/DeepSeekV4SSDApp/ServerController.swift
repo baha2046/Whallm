@@ -306,6 +306,18 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.defaultTemperature = descriptor.defaults.temperature
     settings.defaultTopP = descriptor.defaults.topP
     settings.defaultTopK = descriptor.defaults.topK
+    if modelKind == .qwen3_8FlashNext {
+      // Adopt the 4K input / 1024 output speed profile; keep cache budgets unchanged.
+      settings.readWorkers = 16
+      settings.readyExpertDecode = true
+      settings.layerMajorPrefill = true
+      settings.prefillStepSize = 1_024
+      settings.memoryLimitGiB = 30
+      settings.qwenPooledIndexCache = true
+      settings.qwenNgramLookupOptimized = true
+      settings.qwenCompileTensorOps = true
+      settings.qwenPhaseMemory = true
+    }
     return settings
   }
 

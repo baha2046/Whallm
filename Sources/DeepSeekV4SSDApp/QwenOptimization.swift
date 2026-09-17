@@ -1,6 +1,6 @@
 import Foundation
 
-/// Independent, opt-in controls. Stored choices are not changed by disabling MTP.
+/// Independent controls. Stored choices are not changed by disabling MTP.
 enum QwenOptimization: String, CaseIterable, Identifiable {
   case pooledIndex, ngramLookup, compiledNorm, phaseMemory, mtpPolicy
 

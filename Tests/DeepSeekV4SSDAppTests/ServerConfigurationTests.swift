@@ -6,13 +6,45 @@ import XCTest
 
 final class ServerConfigurationTests: XCTestCase {
   @MainActor
+  func testQwenSpeedDefaultsReachRuntime() throws {
+    let settings = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
+    let catalog = try ModelLibrary.makeServerCatalog(
+      models: [installedModel(.qwen3_8FlashNext, hasMTP: true)],
+      aliases: [:], settings: [.qwen3_8FlashNext: settings], powerSavingLimitGBps: nil)
+    let runtime = try XCTUnwrap(catalog.models.first).runtime
+    XCTAssertEqual(runtime.readWorkers, 16)
+    XCTAssertEqual(runtime.expertEvictionPolicy, "lru")
+    XCTAssertTrue(runtime.readyExpertDecode)
+    XCTAssertTrue(runtime.layerMajorPrefill)
+    XCTAssertEqual(runtime.prefillStepSize, 1024)
+    XCTAssertEqual(runtime.memoryLimitGiB, 30)
+    XCTAssertFalse(runtime.batchedExpertPrefill)
+    XCTAssertFalse(runtime.qwenNextLayerPrefetch)
+    XCTAssertTrue(runtime.qwenGroupedExperts)
+    XCTAssertTrue(runtime.qwenPooledIndexCache)
+    XCTAssertTrue(runtime.qwenNgramLookupOptimized)
+    XCTAssertTrue(runtime.qwenCompileTensorOps)
+    XCTAssertTrue(runtime.qwenPhaseMemory)
+    XCTAssertFalse(runtime.qwenQuantizedKV)
+    XCTAssertFalse(runtime.qwenQuantizedIndex)
+    XCTAssertFalse(runtime.mtpEnabled)
+    XCTAssertEqual(runtime.anePrefillRatio, 0)
+    XCTAssertEqual(settings.approximationEnabled, false)
+    XCTAssertEqual(settings.slots, 3072)
+    XCTAssertEqual(settings.expertCacheGiB, 7.5)
+    XCTAssertEqual(settings.promptCacheMode, .memory)
+    XCTAssertEqual(settings.defaultMaxTokens, 8192)
+  }
+
+  @MainActor
   func testQwenOptimizationSwitchesPersistAndReachRuntimeOnlyForQwen() throws {
     let isolated = try isolatedDefaults()
     defer { isolated.defaults.removePersistentDomain(forName: isolated.suite) }
     for kind in [ModelKind.qwen3_8FlashNext, .deepSeekV4, .deepSeekV41] {
       var settings = ModelAdvancedSettings.defaults(for: kind)
       for feature in QwenOptimization.allCases {
-        XCTAssertFalse(settings[keyPath: feature.keyPath] == true)
+        XCTAssertEqual(settings[keyPath: feature.keyPath] == true,
+                       kind == .qwen3_8FlashNext && feature.keyPath != \ModelAdvancedSettings.qwenMTPPolicy)
         settings[keyPath: feature.keyPath] = true
       }
       settings.qwenMTPDraftTokens = 3
