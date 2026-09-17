@@ -49,31 +49,6 @@ Whallm 让 Apple Silicon Mac 从 SSD 读取所需的专家权重，在本地运�
 
 App 不包含模型权重。DeepSeek V4.1 的专家和 Engram 文件就需要约 **458 GiB**，还需常驻权重和元数据的空间。
 
-## 模型与默认值
-
-| 模型 | API model ID | 专家缓存 Slots | 可选候选模型 |
-| --- | --- | ---: | --- |
-| DeepSeek-V4-Flash-0731 | `deepseek-v4-flash-0731` | 1152 | DSpark |
-| DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 1152 | DSpark |
-| Qwen3.8-Flash-Next-FP8 | `qwen3.8-flash-next-fp8` | 3072 | MTP |
-
-一个 Slot 可以保存一个专家的权重。增加 Slots 会占用更多内存，也可能减少 SSD 读取。已保存的自定义设置会保留。
-
-目前源代码已将主模型、MTP 与 DSpark 的 slots 设置改为“专家缓存 GiB”，按已安装模型的专家大小向下换算，保留旧容量。高级设置的固定标题栏并排显示 **64K 与 128K 峰值内存估算**，上方小字为长度，下方为 GiB 数值。公式保留完整专家容量与对话缓存预留，比较加载、输入处理、生成三个阶段并取最高值。V4.1 的输入处理已改变临时数据的存活方式，目前采用结构估算，不再套用之前的校准结果。
-
-固定估算标题栏、精简说明与 Playground／About／Status 导航调整已包含在通过验证的本地打包产物中，尚未公开发布。
-128K 数值是外推估算，不是实测峰值或保证上限。单次请求可能未填满专家缓存，因此实际用量可低于容量规划值。
-
-在 **Model → Advanced Settings** 中：
-
-- 三个模型的 **Max tokens** 均默认为 **8192**。
-- **Prompt cache** 默认为 **Memory**。**Disk** 可在重启后恢复缓存；**Off** 每次重新处理输入。
-- **Use approximate mode** 默认**关闭**。开启后少用一个选中的专家，可能降低输出质量。
-- **DSpark / MTP** 默认**关闭**，需要额外权重。它们先提出候选 token，再由主模型确认，不能与近似模式同时使用。
-- **Alias** 可设置 API 请求使用的别名。其他设置在下次加载模型时生效；模型加载期间不能编辑。
-
-新下载的 DeepSeek V4 包含 DSpark 权重。V4.1 DSpark 和 Qwen MTP 可以单独安装。Qwen 下载的是已转换好的 MXFP4 模型，不会在安装时于你的 Mac 上量化。App 使用 DSpark／MTP 生成时，不复用跨请求的 Prompt cache。
-
 ## 功能
 
 Whallm 将共用权重保留在内存，从 SSD 读取选中的专家。DeepSeek V4.1 的 Engram 和 Qwen 的 N-gram 数据也按需读取。
@@ -83,12 +58,6 @@ Whallm 将共用权重保留在内存，从 SSD 读取选中的专家。DeepSeek
 | DeepSeek V4 | 按层处理输入、专家批量计算、FP8 KV 缓存、可选 ANE 投影运算和 DSpark |
 | DeepSeek V4.1 | 按层处理输入、专家批量计算、压缩 KV／索引缓存、只计算候选索引、CED 输入处理、ANE 投影运算和 DSpark |
 | Qwen3.8 | 输入阶段的专家分组、专家读取完成后立即计算、QSA 缓存压缩、下一层预读、ANE 投影运算和 MTP |
-
-目前源代码中，V4.1 App 新设置或恢复默认值时，会开启按层处理输入、专家批量计算与下一层预读。Attention 保留原分批顺序；专家运算默认每批最多 4096 tokens，使用连续排列的融合权重，最多复用两层缓冲区。DSpark 可使用这条路径，但仍不能搭配 CED。已保存的设置保留。Python、CLI 与独立 server 现在也默认开启 V4.1 按层处理输入及下一层预读；可用 `--no-v41-layer-major-prefill` 或 `--no-v41-next-layer-prefetch` 关闭。这两个 V4.1 选项不会开启 V4 或 Qwen 的预读。
-
-Qwen App 默认开启按层处理输入与专家加载后立即计算，专家批量计算及下一层预读仍关闭。V4 的这些选项仍默认关闭。缓存压缩、候选索引、CED 与 DeepSeek ANE 仍默认关闭。CED 会跳过后续层不再需要的旧 token。Qwen 缓存压缩与 ANE 可能改变运算结果。UI 会禁用不兼容的组合；这些选项不保证一定加速。
-
-合并后的 V4.1 修改尚未重新测量完整模型，也未重新打包 App。下方性能表是修改前的记录；[BENCHMARK.md](BENCHMARK.md) 另保留 PR 作者的合并前测量，并非合并后 runtime 的验证结果。
 
 ## 性能测试
 

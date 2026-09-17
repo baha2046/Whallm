@@ -49,31 +49,6 @@ Whallm 讓 Apple Silicon Mac 從 SSD 讀取需要的專家權重，在本機執�
 
 App 不包含模型權重。DeepSeek V4.1 的專家與 Engram 檔案就需要約 **458 GiB**，另需常駐權重與中繼資料的空間。
 
-## 模型與預設值
-
-| 模型 | API model ID | 專家快取 Slots | 選用候選模型 |
-| --- | --- | ---: | --- |
-| DeepSeek-V4-Flash-0731 | `deepseek-v4-flash-0731` | 1152 | DSpark |
-| DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 1152 | DSpark |
-| Qwen3.8-Flash-Next-FP8 | `qwen3.8-flash-next-fp8` | 3072 | MTP |
-
-一個 Slot 可保存一個專家的權重。增加 Slots 會多用記憶體，也可能減少 SSD 讀取。已儲存的自訂設定會保留。
-
-目前原始碼已將主模型、MTP 與 DSpark 的 slots 設定改為「專家快取 GiB」，依已安裝模型的專家大小向下換算，保留舊容量。進階設定的固定標頭並排顯示 **64K 與 128K 峰值記憶體估算**，上方小字為長度，下方為 GiB 數值。公式保留完整專家容量與對話快取預留，比較載入、輸入處理、生成三階段並取最高值。V4.1 的輸入處理已改變暫存存活方式，目前採用結構估算，不再套用先前的校準結果。
-
-固定估算標頭、精簡說明與 Playground／About／Status 導覽調整已納入通過驗證的本機打包成品，尚未公開發布。
-128K 數值是外推估算，不是實測峰值或保證上限。單次請求可能未填滿專家快取，因此實際用量可低於容量規劃值。
-
-在 **Model → Advanced Settings** 中：
-
-- 三個模型的 **Max tokens** 均預設為 **8192**。
-- **Prompt cache** 預設為 **Memory**。**Disk** 可在重新啟動後恢復快取；**Off** 每次重新處理輸入。
-- **Use approximate mode** 預設**關閉**。開啟後少用一個選中的專家，可能降低輸出品質。
-- **DSpark / MTP** 預設**關閉**，需要額外權重。它們先提出候選 token，再由主模型確認，不能與近似模式同時使用。
-- **Alias** 可設定 API 請求使用的別名。其他設定在下次載入模型時生效；模型載入期間不能編輯。
-
-新下載的 DeepSeek V4 包含 DSpark 權重。V4.1 DSpark 與 Qwen MTP 可另行安裝。Qwen 下載的是已轉換好的 MXFP4 模型，不會在安裝時於你的 Mac 上量化。App 使用 DSpark／MTP 生成時，不重用跨請求的 Prompt cache。
-
 ## 功能
 
 Whallm 將共用權重留在記憶體，從 SSD 讀取選中的專家。DeepSeek V4.1 的 Engram 與 Qwen 的 N-gram 資料也按需讀取。
@@ -83,12 +58,6 @@ Whallm 將共用權重留在記憶體，從 SSD 讀取選中的專家。DeepSeek
 | DeepSeek V4 | 按層處理輸入、專家合批計算、FP8 KV 快取、選用 ANE 投影運算與 DSpark |
 | DeepSeek V4.1 | 按層處理輸入、專家合批、壓縮 KV／索引快取、只計算候選索引、CED 輸入處理、ANE 投影運算與 DSpark |
 | Qwen3.8 | 輸入階段的專家分組、專家讀取完成後立即計算、QSA 快取壓縮、下一層預讀、ANE 投影運算與 MTP |
-
-目前原始碼中，V4.1 App 新設定或恢復預設值時，會開啟按層處理輸入、專家合批與下一層預讀。Attention 保留原分批順序；專家運算預設每批最多 4096 tokens，使用連續排列的融合權重，最多重用兩層暫存區。DSpark 可使用這條路徑，但仍不能搭配 CED。已儲存的設定保留。Python、CLI 與獨立 server 現在也預設開啟 V4.1 按層處理輸入及下一層預讀；可用 `--no-v41-layer-major-prefill` 或 `--no-v41-next-layer-prefetch` 關閉。這兩個 V4.1 選項不會開啟 V4 或 Qwen 的預讀。
-
-Qwen App 預設開啟按層處理輸入與專家載入後立即計算，專家合批及下一層預讀仍關閉。V4 的這些選項仍預設關閉。快取壓縮、候選索引、CED 與 DeepSeek ANE 仍預設關閉。CED 會略過後續層不再需要的舊 token。Qwen 快取壓縮與 ANE 可能改變運算結果。UI 會停用不相容的組合；這些選項不保證一定加速。
-
-合併後的 V4.1 修改尚未重新測量完整模型，也未重新打包 App。下方效能表是修改前的紀錄；[BENCHMARK.md](BENCHMARK.md) 另保留 PR 作者的合併前測量，並非合併後 runtime 的驗證結果。
 
 ## 效能測試
 

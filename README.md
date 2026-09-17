@@ -49,31 +49,6 @@ Public downloads may contain fewer features than the source described here.
 
 Model weights are not included with the app. DeepSeek V4.1's expert and Engram files alone need about **458 GiB**, plus common weights and metadata.
 
-## Models and defaults
-
-| Model | API model ID | Expert cache slots | Optional draft model |
-| --- | --- | ---: | --- |
-| DeepSeek-V4-Flash-0731 | `deepseek-v4-flash-0731` | 1152 | DSpark |
-| DeepSeek-V4.1-Flash | `deepseek-v4.1-flash` | 1152 | DSpark |
-| Qwen3.8-Flash-Next-FP8 | `qwen3.8-flash-next-fp8` | 3072 | MTP |
-
-A slot holds one expert's weights. More slots keep more experts in memory and may reduce SSD reads. Saved custom settings are preserved.
-
-The current source replaces the main, MTP and DSpark slot controls with **expert cache GiB**. Capacity is rounded down using each installed model’s expert size; old capacities are preserved. The fixed Advanced Settings header shows **64K and 128K peak memory estimates** side by side, with token lengths above the GiB values. Estimates include expert capacity and retained prompt caches, and take the largest load, prefill or generation phase. V4.1 now uses a structural estimate because its prefill buffer lifetimes changed; the previous calibration is no longer applied.
-
-The fixed estimate header, shorter descriptions, and Playground/About/Status navigation updates are included in the validated local package; they have not been publicly released.
-The 128K values are extrapolations, not measured peaks or guaranteed upper bounds. A request may leave expert capacity unused, so its measured usage can be lower than the planning value.
-
-In **Model → Advanced Settings**:
-
-- **Max tokens** defaults to **8192** for all three models.
-- **Prompt cache** defaults to **Memory**. **Disk** also saves it across restarts; **Off** processes each prompt again.
-- **Use approximate mode** defaults to **off**. Enabling it uses one fewer selected expert and may reduce output quality.
-- **DSpark / MTP** default to **off** and require their extra weights. They propose tokens for the main model to verify and cannot run with approximate mode.
-- **Alias** sets an optional API request name. Other settings take effect on the next model load; loaded models are locked for editing.
-
-New DeepSeek V4 downloads include DSpark weights. V4.1 DSpark and Qwen MTP can be installed separately. Qwen downloads a prepared MXFP4 model; installation does not quantize it on your Mac. Prompt-cache reuse is disabled during DSpark/MTP generation in the app.
-
 ## Features
 
 Whallm keeps common weights in memory and reads selected experts from SSD. DeepSeek V4.1 Engram rows and Qwen N-gram rows are also read as needed.
@@ -83,12 +58,6 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 | DeepSeek V4 | Layer-by-layer input processing, batched expert calculations, FP8 KV cache, optional ANE projection and DSpark |
 | DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
 | Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
-
-In the current source, new or reset V4.1 App settings enable layer-major prefill, batched experts and next-layer prefetch. Attention keeps its chunk order; expert calculations default to batches of up to 4096 tokens, using contiguous fused weights and at most two reusable layer buffers. DSpark can use this path, but cannot use CED. Saved settings are preserved. Python, CLI and standalone server defaults now also enable V4.1 layer-major prefill and next-layer prefetch; use `--no-v41-layer-major-prefill` or `--no-v41-next-layer-prefetch` to opt out. These V4.1 flags do not enable prefetch for V4 or Qwen.
-
-Qwen App defaults enable layer-major prefill and calculations as experts load, while batched prefill and next-layer prefetch remain off. These options remain off by default for V4. Cache compression, candidate-only scoring, CED and DeepSeek ANE remain off by default. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
-
-The merged V4.1 changes have not been remeasured on a full model or packaged into a new App. The tables below predate these changes; [BENCHMARK.md](BENCHMARK.md) also preserves the PR author's separate pre-merge measurements, not validation of the merged runtime.
 
 ## Benchmarks
 
