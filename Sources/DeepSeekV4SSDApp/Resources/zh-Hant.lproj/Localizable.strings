@@ -521,3 +521,11 @@
 "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2." = "調高可能減少 SSD 等待，但會增加記憶體用量，過多反而可能變慢。預設為 2。";
 "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld." = "調高可保留更多對話快取、縮短重複輸入的等待，但會增加記憶體用量。建議值為 %lld。";
 "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB." = "調高可保留更多對話快取、縮短重複輸入的等待，但會增加記憶體用量。建議值為 8 GiB。";
+
+"Seed" = "Seed";
+
+"Automatic" = "自動";
+
+"Applies to the next message only. Blank uses a random seed." = "只套用到下一則訊息。留空則使用隨機值。";
+
+"Enter a whole number from 0 to 4294967295, or leave blank for automatic." = "請輸入 0 到 4294967295 的整數，或留空使用自動值。";

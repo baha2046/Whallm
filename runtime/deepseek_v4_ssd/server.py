@@ -1105,8 +1105,6 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         for name in ("frequency_penalty", "presence_penalty"):
             if payload.get(name) not in (None, 0, 0.0):
                 raise APIError(f"{name} is not supported.", param=name)
-        if payload.get("seed") is not None:
-            raise APIError("seed is not supported.", param="seed")
         if payload.get("logprobs") not in (None, False):
             raise APIError("logprobs is not supported.", param="logprobs")
         if payload.get("echo") not in (None, False):
@@ -1905,6 +1903,9 @@ def _options(
             param="max_tokens",
         )
     sampling_defaults = support.sampling_defaults(defaults, thinking_mode)
+    seed = payload.get("seed")
+    if seed is not None and (type(seed) is not int or not 0 <= seed <= 2**32 - 1):
+        raise APIError("seed must be an integer between 0 and 4294967295.", param="seed")
     temperature = _number(
         payload.get("temperature", sampling_defaults["temperature"]),
         "temperature",
@@ -1929,6 +1930,7 @@ def _options(
         presence_penalty=sampling_defaults["presence_penalty"],
         repetition_penalty=sampling_defaults["repetition_penalty"],
         approximation_mode=approximation_mode,
+        seed=seed,
     )
 
 

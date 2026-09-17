@@ -374,6 +374,31 @@ class QwenSamplingServerTests(unittest.TestCase):
             ),
         )
 
+    def test_seed_on_all_generation_endpoints(self):
+        for path, content in (
+            ("/v1/chat/completions", {"messages": [{"role": "user", "content": "Hi"}]}),
+            ("/v1/completions", {"prompt": "Hi"}),
+            ("/v1/responses", {"input": "Hi"}),
+        ):
+            for stream in (False, True):
+                for seed in (None, 0, 42, 2**32 - 1):
+                    with self.subTest(path=path, stream=stream, seed=seed):
+                        status, body = self.request(path, {
+                            "model": "qwen3.8-flash-next-fp8", **content,
+                            "seed": seed, "stream": stream,
+                        })
+                        self.assertEqual(status, 200, body)
+                        self.assertEqual(self.runtime.last_options.seed, seed)
+            for seed in (True, False, -1, 2**32, 1.5, "42", [], {}):
+                with self.subTest(path=path, invalid_seed=seed):
+                    calls = self.runtime.stream_call_count
+                    status, body = self.request(path, {
+                        "model": "qwen3.8-flash-next-fp8", **content, "seed": seed,
+                    })
+                    self.assertEqual(status, 400, body)
+                    self.assertEqual(json.loads(body)["error"]["param"], "seed")
+                    self.assertEqual(self.runtime.stream_call_count, calls)
+
     def test_qwen_request_rejects_nonzero_presence_penalty(self):
         status, body = self.request(
             "/v1/chat/completions",

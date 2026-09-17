@@ -2895,6 +2895,7 @@ final class ChatSession: ObservableObject {
     _ apiKey: String,
     _ model: String,
     _ thinkingMode: String,
+    _ seed: UInt32?,
     _ receive: @MainActor @escaping (ChatDelta) -> Void
   ) async throws -> Void
 
@@ -2910,13 +2911,14 @@ final class ChatSession: ObservableObject {
 
   init(
     defaults: UserDefaults = .standard,
-    stream: @escaping Stream = { messages, baseURL, apiKey, model, thinkingMode, receive in
+    stream: @escaping Stream = { messages, baseURL, apiKey, model, thinkingMode, seed, receive in
       _ = try await ChatClient.stream(
         messages: messages,
         baseURL: baseURL,
         apiKey: apiKey,
         model: model,
         thinkingMode: thinkingMode,
+        seed: seed,
         enableTestTool: false,
         receive: receive
       )
@@ -2933,7 +2935,8 @@ final class ChatSession: ObservableObject {
     configuration: ServerConfiguration,
     model: String,
     thinkingMode: String,
-    language: AppLanguage
+    language: AppLanguage,
+    seed: UInt32? = nil
   ) -> Bool {
     let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty, !isSending, let baseURL = configuration.baseURL else { return false }
@@ -2961,7 +2964,8 @@ final class ChatSession: ObservableObject {
           baseURL,
           configuration.apiKey,
           model,
-          thinkingMode
+          thinkingMode,
+          seed
         ) { delta in
           self.enqueue(delta, for: assistantID)
         }
@@ -3048,6 +3052,9 @@ struct ChatView: View {
   @AppStorage("chatDraft") private var input = ""
   @AppStorage("chatThinkingMode") private var thinkingMode = "chat"
   @AppStorage("chatModel") private var selectedModelName = ""
+  @State private var seedText = ""
+  @State private var seedError: String?
+  @FocusState private var seedFocused: Bool
   @State private var showingClearConfirmation = false
 
   var body: some View {
@@ -3175,6 +3182,26 @@ struct ChatView: View {
       }
 
       VStack(alignment: .leading, spacing: 10) {
+        HStack(spacing: 10) {
+          Text(localized("Seed"))
+          TextField(localized("Automatic"), text: $seedText)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 150)
+            .accessibilityLabel(localized("Seed"))
+            .accessibilityHint(seedError ?? localized("Applies to the next message only. Blank uses a random seed."))
+            .focused($seedFocused)
+            .disabled(isSending)
+            .onChange(of: seedText) { seedError = nil }
+          Text(localized("Applies to the next message only. Blank uses a random seed."))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        if let seedError {
+          Label(seedError, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.red)
+            .accessibilityLabel(L10n.string("Error: %@", language: language, seedError))
+        }
         ZStack(alignment: .topLeading) {
           if input.isEmpty {
             Text(localized("Enter a message…"))
@@ -3249,6 +3276,8 @@ struct ChatView: View {
       Button(localized("Clear Chat"), role: .destructive) {
         session.clear()
         input = ""
+        seedText = ""
+        seedError = nil
       }
       Button(localized("Cancel"), role: .cancel) {}
     } message: {
@@ -3304,14 +3333,25 @@ struct ChatView: View {
 
   private func send() {
     guard let model = selectedCatalogModel?.requestName else { return }
+    let seed: UInt32?
+    do {
+      seed = try ChatClient.parseSeed(seedText, language: language)
+    } catch {
+      seedError = error.localizedDescription
+      seedFocused = true
+      return
+    }
     if session.send(
       text: input,
       configuration: configuration,
       model: model,
       thinkingMode: thinkingMode,
-      language: language
+      language: language,
+      seed: seed
     ) {
       input = ""
+      seedText = ""
+      seedError = nil
     }
   }
 

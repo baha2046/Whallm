@@ -4,11 +4,15 @@ Importing sample_utils on the main thread and drawing on a worker reproduced
 constant tokens with MLX 0.32.0, even when the sampler was built on the worker.
 """
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import mlx.core as mx
 from mlx_lm.generate import generate_step
 from mlx_lm.sample_utils import make_sampler
+from deepseek_v4_ssd.generation import GenerationOptions, ModelRuntime
 
 
 def draw(sampler, seed):
@@ -19,6 +23,53 @@ def draw(sampler, seed):
 
 
 class SamplingTests(unittest.TestCase):
+    def test_requests_on_fresh_workers_get_independent_random_state(self):
+        # Exercise ModelRuntime's request boundary with the real MLX decode loop.
+        # The tiny model avoids loading weights; prompt caching is disabled.
+        class FixedModel:
+            def __call__(self, tokens, cache):
+                return mx.broadcast_to(mx.arange(128) * 0.001, (1, tokens.shape[1], 128))
+
+        def decode(model, tokenizer, prompt, **kwargs):
+            for index, (token, _) in enumerate(generate_step(
+                mx.array(prompt), model, prompt_cache=[], max_tokens=64,
+                sampler=kwargs["sampler"],
+            ), 1):
+                yield SimpleNamespace(
+                    text=str(token), token=token, prompt_tokens=len(prompt),
+                    generation_tokens=index, finish_reason="length" if index == 64 else None,
+                )
+
+        with (
+            patch("deepseek_v4_ssd.generation.load_model", return_value=(
+                FixedModel(), SimpleNamespace(close=lambda: None))),
+            patch("deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained",
+                  return_value=SimpleNamespace(bos_token=None, encode=lambda *_a, **_k: [1])),
+            patch("deepseek_v4_ssd.model_support.state.make_prompt_cache", return_value=[]),
+            patch("deepseek_v4_ssd.generation.stream_generate", side_effect=decode),
+        ):
+            runtime = ModelRuntime(
+                SimpleNamespace(root=Path("/tmp/seed-test")),
+                SimpleNamespace(prefill_step_size=1, layer_major_prefill=False,
+                                prompt_cache_entries=0),
+            )
+
+            def request(temperature=1.0, **kwargs):
+                # A new worker per call matches ThreadingHTTPServer.
+                with ThreadPoolExecutor(max_workers=1) as worker:
+                    return worker.submit(lambda: [piece.token for piece in runtime.stream(
+                        [1], GenerationOptions(max_tokens=64, temperature=temperature, **kwargs)
+                    )]).result()
+
+            automatic = [request() for _ in range(3)]
+            self.assertEqual(len({tuple(tokens) for tokens in automatic}), 3)
+            fixed = request(seed=0)
+            self.assertNotEqual(fixed, request(seed=42))
+            request()
+            self.assertEqual(fixed, request(seed=0))
+            for seed in (None, 0, 42):
+                self.assertEqual(request(temperature=0, seed=seed), [127] * 64)
+
     def test_worker_sampling_advances_and_obeys_reseeding(self):
         profiles = [dict(temp=1.0), dict(temp=1.0, top_p=.95, top_k=20),
                     dict(temp=.7, top_p=.8, top_k=20, min_p=.05)]

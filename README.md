@@ -149,6 +149,8 @@ The API supports text streaming and tool calls through:
 - `POST /v1/chat/completions` and `POST /v1/completions`
 - `POST /api/models/load` and `POST /api/models/unload`
 
+Current source supports an optional `seed` integer from `0` to `4294967295` on all three generation endpoints. Omit it or send `null` for a fresh random seed on every request. In Playground Chat, Seed applies only to the next message and clears after sending. A fixed seed helps reproduce a result with the same prompt, model, settings, and runtime; it does not guarantee identical text across versions, cache states, or acceleration settings. `temperature=0` remains greedy. This change has not been packaged or released yet.
+
 The client executes tools and sends their results back. Images, audio, `logprobs`, `response_format`, and `stop` are not supported. Request bodies are limited to **1 MiB**.
 
 Inference runs on your Mac. Network access is used for downloads, updates, and API connections. Connected clients may send data elsewhere; **Debug** logs can contain complete prompts and tool results.

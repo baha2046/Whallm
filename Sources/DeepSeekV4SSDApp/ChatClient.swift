@@ -261,12 +261,13 @@ enum ChatClient {
     let model: String
     let messages: [ChatMessage]
     let thinkingMode: String
+    let seed: UInt32?
     let tools: [Tool]?
     let stream = true
     let streamOptions = StreamOptions()
 
     enum CodingKeys: String, CodingKey {
-      case model, messages, stream
+      case model, messages, stream, seed
       case thinkingMode = "thinking_mode"
       case streamOptions = "stream_options"
       case tools
@@ -280,15 +281,26 @@ enum ChatClient {
     let error: Detail
   }
 
-  static func stream(
+  static func parseSeed(_ text: String, language: AppLanguage) throws -> UInt32? {
+    let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty else { return nil }
+    guard value.utf8.allSatisfy({ (48...57).contains($0) }), let seed = UInt32(value) else {
+      throw ChatError(L10n.string(
+        "Enter a whole number from 0 to 4294967295, or leave blank for automatic.",
+        language: language))
+    }
+    return seed
+  }
+
+  static func makeRequest(
     messages: [ChatMessage],
     baseURL: URL,
     apiKey: String,
     model: String,
     thinkingMode: String,
-    enableTestTool: Bool,
-    receive: @MainActor @escaping (ChatDelta) -> Void
-  ) async throws -> ChatMetrics {
+    seed: UInt32? = nil,
+    enableTestTool: Bool
+  ) throws -> URLRequest {
     var request = URLRequest(url: baseURL.appending(path: "v1/chat/completions"))
     request.httpMethod = "POST"
     request.timeoutInterval = 3_600
@@ -301,9 +313,25 @@ enum ChatClient {
         model: model,
         messages: messages,
         thinkingMode: thinkingMode,
+        seed: seed,
         tools: enableTestTool ? [Tool()] : nil
       ))
+    return request
+  }
 
+  static func stream(
+    messages: [ChatMessage],
+    baseURL: URL,
+    apiKey: String,
+    model: String,
+    thinkingMode: String,
+    seed: UInt32? = nil,
+    enableTestTool: Bool,
+    receive: @MainActor @escaping (ChatDelta) -> Void
+  ) async throws -> ChatMetrics {
+    let request = try makeRequest(
+      messages: messages, baseURL: baseURL, apiKey: apiKey, model: model,
+      thinkingMode: thinkingMode, seed: seed, enableTestTool: enableTestTool)
     let clock = ContinuousClock()
     let start = clock.now
     let (bytes, response) = try await URLSession.shared.bytes(for: request)

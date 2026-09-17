@@ -6,6 +6,76 @@ import XCTest
 @testable import DeepSeekV4SSDApp
 
 final class ChatStreamDecoderTests: XCTestCase {
+  func testChatSeedValidationAndRequestEncoding() throws {
+    for (input, expected) in [("", nil), ("  ", nil), ("0", UInt32(0)),
+                              (" 42 ", UInt32(42)), ("4294967295", UInt32.max)] {
+      let seed = try ChatClient.parseSeed(input, language: .english)
+      XCTAssertEqual(seed, expected)
+      let request = try ChatClient.makeRequest(
+        messages: [ChatMessage(role: "user", content: "Hello")],
+        baseURL: URL(string: "http://127.0.0.1:11434")!, apiKey: "",
+        model: "test-model", thinkingMode: "chat", seed: seed, enableTestTool: false)
+      let body = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(request.httpBody))
+        as? [String: Any])
+      XCTAssertEqual((body["seed"] as? NSNumber)?.uint32Value, expected)
+      if expected == nil { XCTAssertNil(body["seed"]) }
+    }
+    for input in ["-1", "+1", "1.5", "1e3", "true", "4294967296", "１２", "1 2"] {
+      XCTAssertThrowsError(try ChatClient.parseSeed(input, language: .english))
+    }
+  }
+
+  @MainActor
+  func testChatSeedIsPassedForEachRequestWithoutBecomingADefault() async throws {
+    let suite = "ChatStreamDecoderTests.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    var seeds: [UInt32?] = []
+    let session = ChatSession(defaults: defaults, stream: { _, _, _, _, _, seed, receive in
+      seeds.append(seed)
+      receive(ChatDelta(content: "answer", reasoningContent: ""))
+    })
+    for seed: UInt32? in [42, nil, 0] {
+      XCTAssertTrue(session.send(
+        text: "Hello", configuration: .localDefault, model: "test-model",
+        thinkingMode: "chat", language: .english, seed: seed))
+      for _ in 0..<100 where session.isSending {
+        try await Task.sleep(for: .milliseconds(10))
+      }
+      XCTAssertFalse(session.isSending)
+    }
+    XCTAssertEqual(seeds, [42, nil, 0])
+  }
+
+  @MainActor
+  func testChatSeedLayoutPreview() throws {
+    guard let directory = ProcessInfo.processInfo.environment["WHALLM_CHAT_PREVIEWS"] else { return }
+    let url = URL(fileURLWithPath: directory)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    let suite = "ChatSeedPreview.\(UUID().uuidString)"
+    let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let session = ChatSession(defaults: defaults)
+    for language in [AppLanguage.english, .traditionalChinese, .simplifiedChinese] {
+      let host = NSHostingView(rootView: ChatView(
+        configuration: .localDefault, server: ServerController(), session: session,
+        language: language).preferredColorScheme(.dark))
+      host.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
+      let window = NSWindow(contentRect: NSRect(x: -10_000, y: -10_000, width: 1_000, height: 700),
+        styleMask: [.borderless], backing: .buffered, defer: false)
+      window.isReleasedWhenClosed = false
+      window.contentView = host
+      window.orderBack(nil)
+      defer { window.close() }
+      RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+      host.layoutSubtreeIfNeeded()
+      let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+      host.cacheDisplay(in: host.bounds, to: bitmap)
+      try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+        .write(to: url.appendingPathComponent("chat-\(language.rawValue).png"))
+    }
+  }
+
   func testChatModelSelectionUsesAliasAndRestoresSavedSelection() {
     let models = [
       CatalogModel(id: "deepseek-v4-flash-0731", alias: "work-model"),
@@ -175,7 +245,7 @@ final class ChatStreamDecoderTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suite) }
     let session = ChatSession(
       defaults: defaults,
-      stream: { _, _, _, _, _, receive in
+      stream: { _, _, _, _, _, _, receive in
         receive(ChatDelta(content: "first", reasoningContent: ""))
         try await Task.sleep(for: .milliseconds(500))
         receive(ChatDelta(content: " second", reasoningContent: ""))
@@ -222,7 +292,7 @@ final class ChatStreamDecoderTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suite) }
     let session = ChatSession(
       defaults: defaults,
-      stream: { _, _, _, _, _, receive in
+      stream: { _, _, _, _, _, _, receive in
         for _ in 0..<80 {
           receive(ChatDelta(content: "x", reasoningContent: ""))
         }
@@ -258,7 +328,7 @@ final class ChatStreamDecoderTests: XCTestCase {
     defer { defaults.removePersistentDomain(forName: suite) }
     let session = ChatSession(
       defaults: defaults,
-      stream: { _, _, _, _, _, receive in
+      stream: { _, _, _, _, _, _, receive in
         receive(ChatDelta(content: "partial", reasoningContent: ""))
         throw NSError(domain: "ChatStreamDecoderTests", code: 1)
       }

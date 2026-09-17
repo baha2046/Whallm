@@ -149,6 +149,8 @@ API 支持文本流式输出和工具调用，提供以下端点：
 - `POST /v1/chat/completions` 和 `POST /v1/completions`
 - `POST /api/models/load` 和 `POST /api/models/unload`
 
+当前源码的三个生成端点支持可选 `seed`，接受 `0` 到 `4294967295` 的整数；省略或传入 `null` 时，每次请求使用新的随机值。Playground Chat 的 Seed 仅应用于下一条消息，发送后清空。固定 seed 有助于在相同输入、模型、设置与运行环境下复现结果，但不保证跨版本、缓存状态或加速设置仍逐字一致。`temperature=0` 仍选择概率最高的结果。此变更尚未打包或发布。
+
 工具由客户端执行，再返回结果。不支持图片、音频、`logprobs`、`response_format` 和 `stop`。请求体上限为 **1 MiB**。
 
 推理在你的 Mac 上运行。下载、更新和 API 连接会使用网络。连接的客户端可能将数据发送到其他服务；**Debug** 日志可能包含完整输入和工具结果。

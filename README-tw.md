@@ -149,6 +149,8 @@ API 支援文字串流與工具呼叫，提供以下端點：
 - `POST /v1/chat/completions` 與 `POST /v1/completions`
 - `POST /api/models/load` 與 `POST /api/models/unload`
 
+目前原始碼的三個生成端點支援選填 `seed`，接受 `0` 到 `4294967295` 的整數；省略或傳入 `null` 時，每次請求使用新的隨機值。Playground Chat 的 Seed 只套用到下一則訊息，送出後清空。固定 seed 有助於在相同輸入、模型、設定與執行環境下重現結果，但不保證跨版本、快取狀態或加速設定仍逐字一致。`temperature=0` 維持選取最高機率的結果。這項變更尚未打包或發布。
+
 工具由用戶端執行，再回傳結果。不支援圖片、音訊、`logprobs`、`response_format` 與 `stop`。請求本文上限為 **1 MiB**。
 
 推論在你的 Mac 上執行。下載、更新與 API 連線會使用網路。連接的用戶端可能將資料傳往其他服務；**Debug** 記錄可能包含完整輸入與工具結果。

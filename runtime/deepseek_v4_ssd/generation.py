@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import json
 import os
+import secrets
 import threading
 import time
 from contextlib import closing, contextmanager, nullcontext
@@ -116,6 +117,7 @@ class GenerationOptions:
     presence_penalty: float = 0.0
     repetition_penalty: float = 1.0
     approximation_mode: str = EXACT_APPROXIMATION_MODE
+    seed: int | None = None
 
 
 @dataclass(frozen=True)
@@ -1309,6 +1311,10 @@ class ModelRuntime:
             self, options.approximation_mode
         ):
             with mx.stream(self._generation_stream):
+                # MLX gives fresh request threads the same initial random state.
+                # Reset on the generating thread, after model loading and before
+                # any normal, DSpark, or MTP sampling (including cached prompts).
+                mx.random.seed(options.seed if options.seed is not None else secrets.randbits(32))
                 prompt_tokens = list(prompt) if isinstance(prompt, list) else self._encode_prompt(prompt)
                 available_tokens = getattr(
                     self.installed, "maximum_context", 1_048_576

@@ -521,3 +521,11 @@
 "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2." = "More workers may reduce SSD waiting, but use more memory; too many can slow things down. Default: 2.";
 "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld." = "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: %lld.";
 "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB." = "Keep more conversation history to shorten repeated prefill, at the cost of memory. Recommended: 8 GiB.";
+
+"Seed" = "Seed";
+
+"Automatic" = "Automatic";
+
+"Applies to the next message only. Blank uses a random seed." = "Applies to the next message only. Blank uses a random seed.";
+
+"Enter a whole number from 0 to 4294967295, or leave blank for automatic." = "Enter a whole number from 0 to 4294967295, or leave blank for automatic.";
