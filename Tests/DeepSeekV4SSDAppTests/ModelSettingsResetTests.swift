@@ -8,9 +8,10 @@ final class ModelSettingsResetTests: XCTestCase {
     for kind in ModelPackages.descriptors.compactMap({ ModelKind(rawValue: $0.kind) }) {
       let defaults = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(defaults.anePrefillRatio, 0)
-      XCTAssertEqual(defaults.layerMajorPrefill, kind == .qwen3_8FlashNext)
+      XCTAssertEqual(defaults.layerMajorPrefill, kind == .qwen3_8FlashNext || kind == .deepSeekV41)
       XCTAssertEqual(defaults.readyExpertDecode, kind == .qwen3_8FlashNext)
-      XCTAssertEqual(defaults.batchedExpertPrefill, false)
+      XCTAssertEqual(defaults.batchedExpertPrefill, kind == .deepSeekV41)
+      XCTAssertEqual(defaults.nextLayerPrefetch, kind == .deepSeekV41)
       let budgets = [defaults.expertCacheGiB, defaults.mtpCacheGiB, defaults.dsparkCacheGiB].compactMap { $0 }
       XCTAssertFalse(budgets.isEmpty)
       for budget in budgets {

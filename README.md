@@ -59,7 +59,7 @@ Model weights are not included with the app. DeepSeek V4.1's expert and Engram f
 
 A slot holds one expert's weights. More slots keep more experts in memory and may reduce SSD reads. Saved custom settings are preserved.
 
-The current source replaces the main, MTP and DSpark slot controls with **expert cache GiB**. Capacity is rounded down using each installed model’s expert size; old capacities are preserved. The fixed Advanced Settings header shows **64K and 128K peak memory estimates** side by side, with token lengths above the GiB values. Estimates include expert capacity and retained prompt caches, and take the largest load, prefill or generation phase. V4.1 uses the observed buffer lifetimes for the tested packed-cache, layer-major, CED and candidate-index configuration; other configurations keep the structural estimate.
+The current source replaces the main, MTP and DSpark slot controls with **expert cache GiB**. Capacity is rounded down using each installed model’s expert size; old capacities are preserved. The fixed Advanced Settings header shows **64K and 128K peak memory estimates** side by side, with token lengths above the GiB values. Estimates include expert capacity and retained prompt caches, and take the largest load, prefill or generation phase. V4.1 now uses a structural estimate because its prefill buffer lifetimes changed; the previous calibration is no longer applied.
 
 The fixed estimate header, shorter descriptions, and Playground/About/Status navigation updates are included in the validated local package; they have not been publicly released.
 The 128K values are extrapolations, not measured peaks or guaranteed upper bounds. A request may leave expert capacity unused, so its measured usage can be lower than the planning value.
@@ -84,7 +84,11 @@ Whallm keeps common weights in memory and reads selected experts from SSD. DeepS
 | DeepSeek V4.1 | Layer-by-layer input processing, batched experts, packed KV/index caches, candidate-only index scoring, CED input processing, ANE projection and DSpark |
 | Qwen3.8 | Grouped experts during input processing, expert calculations as reads finish, QSA cache compression, next-layer prefetch, ANE projection and MTP |
 
-V4.1 layer-by-layer input processing, V4.1/Qwen cache compression, candidate-only scoring, CED, next-layer prefetch, and DeepSeek ANE are **off by default**. In the App, layer-major prefill, expert calculations as reads finish, and batched expert input processing default to off for new or reset settings. Saved choices are preserved; standalone CLI defaults are unchanged. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
+In the current source, new or reset V4.1 App settings enable layer-major prefill, batched experts and next-layer prefetch. Attention keeps its chunk order; expert calculations process up to 4096 tokens at a time, using contiguous fused weights and at most two reusable layer buffers. DSpark can use this path, but cannot use CED. Saved settings and standalone CLI defaults are preserved.
+
+Qwen App defaults enable layer-major prefill and calculations as experts load, while batched prefill and next-layer prefetch remain off. These options remain off by default for V4. Cache compression, candidate-only scoring, CED and DeepSeek ANE remain off by default. CED skips old tokens that later layers no longer need. Qwen cache compression and ANE may change numerical results. The UI disables incompatible combinations; these options do not guarantee a speedup.
+
+The V4.1 changes are source-only: full-model speed and peak memory have not been remeasured, and no new app has been packaged. The benchmark tables below predate these changes.
 
 ## Benchmarks
 

@@ -711,7 +711,9 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(catalog.models[0].alias, "work-model")
     XCTAssertTrue(catalog.models[0].runtime.dsparkEnabled)
     XCTAssertEqual(catalog.models[0].runtime.powerSavingLimitGBps, 2)
-    XCTAssertFalse(catalog.models[1].runtime.layerMajorPrefill)
+    XCTAssertTrue(catalog.models[1].runtime.layerMajorPrefill)
+    XCTAssertTrue(catalog.models[1].runtime.batchedExpertPrefill)
+    XCTAssertTrue(catalog.models[1].runtime.v41NextLayerPrefetch)
     XCTAssertFalse(catalog.models[1].runtime.fp8KVCache)
     XCTAssertEqual(catalog.models[1].runtime.promptCacheEntries, 1)
     XCTAssertFalse(catalog.models[1].runtime.persistentPromptCache)
@@ -767,7 +769,7 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertEqual(runtime["qwen_grouped_experts"] as? Bool, false)
     XCTAssertEqual(runtime["ane_prefill"] as? Bool, false)
     let v41Runtime = try XCTUnwrap(models[1]["runtime"] as? [String: Any])
-    XCTAssertEqual(v41Runtime["layer_major_prefill"] as? Bool, false)
+    XCTAssertEqual(v41Runtime["layer_major_prefill"] as? Bool, true)
     XCTAssertEqual(v41Runtime["fp8_kv_cache"] as? Bool, false)
     XCTAssertEqual(v41Runtime["prompt_cache_entries"] as? Int, 1)
     XCTAssertEqual(v41Runtime["persistent_prompt_cache"] as? Bool, false)
@@ -815,9 +817,9 @@ final class ServerConfigurationTests: XCTestCase {
     settings.dsparkEnabled = true
     let speculative = try XCTUnwrap(catalog(settings).models.first)
     XCTAssertTrue(speculative.runtime.dsparkEnabled)
-    XCTAssertFalse(speculative.runtime.v41LayerMajorPrefill)
+    XCTAssertTrue(speculative.runtime.v41LayerMajorPrefill)
     XCTAssertFalse(speculative.runtime.v41CEDPrefill)
-    XCTAssertFalse(speculative.runtime.v41NextLayerPrefetch)
+    XCTAssertTrue(speculative.runtime.v41NextLayerPrefetch)
     XCTAssertEqual(speculative.defaults.approximationMode, "exact")
   }
 

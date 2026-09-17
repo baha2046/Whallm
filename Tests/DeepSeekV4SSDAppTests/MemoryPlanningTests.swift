@@ -231,7 +231,7 @@ final class MemoryPlanningTests: XCTestCase {
     XCTAssertNil(p.estimate(s, mtpAvailable: false, dsparkAvailable: false, contextTokens: 262_144))
   }
 
-  func testDSparkUsesChunkedPrefillForBothDeepSeekModels() throws {
+  func testDSparkPlansLayerMajorPrefillOnlyForV41() throws {
     for kind in [ModelKind.deepSeekV4, .deepSeekV41] {
       let p = try deepSeekProfile(kind)
       let descriptor = try JSONDecoder().decode(DSparkDescriptor.self,
@@ -251,7 +251,12 @@ final class MemoryPlanningTests: XCTestCase {
       let a = try XCTUnwrap(dspark.estimate(s, mtpAvailable: false, dsparkAvailable: true, contextTokens: 32_768))
       s.layerMajorPrefill = false
       let b = try XCTUnwrap(dspark.estimate(s, mtpAvailable: false, dsparkAvailable: true, contextTokens: 32_768))
-      XCTAssertEqual(a.total, b.total)
+      if kind == .deepSeekV41 {
+        XCTAssertNotEqual(a.prefill.temporary, b.prefill.temporary)
+        XCTAssertEqual(a.decoding.total, b.decoding.total)
+      } else {
+        XCTAssertEqual(a.total, b.total)
+      }
       XCTAssertGreaterThan(a.decoding.auxiliary, a.prefill.auxiliary)
       s.promptCacheMode = .off
       XCTAssertEqual(dspark.estimate(s, mtpAvailable: false, dsparkAvailable: true, contextTokens: 32_768)?.total, b.total)
@@ -316,7 +321,7 @@ final class MemoryPlanningTests: XCTestCase {
     }
   }
 
-  func testV41MeasuredLayoutReplacesLogicalCandidatesOnlyInCoveredConfiguration() throws {
+  func testV41SplitPrefillUsesStructuralAllowanceUntilRecalibrated() throws {
     let base = try deepSeekProfile(.deepSeekV41)
     let manifest = InstalledManifest(formatVersion: 1, modelID: "fixture", revision: "fixture",
       layerCount: 40, expertCount: 256, selectedExpertCount: 6,
@@ -343,7 +348,7 @@ final class MemoryPlanningTests: XCTestCase {
     var fallback = settings
     fallback.candidateIndex = false
     let structural = try estimate(fallback, 65_536)
-    XCTAssertLessThan(measured.prefill.temporary, structural.prefill.temporary)
+    XCTAssertEqual(measured.prefill.temporary, structural.prefill.temporary)
     XCTAssertEqual(measured.decoding.total, structural.decoding.total)
     fallback = settings
     fallback.cedPrefill = false

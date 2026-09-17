@@ -39,7 +39,7 @@ class PrefillIOTests(unittest.TestCase):
                         packed = memoryview(cache._active_prefetch_trace.job.packed).cast('B')
                         try:
                             for expert in (0, 2):
-                                parts = cache._pool.write_views(packed, expert)
+                                parts = cache._pool.layer_write_views(packed, expert)
                                 self.assertEqual(b''.join(map(bytes, parts)), data[expert*size:(expert+1)*size])
                                 for part in parts: part.release()
                         finally:

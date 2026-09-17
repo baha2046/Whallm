@@ -84,6 +84,32 @@ class FusedMXFP4Layout:
     regions = staticmethod(_fused_slot_regions)
 
     @staticmethod
+    def layer_regions(model):
+        """Contiguous fused projections across experts, without an SSD repack.
+
+        w1/w3 are aliases of w13; the batched matmul consumes the contiguous
+        fused array, while these aliases preserve the individual tensor values.
+        """
+        source = _fused_slot_regions(model)
+        regions, strides = {}, {}
+        offset = 0
+        for name in ("w13.weight", "w2.weight", "w13.scale", "w2.scale"):
+            region = source[name]
+            regions[name] = Tensor(name, region.dtype, region.shape, offset, region.length)
+            strides[name] = region.length
+            if name.startswith("w13"):
+                suffix = name.split(".")[1]
+                for alias in (f"w3.{suffix}", f"w1.{suffix}"):
+                    part = source[alias]
+                    regions[alias] = Tensor(alias, part.dtype, part.shape,
+                                           offset + part.offset - region.offset, part.length)
+                    strides[alias] = region.length
+            offset += model.expert_count * region.length
+        if offset != model.expert_count * model.expert_blob_size:
+            raise ValueError("batched expert layout does not preserve the layer size")
+        return regions, strides
+
+    @staticmethod
     def individual(arrays, read):
         from .expert_cache import ExpertWeights
         return tuple(ExpertWeights(

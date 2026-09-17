@@ -1859,7 +1859,6 @@ struct ModelAdvancedView: View {
               hint: "Loads routed experts by layer during prefill.",
               value: $settings.layerMajorPrefill
             )
-            .disabled(modelKind == .deepSeekV41 && settings.dsparkEnabled)
           }
           if modelKind.descriptor.supports("readyExpertDecode") {
             Divider()
@@ -1880,7 +1879,7 @@ struct ModelAdvancedView: View {
             toggleField("Read the next expert layer ahead",
               hint: "Reads the next layer while the current layer runs. Uses extra memory.",
               value: optionalToggle(\.nextLayerPrefetch, defaultValue: false))
-            .disabled(!settings.layerMajorPrefill || settings.batchedExpertPrefill == false || (modelKind == .deepSeekV41 && settings.dsparkEnabled))
+            .disabled(!settings.layerMajorPrefill || settings.batchedExpertPrefill == false)
           }
           if modelKind.descriptor.supports("packedKVCache") {
             Divider()

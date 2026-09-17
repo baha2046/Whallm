@@ -132,12 +132,13 @@ struct MemoryPlanningProfile {
     let tokens = Double(input + output)
     let step = min(Double(input), Double(s.prefillStepSize == 0
       ? (input < 1_024 ? 128 : input < 4_096 ? 256 : 1_024) : s.prefillStepSize))
-    // DSpark owns its chunked prefill path for both DeepSeek models.
+    // V4.1 can seed DSpark from layer-major prefill; V4 still uses chunks.
     let threshold = qwen ? 128 : s.layerMajorPrefillThreshold ?? 1_024
-    let layerMajor = s.layerMajorPrefill && !dspark && input >= threshold
+    let layerMajor = s.layerMajorPrefill && (!dspark || v41) && input >= threshold
     let batched = layerMajor && s.batchedExpertPrefill == true
-    let moeStep = !qwen && !v41 && layerMajor
-      ? min(Double(input), Double((s.moePrefillStepSize ?? 0) == 0 ? 4_096 : s.moePrefillStepSize!)) : step
+    let moeStep = v41 && layerMajor ? min(Double(input), 4_096)
+      : !qwen && layerMajor
+        ? min(Double(input), Double((s.moePrefillStepSize ?? 0) == 0 ? 4_096 : s.moePrefillStepSize!)) : step
     guard let cache = cacheFootprint(s, tokens: tokens, step: step, layerMajor: layerMajor,
       dim: dim, hidden: hidden, window: window, indexDim: indexDim) else { return nil }
 
@@ -212,11 +213,13 @@ struct MemoryPlanningProfile {
         + count * hidden * hc * 4 * 2 // FP32 hyper-connection mixing
     }
     // Full-prompt hidden arrays exist only in layer-major prefill. Include input,
-    // chunk outputs and concatenation; V4 additionally retains the attention result.
-    let hiddenCopies = kind == .deepSeekV4 ? 4.0 : 3.0
-    var promptHidden = layerMajor ? Double(input) * hidden * hc * activationBytes * hiddenCopies : 0
+    // chunk outputs and concatenation; both DeepSeek models retain attention results.
+    let hiddenCopies = qwen ? 3.0 : 4.0
+    let capturedHidden = v41 && dspark && layerMajor
+      ? Double(input) * hidden * Double(manifest.dspark?.targetLayerIDs.count ?? 3) * 4 * 2 : 0
+    let promptHidden = (layerMajor ? Double(input) * hidden * hc * activationBytes * hiddenCopies : 0) + capturedHidden
     let logits = layerMajor ? 0 : step * vocab * (v41 ? 4 : activationBytes)
-    var prefillWork = max(attentionWork(step), moeWork(moeStep), logits) + cache.growth
+    let prefillWork = max(attentionWork(step), moeWork(moeStep), logits) + cache.growth
     // Each layer-major chunk retains one SharedState. Its arrays use that
     // chunk's visible history, not the final cache's reserved capacity.
     var sharedIndices = 0.0
@@ -241,33 +244,10 @@ struct MemoryPlanningProfile {
         }
       }
 
-      // The 8K/16K/64K lifetime observations and held-out 32K check apply only
-      // to this V4.1 layout. Other settings retain the structural allowance above.
-      // Retained lazy graphs keep FP32 scores, rather than every logical candidate
-      // mask/position array becoming a separate persistent allocation.
-      let measuredLayout = layerMajor && batched && step == 1_024 && input >= 8_192
-        && s.packedKVCache == true && s.packedIndexCache == true
-        && s.cedPrefill == true && s.candidateIndex == true
-        && manifest.layerCount == 40 && hidden == 5_120 && hc == 4
-        && dim == 512 && heads == 64 && indexHeads == 32 && topk == 512
-        && activationBytes == 2 && source == 20 && candidateRatio == 1
-      if measuredLayout {
-        // stream() prefills all but the final input token; the next call decodes it.
-        let count = input - 1
-        sharedIndices = 0
-        for begin in stride(from: 0, to: count, by: Int(step)) {
-          let end = min(count, begin + Int(step))
-          sharedIndices += Double(end - begin) * (Double(end) * 4 + topk * 4)
-        }
-        // Concat observations rule out three simultaneous full hidden copies.
-        promptHidden = Double(input) * hidden * hc * activationBytes * 2
-        let headScores = step * Double(count) * indexHeads * 4
-        let activation = step * heads * dim * activationBytes * 3
-        // Largest source-layer temporary excess measured at 8K/16K on M2 Max.
-        // Keep the frozen candidate value; 128K is extrapolated, not validated.
-        let observedTemporaryFloor = 7_654_363_116.0
-        prefillWork = max(observedTemporaryFloor, headScores + activation, moeWork(moeStep)) + cache.growth
-      }
+      // The old measured allowance described interleaved attention/FFN chunks.
+      // Split attention/FFN and pooled layer buffers need new peak measurements;
+      // use the structural allowance above instead of reusing that calibration.
+
     }
     let decodeQueries = mtp ? 6.0 : dspark ? Double(manifest.dspark?.blockSize ?? 5) : 1.0
     // Verification forks main state only in speculative generation, not all phases.

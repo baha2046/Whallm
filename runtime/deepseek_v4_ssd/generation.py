@@ -1433,13 +1433,26 @@ class ModelRuntime:
 
                 try:
                     if dspark is not None:
+                        dspark_prefilled = reused_tokens
+                        if use_layer_major and self.installed.model_kind == "deepseek-v4.1":
+                            from .model_support.deepseek_v41 import _deepseek_v41_layer_major_prefill
+                            if reused_tokens == 0:
+                                dspark.reset_cache()
+                            with _route_phase(self.expert_cache, "prefill"):
+                                hidden = _deepseek_v41_layer_major_prefill(
+                                    self.model, generation_prompt[:-1], prompt_cache,
+                                    step_size, self.expert_cache, self.config, dspark.target_layers)
+                                if hidden is not None:
+                                    dspark.prefill_context(hidden, reused_tokens)
+                                    del hidden
+                            dspark_prefilled = len(prompt_tokens) - 1
                         yield from self._stream_dspark(
                             prompt_tokens,
                             prompt_cache,
                             dspark,
                             options,
                             step_size,
-                            reused_tokens,
+                            dspark_prefilled,
                             dspark_prompt_cache_enabled,
                         )
                         completed = True

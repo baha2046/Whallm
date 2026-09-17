@@ -403,9 +403,9 @@ final class ModelLibrary: ObservableObject {
           v41PackedIndex: modelKind == .deepSeekV41 && settings.packedIndexCache == true,
           v41CandidateIndex: modelKind == .deepSeekV41 && settings.candidateIndex == true,
           v41CEDPrefill: modelKind == .deepSeekV41 && settings.cedPrefill == true && settings.layerMajorPrefill && !settings.dsparkEnabled,
-          v41NextLayerPrefetch: modelKind == .deepSeekV41 && settings.nextLayerPrefetch == true && settings.layerMajorPrefill && settings.batchedExpertPrefill != false && !settings.dsparkEnabled,
+          v41NextLayerPrefetch: modelKind == .deepSeekV41 && settings.nextLayerPrefetch == true && settings.layerMajorPrefill && settings.batchedExpertPrefill != false,
           deepseekANEPrefill: modelKind != .qwen3_8FlashNext && settings.deepSeekANEPrefill == true,
-          v41LayerMajorPrefill: modelKind == .deepSeekV41 && settings.layerMajorPrefill && !settings.dsparkEnabled
+          v41LayerMajorPrefill: modelKind == .deepSeekV41 && settings.layerMajorPrefill
         ),
         defaults: ModelCatalog.Entry.Defaults(
           maxTokens: settings.defaultMaxTokens,

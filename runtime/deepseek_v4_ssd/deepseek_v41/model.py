@@ -79,6 +79,10 @@ class Block(nn.Module):
                  cache, shared):
         """x [b, s, hc, d]; pre_mix [b, s, hc] from the previous sub-layer.
         Returns (x, ffn_pre) — ffn_pre feeds the next layer (or the head)."""
+        x, attn_pre = self.forward_attention(x, pre_mix, start_pos, cache, shared)
+        return self.forward_ffn(x, attn_pre)
+
+    def forward_attention(self, x, pre_mix, start_pos, cache, shared):
         residual = x
         attn_pre, attn_post, attn_comb = hc_mixes(
             x, self.hc_attn_fn, self.hc_attn_scale, self.hc_attn_base,
@@ -86,7 +90,9 @@ class Block(nn.Module):
         h = hc_pre(x, pre_mix)
         h = self.attn(self.attn_norm(h), start_pos, cache, shared)
         x = hc_post(h, residual, attn_post, attn_comb)
+        return x, attn_pre
 
+    def forward_ffn(self, x, attn_pre):
         residual = x
         ffn_pre, ffn_post, ffn_comb = hc_mixes(
             x, self.hc_ffn_fn, self.hc_ffn_scale, self.hc_ffn_base,

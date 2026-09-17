@@ -107,9 +107,14 @@ class DSpark(nn.Module):
         return first.main_norm(first.main_proj(hidden))
 
     def prefill_context(self, main_hidden, offset):
-        main_x = self._main_x(main_hidden)
-        for stage in self.mtp:
-            stage.attn.seed(main_x, offset)
+        # Bound projection temporaries and materialize each context before the
+        # next chunk. The stored context itself remains limited to window_size.
+        for begin in range(0, main_hidden.shape[1], 4096):
+            check_cancelled()
+            main_x = self._main_x(main_hidden[:, begin:begin + 4096])
+            for stage in self.mtp:
+                stage.attn.seed(main_x, offset + begin)
+            mx.eval([stage.attn.context for stage in self.mtp])
 
     def draft(self, main_model, anchor, main_hidden, start_pos, temperature, top_p, confidence_threshold):
         started = time.perf_counter()

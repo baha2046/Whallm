@@ -306,6 +306,11 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     settings.defaultTemperature = descriptor.defaults.temperature
     settings.defaultTopP = descriptor.defaults.topP
     settings.defaultTopK = descriptor.defaults.topK
+    if modelKind == .deepSeekV41 {
+      settings.layerMajorPrefill = true
+      settings.batchedExpertPrefill = true
+      settings.nextLayerPrefetch = true
+    }
     if modelKind == .qwen3_8FlashNext {
       // Adopt the 4K input / 1024 output speed profile; keep cache budgets unchanged.
       settings.readWorkers = 16

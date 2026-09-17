@@ -376,6 +376,10 @@ class _SlotPool:
         }
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
+        self._layer_regions, self._layer_strides = (
+            self._layout.layer_regions(model) if model.model_kind == "deepseek-v4.1"
+            else (self._regions, {name: model.expert_blob_size for name in self._regions})
+        )
         self._slots: list[mx.array | None] = [None] * slots
         self._views: list[memoryview | None] = [None] * slots
         self._loaded = bytearray(slots)
@@ -465,8 +469,14 @@ class _SlotPool:
     def batched(self, packed: mx.array) -> BatchedExperts:
         return self._layout.batched(packed, self._batched_array)
 
+    def layer_write_views(self, buffer: memoryview, expert: int) -> list[memoryview]:
+        return [buffer[self._layer_regions[r.name].offset + expert * self._layer_strides[r.name]:
+                       self._layer_regions[r.name].offset + expert * self._layer_strides[r.name] + r.length]
+                for r in self._model.expert_regions]
+
     def _batched_array(self, packed: mx.array, name: str) -> mx.array:
-        region = self._regions[name]
+        region = self._layer_regions[name]
+        expert_stride = self._layer_strides[name]
         if region.dtype == "U32":
             shape = (self._model.expert_count, *region.shape)
             row_strides = []
@@ -478,13 +488,13 @@ class _SlotPool:
                 packed,
                 shape=shape,
                 strides=(
-                    self._model.expert_blob_size // 4,
+                    expert_stride // 4,
                     *reversed(row_strides),
                 ),
                 offset=region.offset // 4,
             )
         if (
-            self._model.expert_blob_size % 4
+            expert_stride % 4
             or region.offset % 4
             or region.shape[-1] % 4
         ):
@@ -499,7 +509,7 @@ class _SlotPool:
         value = mx.as_strided(
             packed,
             shape=shape,
-            strides=(self._model.expert_blob_size // 4, *reversed(row_strides)),
+            strides=(expert_stride // 4, *reversed(row_strides)),
             offset=region.offset // 4,
         )
         return value if name.endswith(".weight") else value.view(mx.uint8)
@@ -516,6 +526,8 @@ class _StagedSlotPool(_SlotPool):
         self._layout = support_for_installed(model).expert_layout
         self._regions = self._layout.regions(model)
         self._w13_regions, self._w2_regions = _staged_slot_regions(model)
+        self._layer_regions = self._regions
+        self._layer_strides = {name: model.expert_blob_size for name in self._regions}
         self._w13_size = sum(
             region.length
             for name, region in self._w13_regions.items()
@@ -711,6 +723,7 @@ class ExpertCache:
             else None
         )
         self._prefetched_layers: dict[int, _LayerRead] = {}
+        self._layer_buffers: list[mx.array] | None = None
         self._batched_layer: tuple[int, BatchedExperts] | None = None
         self._active_prefetch_trace: _ActivePrefetchTrace | None = None
         self._route_trace_path = route_trace_path
@@ -900,6 +913,19 @@ class ExpertCache:
             self._prefetched_layers.clear()
         cancel_and_drain(future for job in pending for future in job.futures)
 
+    @contextmanager
+    def reuse_layer_buffers(self):
+        """Request-local storage; no pooled layer survives prefill or cancellation."""
+        if self._layer_buffers is not None or self._batched_layer is not None:
+            raise RuntimeError("batched prefill buffers are already in use")
+        self._layer_buffers = []
+        try:
+            yield
+        finally:
+            self.discard_prefetched_layers()
+            mx.synchronize()
+            self._layer_buffers = None
+            mx.clear_cache()
 
     def resident_expert_keys(
         self,
@@ -1129,8 +1155,14 @@ class ExpertCache:
             length = self.model.expert_count * self.model.expert_blob_size
             if length % 4:
                 raise ValueError("batched expert layer must be 4-byte aligned")
-            packed = mx.empty((length // 4,), dtype=mx.uint32)
-            mx.eval(packed)
+            if self._layer_buffers:
+                packed = self._layer_buffers.pop()
+            else:
+                if (self._layer_buffers is not None
+                        and len(self._prefetched_layers) + int(self._batched_layer is not None) >= 2):
+                    raise RuntimeError("batched prefill allows only two layer buffers")
+                packed = mx.empty((length // 4,), dtype=mx.uint32)
+                mx.eval(packed)
             step = (
                 len(selected) + self.prefetch_read_workers - 1
             ) // self.prefetch_read_workers
@@ -1195,6 +1227,11 @@ class ExpertCache:
         try:
             yield batched
         finally:
+            # Reads into this storage may start as soon as it returns to the
+            # pool. Fence GPU consumers even when prefill raises or is cancelled.
+            if self._layer_buffers is not None:
+                mx.synchronize()
+                self._layer_buffers.append(packed)
             active = self._active_prefetch_trace
             if active is not None and self._route_trace is not None:
                 self._route_trace.record_prefetch_event(
@@ -1764,7 +1801,7 @@ class ExpertCache:
         view = memoryview(packed).cast("B")
         try:
             for expert in experts:
-                views = self._pool.write_views(view, expert)
+                views = self._pool.layer_write_views(view, expert)
                 try:
                     self._pread_views(layer, views,
                                       expert * self.model.expert_blob_size,

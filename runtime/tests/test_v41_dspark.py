@@ -53,3 +53,54 @@ class V41DSparkTests(unittest.TestCase):
         self.assertEqual(draft.mtp[0].attn.offset, 7)
         with self.assertRaisesRegex(ValueError, 'position'):
             draft.prefill_context(hidden, 2)
+
+    def test_runtime_layer_major_matches_chunked_and_recovers_after_cancel(self):
+        import json
+        from dataclasses import asdict
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from types import SimpleNamespace
+        from tokenizers import Tokenizer, models
+        from transformers import PreTrainedTokenizerFast
+        from deepseek_v4_ssd.generation import ModelRuntime, GenerationOptions
+        from deepseek_v4_ssd.model import RuntimeConfig
+        from deepseek_v4_ssd.model_support import get_support
+        from deepseek_v4_ssd.expert_cache import CacheMetrics
+        from contextlib import nullcontext
+        model = tiny_model()
+        model.dspark = DSpark(model.args, block_size=3, noise_token_id=15,
+                              target_layers=(1, 2, 3), markov_rank=8, expert_count=2, topk=1)
+        backend = Tokenizer(models.WordLevel({str(i): i for i in range(16)}, unk_token='0'))
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=backend, unk_token='0')
+        prompt = [1, 2, 3, 4, 5, 6, 7, 8]
+        options = GenerationOptions(max_tokens=8, temperature=0, seed=17)
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'config.json').write_text(json.dumps(asdict(model.args)))
+            installed = SimpleNamespace(root=root, model_kind='deepseek-v4.1',
+                model_id='fixture/v41', revision='fixture', format_version=3, maximum_context=32)
+            def runtime(layer_major):
+                config = RuntimeConfig(dspark_enabled=True, layer_major_prefill_threshold=1,
+                    v41_layer_major_prefill=layer_major, layer_major_prefill=layer_major,
+                    batched_expert_prefill=False, prompt_cache_entries=0, prefill_step_size=3)
+                with patch('deepseek_v4_ssd.generation.load_model',
+                           return_value=(model, SimpleNamespace(close=lambda: None, metrics_snapshot=CacheMetrics,
+                                                              capture_expert_unions=nullcontext))), \
+                     patch('deepseek_v4_ssd.generation.AutoTokenizer.from_pretrained', return_value=tokenizer):
+                    return ModelRuntime(installed, config)
+            with runtime(False) as control:
+                expected = [p.token for p in control.stream(prompt, options)]
+            with runtime(True) as candidate:
+                for _ in range(2):
+                    self.assertEqual([p.token for p in candidate.stream(prompt, options)], expected)
+                    self.assertTrue(candidate.metrics.snapshot()['layer_major_prefill'])
+                pending = candidate.stream(prompt, options)
+                next(pending)
+                pending.close()
+                self.assertEqual([p.token for p in candidate.stream(prompt, options)], expected)
+        support = get_support('deepseek-v4.1')
+        support.validate_config(RuntimeConfig(dspark_enabled=True, v41_layer_major_prefill=True,
+                                             v41_next_layer_prefetch=True))
+        for setting in ('v41_ced_prefill', 'dspark_prompt_cache', 'dspark_sequential_verification'):
+            with self.assertRaises(ValueError):
+                support.validate_config(RuntimeConfig(dspark_enabled=True, **{setting: True}))

@@ -154,8 +154,8 @@ def _deepseek_v41_prefill(
 
 
 def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
-                                      expert_cache, config):
-    """Read each expert layer once while retaining per-chunk shared attention state."""
+                                      expert_cache, config, target_layers=()):
+    """Read each layer once; retain attention chunk order and batch token-local FFN."""
     from contextlib import nullcontext
     import numpy as np
     from ..deepseek_v41.model import SharedState
@@ -163,7 +163,13 @@ def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
 
     if not token_ids:
         return
+    if step_size < 1:
+        raise ValueError("prefill step size must be positive")
+    if target_layers and config.v41_ced_prefill:
+        raise ValueError("CED prefill cannot capture the full DSpark context")
     core = model.model
+    if any(i < 0 or i >= len(core.layers) for i in target_layers):
+        raise ValueError("DSpark target layer is outside the main model")
     state = cache[0].cache
     start_pos = state.offset
     count = len(token_ids)
@@ -186,38 +192,61 @@ def _deepseek_v41_layer_major_prefill(model, token_ids, cache, step_size,
     hidden_start = 0
     last_source = max(core.args.kv_source_layers, default=len(core.layers) - 1)
     skipped = 0
-    for layer_id, layer in enumerate(core.layers):
-        check_cancelled()
-        outputs, mixes = [], []
-        keep_from = 0
-        if config.v41_ced_prefill and layer_id > last_source:
-            # Later layers share encoder KV. Their only token-local history is SWA.
-            # Retain the entire dependency cone needed to rebuild every final window.
-            required = (len(core.layers) - layer_id) * (core.args.window_size - 1) + 1
-            keep_from = max(0, count - required) // step_size * step_size
-            if layer.engram is not None:
-                raise ValueError("CED tail replay cannot skip an Engram layer")
-        with expert_cache.batched_layer(layer_id) if batched else nullcontext():
-            for chunk_index, begin in enumerate(chunks):
-                check_cancelled()
-                end = min(count, begin + step_size)
-                if begin < keep_from:
-                    skipped += end - begin
-                    continue
-                h = hidden[:, begin - hidden_start:end - hidden_start]
+    captured = {}
+    with expert_cache.reuse_layer_buffers() if batched else nullcontext():
+        for layer_id, layer in enumerate(core.layers):
+            check_cancelled()
+            keep_from = 0
+            if config.v41_ced_prefill and layer_id > last_source:
+                required = (len(core.layers) - layer_id) * (core.args.window_size - 1) + 1
+                keep_from = max(0, count - required) // step_size * step_size
                 if layer.engram is not None:
-                    h = layer.engram(h, hashes[:, begin:end, layer.engram.layer_hash_index])
-                h, mix = layer(h, pre_mix[:, begin - hidden_start:end - hidden_start], start_pos + begin,
-                               state, shared_chunks[chunk_index])
-                if (batched and config.v41_next_layer_prefetch and begin == keep_from
-                        and layer_id + 1 < len(core.layers)):
+                    raise ValueError("CED tail replay cannot skip an Engram layer")
+            outputs, mixes, layer_capture = [], [], []
+            with expert_cache.batched_layer(layer_id) if batched else nullcontext():
+                if batched and config.v41_next_layer_prefetch and layer_id + 1 < len(core.layers):
                     expert_cache.prefetch_layer(layer_id + 1)
-                mx.eval(h, mix)
-                outputs.append(h)
-                mixes.append(mix)
-        hidden = mx.concatenate(outputs, axis=1)
-        hidden_start = keep_from
-        pre_mix = mx.concatenate(mixes, axis=1)
-        mx.eval(hidden, pre_mix)
+                for chunk_index, begin in enumerate(chunks):
+                    check_cancelled()
+                    end = min(count, begin + step_size)
+                    if begin < keep_from:
+                        skipped += end - begin
+                        continue
+                    h = hidden[:, begin - hidden_start:end - hidden_start]
+                    if layer.engram is not None:
+                        h = layer.engram(h, hashes[:, begin:end, layer.engram.layer_hash_index])
+                    # Match Model.__call__: capture after Engram, before this block.
+                    if layer_id in target_layers:
+                        layer_capture.append(h.mean(axis=2))
+                    h, mix = layer.forward_attention(
+                        h, pre_mix[:, begin - hidden_start:end - hidden_start],
+                        start_pos + begin, state, shared_chunks[chunk_index])
+                    mx.eval(h, mix)
+                    outputs.append(h)
+                    mixes.append(mix)
+                attention_hidden = mx.concatenate(outputs, axis=1)
+                attention_mix = mx.concatenate(mixes, axis=1)
+                mx.eval(attention_hidden, attention_mix)
+                if layer_capture:
+                    captured[layer_id] = mx.concatenate(layer_capture, axis=1)
+                    mx.eval(captured[layer_id])
+                outputs, mixes, layer_capture = [], [], []
+                # The FFN is token-local; attention's history and chunk size stay unchanged.
+                for begin in range(0, count - keep_from, 4096):
+                    check_cancelled()
+                    h, mix = layer.forward_ffn(attention_hidden[:, begin:begin + 4096],
+                                              attention_mix[:, begin:begin + 4096])
+                    mx.eval(h, mix)
+                    outputs.append(h)
+                    mixes.append(mix)
+                hidden = mx.concatenate(outputs, axis=1)
+                pre_mix = mx.concatenate(mixes, axis=1)
+                mx.eval(hidden, pre_mix)
+                del attention_hidden, attention_mix, h, mix, outputs, mixes
+            hidden_start = keep_from
     state.offset = start_pos + count
     model.ced_skipped_layer_tokens = skipped
+    if target_layers:
+        result = mx.concatenate([captured[i] for i in target_layers], axis=-1)
+        mx.eval(result)
+        return result

@@ -18,7 +18,7 @@ class ModelSupport:
     def validate_config(self, config) -> None:
         features = self.descriptor.features
         if self.descriptor.kind == "deepseek-v4.1" and getattr(config, "dspark_enabled", False):
-            for name in ("v41_layer_major_prefill", "v41_ced_prefill", "v41_next_layer_prefetch", "dspark_prompt_cache", "dspark_sequential_verification"):
+            for name in ("v41_ced_prefill", "dspark_prompt_cache", "dspark_sequential_verification"):
                 if getattr(config, name, False):
                     raise ValueError(f"{name} is not supported by V4.1 DSpark")
         for name in ("qwen_quantized_kv", "qwen_quantized_index", "v41_packed_kv", "v41_packed_index",
