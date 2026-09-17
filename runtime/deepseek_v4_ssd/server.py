@@ -444,7 +444,7 @@ class OpenAIHandler(BaseHTTPRequestHandler):
         if type(context) is not int or context not in throughput.CONTEXT_LENGTHS:
             raise APIError("Choose a supported context length.", param="context_length")
         if type(generation) is not int or generation not in throughput.GENERATION_LENGTHS:
-            raise APIError("Choose 128, 1024, or 4096 output tokens.", param="generation_length")
+            raise APIError("Choose 128, 512, 1024, or 4096 output tokens.", param="generation_length")
         self._start_sse()
         try:
             with ClientConnection(self.connection), self.app.status_memory.activity(), AppMemorySampler() as memory:

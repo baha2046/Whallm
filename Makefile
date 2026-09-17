@@ -33,6 +33,13 @@ test:
 	ln -sfn "$(SPARKLE_FRAMEWORK_PATH)/Sparkle.framework" .build/debug/PackageFrameworks/Sparkle.framework
 	swift test -Xswiftc -DWHALLM_LOCAL_BUILD $(ARGS)
 
+# Set before Python starts: MLX caches this flag on first use. Strict FP32
+# parity tests must not compare shape-dependent TF32 kernels on M5.
+# This is test-only; packaged and standalone runtime defaults are unchanged.
+## test-python: run all Python tests with full float32 matrix precision
+test-python:
+	MLX_ENABLE_TF32=0 PYTHONPATH=runtime:. .venv/bin/python -m unittest discover -s runtime/tests $(ARGS)
+
 ## package: build a local macOS app with Python, runtime, and local debug features
 package:
 	WHALLM_BUILD_FLAVOR=local ./Scripts/package-app.sh

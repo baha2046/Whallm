@@ -10,7 +10,7 @@ from pathlib import Path
 from .cancellation import check_cancelled
 
 CONTEXT_LENGTHS = (1024, 4096, 8192, 16384, 32768, 65536, 131072, 204800)
-GENERATION_LENGTHS = (128, 1024, 4096)
+GENERATION_LENGTHS = (128, 512, 1024, 4096)
 CONTEXT_TYPES = ("code", "novel")
 TEMPERATURE = 0.0
 SEED = 42

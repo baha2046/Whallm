@@ -5,6 +5,23 @@ import XCTest
 
 final class ThroughputTests: XCTestCase {
   @MainActor
+  func testGenerationLengthIncludes512AndPreservesDefault() {
+    XCTAssertEqual(ThroughputSession.generationLengths, [128, 512, 1024, 4096])
+    let session = ThroughputSession()
+    XCTAssertEqual(session.generationLength, 128)
+    session.generationLength = 512
+    XCTAssertEqual(session.generationLength, 512)
+    #if WHALLM_LOCAL_BUILD
+    session.model = ThroughputSession.dryRunModel
+    session.contextLengths = [1024]
+    session.runDryRun()
+    XCTAssertEqual(session.results.first?.generationLimit, 512)
+    XCTAssertEqual(session.results.first?.generationTokens, 512)
+    XCTAssertNil(session.error)
+    #endif
+  }
+
+  @MainActor
   func testCompletionUnloadsOnceAfterAllTrialsAndKeepsResults() async throws {
     let session = ThroughputSession()
     session.model = "test-model"

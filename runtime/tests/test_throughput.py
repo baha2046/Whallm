@@ -116,6 +116,18 @@ class ThroughputTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Choose Code or Novel"):
             prompt_tokens(self.runtime, 1024, "../../invalid")
 
+    def test_512_output_tokens_reach_runtime_and_streamed_result(self):
+        with urlopen(self.request(generation_length=512)) as response:
+            self.assertEqual(response.status, 200)
+            body = response.read().decode()
+        events = [json.loads(line[6:]) for line in body.splitlines()
+                  if line.startswith("data: {")]
+        result = next(event["result"] for event in events if "result" in event)
+        self.assertEqual(self.runtime.options.max_tokens, 512)
+        self.assertEqual(result["generation_limit"], 512)
+        self.assertEqual(result["generation_tokens"], 2)  # Mock runtime stops at EOS.
+        self.assertTrue(body.endswith("data: [DONE]\n\n"))
+
     def test_novel_selection_reaches_generation_and_result(self):
         with urlopen(self.request(benchmark_context="novel")) as response:
             events = [json.loads(line[6:]) for line in response.read().decode().splitlines()

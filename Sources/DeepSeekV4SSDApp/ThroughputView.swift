@@ -206,6 +206,7 @@ final class ThroughputSession: ObservableObject {
   static let dryRunAvailable = false
   #endif
   static let dryRunModel = "dry-run"
+  static let generationLengths = [128, 512, 1024, 4096]
   static let contextLengths = [1024, 4096, 8192, 16384, 32768, 65536, 131072, 204800]
   @Published var model = ""
   @Published var contextLengths: Set<Int> = [4096, 8192, 16384]
@@ -423,7 +424,7 @@ struct ThroughputView: View {
                 settingLabel("Generation length", detail: "Maximum output tokens per test.")
                 Spacer(minLength: 8)
                 Picker(label("Generation length"), selection: $session.generationLength) {
-                  ForEach([128, 1024, 4096], id: \.self) { Text(String($0)).tag($0) }
+                  ForEach(ThroughputSession.generationLengths, id: \.self) { Text(String($0)).tag($0) }
                 }
                 .labelsHidden().pickerStyle(.segmented).fixedSize().frame(width: 210, alignment: .trailing)
               }
