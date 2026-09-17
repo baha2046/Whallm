@@ -467,6 +467,12 @@ class _SlotPool:
         self._loaded[slot] = 0
 
     def batched(self, packed: mx.array) -> BatchedExperts:
+        """View a slot-major arena (paired with write_views), including research callers."""
+        return self._layout.batched(
+            packed, lambda buffer, name: self._batched_array(buffer, name, layer_major=False))
+
+    def batched_layer(self, packed: mx.array) -> BatchedExperts:
+        """View a region-major layer buffer (paired with layer_write_views)."""
         return self._layout.batched(packed, self._batched_array)
 
     def layer_write_views(self, buffer: memoryview, expert: int) -> list[memoryview]:
@@ -477,9 +483,12 @@ class _SlotPool:
             views.append(buffer[start:start + region.length])
         return views
 
-    def _batched_array(self, packed: mx.array, name: str) -> mx.array:
+    def _batched_array(self, packed: mx.array, name: str, *, layer_major: bool = True) -> mx.array:
         region = self._regions[name]
-        base, expert_stride, inner = self._batched_layout[name]
+        base, expert_stride, inner = (
+            self._batched_layout[name] if layer_major
+            else (region.offset, self._model.expert_blob_size, 0)
+        )
         offset = base + inner
         if offset % 4 or expert_stride % 4:
             raise ValueError("batched expert layer regions must be 4-byte aligned")
@@ -1228,7 +1237,7 @@ class ExpertCache:
             default=0.0,
         )
         packed = job.packed
-        batched = self._pool.batched(packed)
+        batched = self._pool.batched_layer(packed)
         with self._lock:
             self.metrics.bytes_read += len(job.experts) * self.model.expert_blob_size
             self.metrics.read_seconds += elapsed

@@ -173,6 +173,26 @@ class PrefillSlotReleaseTests(unittest.TestCase):
 
 
 class LayerBufferPoolTests(unittest.TestCase):
+    def test_slot_major_arenas_keep_their_layout_and_dynamic_expert_count(self):
+        import copy
+        from dataclasses import replace
+        with tempfile.TemporaryDirectory() as directory:
+            model = fixture(Path(directory))
+            with ExpertCache(model, slots=2, read_workers=1) as cache:
+                for count in (1, 2):
+                    proxy = copy.copy(cache._pool)
+                    proxy._model = replace(model, expert_count=count)
+                    arena = mx.zeros((count * model.expert_blob_size // 4,), dtype=mx.uint32)
+                    mx.eval(arena)
+                    buffer = memoryview(arena).cast('B')
+                    for expert in range(count):
+                        for region, view in zip(model.expert_regions, proxy.write_views(buffer, expert)):
+                            start = expert * model.expert_blob_size + region.offset
+                            view[:] = bytes(range(start, start + region.length))
+                    weights = proxy.batched(arena)
+                    self.assertEqual(weights.w1_scales[:, 0, 0].tolist(), [4, 28][:count])
+                    self.assertEqual(weights.w13_scales[:, :, 0].tolist(), [[20, 4], [44, 28]][:count])
+
     def test_layer_buffers_are_reused_between_layers_and_released_after_prefill(self):
         with tempfile.TemporaryDirectory() as directory:
             with ExpertCache(fixture(Path(directory)), slots=2, read_workers=1) as cache:
