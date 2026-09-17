@@ -37,7 +37,7 @@ enum QwenOptimization: String, CaseIterable, Identifiable {
     case .phaseMemory:
       "Limits the expert cache to half its capacity while reading a prompt, keeping room for one layer when possible. Restores full capacity for answers. May cause extra SSD reads."
     case .mtpPolicy:
-      "Experimental. MTP output differs from non-MTP in a full-model test; the cause is unresolved. Off uses 5 draft tokens and stops after one zero-acceptance round."
+      "MTP output differs from non-MTP in a full-model test; the cause is unresolved. Off uses 5 draft tokens and stops after one zero-acceptance round."
     }
   }
 }

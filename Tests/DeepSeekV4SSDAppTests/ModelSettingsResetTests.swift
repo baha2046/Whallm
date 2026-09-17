@@ -8,10 +8,11 @@ final class ModelSettingsResetTests: XCTestCase {
     for kind in ModelPackages.descriptors.compactMap({ ModelKind(rawValue: $0.kind) }) {
       let defaults = ModelAdvancedSettings.defaults(for: kind)
       XCTAssertEqual(defaults.anePrefillRatio, 0)
-      XCTAssertEqual(defaults.layerMajorPrefill, kind == .qwen3_8FlashNext || kind == .deepSeekV41)
-      XCTAssertEqual(defaults.readyExpertDecode, kind == .qwen3_8FlashNext)
-      XCTAssertEqual(defaults.batchedExpertPrefill, kind == .deepSeekV41)
-      XCTAssertEqual(defaults.nextLayerPrefetch, kind == .deepSeekV41)
+      XCTAssertEqual(defaults.layerMajorPrefill, kind.descriptor.supports("layerMajorPrefill"))
+      XCTAssertEqual(defaults.readyExpertDecode, kind.descriptor.supports("readyExpertDecode"))
+      XCTAssertEqual(defaults.batchedExpertPrefill, kind.descriptor.supports("batchedExpertPrefill"))
+      XCTAssertEqual(defaults.nextLayerPrefetch, kind.descriptor.supports("nextLayerPrefetch"))
+      XCTAssertEqual(defaults.qwenGroupedExperts, kind.descriptor.supports("groupedExperts"))
       let budgets = [defaults.expertCacheGiB, defaults.mtpCacheGiB, defaults.dsparkCacheGiB].compactMap { $0 }
       XCTAssertFalse(budgets.isEmpty)
       for budget in budgets {
@@ -24,17 +25,42 @@ final class ModelSettingsResetTests: XCTestCase {
       var legacy = defaults
       legacy.readyExpertDecode = nil
       legacy.batchedExpertPrefill = nil
+      legacy.nextLayerPrefetch = nil
+      legacy.qwenGroupedExperts = nil
       legacy.anePrefillRatio = nil
       legacy.packedKVCache = nil
       legacy.packedIndexCache = nil
       legacy.approximationEnabled = nil
       let normalized = legacy.normalized(for: kind)
-      XCTAssertEqual(normalized.readyExpertDecode, false)
-      XCTAssertEqual(normalized.batchedExpertPrefill, false)
+      XCTAssertEqual(normalized.readyExpertDecode, defaults.readyExpertDecode)
+      XCTAssertEqual(normalized.batchedExpertPrefill, defaults.batchedExpertPrefill)
+      XCTAssertEqual(normalized.nextLayerPrefetch, defaults.nextLayerPrefetch)
+      XCTAssertEqual(normalized.qwenGroupedExperts, defaults.qwenGroupedExperts)
       XCTAssertEqual(normalized.anePrefillRatio, 0)
       XCTAssertEqual(normalized.packedKVCache, false)
       XCTAssertEqual(normalized.packedIndexCache, false)
       XCTAssertEqual(normalized.approximationEnabled, false)
+    }
+  }
+
+  func testExplicitAccelerationOptOutsSurviveSaveAndLoad() throws {
+    let suite = "AccelerationDefaultsTests.\(UUID().uuidString)"
+    let store = try XCTUnwrap(UserDefaults(suiteName: suite))
+    defer { store.removePersistentDomain(forName: suite) }
+    for kind in ModelPackages.descriptors.compactMap({ ModelKind(rawValue: $0.kind) }) {
+      var settings = ModelAdvancedSettings.defaults(for: kind)
+      settings.layerMajorPrefill = false
+      settings.readyExpertDecode = false
+      settings.batchedExpertPrefill = false
+      settings.nextLayerPrefetch = false
+      settings.qwenGroupedExperts = false
+      settings.save(for: kind, defaults: store)
+      let restored = ModelAdvancedSettings.loadOrDefault(for: kind, defaults: store)
+      XCTAssertFalse(restored.layerMajorPrefill)
+      XCTAssertEqual(restored.readyExpertDecode, false)
+      XCTAssertEqual(restored.batchedExpertPrefill, false)
+      XCTAssertEqual(restored.nextLayerPrefetch, false)
+      XCTAssertEqual(restored.qwenGroupedExperts, false)
     }
   }
 

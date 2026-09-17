@@ -6,6 +6,32 @@ import XCTest
 
 final class ServerConfigurationTests: XCTestCase {
   @MainActor
+  func testAccelerationDefaultsAndOptOutsReachSerializedCatalogForEveryModel() throws {
+    for kind in [ModelKind.deepSeekV4, .deepSeekV41, .qwen3_8FlashNext] {
+      for enabled in [true, false] {
+        var settings = ModelAdvancedSettings.defaults(for: kind)
+        if !enabled {
+          settings.layerMajorPrefill = false
+          settings.readyExpertDecode = false
+          settings.batchedExpertPrefill = false
+          settings.nextLayerPrefetch = false
+          settings.qwenGroupedExperts = false
+        }
+        let catalog = try ModelLibrary.makeServerCatalog(models: [installedModel(kind)],
+          aliases: [:], settings: [kind: settings], powerSavingLimitGBps: nil)
+        let runtime = try XCTUnwrap(catalog.models.first).runtime
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(runtime)) as? [String: Any])
+        for key in ["layer_major_prefill", "ready_expert_decode", "batched_expert_prefill"] {
+          XCTAssertEqual(json[key] as? Bool, enabled, "\(kind): \(key)")
+        }
+        XCTAssertEqual(json["qwen_next_layer_prefetch"] as? Bool, enabled && kind == .qwen3_8FlashNext)
+        XCTAssertEqual(json["v41_next_layer_prefetch"] as? Bool, enabled && kind == .deepSeekV41)
+        XCTAssertEqual(json["qwen_grouped_experts"] as? Bool, enabled && kind == .qwen3_8FlashNext)
+      }
+    }
+  }
+
+  @MainActor
   func testQwenSpeedDefaultsReachRuntime() throws {
     let settings = ModelAdvancedSettings.defaults(for: .qwen3_8FlashNext)
     let catalog = try ModelLibrary.makeServerCatalog(
@@ -18,8 +44,8 @@ final class ServerConfigurationTests: XCTestCase {
     XCTAssertTrue(runtime.layerMajorPrefill)
     XCTAssertEqual(runtime.prefillStepSize, 1024)
     XCTAssertEqual(runtime.memoryLimitGiB, 30)
-    XCTAssertFalse(runtime.batchedExpertPrefill)
-    XCTAssertFalse(runtime.qwenNextLayerPrefetch)
+    XCTAssertTrue(runtime.batchedExpertPrefill)
+    XCTAssertTrue(runtime.qwenNextLayerPrefetch)
     XCTAssertTrue(runtime.qwenGroupedExperts)
     XCTAssertTrue(runtime.qwenPooledIndexCache)
     XCTAssertTrue(runtime.qwenNgramLookupOptimized)
@@ -98,7 +124,7 @@ final class ServerConfigurationTests: XCTestCase {
   }
 
   func testQwenOptimizationCopyIsLocalized() {
-    let extra = ["Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load.",
+    let extra = ["Speed improvements are not yet verified. Changes apply on next model load.",
                  "MTP draft tokens", "Zero-acceptance rounds before stopping MTP",
                  "Choose 1–5 MTP draft tokens and 1–32 zero-acceptance rounds."]
     for language in [AppLanguage.traditionalChinese, .simplifiedChinese] {

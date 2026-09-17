@@ -1654,7 +1654,7 @@ private struct AdvancedView: View {
 }
 
 struct ModelAdvancedView: View {
-  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = false
+  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = true
   @Binding var settings: ModelAdvancedSettings
   @Binding var alias: String
   let aliasError: String?
@@ -1864,21 +1864,21 @@ struct ModelAdvancedView: View {
             Divider()
             toggleField("Compute experts as they load",
               hint: "Starts available expert calculations while other experts are still loading.",
-              value: optionalToggle(\.readyExpertDecode, defaultValue: false))
+              value: optionalToggle(\.readyExpertDecode, defaultValue: true))
 
           }
           if modelKind.descriptor.supports("batchedExpertPrefill") {
             Divider()
             toggleField("Batch expert calculations",
               hint: "Processes the experts for an input batch together.",
-              value: optionalToggle(\.batchedExpertPrefill, defaultValue: false))
+              value: optionalToggle(\.batchedExpertPrefill, defaultValue: true))
             .disabled(!settings.layerMajorPrefill)
           }
           if modelKind.descriptor.supports("nextLayerPrefetch") {
             Divider()
             toggleField("Read the next expert layer ahead",
               hint: "Reads the next layer while the current layer runs. Uses extra memory.",
-              value: optionalToggle(\.nextLayerPrefetch, defaultValue: false))
+              value: optionalToggle(\.nextLayerPrefetch, defaultValue: true))
             .disabled(!settings.layerMajorPrefill || settings.batchedExpertPrefill == false)
           }
           if modelKind.descriptor.supports("packedKVCache") {
@@ -1981,7 +1981,7 @@ struct ModelAdvancedView: View {
           }
           if modelKind == .qwen3_8FlashNext {
             Divider()
-            Text(L10n.string("Experimental Qwen features. Speed improvements are not yet verified. Changes apply on next model load.", language: language))
+            Text(L10n.string("Speed improvements are not yet verified. Changes apply on next model load.", language: language))
               .font(.caption)
               .foregroundStyle(.secondary)
               .fixedSize(horizontal: false, vertical: true)
@@ -2364,7 +2364,7 @@ private struct LogsView: View {
 }
 
 struct SettingsView: View {
-  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = false
+  @AppStorage(ExpertCacheControl.slotsPreferenceKey) private var editCachesInSlots = true
   @Binding var languageCode: String
   let language: AppLanguage
   @ObservedObject var appUpdater: AppUpdater

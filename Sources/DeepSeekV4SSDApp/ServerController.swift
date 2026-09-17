@@ -242,9 +242,9 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var readWorkers = 4
   var prefetchReadWorkers: Int? = 2
   var moePrefillStepSize: Int? = 0
-  var readyExpertDecode: Bool? = false
-  var batchedExpertPrefill: Bool? = false
-  var nextLayerPrefetch: Bool? = false
+  var readyExpertDecode: Bool? = true
+  var batchedExpertPrefill: Bool? = true
+  var nextLayerPrefetch: Bool? = true
   var packedKVCache: Bool? = false
   var packedIndexCache: Bool? = false
   var candidateIndex: Bool? = false
@@ -254,7 +254,7 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
   var qwenAdaptiveSampling: Bool? = true
   var memoryLimitGiB = 0
   var prefillStepSize = 0
-  var layerMajorPrefill = false
+  var layerMajorPrefill = true
   var layerMajorPrefillThreshold: Int? = 1_024
   var promptCacheMode: PromptCacheMode?
   var promptCacheEntries = 2
@@ -299,23 +299,19 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
         settings.dsparkCacheGiB = ExpertMemory.defaultGiB(slots: 768, blobBytes: blob)
       }
     }
-    settings.layerMajorPrefill = false
+    settings.layerMajorPrefill = descriptor.supports("layerMajorPrefill")
+    settings.readyExpertDecode = descriptor.supports("readyExpertDecode")
+    settings.batchedExpertPrefill = descriptor.supports("batchedExpertPrefill")
+    settings.nextLayerPrefetch = descriptor.supports("nextLayerPrefetch")
     settings.promptCacheEntries = descriptor.defaults.promptCacheEntries
     settings.bf16KVCache = descriptor.defaults.bf16KVCache
     settings.defaultMaxTokens = descriptor.defaults.maxTokens
     settings.defaultTemperature = descriptor.defaults.temperature
     settings.defaultTopP = descriptor.defaults.topP
     settings.defaultTopK = descriptor.defaults.topK
-    if modelKind == .deepSeekV41 {
-      settings.layerMajorPrefill = true
-      settings.batchedExpertPrefill = true
-      settings.nextLayerPrefetch = true
-    }
     if modelKind == .qwen3_8FlashNext {
       // Adopt the 4K input / 1024 output speed profile; keep cache budgets unchanged.
       settings.readWorkers = 16
-      settings.readyExpertDecode = true
-      settings.layerMajorPrefill = true
       settings.prefillStepSize = 1_024
       settings.memoryLimitGiB = 30
       settings.qwenPooledIndexCache = true
@@ -333,8 +329,12 @@ struct ModelAdvancedSettings: Codable, Equatable, Sendable {
     let descriptor = modelKind.descriptor
     settings.promptCacheMode = descriptor.supports("promptCache")
       ? (settings.promptCacheMode ?? .memory) : .off
-    settings.readyExpertDecode = settings.readyExpertDecode ?? false
-    settings.batchedExpertPrefill = settings.batchedExpertPrefill ?? false
+    settings.readyExpertDecode = descriptor.supports("readyExpertDecode")
+      && (settings.readyExpertDecode ?? true)
+    settings.batchedExpertPrefill = descriptor.supports("batchedExpertPrefill")
+      && (settings.batchedExpertPrefill ?? true)
+    settings.nextLayerPrefetch = descriptor.supports("nextLayerPrefetch")
+      && (settings.nextLayerPrefetch ?? true)
     settings.packedKVCache = settings.packedKVCache ?? false
     settings.packedIndexCache = settings.packedIndexCache ?? false
     settings.prefetchReadWorkers = settings.prefetchReadWorkers ?? 2
